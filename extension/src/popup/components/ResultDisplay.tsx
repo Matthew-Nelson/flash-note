@@ -1,16 +1,5 @@
 import { useState } from 'react';
-
-interface GeneratedNote {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
-  metadata: {
-    model: string;
-    tokensUsed: number;
-    generationTimeMs: number;
-  };
-}
+import { type GeneratedNote } from '@/shared/schemas';
 
 interface ResultDisplayProps {
   note: GeneratedNote;
@@ -121,9 +110,11 @@ ${note.plan}`;
       </div>
 
       {/* Footer */}
-      <div className="px-4 py-2 border-t bg-gray-50 text-xs text-gray-500 text-center">
-        Generated in {(note.metadata.generationTimeMs / 1000).toFixed(1)}s
-      </div>
+      {note.metadata && (
+        <div className="px-4 py-2 border-t bg-gray-50 text-xs text-gray-500 text-center">
+          Generated in {(note.metadata.generationTimeMs / 1000).toFixed(1)}s
+        </div>
+      )}
     </div>
   );
 }

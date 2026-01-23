@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { storage, type StoredAuth } from '@/shared/storage';
+import { storage } from '@/shared/storage';
 import { api } from '@/shared/api';
 
 interface User {
   id: string;
   email: string;
   subscriptionStatus: string;
-  trialEndsAt: string;
+  trialEndsAt?: string | null;
 }
 
 export function useAuth() {

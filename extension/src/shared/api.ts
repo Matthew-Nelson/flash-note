@@ -1,4 +1,5 @@
-import { storage, type StoredAuth } from './storage';
+import { storage } from './storage';
+import type { AuthResponse, GenerateNoteInput, GeneratedNote } from './schemas';
 
 // Use localhost in development, production URL otherwise
 const API_BASE = import.meta.env.DEV
@@ -16,35 +17,6 @@ export class ApiError extends Error {
     super(message);
     this.name = 'ApiError';
   }
-}
-
-interface AuthResponse {
-  user: {
-    id: string;
-    email: string;
-    subscriptionStatus: string;
-    trialEndsAt: string;
-  };
-  accessToken: string;
-  refreshToken: string;
-}
-
-interface GenerateNoteInput {
-  noteType: string;
-  patientContext?: string;
-  quickNotes: string;
-}
-
-interface GeneratedNote {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
-  metadata: {
-    model: string;
-    tokensUsed: number;
-    generationTimeMs: number;
-  };
 }
 
 class ApiClient {

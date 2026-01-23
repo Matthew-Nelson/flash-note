@@ -2,7 +2,7 @@ interface User {
   id: string;
   email: string;
   subscriptionStatus: string;
-  trialEndsAt: string;
+  trialEndsAt?: string | null;
 }
 
 interface SettingsProps {
@@ -12,8 +12,10 @@ interface SettingsProps {
 
 export default function Settings({ user, onLogout }: SettingsProps) {
   const isTrialing = user.subscriptionStatus === 'trialing';
-  const trialEndsAt = new Date(user.trialEndsAt);
-  const daysLeft = Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
+  const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
+  const daysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   return (
     <div className="p-4 space-y-6">
@@ -50,7 +52,9 @@ export default function Settings({ user, onLogout }: SettingsProps) {
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Subscription</h2>
           <div className="bg-blue-50 rounded-lg p-4">
             <p className="text-sm text-blue-800 mb-3">
-              Your trial ends on {trialEndsAt.toLocaleDateString()}. Subscribe to continue using FlashNote.
+              {trialEndsAt
+                ? `Your trial ends on ${trialEndsAt.toLocaleDateString()}. Subscribe to continue using FlashNote.`
+                : 'Subscribe to continue using FlashNote.'}
             </p>
             <a
               href="https://flashnote.com/pricing"

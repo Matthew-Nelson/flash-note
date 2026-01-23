@@ -1,7 +1,8 @@
 import { config as dotenvConfig } from 'dotenv';
 import { z } from 'zod';
 
-dotenvConfig();
+// Load .env file, override any existing env vars to ensure local .env takes precedence
+dotenvConfig({ override: true });
 
 const envSchema = z.object({
   // Server

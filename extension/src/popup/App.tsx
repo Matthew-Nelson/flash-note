@@ -4,20 +4,9 @@ import LoginForm from './components/LoginForm';
 import NoteGenerator from './components/NoteGenerator';
 import ResultDisplay from './components/ResultDisplay';
 import Settings from './components/Settings';
+import { type GeneratedNote } from '@/shared/schemas';
 
 type View = 'generator' | 'result' | 'settings';
-
-interface GeneratedNote {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
-  metadata: {
-    model: string;
-    tokensUsed: number;
-    generationTimeMs: number;
-  };
-}
 
 export default function App() {
   const { user, isLoading, logout } = useAuth();

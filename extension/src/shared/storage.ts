@@ -1,12 +1,15 @@
+// User type with optional trialEndsAt to match backend response
+export interface StoredUser {
+  id: string;
+  email: string;
+  subscriptionStatus: string;
+  trialEndsAt?: string | null;
+}
+
 export interface StoredAuth {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    subscriptionStatus: string;
-    trialEndsAt: string;
-  };
+  user: StoredUser;
   expiresAt: number;
 }
 
