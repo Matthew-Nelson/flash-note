@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { buildSOAPPrompt, parseSOAPSections } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
+import { generateMockSOAPNote } from './mock-ai-service.js';
 import type { GeneratedNote, NoteType } from '../types/index.js';
 
 interface GeminiResponse {
@@ -38,6 +39,11 @@ class AIService {
     noteType: NoteType,
     patientContext?: string
   ): Promise<GeneratedNote> {
+    // Use mock response in development when USE_MOCK_AI is enabled
+    if (config.USE_MOCK_AI) {
+      return generateMockSOAPNote(quickNotes, noteType, patientContext);
+    }
+
     const startTime = Date.now();
 
     const prompt = buildSOAPPrompt(quickNotes, noteType, patientContext);
@@ -96,7 +102,7 @@ class AIService {
         throw new AppError(500, 'ai_error', 'Failed to generate note');
       }
 
-      return await response.json();
+      return (await response.json()) as GeminiResponse;
     } catch (error) {
       clearTimeout(timeoutId);
 

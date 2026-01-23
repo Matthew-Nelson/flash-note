@@ -23,6 +23,12 @@ const envSchema = z.object({
   GEMINI_TEMPERATURE: z.string().transform(Number).default('0.7'),
   GEMINI_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
+  // Development
+  USE_MOCK_AI: z
+    .string()
+    .transform((val) => val === 'true')
+    .default('false'),
+
   // Stripe
   STRIPE_SECRET_KEY: z.string().min(1),
   STRIPE_WEBHOOK_SECRET: z.string().min(1),
