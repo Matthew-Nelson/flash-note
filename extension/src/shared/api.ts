@@ -1,10 +1,10 @@
 import { storage } from './storage';
 import type { AuthResponse, GenerateNoteInput, GeneratedNote } from './schemas';
 
-// Use localhost in development, production URL otherwise
-const API_BASE = import.meta.env.DEV
-  ? 'http://localhost:4000'
-  : 'https://api.flashnote.com';
+// API URL is set via environment variables at build time
+// Development: VITE_API_URL=http://localhost:4000 (from .env.development)
+// Production: VITE_API_URL=https://api.flashnote.com (from .env.production)
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const ACCESS_TOKEN_EXPIRY_MS = 55 * 60 * 1000; // 55 minutes
 

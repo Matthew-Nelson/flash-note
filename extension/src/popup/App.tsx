@@ -9,7 +9,7 @@ import { type GeneratedNote } from '@/shared/schemas';
 type View = 'generator' | 'result' | 'settings';
 
 export default function App() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, login, register, logout } = useAuth();
   const [view, setView] = useState<View>('generator');
   const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
 
@@ -30,7 +30,7 @@ export default function App() {
   }
 
   if (!user) {
-    return <LoginForm />;
+    return <LoginForm onLogin={login} onRegister={register} />;
   }
 
   const handleNoteGenerated = (note: GeneratedNote) => {

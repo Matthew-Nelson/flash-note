@@ -1,5 +1,5 @@
 // FlashNote Background Service Worker
-// Handles extension lifecycle events
+// Handles extension lifecycle events and side panel
 
 // Log when the extension is installed or updated
 chrome.runtime.onInstalled.addListener((details) => {
@@ -10,7 +10,14 @@ chrome.runtime.onInstalled.addListener((details) => {
   }
 });
 
-// Handle messages from popup or content scripts
+// Open side panel when extension icon is clicked
+chrome.action.onClicked.addListener(async (tab) => {
+  if (tab.id) {
+    await chrome.sidePanel.open({ tabId: tab.id });
+  }
+});
+
+// Handle messages from side panel or content scripts
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'PING') {
     sendResponse({ type: 'PONG' });
@@ -42,9 +49,9 @@ function stopKeepAlive() {
   }
 }
 
-// Start keep-alive when popup opens
+// Start keep-alive when side panel connects
 chrome.runtime.onConnect.addListener((port) => {
-  if (port.name === 'popup') {
+  if (port.name === 'sidepanel') {
     startKeepAlive();
     port.onDisconnect.addListener(() => {
       stopKeepAlive();

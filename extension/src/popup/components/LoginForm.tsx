@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { useAuth } from '../hooks/useAuth';
 import { validateLogin, validateRegister } from '../../shared/schemas';
 
-export default function LoginForm() {
-  const { login, register } = useAuth();
+interface LoginFormProps {
+  onLogin: (email: string, password: string) => Promise<unknown>;
+  onRegister: (email: string, password: string) => Promise<unknown>;
+}
+
+export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,9 +31,9 @@ export default function LoginForm() {
 
     try {
       if (isSignUp) {
-        await register(email, password);
+        await onRegister(email, password);
       } else {
-        await login(email, password);
+        await onLogin(email, password);
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -48,7 +51,7 @@ export default function LoginForm() {
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-gray-900">FlashNote</h1>
         <p className="text-sm text-gray-600 mt-1">
-          AI-powered SOAP notes for PTs
+          AI-powered SOAP notes for PTs - TESTING
         </p>
       </div>
 

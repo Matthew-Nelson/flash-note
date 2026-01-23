@@ -8,15 +8,15 @@ function chromeExtensionPlugin() {
   return {
     name: 'chrome-extension-fix',
     closeBundle() {
-      const srcHtml = resolve(__dirname, 'dist/src/popup/index.html');
-      const destDir = resolve(__dirname, 'dist/popup');
+      const srcHtml = resolve(__dirname, 'dist/src/sidepanel/index.html');
+      const destDir = resolve(__dirname, 'dist/sidepanel');
       const destHtml = resolve(destDir, 'index.html');
 
       if (existsSync(srcHtml)) {
         // Read and fix the paths in the HTML
         let html = readFileSync(srcHtml, 'utf-8');
-        // Fix relative paths to be correct from popup/ directory
-        html = html.replace(/\.\.\/\.\.\/popup\//g, './');
+        // Fix relative paths to be correct from sidepanel/ directory
+        html = html.replace(/\.\.\/\.\.\/sidepanel\//g, './');
         html = html.replace(/\.\.\/\.\.\/assets\//g, '../assets/');
 
         if (!existsSync(destDir)) {
@@ -44,7 +44,7 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       input: {
-        popup: resolve(__dirname, 'src/popup/index.html'),
+        sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
         background: resolve(__dirname, 'src/background/service-worker.ts'),
       },
       output: {
@@ -52,7 +52,7 @@ export default defineConfig({
           if (chunk.name === 'background') {
             return 'background/service-worker.js';
           }
-          return 'popup/[name].js';
+          return 'sidepanel/[name].js';
         },
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
