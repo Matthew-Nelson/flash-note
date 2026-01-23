@@ -1,9 +1,39 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
+import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'fs';
+
+// Plugin to fix output paths for Chrome extension
+function chromeExtensionPlugin() {
+  return {
+    name: 'chrome-extension-fix',
+    closeBundle() {
+      const srcHtml = resolve(__dirname, 'dist/src/popup/index.html');
+      const destDir = resolve(__dirname, 'dist/popup');
+      const destHtml = resolve(destDir, 'index.html');
+
+      if (existsSync(srcHtml)) {
+        // Read and fix the paths in the HTML
+        let html = readFileSync(srcHtml, 'utf-8');
+        // Fix relative paths to be correct from popup/ directory
+        html = html.replace(/\.\.\/\.\.\/popup\//g, './');
+        html = html.replace(/\.\.\/\.\.\/assets\//g, '../assets/');
+
+        if (!existsSync(destDir)) {
+          mkdirSync(destDir, { recursive: true });
+        }
+        writeFileSync(destHtml, html);
+
+        // Clean up the src directory in dist
+        rmSync(resolve(__dirname, 'dist/src'), { recursive: true, force: true });
+      }
+    },
+  };
+}
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), chromeExtensionPlugin()],
+  base: './', // Use relative paths for Chrome extension
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -22,7 +52,7 @@ export default defineConfig({
           if (chunk.name === 'background') {
             return 'background/service-worker.js';
           }
-          return '[name]/[name].js';
+          return 'popup/[name].js';
         },
         chunkFileNames: 'chunks/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash][extname]',
