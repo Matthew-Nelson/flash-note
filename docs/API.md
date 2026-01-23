@@ -181,7 +181,7 @@ Authorization: Bearer <token>
     "assessment": "Patient demonstrating good progress...",
     "plan": "Continue current plan of care...",
     "metadata": {
-      "model": "gemini-2.0-flash",
+      "model": "gemini-2.5-flash",
       "tokensUsed": 847,
       "generationTimeMs": 1234
     }

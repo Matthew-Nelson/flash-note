@@ -10,7 +10,7 @@ FlashNote is an AI-powered browser extension that helps Physical Therapists gene
 
 ## Key Architecture Decisions
 
-- **LLM Provider**: Google Gemini (gemini-2.0-flash) - chosen for cost efficiency
+- **LLM Provider**: Google Gemini (gemini-2.5-flash) - chosen for cost efficiency
 - **Auth**: Custom JWT implementation (no third-party auth to avoid expensive BAAs)
 - **Database**: PostgreSQL with raw SQL queries (no ORM)
 - **EMR Integration**: Copy/paste only (v1) - no direct EMR integrations
