@@ -1,19 +1,6 @@
 import { useState } from 'react';
 import { api } from '@/shared/api';
-
-type NoteType = 'daily_note' | 'initial_eval' | 'progress_note' | 'discharge';
-
-interface GeneratedNote {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
-  metadata: {
-    model: string;
-    tokensUsed: number;
-    generationTimeMs: number;
-  };
-}
+import { validateGenerateNote, type NoteType, type GeneratedNote } from '@/shared/schemas';
 
 interface NoteGeneratorProps {
   onNoteGenerated: (note: GeneratedNote) => void;
@@ -30,26 +17,35 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const [noteType, setNoteType] = useState<NoteType>('daily_note');
   const [patientContext, setPatientContext] = useState('');
   const [quickNotes, setQuickNotes] = useState('');
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setErrors([]);
+
+    // Validate input with Zod
+    const validation = validateGenerateNote({
+      noteType,
+      patientContext: patientContext || undefined,
+      quickNotes,
+    });
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const result = await api.generateNote({
-        noteType,
-        patientContext: patientContext || undefined,
-        quickNotes,
-      });
+      const result = await api.generateNote(validation.data);
       onNoteGenerated(result);
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        setErrors([err.message]);
       } else {
-        setError('Failed to generate note');
+        setErrors(['Failed to generate note']);
       }
     } finally {
       setIsLoading(false);
@@ -116,10 +112,18 @@ e.g., reports 40% pain reduction. flex ROM 50->65. MFR lumbar paraspinals. grade
         </p>
       </div>
 
-      {/* Error */}
-      {error && (
+      {/* Errors */}
+      {errors.length > 0 && (
         <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
-          {error}
+          {errors.length === 1 ? (
+            errors[0]
+          ) : (
+            <ul className="list-disc list-inside space-y-1">
+              {errors.map((error, i) => (
+                <li key={i}>{error}</li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 

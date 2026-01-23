@@ -1,17 +1,29 @@
 import { useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { validateLogin, validateRegister } from '../../shared/schemas';
 
 export default function LoginForm() {
   const { login, register } = useAuth();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setErrors([]);
+
+    // Validate input with Zod
+    const validation = isSignUp
+      ? validateRegister({ email, password })
+      : validateLogin({ email, password });
+
+    if (!validation.success) {
+      setErrors(validation.errors);
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -22,9 +34,9 @@ export default function LoginForm() {
       }
     } catch (err) {
       if (err instanceof Error) {
-        setError(err.message);
+        setErrors([err.message]);
       } else {
-        setError('An unexpected error occurred');
+        setErrors(['An unexpected error occurred']);
       }
     } finally {
       setIsLoading(false);
@@ -72,9 +84,17 @@ export default function LoginForm() {
           />
         </div>
 
-        {error && (
+        {errors.length > 0 && (
           <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
-            {error}
+            {errors.length === 1 ? (
+              errors[0]
+            ) : (
+              <ul className="list-disc list-inside space-y-1">
+                {errors.map((error, i) => (
+                  <li key={i}>{error}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
