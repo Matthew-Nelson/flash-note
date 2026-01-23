@@ -1,0 +1,46 @@
+export interface StoredAuth {
+  accessToken: string;
+  refreshToken: string;
+  user: {
+    id: string;
+    email: string;
+    subscriptionStatus: string;
+    trialEndsAt: string;
+  };
+  expiresAt: number;
+}
+
+export interface StoredPreferences {
+  defaultNoteType: string;
+  lastUsedPatientContext: string;
+}
+
+export const storage = {
+  async getAuth(): Promise<StoredAuth | null> {
+    const result = await chrome.storage.local.get('auth');
+    return result.auth ?? null;
+  },
+
+  async setAuth(auth: StoredAuth): Promise<void> {
+    await chrome.storage.local.set({ auth });
+  },
+
+  async clearAuth(): Promise<void> {
+    await chrome.storage.local.remove('auth');
+  },
+
+  async getPreferences(): Promise<StoredPreferences> {
+    const result = await chrome.storage.local.get('preferences');
+    return result.preferences ?? {
+      defaultNoteType: 'daily_note',
+      lastUsedPatientContext: '',
+    };
+  },
+
+  async setPreferences(prefs: Partial<StoredPreferences>): Promise<void> {
+    const current = await this.getPreferences();
+    await chrome.storage.local.set({
+      preferences: { ...current, ...prefs },
+    });
+  },
+};
