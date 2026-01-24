@@ -17,12 +17,6 @@ export default {
           900: '#0c4a6e',
         },
       },
-      width: {
-        popup: '400px',
-      },
-      minHeight: {
-        popup: '500px',
-      },
     },
   },
   plugins: [],

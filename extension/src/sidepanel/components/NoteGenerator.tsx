@@ -82,7 +82,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 min-h-[400px] animate-fade-in">
+      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
         <div className="loading-indicator flex flex-col items-center gap-6">
           {/* Loading visual - adapts per theme */}
           <div className="relative">
@@ -139,18 +139,18 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
         <label htmlFor="patientContext" className="label block text-sm mb-1">
           Patient Context <span className="opacity-50">(optional)</span>
         </label>
-        <input
+        <textarea
           id="patientContext"
-          type="text"
           value={patientContext}
           onChange={(e) => setPatientContext(e.target.value)}
           maxLength={500}
-          className="input-field w-full px-3 py-2"
+          rows={2}
+          className="input-field w-full px-3 py-2 resize-y min-h-[60px]"
           placeholder="e.g., John, 52M, chronic LBP, visit 5/12"
         />
       </div>
 
-      {/* Quick Notes */}
+      {/* Session Notes */}
       <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
         <label htmlFor="quickNotes" className="label block text-sm mb-1">
           Session Notes
@@ -163,7 +163,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
           minLength={10}
           maxLength={5000}
           rows={8}
-          className="input-field w-full px-3 py-2 resize-none"
+          className="input-field w-full px-3 py-2 resize-y min-h-[120px]"
           placeholder="Enter your quick notes here...
 
 e.g., reports 40% pain reduction. flex ROM 50->65. MFR lumbar paraspinals. grade III mobs L4-5. HEP bridges 2x15, bird dogs 2x10. tolerated well."

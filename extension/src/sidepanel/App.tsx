@@ -25,7 +25,7 @@ function AppContent() {
 
   if (isLoading) {
     return (
-      <div className="app-container flex items-center justify-center min-h-[500px]">
+      <div className="app-container flex items-center justify-center flex-1">
         <div className="loading-indicator flex flex-col items-center gap-4">
           <div className="loading-orb" />
           <span className="text-sm opacity-70">Loading...</span>
@@ -48,7 +48,7 @@ function AppContent() {
   };
 
   return (
-    <div className="app-container flex flex-col min-h-[500px]">
+    <div className="app-container flex flex-col flex-1">
       {/* Header */}
       <header className="app-header flex items-center justify-between px-4 py-3">
         <h1 className="app-title text-lg font-semibold">FlashNote</h1>
@@ -84,7 +84,7 @@ function AppContent() {
 
       {/* Main content */}
       <main className="flex-1 overflow-auto">
-        <div className="animate-fade-in">
+        <div key={view} className="animate-fade-in">
           {view === 'settings' && <Settings user={user} onLogout={logout} />}
           {view === 'generator' && <NoteGenerator onNoteGenerated={handleNoteGenerated} />}
           {view === 'result' && generatedNote && (

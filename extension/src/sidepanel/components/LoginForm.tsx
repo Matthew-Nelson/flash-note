@@ -47,7 +47,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   };
 
   return (
-    <div className="app-container flex flex-col justify-center min-h-[500px] px-6 py-8">
+    <div className="app-container flex flex-col justify-center flex-1 px-6 py-8">
       <div className="text-center mb-8 animate-fade-in-up">
         <h1 className="app-title text-2xl font-bold">FlashNote</h1>
         <p className="text-sm opacity-70 mt-2">

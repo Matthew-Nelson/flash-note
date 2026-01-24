@@ -109,8 +109,8 @@ ${note.plan}`;
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b card-header">
+      {/* Action bar */}
+      <div className="flex items-center justify-between px-4 py-3">
         <button
           onClick={onBack}
           className="btn-secondary flex items-center text-sm px-3 py-1.5 rounded-lg"
