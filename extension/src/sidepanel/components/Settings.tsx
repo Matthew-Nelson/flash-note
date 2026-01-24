@@ -20,21 +20,21 @@ export default function Settings({ user, onLogout }: SettingsProps) {
   return (
     <div className="p-4 space-y-6">
       {/* Account Info */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Account</h2>
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+      <div className="animate-fade-in-up">
+        <h2 className="text-sm font-semibold mb-3">Account</h2>
+        <div className="card p-4 space-y-3">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Email</span>
-            <span className="text-gray-900">{user.email}</span>
+            <span className="opacity-60">Email</span>
+            <span>{user.email}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Status</span>
+            <span className="opacity-60">Status</span>
             <span className={`font-medium ${
               user.subscriptionStatus === 'active'
-                ? 'text-green-600'
+                ? 'status-active'
                 : isTrialing
-                  ? 'text-blue-600'
-                  : 'text-red-600'
+                  ? 'status-trial'
+                  : 'status-expired'
             }`}>
               {user.subscriptionStatus === 'active'
                 ? 'Active'
@@ -48,10 +48,10 @@ export default function Settings({ user, onLogout }: SettingsProps) {
 
       {/* Subscription */}
       {isTrialing && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Subscription</h2>
-          <div className="bg-blue-50 rounded-lg p-4">
-            <p className="text-sm text-blue-800 mb-3">
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <h2 className="text-sm font-semibold mb-3">Subscription</h2>
+          <div className="trial-banner rounded-lg p-4">
+            <p className="text-sm mb-3">
               {trialEndsAt
                 ? `Your trial ends on ${trialEndsAt.toLocaleDateString()}. Subscribe to continue using FlashNote.`
                 : 'Subscribe to continue using FlashNote.'}
@@ -60,7 +60,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
               href="https://flashnote.com/pricing"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-block w-full text-center py-2 px-4 bg-primary-600 text-white text-sm font-medium rounded-md hover:bg-primary-700"
+              className="btn-primary inline-block w-full text-center py-2 px-4 text-sm font-medium rounded-lg"
             >
               View Plans
             </a>
@@ -69,14 +69,14 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {user.subscriptionStatus === 'active' && (
-        <div>
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Subscription</h2>
-          <div className="bg-gray-50 rounded-lg p-4">
+        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+          <h2 className="text-sm font-semibold mb-3">Subscription</h2>
+          <div className="card p-4">
             <a
               href="https://flashnote.com/dashboard"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary-600 hover:text-primary-700"
+              className="link text-sm"
             >
               Manage subscription
             </a>
@@ -85,20 +85,20 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {/* Support */}
-      <div>
-        <h2 className="text-sm font-semibold text-gray-900 mb-3">Support</h2>
+      <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+        <h2 className="text-sm font-semibold mb-3">Support</h2>
         <div className="space-y-2">
           <a
             href="https://flashnote.com/help"
             target="_blank"
             rel="noopener noreferrer"
-            className="block text-sm text-gray-600 hover:text-gray-900"
+            className="link block text-sm"
           >
             Help Center
           </a>
           <a
             href="mailto:support@flashnote.com"
-            className="block text-sm text-gray-600 hover:text-gray-900"
+            className="link block text-sm"
           >
             Contact Support
           </a>
@@ -106,17 +106,17 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       </div>
 
       {/* Logout */}
-      <div className="pt-4 border-t">
+      <div className="pt-4 border-t animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
         <button
           onClick={onLogout}
-          className="w-full py-2 px-4 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md"
+          className="w-full py-2 px-4 text-sm font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
         >
           Sign Out
         </button>
       </div>
 
       {/* Version */}
-      <div className="text-center text-xs text-gray-400">
+      <div className="text-center text-xs opacity-40 animate-fade-in" style={{ animationDelay: '0.25s' }}>
         FlashNote v0.1.0
       </div>
     </div>
