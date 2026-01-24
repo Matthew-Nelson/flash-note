@@ -22,7 +22,8 @@ function StreamingSection({
   isCopied,
   label,
   icon,
-  delay = 0
+  delay = 0,
+  staggerClass = ''
 }: {
   content: string;
   onCopy: () => void;
@@ -30,6 +31,7 @@ function StreamingSection({
   label: string;
   icon: string;
   delay?: number;
+  staggerClass?: string;
 }) {
   const [shouldStream, setShouldStream] = useState(false);
   const { displayedText, isComplete } = useStreamingText(
@@ -42,12 +44,13 @@ function StreamingSection({
     return () => clearTimeout(timer);
   }, [delay]);
 
-  if (!shouldStream) {
-    return null;
-  }
-
   return (
-    <div className="card section-reveal overflow-hidden" style={{ animationDelay: `${delay}ms` }}>
+    <div
+      className={`card section-reveal overflow-hidden ${staggerClass} ${
+        shouldStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
+      }`}
+      aria-hidden={!shouldStream}
+    >
       <div className="card-header flex items-center justify-between">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <span>{icon}</span>
@@ -153,6 +156,7 @@ ${note.plan}`;
             onCopy={() => copyToClipboard(note[section.key], section.key)}
             isCopied={copiedSection === section.key}
             delay={index * 200}
+            staggerClass={`stagger-${index + 1}`}
           />
         ))}
       </div>

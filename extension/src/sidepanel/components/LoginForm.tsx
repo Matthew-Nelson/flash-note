@@ -55,7 +55,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up stagger-2">
         <div>
           <label htmlFor="email" className="label block text-sm mb-1">
             Email
@@ -122,7 +122,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         </button>
       </form>
 
-      <div className="mt-6 text-center animate-fade-in" style={{ animationDelay: '0.2s' }}>
+      <div className="mt-6 text-center animate-fade-in stagger-4">
         <button
           type="button"
           onClick={() => setIsSignUp(!isSignUp)}

@@ -135,7 +135,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
       </div>
 
       {/* Patient Context */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.05s' }}>
+      <div className="animate-fade-in-up stagger-1">
         <label htmlFor="patientContext" className="label block text-sm mb-1">
           Patient Context <span className="opacity-50">(optional)</span>
         </label>
@@ -151,7 +151,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
       </div>
 
       {/* Session Notes */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+      <div className="animate-fade-in-up stagger-2">
         <label htmlFor="quickNotes" className="label block text-sm mb-1">
           Session Notes
         </label>
@@ -189,7 +189,7 @@ e.g., reports 40% pain reduction. flex ROM 50->65. MFR lumbar paraspinals. grade
       )}
 
       {/* Submit */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+      <div className="animate-fade-in-up stagger-3">
         <button
           type="submit"
           disabled={isLoading || quickNotes.length < 10}

@@ -48,7 +48,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
 
       {/* Subscription */}
       {isTrialing && (
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+        <div className="animate-fade-in-up stagger-2">
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="trial-banner rounded-lg p-4">
             <p className="text-sm mb-3">
@@ -69,7 +69,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {user.subscriptionStatus === 'active' && (
-        <div className="animate-fade-in-up" style={{ animationDelay: '0.1s' }}>
+        <div className="animate-fade-in-up stagger-2">
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="card p-4">
             <a
@@ -85,7 +85,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {/* Support */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '0.15s' }}>
+      <div className="animate-fade-in-up stagger-3">
         <h2 className="text-sm font-semibold mb-3">Support</h2>
         <div className="space-y-2">
           <a
@@ -106,7 +106,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       </div>
 
       {/* Logout */}
-      <div className="pt-4 border-t animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
+      <div className="pt-4 border-t animate-fade-in-up stagger-4">
         <button
           onClick={onLogout}
           className="w-full py-2 px-4 text-sm font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -116,7 +116,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       </div>
 
       {/* Version */}
-      <div className="text-center text-xs opacity-40 animate-fade-in" style={{ animationDelay: '0.25s' }}>
+      <div className="text-center text-xs opacity-40 animate-fade-in stagger-5">
         FlashNote v0.1.0
       </div>
     </div>

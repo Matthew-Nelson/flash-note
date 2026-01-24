@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface UseStreamingTextOptions {
   speed?: number; // ms per character
@@ -13,6 +13,10 @@ export function useStreamingText(
   const [displayedText, setDisplayedText] = useState('');
   const [isComplete, setIsComplete] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
+
+  // Use ref to avoid restarting animation when onComplete changes
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
   useEffect(() => {
     if (!text) {
@@ -34,12 +38,12 @@ export function useStreamingText(
         setIsComplete(true);
         setIsStreaming(false);
         clearInterval(interval);
-        onComplete?.();
+        onCompleteRef.current?.();
       }
     }, speed);
 
     return () => clearInterval(interval);
-  }, [text, speed, onComplete]);
+  }, [text, speed]);
 
   const skipToEnd = useCallback(() => {
     setDisplayedText(text);
