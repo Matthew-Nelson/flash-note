@@ -21,7 +21,10 @@ export function requireAuth(
   const token = authHeader.slice(7);
 
   try {
-    const payload = jwt.verify(token, config.JWT_SECRET) as TokenPayload;
+    // SECURITY: Explicitly specify algorithm to prevent algorithm confusion attacks
+    const payload = jwt.verify(token, config.JWT_SECRET, {
+      algorithms: ['HS256'],
+    }) as TokenPayload;
     (req as AuthenticatedRequest).user = payload;
     next();
   } catch {

@@ -1,8 +1,17 @@
-import { config } from '../config.js';
+import { config, isProduction } from '../config.js';
 import { buildSOAPPrompt, parseSOAPSections } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateMockSOAPNote } from './mock-ai-service.js';
 import type { GeneratedNote, NoteType } from '../types/index.js';
+
+// SECURITY: Prevent mock AI from being used in production
+// This could result in fake clinical notes that could harm patients
+if (isProduction && config.USE_MOCK_AI) {
+  throw new Error(
+    'SECURITY ERROR: USE_MOCK_AI cannot be enabled in production. ' +
+    'Mock responses could generate fake clinical notes that harm patients.'
+  );
+}
 
 interface GeminiResponse {
   candidates: Array<{
@@ -69,7 +78,8 @@ class AIService {
   }
 
   private async callGemini(prompt: string): Promise<GeminiResponse> {
-    const url = `${this.apiUrl}/models/${this.model}:generateContent?key=${this.apiKey}`;
+    // SECURITY: API key moved to header instead of URL to prevent logging exposure
+    const url = `${this.apiUrl}/models/${this.model}:generateContent`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeout);
@@ -79,6 +89,7 @@ class AIService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey,
         },
         body: JSON.stringify({
           contents: [

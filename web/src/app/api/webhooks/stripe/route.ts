@@ -16,12 +16,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the webhook to the backend API
+    // SECURITY: Forward raw body without modifying Content-Type to preserve signature integrity
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
     const response = await fetch(`${backendUrl}/billing/webhook`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        // Forward the original content-type from Stripe for proper signature verification
+        'Content-Type': request.headers.get('content-type') || 'application/json',
         'Stripe-Signature': signature,
       },
       body,
