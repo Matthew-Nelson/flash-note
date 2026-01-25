@@ -15,8 +15,9 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement login
-      console.log('Login:', { email, password });
+      // TODO: Implement login - redirect to extension for now
+      // Login is handled by the Chrome extension, not the web app
+      setError('Please use the Chrome extension to log in');
     } catch (err) {
       setError('Invalid email or password');
     } finally {

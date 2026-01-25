@@ -1,16 +1,28 @@
-import { Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
+// Middleware to check subscription status
+// Must be used after requireAuth middleware
 export async function requireActiveSubscription(
-  req: AuthenticatedRequest,
+  req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
+    // This middleware expects requireAuth to have run first
+    const authenticatedReq = req as AuthenticatedRequest;
+    if (!authenticatedReq.user?.userId) {
+      res.status(401).json({
+        success: false,
+        error: { code: 'unauthorized', message: 'Authentication required' },
+      });
+      return;
+    }
+
     const result = await db.query(
       `SELECT subscription_status, trial_ends_at FROM users WHERE id = $1`,
-      [req.user.userId]
+      [authenticatedReq.user.userId]
     );
 
     const user = result.rows[0];

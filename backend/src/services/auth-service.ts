@@ -96,24 +96,29 @@ class AuthService {
   }
 
   private generateAccessToken(userId: string, email: string): string {
+    // SECURITY: Explicitly specify HS256 algorithm
     return jwt.sign(
       { userId, email } as TokenPayload,
       config.JWT_SECRET,
-      { expiresIn: ACCESS_TOKEN_EXPIRY }
+      { expiresIn: ACCESS_TOKEN_EXPIRY, algorithm: 'HS256' }
     );
   }
 
   private generateRefreshToken(userId: string): string {
+    // SECURITY: Explicitly specify HS256 algorithm
     return jwt.sign(
       { userId, type: 'refresh' },
       config.JWT_REFRESH_SECRET,
-      { expiresIn: REFRESH_TOKEN_EXPIRY }
+      { expiresIn: REFRESH_TOKEN_EXPIRY, algorithm: 'HS256' }
     );
   }
 
   private verifyRefreshToken(token: string): { userId: string } | null {
     try {
-      const payload = jwt.verify(token, config.JWT_REFRESH_SECRET) as {
+      // SECURITY: Explicitly specify algorithm to prevent algorithm confusion attacks
+      const payload = jwt.verify(token, config.JWT_REFRESH_SECRET, {
+        algorithms: ['HS256'],
+      }) as {
         userId: string;
         type: string;
       };

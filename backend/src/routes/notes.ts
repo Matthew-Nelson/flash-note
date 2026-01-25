@@ -12,7 +12,7 @@ export const notesRouter = Router();
 
 // All notes routes require authentication and active subscription
 notesRouter.use(requireAuth);
-notesRouter.use(requireActiveSubscription as any);
+notesRouter.use(requireActiveSubscription);
 notesRouter.use(generateRateLimit);
 
 // Validation schema
@@ -28,6 +28,7 @@ notesRouter.post('/generate', async (req, res, next) => {
     const { noteType, patientContext, quickNotes } = generateNoteSchema.parse(req.body);
     const { userId } = (req as AuthenticatedRequest).user;
     const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
 
     const result = await aiService.generateSOAPNote(
       quickNotes,
@@ -35,7 +36,7 @@ notesRouter.post('/generate', async (req, res, next) => {
       patientContext
     );
 
-    // Log audit (without PHI)
+    // Log audit (without PHI) - HIPAA compliant
     await auditService.log({
       userId,
       action: AuditAction.NOTE_GENERATED,
@@ -46,6 +47,7 @@ notesRouter.post('/generate', async (req, res, next) => {
         generationTimeMs: result.metadata.generationTimeMs,
       },
       ipAddress,
+      userAgent,
     });
 
     // Update usage tracking

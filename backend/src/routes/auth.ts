@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { authService } from '../services/auth-service.js';
 import { auditService } from '../services/audit-service.js';
-import { loginRateLimit, registerRateLimit } from '../middleware/rate-limit.js';
+import { loginRateLimit, registerRateLimit, refreshRateLimit } from '../middleware/rate-limit.js';
 import { requireAuth } from '../middleware/auth.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
@@ -34,6 +34,7 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
   try {
     const { email, password } = registerSchema.parse(req.body);
     const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
 
     const result = await authService.register(email, password);
 
@@ -42,6 +43,7 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
       action: AuditAction.REGISTER,
       status: 'SUCCESS',
       ipAddress,
+      userAgent,
     });
 
     res.status(201).json({
@@ -58,6 +60,7 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
     const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
 
     const result = await authService.login(email, password);
 
@@ -68,6 +71,7 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
         status: 'FAILURE',
         metadata: { email },
         ipAddress,
+        userAgent,
       });
 
       throw new AppError(401, 'invalid_credentials', 'Invalid email or password');
@@ -78,6 +82,7 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
       action: AuditAction.LOGIN,
       status: 'SUCCESS',
       ipAddress,
+      userAgent,
     });
 
     res.json({
@@ -90,7 +95,8 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
 });
 
 // POST /auth/refresh
-authRouter.post('/refresh', async (req, res, next) => {
+// SECURITY: Rate limited to prevent token enumeration attacks
+authRouter.post('/refresh', refreshRateLimit, async (req, res, next) => {
   try {
     const { refreshToken } = refreshSchema.parse(req.body);
 
@@ -114,6 +120,7 @@ authRouter.post('/logout', requireAuth, async (req, res, next) => {
   try {
     const { userId } = (req as AuthenticatedRequest).user;
     const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
 
     await authService.logout(userId);
 
@@ -122,6 +129,7 @@ authRouter.post('/logout', requireAuth, async (req, res, next) => {
       action: AuditAction.LOGOUT,
       status: 'SUCCESS',
       ipAddress,
+      userAgent,
     });
 
     res.json({

@@ -55,3 +55,18 @@ export const generateRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// SECURITY: Rate limit for refresh token endpoint to prevent enumeration attacks
+export const refreshRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30, // 30 refresh attempts per window
+  message: {
+    success: false,
+    error: {
+      code: 'too_many_attempts',
+      message: 'Too many refresh attempts. Please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
