@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validateLogin, validateRegister } from '../../shared/schemas';
+import { validateLogin, validateRegister } from '@/shared/schemas';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<unknown>;
@@ -47,17 +47,17 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   };
 
   return (
-    <div className="flex flex-col justify-center min-h-[500px] px-6 py-8">
-      <div className="text-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">FlashNote</h1>
-        <p className="text-sm text-gray-600 mt-1">
-          AI-powered SOAP notes for PTs - TESTING
+    <div className="app-container flex flex-col justify-center flex-1 px-6 py-8">
+      <div className="text-center mb-8 animate-fade-in-up">
+        <h1 className="app-title text-2xl font-bold">FlashNote</h1>
+        <p className="text-sm opacity-70 mt-2">
+          AI-powered SOAP notes for PTs
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up stagger-2">
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="email" className="label block text-sm mb-1">
             Email
           </label>
           <input
@@ -66,13 +66,13 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            className="input-field w-full px-3 py-2"
             placeholder="you@clinic.com"
           />
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+          <label htmlFor="password" className="label block text-sm mb-1">
             Password
           </label>
           <input
@@ -82,13 +82,13 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={8}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            className="input-field w-full px-3 py-2"
             placeholder={isSignUp ? 'Min 8 chars, 1 uppercase, 1 number' : '********'}
           />
         </div>
 
         {errors.length > 0 && (
-          <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
+          <div className="error-message text-sm px-3 py-2 animate-fade-in">
             {errors.length === 1 ? (
               errors[0]
             ) : (
@@ -104,11 +104,11 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="btn-primary w-full flex justify-center py-3 px-4 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center">
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
@@ -122,11 +122,11 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         </button>
       </form>
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 text-center animate-fade-in stagger-4">
         <button
           type="button"
           onClick={() => setIsSignUp(!isSignUp)}
-          className="text-sm text-primary-600 hover:text-primary-500"
+          className="link text-sm"
         >
           {isSignUp
             ? 'Already have an account? Sign in'
