@@ -50,6 +50,7 @@ export const storedUserSchema = z.object({
 export const storedAuthSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
+  csrfToken: z.string(),
   user: storedUserSchema,
   expiresAt: z.number(),
 });
@@ -71,6 +72,7 @@ export const authResponseSchema = z.object({
   user: storedUserSchema,
   accessToken: z.string(),
   refreshToken: z.string(),
+  csrfToken: z.string(),
 });
 
 export const generatedNoteSchema = z.object({

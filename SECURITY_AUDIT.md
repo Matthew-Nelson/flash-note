@@ -1,6 +1,6 @@
 # FlashNote Security Audit Report
 
-**Date:** January 2026 (Updated January 27, 2026)
+**Date:** January 2026 (Updated January 28, 2026)
 **Auditor:** Security Review
 **Scope:** Full codebase audit (backend, extension, web)
 **Classification:** HIPAA-regulated healthcare application
@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 5 | 6 | 0 |
+| HIGH | 9 | 6 | 5 | 0 |
 | MEDIUM | 8 | 2 | 6 | 1 |
 | LOW | 5 | 0 | 5 | 0 |
 
@@ -99,16 +99,43 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 ---
 
 ### HIGH-002: Missing CSRF Protection
-**Status:** OPEN
-**File:** `backend/src/index.ts`
+**Status:** RESOLVED
+**File:** `backend/src/middleware/csrf.ts`
 **Severity:** HIGH
 **CVSS:** 6.5
 
-No CSRF tokens are implemented for state-changing operations.
+**Original Issue:** No CSRF tokens were implemented for state-changing operations.
 
-**Risk:** Attackers could trick authenticated users into performing unwanted actions via malicious websites.
+**Resolution:** Implemented stateless signed CSRF token system:
 
-**Fix:** Implement CSRF protection using `csurf` middleware or SameSite cookies with Strict mode.
+**Token Design:**
+- Format: `base64url(userId:timestamp:hmac_signature)`
+- HMAC-SHA256 signed using JWT_SECRET
+- 24-hour expiry window
+- User-bound (token userId must match authenticated user)
+- Timing-safe comparison to prevent timing attacks
+
+**Protected Endpoints:**
+- `POST /notes/generate` - Core functionality
+- `POST /billing/checkout` - Financial operations
+- `POST /billing/portal` - Financial operations
+- `POST /auth/logout` - Session destruction
+
+**Implementation Files:**
+- `backend/src/middleware/csrf.ts` - Token generation, validation, and middleware
+- `backend/src/services/auth-service.ts` - CSRF token included in auth responses
+- `backend/src/routes/notes.ts` - `requireCsrf` middleware applied
+- `backend/src/routes/billing.ts` - `requireCsrf` on /checkout and /portal
+- `backend/src/routes/auth.ts` - `requireCsrf` on /logout
+- `extension/src/shared/storage.ts` - csrfToken stored with auth data
+- `extension/src/shared/schemas.ts` - csrfToken added to schemas
+- `extension/src/shared/api.ts` - X-CSRF-Token header included in requests
+
+**Why This Approach:**
+- No database changes required (stateless)
+- Works with Bearer token architecture
+- Defense-in-depth against XSS+CSRF chain attacks
+- Meets HIPAA expectation for layered security controls
 
 ---
 
@@ -520,7 +547,7 @@ No automated dependency vulnerability scanning configured.
 ## Recommended Remediation Priority
 
 ### Before Production
-1. **HIGH-002:** CSRF protection
+1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
 2. **HIGH-003:** Content Security Policy
 3. **HIGH-005:** Account lockout mechanism
 
@@ -549,6 +576,7 @@ No automated dependency vulnerability scanning configured.
 |------|---------|
 | January 2026 | Initial audit completed |
 | January 27, 2026 | **Major remediation update:** All critical issues (CRITICAL-001 through CRITICAL-004) resolved. Resolved HIGH-004, HIGH-008, HIGH-009, HIGH-010, HIGH-011, MEDIUM-001, MEDIUM-009. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. Key fixes: removed PHI persistence in extension storage, added comprehensive audit logging for auth/access failures and note generation failures. |
+| January 28, 2026 | **Resolved HIGH-002 (CSRF Protection):** Implemented stateless signed CSRF tokens with HMAC-SHA256 signatures. Protected all state-changing endpoints (notes/generate, billing/checkout, billing/portal, auth/logout). Extension updated to store and send X-CSRF-Token header. Tokens are user-bound, time-limited (24h), and validated with timing-safe comparison. |
 
 ---
 
@@ -558,6 +586,7 @@ Significant progress has been made on security remediation. All critical vulnera
 
 **Remaining Priority Items:**
 - All HIPAA-critical audit logging issues have been resolved
-- 6 original HIGH severity issues remain open (access controls, CSRF, CSP)
+- CSRF protection now implemented (HIGH-002 resolved)
+- 5 original HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding)
 
-**Recommended Action:** Proceed with remaining HIGH severity items (CSRF protection, CSP, account lockout) before production deployment. The HIPAA audit requirements are now satisfied.
+**Recommended Action:** Proceed with remaining HIGH severity items (CSP, account lockout) before production deployment. The HIPAA audit requirements are now satisfied, and defense-in-depth is improved with CSRF protection.

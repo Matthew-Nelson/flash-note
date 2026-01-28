@@ -4,6 +4,7 @@ import { config } from '../config.js';
 import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUser } from '../db/queries/users.js';
 import { AppError } from '../middleware/error-handler.js';
+import { generateCsrfToken } from '../middleware/csrf.js';
 import type { TokenPayload, User } from '../types/index.js';
 
 const BCRYPT_ROUNDS = 12;
@@ -36,6 +37,7 @@ class AuthService {
       user: this.sanitizeUser(user),
       accessToken,
       refreshToken,
+      csrfToken: generateCsrfToken(user.id),
     };
   }
 
@@ -57,6 +59,7 @@ class AuthService {
       user: this.sanitizeUser(user),
       accessToken,
       refreshToken,
+      csrfToken: generateCsrfToken(user.id),
     };
   }
 
@@ -87,6 +90,7 @@ class AuthService {
       user: this.sanitizeUser(user),
       accessToken: newAccessToken,
       refreshToken: newRefreshToken,
+      csrfToken: generateCsrfToken(user.id),
     };
   }
 

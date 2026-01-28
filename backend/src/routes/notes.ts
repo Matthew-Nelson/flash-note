@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
+import { requireCsrf } from '../middleware/csrf.js';
 import { requireActiveSubscription } from '../middleware/subscription.js';
 import { generateRateLimit } from '../middleware/rate-limit.js';
 import { aiService } from '../services/ai-service.js';
@@ -11,8 +12,9 @@ import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
 export const notesRouter = Router();
 
-// All notes routes require authentication and active subscription
+// All notes routes require authentication, CSRF validation, and active subscription
 notesRouter.use(requireAuth);
+notesRouter.use(requireCsrf);
 notesRouter.use(requireActiveSubscription);
 notesRouter.use(generateRateLimit);
 
