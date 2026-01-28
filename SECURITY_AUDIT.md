@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 4 | 6 | 1 |
+| HIGH | 9 | 5 | 6 | 0 |
 | MEDIUM | 8 | 1 | 7 | 2 |
 | LOW | 5 | 0 | 5 | 0 |
 
@@ -255,38 +255,22 @@ Patient context now only exists in React component state during the active sessi
 ---
 
 ### HIGH-011: Authorization Failures Not Audited
-**Status:** OPEN
-**Files:** `backend/src/middleware/auth.ts:14-18,31-34`, `backend/src/middleware/subscription.ts`
+**Status:** RESOLVED
+**Files:** `backend/src/middleware/auth.ts`, `backend/src/middleware/subscription.ts`
 **Severity:** HIGH
 **CVSS:** 5.0
 
-Authorization failures return error responses but are NOT logged to the audit system:
-- Missing token (401)
-- Invalid/expired token (401)
-- Subscription expired (403)
-- Trial ended (403)
+**Original Issue:** Authorization failures returned error responses but were NOT logged to the audit system.
 
-**Risk:** HIPAA violation - incomplete audit trail. Cannot detect:
-- Brute force attempts
-- Compromised token usage
-- Unauthorized access patterns
+**Resolution:** Added audit logging for all authorization failure scenarios:
+- `AUTH_FAILED` action logged in auth middleware for missing/invalid tokens
+- `ACCESS_DENIED` action logged in subscription middleware for:
+  - Missing user context
+  - User not found
+  - Trial expired
+  - Subscription required
 
-**HIPAA Requirement Violated:** "Log ALL authorization failures (access denied events)"
-
-**Fix:** Add audit logging to auth middleware:
-```typescript
-if (!authHeader?.startsWith('Bearer ')) {
-  await auditService.log({
-    userId: null,
-    action: AuditAction.AUTH_FAILED,
-    status: 'FAILURE',
-    metadata: { reason: 'missing_token' },
-    ipAddress: req.ip,
-    userAgent: req.get('user-agent'),
-  });
-  // ... return 401
-}
-```
+All audit entries include userId (when available), reason, path, IP address, and user-agent.
 
 ---
 
@@ -539,7 +523,7 @@ No automated dependency vulnerability scanning configured.
 | Requirement | Status | Notes |
 |-------------|--------|-------|
 | Access Controls | PARTIAL | Missing MFA, account lockout |
-| Audit Controls | PARTIAL | Auth failures and generation failures not logged (HIGH-011, MEDIUM-009) |
+| Audit Controls | PARTIAL | Generation failures not logged (MEDIUM-009); auth failures now logged (HIGH-011 resolved) |
 | Transmission Security | PASS | TLS enforced |
 | PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
 | Unique User IDs | PASS | UUID-based |
@@ -552,8 +536,7 @@ No automated dependency vulnerability scanning configured.
 ## Recommended Remediation Priority
 
 ### Immediate (HIPAA Critical)
-1. **HIGH-011:** Audit authorization failures - *HIPAA audit requirement*
-2. **MEDIUM-009:** Audit note generation failures - *HIPAA audit requirement*
+1. **MEDIUM-009:** Audit note generation failures - *HIPAA audit requirement*
 
 ### Before Production
 1. **HIGH-002:** CSRF protection
@@ -586,6 +569,7 @@ No automated dependency vulnerability scanning configured.
 | January 2026 | Initial audit completed |
 | January 27, 2026 | Updated to reflect remediation status. Marked CRITICAL-001 through CRITICAL-004 as RESOLVED. Marked HIGH-004, HIGH-008, HIGH-009, MEDIUM-001 as RESOLVED. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. |
 | January 27, 2026 | HIGH-010 RESOLVED: Removed `lastUsedPatientContext` field from extension storage schema to prevent PHI persistence. |
+| January 27, 2026 | HIGH-011 RESOLVED: Added audit logging for all authorization failures in auth and subscription middleware. |
 
 ---
 
@@ -594,8 +578,8 @@ No automated dependency vulnerability scanning configured.
 Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
 
 **Remaining Priority Items:**
-- 2 HIPAA audit logging issues require immediate attention (HIGH-011, MEDIUM-009)
+- 1 HIPAA audit logging issue requires immediate attention (MEDIUM-009)
 - 6 original HIGH severity issues remain open (access controls, CSRF, CSP)
-- Production deployment should wait until HIGH-011 and MEDIUM-009 are resolved
+- Production deployment should wait until MEDIUM-009 is resolved
 
-**Recommended Action:** Address the HIPAA audit logging gaps (HIGH-011, MEDIUM-009) immediately. These are compliance requirements, not optional hardening. Then proceed with remaining HIGH severity items before production deployment.
+**Recommended Action:** Address the remaining HIPAA audit logging gap (MEDIUM-009) immediately. Then proceed with remaining HIGH severity items before production deployment.

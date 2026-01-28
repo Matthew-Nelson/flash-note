@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
-import type { AuthenticatedRequest } from '../types/index.js';
+import { auditService } from '../services/audit-service.js';
+import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 
 // Middleware to check subscription status
 // Must be used after requireAuth middleware
@@ -9,10 +10,21 @@ export async function requireActiveSubscription(
   res: Response,
   next: NextFunction
 ): Promise<void> {
+  const ipAddress = req.ip || req.socket.remoteAddress;
+  const userAgent = req.get('user-agent');
+
   try {
     // This middleware expects requireAuth to have run first
     const authenticatedReq = req as AuthenticatedRequest;
     if (!authenticatedReq.user?.userId) {
+      await auditService.log({
+        userId: null,
+        action: AuditAction.ACCESS_DENIED,
+        status: 'FAILURE',
+        metadata: { reason: 'unauthorized', path: req.path },
+        ipAddress,
+        userAgent,
+      });
       res.status(401).json({
         success: false,
         error: { code: 'unauthorized', message: 'Authentication required' },
@@ -20,13 +32,23 @@ export async function requireActiveSubscription(
       return;
     }
 
+    const userId = authenticatedReq.user.userId;
+
     const result = await db.query(
       `SELECT subscription_status, trial_ends_at FROM users WHERE id = $1`,
-      [authenticatedReq.user.userId]
+      [userId]
     );
 
     const user = result.rows[0];
     if (!user) {
+      await auditService.log({
+        userId,
+        action: AuditAction.ACCESS_DENIED,
+        status: 'FAILURE',
+        metadata: { reason: 'user_not_found', path: req.path },
+        ipAddress,
+        userAgent,
+      });
       res.status(401).json({
         success: false,
         error: { code: 'user_not_found', message: 'User not found' },
@@ -41,6 +63,14 @@ export async function requireActiveSubscription(
         return;
       }
       // Trial expired
+      await auditService.log({
+        userId,
+        action: AuditAction.ACCESS_DENIED,
+        status: 'FAILURE',
+        metadata: { reason: 'trial_expired', path: req.path },
+        ipAddress,
+        userAgent,
+      });
       res.status(402).json({
         success: false,
         error: {
@@ -58,6 +88,14 @@ export async function requireActiveSubscription(
     }
 
     // Not subscribed
+    await auditService.log({
+      userId,
+      action: AuditAction.ACCESS_DENIED,
+      status: 'FAILURE',
+      metadata: { reason: 'subscription_required', subscriptionStatus: user.subscription_status, path: req.path },
+      ipAddress,
+      userAgent,
+    });
     res.status(402).json({
       success: false,
       error: {
