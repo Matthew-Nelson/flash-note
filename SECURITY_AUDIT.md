@@ -548,10 +548,7 @@ No automated dependency vulnerability scanning configured.
 | Date | Changes |
 |------|---------|
 | January 2026 | Initial audit completed |
-| January 27, 2026 | Updated to reflect remediation status. Marked CRITICAL-001 through CRITICAL-004 as RESOLVED. Marked HIGH-004, HIGH-008, HIGH-009, MEDIUM-001 as RESOLVED. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. |
-| January 27, 2026 | HIGH-010 RESOLVED: Removed `lastUsedPatientContext` field from extension storage schema to prevent PHI persistence. |
-| January 27, 2026 | HIGH-011 RESOLVED: Added audit logging for all authorization failures in auth and subscription middleware. |
-| January 27, 2026 | MEDIUM-009 RESOLVED: Added audit logging for note generation failures in notes route. |
+| January 27, 2026 | **Major remediation update:** All critical issues (CRITICAL-001 through CRITICAL-004) resolved. Resolved HIGH-004, HIGH-008, HIGH-009, HIGH-010, HIGH-011, MEDIUM-001, MEDIUM-009. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. Key fixes: removed PHI persistence in extension storage, added comprehensive audit logging for auth/access failures and note generation failures. |
 
 ---
 

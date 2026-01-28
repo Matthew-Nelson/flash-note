@@ -3,26 +3,29 @@ import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { auditService } from '../services/audit-service.js';
 import { AuditAction, type TokenPayload, type AuthenticatedRequest } from '../types/index.js';
+import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
-export async function requireAuth(
+export function requireAuth(
   req: Request,
   res: Response,
   next: NextFunction
-): Promise<void> {
+): void {
   const authHeader = req.headers.authorization;
-  const ipAddress = req.ip || req.socket.remoteAddress;
-  const userAgent = req.get('user-agent');
+  const { ipAddress, userAgent } = getRequestMetadata(req);
 
   if (!authHeader?.startsWith('Bearer ')) {
-    // HIPAA: Log all authorization failures
-    await auditService.log({
-      userId: null,
-      action: AuditAction.AUTH_FAILED,
-      status: 'FAILURE',
-      metadata: { reason: 'missing_token', path: req.path },
-      ipAddress,
-      userAgent,
-    });
+    // HIPAA: Log all authorization failures (non-blocking)
+    safeAuditLog(
+      auditService.log({
+        userId: null,
+        action: AuditAction.AUTH_FAILED,
+        status: 'FAILURE',
+        metadata: { reason: 'missing_token', path: req.path },
+        ipAddress,
+        userAgent,
+      }),
+      'auth:missing_token'
+    );
     res.status(401).json({
       success: false,
       error: { code: 'missing_token', message: 'Authorization header required' },
@@ -40,15 +43,18 @@ export async function requireAuth(
     (req as AuthenticatedRequest).user = payload;
     next();
   } catch {
-    // HIPAA: Log all authorization failures
-    await auditService.log({
-      userId: null,
-      action: AuditAction.AUTH_FAILED,
-      status: 'FAILURE',
-      metadata: { reason: 'invalid_token', path: req.path },
-      ipAddress,
-      userAgent,
-    });
+    // HIPAA: Log all authorization failures (non-blocking)
+    safeAuditLog(
+      auditService.log({
+        userId: null,
+        action: AuditAction.AUTH_FAILED,
+        status: 'FAILURE',
+        metadata: { reason: 'invalid_token', path: req.path },
+        ipAddress,
+        userAgent,
+      }),
+      'auth:invalid_token'
+    );
     res.status(401).json({
       success: false,
       error: { code: 'invalid_token', message: 'Invalid or expired token' },
