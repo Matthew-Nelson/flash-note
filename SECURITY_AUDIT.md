@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 7 | 4 | 2 |
+| HIGH | 9 | 8 | 3 | 2 |
 | MEDIUM | 8 | 2 | 6 | 5 |
 | LOW | 5 | 0 | 5 | 2 |
 
@@ -140,29 +140,19 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 ---
 
 ### HIGH-003: No Content Security Policy
-**Status:** OPEN
-**File:** `backend/src/index.ts:14`
+**Status:** RESOLVED
+**File:** `backend/src/index.ts:14-24`
 **Severity:** HIGH
 **CVSS:** 6.1
 
-Helmet is enabled but CSP is not configured.
+**Original Issue:** Helmet was enabled but CSP was not configured.
 
-**Risk:** XSS attacks could execute arbitrary JavaScript, potentially stealing tokens or PHI.
+**Resolution:** Implemented CSP appropriate for a JSON REST API:
+- `defaultSrc: ["'none'"]` - API serves no renderable content
+- `frameAncestors: ["'none'"]` - Prevent embedding in iframes (clickjacking protection)
+- HSTS enabled with 1-year max-age, includeSubDomains, and preload
 
-**Fix:** Configure strict CSP headers in Helmet configuration:
-```typescript
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:"],
-      connectSrc: ["'self'", config.API_URL],
-    },
-  },
-}));
-```
+**Note:** Extensive CSP directives (scriptSrc, styleSrc, etc.) are not necessary for a pure JSON API since those directives only apply when browsers render HTML content. Helmet's defaults handle other security headers (X-Frame-Options, X-Content-Type-Options, etc.).
 
 ---
 
@@ -819,7 +809,7 @@ app.use(express.json({ limit: '100kb' }));
 ### Before Production (DoS & Security Hardening)
 1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
 2. ~~**HIGH-013:** Query statement timeout (DoS prevention)~~ RESOLVED
-3. **HIGH-003:** Content Security Policy
+3. ~~**HIGH-003:** Content Security Policy~~ RESOLVED
 4. **HIGH-005:** Account lockout mechanism
 
 ### Short-term (Security Hardening)
@@ -855,6 +845,7 @@ app.use(express.json({ limit: '100kb' }));
 | January 28, 2026 | **Resolved HIGH-002 (CSRF Protection):** Implemented stateless signed CSRF tokens with HMAC-SHA256 signatures. Protected all state-changing endpoints (notes/generate, billing/checkout, billing/portal, auth/logout). Extension updated to store and send X-CSRF-Token header. Tokens are user-bound, time-limited (24h), and validated with timing-safe comparison. |
 | January 28, 2026 | **Code Review - New Findings:** Added 2 HIGH (HIGH-012: email in audit logs, HIGH-013: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 2 LOW (LOW-006: magic strings, LOW-007: implicit body size limit). Body size limit downgraded from HIGH to LOW as Express defaults to 100KB - fix is for explicitness only. |
 | January 28, 2026 | **Resolved HIGH-013 (Query Statement Timeout):** Added 30-second `statement_timeout` to database pool configuration. Prevents DoS attacks via long-running queries exhausting connection pool. |
+| January 28, 2026 | **Resolved HIGH-003 (Content Security Policy):** Configured CSP appropriate for JSON API: `defaultSrc: 'none'` (no renderable content), `frameAncestors: 'none'` (clickjacking protection). Enabled HSTS with 1-year max-age, includeSubDomains, and preload. |
 
 ---
 
@@ -866,7 +857,7 @@ Significant progress has been made on security remediation. All critical vulnera
 | Severity | Open | New (This Review) |
 |----------|------|-------------------|
 | CRITICAL | 0 | 0 |
-| HIGH | 6 | 1 |
+| HIGH | 5 | 1 |
 | MEDIUM | 11 | 5 |
 | LOW | 7 | 2 |
 
@@ -874,11 +865,12 @@ Significant progress has been made on security remediation. All critical vulnera
 - All HIPAA-critical audit logging issues have been resolved
 - CSRF protection implemented (HIGH-002 resolved)
 - Query statement timeout implemented (HIGH-013 resolved) - DoS prevention now in place
+- Content Security Policy implemented (HIGH-003 resolved) - XSS defense-in-depth
 - **Remaining:** PHI/PII logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
-- 6 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, email in logs)
+- 5 HIGH severity issues remain open (access controls, account lockout, email verification, device binding, email in logs)
 
 **Recommended Action:**
-1. **Before Production:** HIGH-003 (CSP), HIGH-005 (account lockout)
+1. **Before Production:** HIGH-005 (account lockout)
 2. **Short-term:** Address PII/PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
 
 **Priority Discussion:**

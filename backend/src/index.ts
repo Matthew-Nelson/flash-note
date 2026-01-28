@@ -11,7 +11,21 @@ import { billingRouter } from './routes/billing.js';
 const app: Express = express();
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    hsts: {
+      maxAge: 31536000, // 1 year
+      includeSubDomains: true,
+      preload: true,
+    },
+  })
+);
 app.use(cors({
   origin: config.NODE_ENV === 'production'
     ? [config.WEB_URL]
