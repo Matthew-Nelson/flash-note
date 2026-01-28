@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 6 | 5 | 2 |
+| HIGH | 9 | 7 | 4 | 2 |
 | MEDIUM | 8 | 2 | 6 | 5 |
 | LOW | 5 | 0 | 5 | 2 |
 
@@ -330,37 +330,25 @@ await auditService.log({
 ---
 
 ### HIGH-013: No Query Statement Timeout (formerly HIGH-014)
-**Status:** OPEN
-**File:** `backend/src/db/index.ts:6-11`
+**Status:** RESOLVED
+**File:** `backend/src/db/index.ts:6-12`
 **Severity:** HIGH
 **CVSS:** 6.0
 
-The database connection pool has connection timeout but individual queries have no statement timeout:
-```typescript
-export const db = new Pool({
-  connectionString: config.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,  // Only for establishing connection
-});
-```
+**Original Issue:** The database connection pool had connection timeout but individual queries had no statement timeout. Long-running or malicious queries could exhaust the connection pool (20 connections), causing denial of service for all users.
 
-**Risk:** Long-running or malicious queries could exhaust the connection pool (20 connections), causing denial of service for all users.
-
-**Relation to MEDIUM-004:** This is distinct from MEDIUM-004 (connection error handling). MEDIUM-004 addresses reconnection logic; this addresses query-level resource exhaustion.
-
-**Fix:** Add statement timeout via connection string or pool configuration:
+**Resolution:** Added 30-second `statement_timeout` to the database pool configuration:
 ```typescript
 export const db = new Pool({
   connectionString: config.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
-  statement_timeout: 30000,  // 30 second query timeout
+  statement_timeout: 30000,
 });
 ```
 
-Or add to connection string: `?statement_timeout=30000`
+PostgreSQL will now terminate any query exceeding 30 seconds, immediately releasing the connection back to the pool and preventing resource exhaustion attacks.
 
 ---
 
@@ -830,7 +818,7 @@ app.use(express.json({ limit: '100kb' }));
 
 ### Before Production (DoS & Security Hardening)
 1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
-2. **HIGH-013:** Query statement timeout (DoS prevention)
+2. ~~**HIGH-013:** Query statement timeout (DoS prevention)~~ RESOLVED
 3. **HIGH-003:** Content Security Policy
 4. **HIGH-005:** Account lockout mechanism
 
@@ -866,6 +854,7 @@ app.use(express.json({ limit: '100kb' }));
 | January 27, 2026 | **Major remediation update:** All critical issues (CRITICAL-001 through CRITICAL-004) resolved. Resolved HIGH-004, HIGH-008, HIGH-009, HIGH-010, HIGH-011, MEDIUM-001, MEDIUM-009. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. Key fixes: removed PHI persistence in extension storage, added comprehensive audit logging for auth/access failures and note generation failures. |
 | January 28, 2026 | **Resolved HIGH-002 (CSRF Protection):** Implemented stateless signed CSRF tokens with HMAC-SHA256 signatures. Protected all state-changing endpoints (notes/generate, billing/checkout, billing/portal, auth/logout). Extension updated to store and send X-CSRF-Token header. Tokens are user-bound, time-limited (24h), and validated with timing-safe comparison. |
 | January 28, 2026 | **Code Review - New Findings:** Added 2 HIGH (HIGH-012: email in audit logs, HIGH-013: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 2 LOW (LOW-006: magic strings, LOW-007: implicit body size limit). Body size limit downgraded from HIGH to LOW as Express defaults to 100KB - fix is for explicitness only. |
+| January 28, 2026 | **Resolved HIGH-013 (Query Statement Timeout):** Added 30-second `statement_timeout` to database pool configuration. Prevents DoS attacks via long-running queries exhausting connection pool. |
 
 ---
 
@@ -877,24 +866,22 @@ Significant progress has been made on security remediation. All critical vulnera
 | Severity | Open | New (This Review) |
 |----------|------|-------------------|
 | CRITICAL | 0 | 0 |
-| HIGH | 7 | 2 |
+| HIGH | 6 | 1 |
 | MEDIUM | 11 | 5 |
 | LOW | 7 | 2 |
 
 **Remaining Priority Items:**
 - All HIPAA-critical audit logging issues have been resolved
 - CSRF protection implemented (HIGH-002 resolved)
-- **NEW:** DoS vector identified (HIGH-013: query timeout) - should be addressed before production
-- **NEW:** PHI/PII logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
-- 7 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, query timeout, email in logs)
+- Query statement timeout implemented (HIGH-013 resolved) - DoS prevention now in place
+- **Remaining:** PHI/PII logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
+- 6 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, email in logs)
 
 **Recommended Action:**
-1. **Before Production:** HIGH-013 (query timeout - DoS prevention), HIGH-003 (CSP), HIGH-005 (account lockout)
+1. **Before Production:** HIGH-003 (CSP), HIGH-005 (account lockout)
 2. **Short-term:** Address PII/PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
 
 **Priority Discussion:**
-The new HIGH-013 finding (query statement timeout) is a low-effort, high-impact fix that should be addressed before production. It represents an actual DoS vector rather than a defense-in-depth control.
-
 The email logging issue (HIGH-012) is nuanced - while it doesn't leak PHI, it does log PII (email addresses) and could enable enumeration attacks through log analysis. This is categorized as HIGH due to the healthcare context where any PII logging should be scrutinized.
 
 Note: JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
