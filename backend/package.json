@@ -2,6 +2,7 @@
   "name": "@flashnote/backend",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "FlashNote Backend API",
   "main": "dist/index.js",
   "scripts": {
