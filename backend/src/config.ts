@@ -15,6 +15,7 @@ const envSchema = z.object({
   // Auth
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
+  CSRF_SECRET: z.string().min(32),
 
   // Gemini AI
   GEMINI_API_KEY: z.string().min(1),

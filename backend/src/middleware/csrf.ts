@@ -1,7 +1,9 @@
 import crypto from 'crypto';
 import { Request, Response, NextFunction } from 'express';
 import { config } from '../config.js';
-import type { AuthenticatedRequest } from '../types/index.js';
+import { auditService } from '../services/audit-service.js';
+import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
+import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 
 const CSRF_HEADER = 'x-csrf-token';
 const CSRF_TOKEN_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -14,7 +16,7 @@ export function generateCsrfToken(userId: string): string {
   const timestamp = Date.now().toString();
   const data = `${userId}:${timestamp}`;
   const signature = crypto
-    .createHmac('sha256', config.JWT_SECRET)
+    .createHmac('sha256', config.CSRF_SECRET)
     .update(data)
     .digest('hex');
   return Buffer.from(`${data}:${signature}`).toString('base64url');
@@ -47,7 +49,7 @@ export function validateCsrfToken(token: string, userId: string): boolean {
     // Verify HMAC signature using timing-safe comparison
     const data = `${tokenUserId}:${timestamp}`;
     const expectedSignature = crypto
-      .createHmac('sha256', config.JWT_SECRET)
+      .createHmac('sha256', config.CSRF_SECRET)
       .update(data)
       .digest('hex');
 
@@ -75,7 +77,20 @@ export function requireCsrf(
   const csrfToken = req.get(CSRF_HEADER);
   const userId = (req as AuthenticatedRequest).user?.userId;
 
+  const { ipAddress, userAgent } = getRequestMetadata(req);
+
   if (!csrfToken) {
+    safeAuditLog(
+      auditService.log({
+        userId: userId ?? null,
+        action: AuditAction.CSRF_FAILED,
+        status: 'FAILURE',
+        metadata: { reason: 'missing_token', endpoint: req.originalUrl },
+        ipAddress,
+        userAgent,
+      }),
+      'csrf-missing'
+    );
     res.status(403).json({
       success: false,
       error: { code: 'missing_csrf_token', message: 'CSRF token required' },
@@ -84,6 +99,17 @@ export function requireCsrf(
   }
 
   if (!userId || !validateCsrfToken(csrfToken, userId)) {
+    safeAuditLog(
+      auditService.log({
+        userId: userId ?? null,
+        action: AuditAction.CSRF_FAILED,
+        status: 'FAILURE',
+        metadata: { reason: 'invalid_token', endpoint: req.originalUrl },
+        ipAddress,
+        userAgent,
+      }),
+      'csrf-invalid'
+    );
     res.status(403).json({
       success: false,
       error: { code: 'invalid_csrf_token', message: 'Invalid CSRF token' },

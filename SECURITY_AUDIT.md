@@ -1,6 +1,6 @@
 # FlashNote Security Audit Report
 
-**Date:** January 2026 (Updated January 28, 2026)
+**Date:** January 2026 (Updated January 28, 2026, Code Review January 28, 2026)
 **Auditor:** Security Review
 **Scope:** Full codebase audit (backend, extension, web)
 **Classification:** HIPAA-regulated healthcare application
@@ -16,9 +16,9 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 6 | 5 | 0 |
-| MEDIUM | 8 | 2 | 6 | 1 |
-| LOW | 5 | 0 | 5 | 0 |
+| HIGH | 9 | 6 | 5 | 3 |
+| MEDIUM | 8 | 2 | 6 | 5 |
+| LOW | 5 | 0 | 5 | 1 |
 
 ### Overall Risk Assessment: **MEDIUM** (improved from HIGH)
 
@@ -301,6 +301,89 @@ All audit entries include userId (when available), reason, path, IP address, and
 
 ---
 
+## New High Severity Findings (Code Review - January 28, 2026)
+
+### HIGH-012: Email Logged in Failed Login Audit
+**Status:** OPEN
+**File:** `backend/src/routes/auth.ts:73`
+**Severity:** HIGH
+**CVSS:** 5.5
+
+User-provided email is logged directly in audit metadata for failed login attempts:
+```typescript
+await auditService.log({
+  userId: null,
+  action: AuditAction.LOGIN_FAILED,
+  status: 'FAILURE',
+  metadata: { email },  // User input logged directly
+  ...
+});
+```
+
+**Risk:**
+- Enables user enumeration through audit log analysis
+- Sets precedent for logging user-supplied data
+- Email addresses may contain PII in some contexts
+
+**Fix:** Log a partial hash of the email or omit entirely. If needed for investigation, store only `emailDomain` or a one-way hash.
+
+---
+
+### HIGH-013: Missing JSON Body Size Limit
+**Status:** OPEN
+**File:** `backend/src/index.ts:23`
+**Severity:** HIGH
+**CVSS:** 6.5
+
+Express JSON body parser has no explicit size limit:
+```typescript
+app.use(express.json());
+```
+
+**Risk:** Memory exhaustion attacks via large payloads. While Express defaults to 100KB, this should be explicit for security-critical applications.
+
+**Fix:**
+```typescript
+app.use(express.json({ limit: '100kb' }));
+```
+
+---
+
+### HIGH-014: No Query Statement Timeout
+**Status:** OPEN
+**File:** `backend/src/db/index.ts:6-11`
+**Severity:** HIGH
+**CVSS:** 6.0
+
+The database connection pool has connection timeout but individual queries have no statement timeout:
+```typescript
+export const db = new Pool({
+  connectionString: config.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,  // Only for establishing connection
+});
+```
+
+**Risk:** Long-running or malicious queries could exhaust the connection pool (20 connections), causing denial of service for all users.
+
+**Relation to MEDIUM-004:** This is distinct from MEDIUM-004 (connection error handling). MEDIUM-004 addresses reconnection logic; this addresses query-level resource exhaustion.
+
+**Fix:** Add statement timeout via connection string or pool configuration:
+```typescript
+export const db = new Pool({
+  connectionString: config.DATABASE_URL,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  statement_timeout: 30000,  // 30 second query timeout
+});
+```
+
+Or add to connection string: `?statement_timeout=30000`
+
+---
+
 ## Medium Severity Findings
 
 ### MEDIUM-001: TypeScript Type Assertion Bypasses Type Safety
@@ -459,6 +542,174 @@ While this specific line doesn't log PHI directly, it indicates that error/warni
 
 ---
 
+## New Medium Severity Findings (Code Review - January 28, 2026)
+
+### MEDIUM-011: No Session Count Limit Per User
+**Status:** OPEN
+**File:** `backend/src/services/auth-service.ts:136-144`
+**Severity:** MEDIUM
+
+`storeRefreshToken` creates new sessions without limiting count per user:
+```typescript
+await db.query(
+  `INSERT INTO sessions (user_id, refresh_token_hash, expires_at)
+   VALUES ($1, $2, $3)`,
+  [userId, hash, expiresAt]
+);
+```
+
+**Risk:**
+- An attacker with valid credentials could create unlimited sessions
+- Causes database bloat over time
+- Exacerbates MEDIUM-002 (O(n) bcrypt comparisons per refresh)
+
+**Relation to MEDIUM-002:** These issues should be addressed together. Limiting sessions reduces the performance impact of the bcrypt loop.
+
+**Fix:** Add session limit (e.g., max 5 active sessions) and remove oldest when exceeded:
+```typescript
+// Before inserting new session
+await db.query(
+  `DELETE FROM sessions WHERE user_id = $1 AND id NOT IN (
+    SELECT id FROM sessions WHERE user_id = $1
+    ORDER BY created_at DESC LIMIT 4
+  )`,
+  [userId]
+);
+```
+
+---
+
+### MEDIUM-012: Gemini API Error Response May Contain PHI
+**Status:** OPEN
+**File:** `backend/src/services/ai-service.ts:112`
+**Severity:** MEDIUM
+
+Raw API error response is logged without sanitization:
+```typescript
+const error = await response.text();
+console.error('Gemini API error:', error);
+```
+
+**Risk:** Error responses from Gemini may echo back portions of the request (which contains PHI from `quickNotes` and `patientContext`), which would then be logged.
+
+**Relation to MEDIUM-010:** This is a specific instance of the general concern raised in MEDIUM-010 about PHI leaking through logging paths.
+
+**Fix:** Log only status code and a sanitized error indicator:
+```typescript
+console.error('Gemini API error:', {
+  status: response.status,
+  statusText: response.statusText
+});
+```
+
+---
+
+### MEDIUM-013: Missing Webhook Idempotency Check
+**Status:** OPEN
+**File:** `backend/src/services/billing-service.ts:52-85`
+**Severity:** MEDIUM
+
+Stripe webhooks are processed without checking for duplicate events:
+```typescript
+async handleWebhook(body: Buffer, signature: string): Promise<void> {
+  // No idempotency check for event.id
+  switch (event.type) {
+    case 'checkout.session.completed':
+      await this.handleCheckoutComplete(session);
+```
+
+**Risk:** Stripe may retry webhooks on delivery failures. Without idempotency checks:
+- Duplicate subscription status updates
+- Potential billing inconsistencies
+- Duplicate audit log entries
+
+**Fix:** Store processed event IDs and skip duplicates:
+```typescript
+// Check if already processed
+const existing = await db.query(
+  'SELECT id FROM webhook_events WHERE stripe_event_id = $1',
+  [event.id]
+);
+if (existing.rows.length > 0) {
+  return; // Already processed
+}
+// Process and record
+await db.query(
+  'INSERT INTO webhook_events (stripe_event_id) VALUES ($1)',
+  [event.id]
+);
+```
+
+---
+
+### MEDIUM-014: Extension API Client Missing Retry Logic
+**Status:** OPEN
+**File:** `extension/src/shared/api.ts:71-99`
+**Severity:** MEDIUM
+
+The API client doesn't implement retry logic for transient failures:
+```typescript
+private async request<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  // No retry on 5xx or network errors
+  const response = await fetch(`${API_BASE}${endpoint}`, { ... });
+```
+
+**Risk:**
+- Users see failures for temporary network issues that would succeed on retry
+- Poor UX in unstable network conditions (common in clinical environments)
+- Lost work if note generation fails on transient error
+
+**Fix:** Add exponential backoff retry for 5xx errors and network failures:
+```typescript
+private async requestWithRetry<T>(
+  endpoint: string,
+  options: RequestInit = {},
+  retries = 3
+): Promise<T> {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await this.request(endpoint, options);
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      if (error instanceof ApiError && error.status < 500) throw error;
+      await new Promise(r => setTimeout(r, Math.pow(2, i) * 1000));
+    }
+  }
+}
+```
+
+---
+
+### MEDIUM-015: CORS Missing Extension Origin in Production
+**Status:** OPEN
+**File:** `backend/src/index.ts:15-19`
+**Severity:** MEDIUM
+
+**Update to MEDIUM-007:** In addition to the staging/test environment concern, the production CORS configuration only allows `config.WEB_URL`:
+```typescript
+origin: config.NODE_ENV === 'production'
+  ? [config.WEB_URL]
+  : ['http://localhost:3000', 'http://localhost:5173'],
+```
+
+**Risk:** Chrome extensions make requests from `chrome-extension://<extension-id>` origins. If the extension makes direct API calls in production, they may be blocked by CORS.
+
+**Note:** The extension may work via different mechanisms (e.g., service worker fetch without CORS, or if the API doesn't enforce CORS for Bearer-authenticated requests). This should be verified.
+
+**Fix:** If extension requires CORS, add the extension ID to allowed origins:
+```typescript
+origin: config.NODE_ENV === 'production'
+  ? [config.WEB_URL, 'chrome-extension://YOUR_EXTENSION_ID']
+  : ['http://localhost:3000', 'http://localhost:5173'],
+```
+
+Or use a CORS configuration that allows credentialed requests from extensions.
+
+---
+
 ## Low Severity Findings
 
 ### LOW-001: Console Logging in Production
@@ -529,6 +780,33 @@ No automated dependency vulnerability scanning configured.
 
 ---
 
+## New Low Severity Findings (Code Review - January 28, 2026)
+
+### LOW-006: Subscription Status Uses Magic Strings
+**Status:** OPEN
+**File:** `backend/src/middleware/subscription.ts:66,94`
+**Severity:** LOW
+
+Subscription status is checked with string literals rather than constants or enums:
+```typescript
+if (user.subscription_status === 'trialing')
+if (user.subscription_status === 'active')
+```
+
+**Risk:** Typos could cause silent failures in authorization logic. This is a code quality issue rather than a security vulnerability.
+
+**Fix:** Define subscription statuses as an enum or constants:
+```typescript
+export const SubscriptionStatus = {
+  TRIALING: 'trialing',
+  ACTIVE: 'active',
+  CANCELED: 'canceled',
+  PAST_DUE: 'past_due',
+} as const;
+```
+
+---
+
 ## Compliance Checklist (HIPAA)
 
 | Requirement | Status | Notes |
@@ -546,27 +824,34 @@ No automated dependency vulnerability scanning configured.
 
 ## Recommended Remediation Priority
 
-### Before Production
+### Before Production (DoS & Resource Exhaustion)
 1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
-2. **HIGH-003:** Content Security Policy
-3. **HIGH-005:** Account lockout mechanism
+2. **HIGH-013:** JSON body size limit (trivial fix, high impact)
+3. **HIGH-014:** Query statement timeout (DoS prevention)
+4. **HIGH-003:** Content Security Policy
+5. **HIGH-005:** Account lockout mechanism
 
-### Short-term
+### Short-term (Security Hardening)
 1. **HIGH-001 + HIGH-007:** Password reset + email verification (build together)
 2. **HIGH-006:** Device binding for refresh tokens
-3. **MEDIUM-005:** Prompt injection protection
+3. **HIGH-012:** Remove email from failed login audit (PII concern)
+4. **MEDIUM-005:** Prompt injection protection
+5. **MEDIUM-012:** Sanitize Gemini error logging (PHI concern)
 
-### Medium-term
-1. **MEDIUM-002:** Efficient refresh token validation
-2. **MEDIUM-003:** Session timeout warning
-3. **MEDIUM-006:** Request ID tracing
-4. **LOW-001:** Structured logging
+### Medium-term (Performance & Reliability)
+1. **MEDIUM-002 + MEDIUM-011:** Efficient refresh token validation + session limits (address together)
+2. **MEDIUM-013:** Webhook idempotency
+3. **MEDIUM-014:** Extension retry logic
+4. **MEDIUM-003:** Session timeout warning
+5. **MEDIUM-006:** Request ID tracing
+6. **LOW-001:** Structured logging
 
 ### Ongoing
 1. **LOW-003:** Test coverage
 2. **LOW-005:** Dependency scanning in CI
-3. Security testing automation
-4. Penetration testing
+3. **MEDIUM-015:** Verify extension CORS in production
+4. Security testing automation
+5. Penetration testing
 
 ---
 
@@ -577,6 +862,7 @@ No automated dependency vulnerability scanning configured.
 | January 2026 | Initial audit completed |
 | January 27, 2026 | **Major remediation update:** All critical issues (CRITICAL-001 through CRITICAL-004) resolved. Resolved HIGH-004, HIGH-008, HIGH-009, HIGH-010, HIGH-011, MEDIUM-001, MEDIUM-009. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. Key fixes: removed PHI persistence in extension storage, added comprehensive audit logging for auth/access failures and note generation failures. |
 | January 28, 2026 | **Resolved HIGH-002 (CSRF Protection):** Implemented stateless signed CSRF tokens with HMAC-SHA256 signatures. Protected all state-changing endpoints (notes/generate, billing/checkout, billing/portal, auth/logout). Extension updated to store and send X-CSRF-Token header. Tokens are user-bound, time-limited (24h), and validated with timing-safe comparison. |
+| January 28, 2026 | **Code Review - New Findings:** Added 3 HIGH (HIGH-012: email in audit logs, HIGH-013: body size limit, HIGH-014: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 1 LOW (LOW-006: magic strings). Updated remediation priorities to address DoS vectors before production. |
 
 ---
 
@@ -584,9 +870,27 @@ No automated dependency vulnerability scanning configured.
 
 Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
 
+**Current Issue Count:**
+| Severity | Open | New (This Review) |
+|----------|------|-------------------|
+| CRITICAL | 0 | 0 |
+| HIGH | 8 | 3 |
+| MEDIUM | 11 | 5 |
+| LOW | 6 | 1 |
+
 **Remaining Priority Items:**
 - All HIPAA-critical audit logging issues have been resolved
-- CSRF protection now implemented (HIGH-002 resolved)
-- 5 original HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding)
+- CSRF protection implemented (HIGH-002 resolved)
+- **NEW:** DoS vectors identified (HIGH-013, HIGH-014) - trivial fixes, should be addressed immediately
+- **NEW:** PHI logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
+- 8 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, body size limit, query timeout, email in logs)
 
-**Recommended Action:** Proceed with remaining HIGH severity items (CSP, account lockout) before production deployment. The HIPAA audit requirements are now satisfied, and defense-in-depth is improved with CSRF protection.
+**Recommended Action:**
+1. **Immediate (trivial fixes):** Add `express.json({ limit: '100kb' })` and `statement_timeout` to database pool - these are one-line fixes that prevent DoS attacks
+2. **Before Production:** HIGH-003 (CSP), HIGH-005 (account lockout)
+3. **Short-term:** Address PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
+
+**Priority Discussion:**
+The new HIGH-013 and HIGH-014 findings are low-effort, high-impact fixes that should be addressed before the previously identified HIGH-003/HIGH-005. They represent actual DoS vectors rather than defense-in-depth controls. I recommend elevating them to "Before Production" priority.
+
+The email logging issue (HIGH-012) is nuanced - while it doesn't leak PHI, it does log PII (email addresses) and could enable enumeration attacks through log analysis. This is categorized as HIGH due to the healthcare context where any PII logging should be scrutinized.
