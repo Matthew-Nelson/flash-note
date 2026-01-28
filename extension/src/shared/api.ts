@@ -32,6 +32,11 @@ class ApiClient {
     return auth.accessToken;
   }
 
+  private async getCsrfToken(): Promise<string | null> {
+    const auth = await storage.getAuth();
+    return auth?.csrfToken ?? null;
+  }
+
   private async refreshToken(refreshToken: string): Promise<string | null> {
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
@@ -52,6 +57,7 @@ class ApiClient {
         user: data.user,
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
+        csrfToken: data.csrfToken,
         expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
       });
 
@@ -67,12 +73,14 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const token = await this.getToken();
+    const csrfToken = await this.getCsrfToken();
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
+        ...(csrfToken && { 'X-CSRF-Token': csrfToken }),
         ...options.headers,
       },
     });
@@ -100,6 +108,7 @@ class ApiClient {
       user: data.user,
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
+      csrfToken: data.csrfToken,
       expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
     });
 
@@ -116,6 +125,7 @@ class ApiClient {
       user: data.user,
       accessToken: data.accessToken,
       refreshToken: data.refreshToken,
+      csrfToken: data.csrfToken,
       expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
     });
 

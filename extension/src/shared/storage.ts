@@ -9,6 +9,7 @@ export interface StoredUser {
 export interface StoredAuth {
   accessToken: string;
   refreshToken: string;
+  csrfToken: string;
   user: StoredUser;
   expiresAt: number;
 }

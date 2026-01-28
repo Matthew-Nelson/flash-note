@@ -78,6 +78,7 @@ export enum AuditAction {
   SUBSCRIPTION_CANCELLED = 'SUBSCRIPTION_CANCELLED',
   AUTH_FAILED = 'AUTH_FAILED',
   ACCESS_DENIED = 'ACCESS_DENIED',
+  CSRF_FAILED = 'CSRF_FAILED',
 }
 
 export interface AuditLogEntry {

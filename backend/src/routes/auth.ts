@@ -4,6 +4,7 @@ import { authService } from '../services/auth-service.js';
 import { auditService } from '../services/audit-service.js';
 import { loginRateLimit, registerRateLimit, refreshRateLimit } from '../middleware/rate-limit.js';
 import { requireAuth } from '../middleware/auth.js';
+import { requireCsrf } from '../middleware/csrf.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 
@@ -116,7 +117,7 @@ authRouter.post('/refresh', refreshRateLimit, async (req, res, next) => {
 });
 
 // POST /auth/logout
-authRouter.post('/logout', requireAuth, async (req, res, next) => {
+authRouter.post('/logout', requireAuth, requireCsrf, async (req, res, next) => {
   try {
     const { userId } = (req as AuthenticatedRequest).user;
     const ipAddress = req.ip ?? undefined;
