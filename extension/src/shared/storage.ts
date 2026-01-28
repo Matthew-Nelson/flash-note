@@ -15,7 +15,6 @@ export interface StoredAuth {
 
 export interface StoredPreferences {
   defaultNoteType: string;
-  lastUsedPatientContext: string;
 }
 
 export const storage = {
@@ -36,7 +35,6 @@ export const storage = {
     const result = await chrome.storage.local.get('preferences');
     return result.preferences ?? {
       defaultNoteType: 'daily_note',
-      lastUsedPatientContext: '',
     };
   },
 

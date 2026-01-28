@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 3 | 6 | 2 |
+| HIGH | 9 | 4 | 6 | 1 |
 | MEDIUM | 8 | 1 | 7 | 2 |
 | LOW | 5 | 0 | 5 | 0 |
 
@@ -238,25 +238,19 @@ if (isProduction && config.USE_MOCK_AI) {
 ## New High Severity Findings (HIPAA Compliance)
 
 ### HIGH-010: PHI May Persist in Extension Storage
-**Status:** OPEN
-**File:** `extension/src/shared/storage.ts:39`
+**Status:** RESOLVED
+**File:** `extension/src/shared/storage.ts`
 **Severity:** HIGH
 **CVSS:** 6.5
 
-```typescript
-lastUsedPatientContext: '',  // Persisted in chrome.storage.local
-```
+**Original Issue:** The `lastUsedPatientContext` field was defined in the storage schema, which would persist patient identifiers or diagnoses in `chrome.storage.local` beyond the active session.
 
-The `lastUsedPatientContext` field is stored in `chrome.storage.local` and persists across sessions. This field may contain patient identifiers, diagnoses, or other PHI.
+**Resolution:** Removed the `lastUsedPatientContext` field entirely from:
+- `StoredPreferences` interface in `storage.ts`
+- Default preferences in `getPreferences()`
+- `storedPreferencesSchema` in `schemas.ts`
 
-**Risk:** HIPAA violation - PHI stored in local storage beyond the active session. If the device is compromised or shared, PHI could be exposed.
-
-**HIPAA Requirement Violated:** "NEVER store PHI in local storage, cookies, or client-side state longer than the active session"
-
-**Fix:** Either:
-1. Clear `lastUsedPatientContext` on logout via `storage.clearAuth()`
-2. Don't persist this field at all - only keep in memory during session
-3. Add a separate `clearPatientContext()` method called on logout
+Patient context now only exists in React component state during the active session.
 
 ---
 
@@ -547,7 +541,7 @@ No automated dependency vulnerability scanning configured.
 | Access Controls | PARTIAL | Missing MFA, account lockout |
 | Audit Controls | PARTIAL | Auth failures and generation failures not logged (HIGH-011, MEDIUM-009) |
 | Transmission Security | PASS | TLS enforced |
-| PHI Storage | PARTIAL | Extension may persist patient context (HIGH-010) |
+| PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
 | Unique User IDs | PASS | UUID-based |
 | Automatic Logoff | FAIL | No session timeout warning |
 | Encryption | PARTIAL | Tokens not encrypted at rest |
@@ -558,9 +552,8 @@ No automated dependency vulnerability scanning configured.
 ## Recommended Remediation Priority
 
 ### Immediate (HIPAA Critical)
-1. **HIGH-010:** Clear patient context on logout - *PHI exposure risk*
-2. **HIGH-011:** Audit authorization failures - *HIPAA audit requirement*
-3. **MEDIUM-009:** Audit note generation failures - *HIPAA audit requirement*
+1. **HIGH-011:** Audit authorization failures - *HIPAA audit requirement*
+2. **MEDIUM-009:** Audit note generation failures - *HIPAA audit requirement*
 
 ### Before Production
 1. **HIGH-002:** CSRF protection
@@ -592,6 +585,7 @@ No automated dependency vulnerability scanning configured.
 |------|---------|
 | January 2026 | Initial audit completed |
 | January 27, 2026 | Updated to reflect remediation status. Marked CRITICAL-001 through CRITICAL-004 as RESOLVED. Marked HIGH-004, HIGH-008, HIGH-009, MEDIUM-001 as RESOLVED. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. |
+| January 27, 2026 | HIGH-010 RESOLVED: Removed `lastUsedPatientContext` field from extension storage schema to prevent PHI persistence. |
 
 ---
 
@@ -600,8 +594,8 @@ No automated dependency vulnerability scanning configured.
 Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
 
 **Remaining Priority Items:**
-- 3 new HIPAA compliance issues require immediate attention (audit logging gaps, PHI persistence)
+- 2 HIPAA audit logging issues require immediate attention (HIGH-011, MEDIUM-009)
 - 6 original HIGH severity issues remain open (access controls, CSRF, CSP)
-- Production deployment should wait until HIGH-010, HIGH-011, and MEDIUM-009 are resolved
+- Production deployment should wait until HIGH-011 and MEDIUM-009 are resolved
 
-**Recommended Action:** Address the HIPAA audit logging gaps (HIGH-011, MEDIUM-009) and PHI persistence issue (HIGH-010) immediately. These are compliance requirements, not optional hardening. Then proceed with remaining HIGH severity items before production deployment.
+**Recommended Action:** Address the HIPAA audit logging gaps (HIGH-011, MEDIUM-009) immediately. These are compliance requirements, not optional hardening. Then proceed with remaining HIGH severity items before production deployment.
