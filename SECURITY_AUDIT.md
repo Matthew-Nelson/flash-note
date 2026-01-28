@@ -16,9 +16,9 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Open | New Issues |
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 6 | 5 | 3 |
+| HIGH | 9 | 6 | 5 | 2 |
 | MEDIUM | 8 | 2 | 6 | 5 |
-| LOW | 5 | 0 | 5 | 1 |
+| LOW | 5 | 0 | 5 | 2 |
 
 ### Overall Risk Assessment: **MEDIUM** (improved from HIGH)
 
@@ -329,27 +329,7 @@ await auditService.log({
 
 ---
 
-### HIGH-013: Missing JSON Body Size Limit
-**Status:** OPEN
-**File:** `backend/src/index.ts:23`
-**Severity:** HIGH
-**CVSS:** 6.5
-
-Express JSON body parser has no explicit size limit:
-```typescript
-app.use(express.json());
-```
-
-**Risk:** Memory exhaustion attacks via large payloads. While Express defaults to 100KB, this should be explicit for security-critical applications.
-
-**Fix:**
-```typescript
-app.use(express.json({ limit: '100kb' }));
-```
-
----
-
-### HIGH-014: No Query Statement Timeout
+### HIGH-013: No Query Statement Timeout (formerly HIGH-014)
 **Status:** OPEN
 **File:** `backend/src/db/index.ts:6-11`
 **Severity:** HIGH
@@ -807,6 +787,30 @@ export const SubscriptionStatus = {
 
 ---
 
+### LOW-007: JSON Body Size Limit Not Explicit
+**Status:** OPEN
+**File:** `backend/src/index.ts:23`
+**Severity:** LOW
+
+Express JSON body parser relies on implicit default size limit:
+```typescript
+app.use(express.json());
+```
+
+**Note:** Express defaults to 100KB, which is adequate (the max legitimate request based on Zod validation is ~5.5KB). This is not an active vulnerability.
+
+**Risk:**
+- Express could change the default in a future version
+- Security auditors may flag the missing explicit limit
+- Code clarity - not immediately obvious a limit exists
+
+**Fix:** Make the default explicit for clarity:
+```typescript
+app.use(express.json({ limit: '100kb' }));
+```
+
+---
+
 ## Compliance Checklist (HIPAA)
 
 | Requirement | Status | Notes |
@@ -824,12 +828,11 @@ export const SubscriptionStatus = {
 
 ## Recommended Remediation Priority
 
-### Before Production (DoS & Resource Exhaustion)
+### Before Production (DoS & Security Hardening)
 1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
-2. **HIGH-013:** JSON body size limit (trivial fix, high impact)
-3. **HIGH-014:** Query statement timeout (DoS prevention)
-4. **HIGH-003:** Content Security Policy
-5. **HIGH-005:** Account lockout mechanism
+2. **HIGH-013:** Query statement timeout (DoS prevention)
+3. **HIGH-003:** Content Security Policy
+4. **HIGH-005:** Account lockout mechanism
 
 ### Short-term (Security Hardening)
 1. **HIGH-001 + HIGH-007:** Password reset + email verification (build together)
@@ -862,7 +865,7 @@ export const SubscriptionStatus = {
 | January 2026 | Initial audit completed |
 | January 27, 2026 | **Major remediation update:** All critical issues (CRITICAL-001 through CRITICAL-004) resolved. Resolved HIGH-004, HIGH-008, HIGH-009, HIGH-010, HIGH-011, MEDIUM-001, MEDIUM-009. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. Key fixes: removed PHI persistence in extension storage, added comprehensive audit logging for auth/access failures and note generation failures. |
 | January 28, 2026 | **Resolved HIGH-002 (CSRF Protection):** Implemented stateless signed CSRF tokens with HMAC-SHA256 signatures. Protected all state-changing endpoints (notes/generate, billing/checkout, billing/portal, auth/logout). Extension updated to store and send X-CSRF-Token header. Tokens are user-bound, time-limited (24h), and validated with timing-safe comparison. |
-| January 28, 2026 | **Code Review - New Findings:** Added 3 HIGH (HIGH-012: email in audit logs, HIGH-013: body size limit, HIGH-014: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 1 LOW (LOW-006: magic strings). Updated remediation priorities to address DoS vectors before production. |
+| January 28, 2026 | **Code Review - New Findings:** Added 2 HIGH (HIGH-012: email in audit logs, HIGH-013: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 2 LOW (LOW-006: magic strings, LOW-007: implicit body size limit). Body size limit downgraded from HIGH to LOW as Express defaults to 100KB - fix is for explicitness only. |
 
 ---
 
@@ -874,23 +877,24 @@ Significant progress has been made on security remediation. All critical vulnera
 | Severity | Open | New (This Review) |
 |----------|------|-------------------|
 | CRITICAL | 0 | 0 |
-| HIGH | 8 | 3 |
+| HIGH | 7 | 2 |
 | MEDIUM | 11 | 5 |
-| LOW | 6 | 1 |
+| LOW | 7 | 2 |
 
 **Remaining Priority Items:**
 - All HIPAA-critical audit logging issues have been resolved
 - CSRF protection implemented (HIGH-002 resolved)
-- **NEW:** DoS vectors identified (HIGH-013, HIGH-014) - trivial fixes, should be addressed immediately
-- **NEW:** PHI logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
-- 8 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, body size limit, query timeout, email in logs)
+- **NEW:** DoS vector identified (HIGH-013: query timeout) - should be addressed before production
+- **NEW:** PHI/PII logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
+- 7 HIGH severity issues remain open (access controls, CSP, account lockout, email verification, device binding, query timeout, email in logs)
 
 **Recommended Action:**
-1. **Immediate (trivial fixes):** Add `express.json({ limit: '100kb' })` and `statement_timeout` to database pool - these are one-line fixes that prevent DoS attacks
-2. **Before Production:** HIGH-003 (CSP), HIGH-005 (account lockout)
-3. **Short-term:** Address PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
+1. **Before Production:** HIGH-013 (query timeout - DoS prevention), HIGH-003 (CSP), HIGH-005 (account lockout)
+2. **Short-term:** Address PII/PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
 
 **Priority Discussion:**
-The new HIGH-013 and HIGH-014 findings are low-effort, high-impact fixes that should be addressed before the previously identified HIGH-003/HIGH-005. They represent actual DoS vectors rather than defense-in-depth controls. I recommend elevating them to "Before Production" priority.
+The new HIGH-013 finding (query statement timeout) is a low-effort, high-impact fix that should be addressed before production. It represents an actual DoS vector rather than a defense-in-depth control.
 
 The email logging issue (HIGH-012) is nuanced - while it doesn't leak PHI, it does log PII (email addresses) and could enable enumeration attacks through log analysis. This is categorized as HIGH due to the healthcare context where any PII logging should be scrutinized.
+
+Note: JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
