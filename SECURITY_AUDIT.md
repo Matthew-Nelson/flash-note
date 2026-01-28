@@ -17,7 +17,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 |----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 |
 | HIGH | 9 | 5 | 6 | 0 |
-| MEDIUM | 8 | 1 | 7 | 2 |
+| MEDIUM | 8 | 2 | 6 | 1 |
 | LOW | 5 | 0 | 5 | 0 |
 
 ### Overall Risk Assessment: **MEDIUM** (improved from HIGH)
@@ -401,33 +401,17 @@ Access and refresh tokens stored in the same storage object.
 ## New Medium Severity Findings (HIPAA Compliance)
 
 ### MEDIUM-009: Note Generation Failures Not Audited
-**Status:** OPEN
-**File:** `backend/src/routes/notes.ts:60-62`
+**Status:** RESOLVED
+**File:** `backend/src/routes/notes.ts`
 **Severity:** MEDIUM
 
-Only successful note generations are logged to the audit system (lines 40-51). Failed attempts pass through `next(error)` without audit logging.
+**Original Issue:** Only successful note generations were logged to the audit system. Failed attempts passed through without audit logging.
 
-**Risk:** Incomplete audit trail - cannot track:
-- Failed generation attempts (potential abuse)
-- Error patterns that may indicate attacks
-- Usage anomalies
-
-**HIPAA Requirement Violated:** "Log note generation metadata (timestamp, user ID, success/failure)"
-
-**Fix:** Add audit logging in catch block:
-```typescript
-} catch (error) {
-  await auditService.log({
-    userId,
-    action: AuditAction.NOTE_GENERATED,
-    status: 'FAILURE',
-    metadata: { noteType, error: error instanceof Error ? error.message : 'Unknown' },
-    ipAddress,
-    userAgent,
-  });
-  next(error);
-}
-```
+**Resolution:** Added audit logging in catch block with:
+- `NOTE_GENERATED` action with `FAILURE` status
+- noteType and error type (validation_error or generation_error)
+- Error messages intentionally excluded to prevent PHI leakage
+- userId, IP address, and user-agent included
 
 ---
 
@@ -523,7 +507,7 @@ No automated dependency vulnerability scanning configured.
 | Requirement | Status | Notes |
 |-------------|--------|-------|
 | Access Controls | PARTIAL | Missing MFA, account lockout |
-| Audit Controls | PARTIAL | Generation failures not logged (MEDIUM-009); auth failures now logged (HIGH-011 resolved) |
+| Audit Controls | PASS | Auth failures (HIGH-011) and generation failures (MEDIUM-009) now logged |
 | Transmission Security | PASS | TLS enforced |
 | PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
 | Unique User IDs | PASS | UUID-based |
@@ -534,9 +518,6 @@ No automated dependency vulnerability scanning configured.
 ---
 
 ## Recommended Remediation Priority
-
-### Immediate (HIPAA Critical)
-1. **MEDIUM-009:** Audit note generation failures - *HIPAA audit requirement*
 
 ### Before Production
 1. **HIGH-002:** CSRF protection
@@ -570,6 +551,7 @@ No automated dependency vulnerability scanning configured.
 | January 27, 2026 | Updated to reflect remediation status. Marked CRITICAL-001 through CRITICAL-004 as RESOLVED. Marked HIGH-004, HIGH-008, HIGH-009, MEDIUM-001 as RESOLVED. Added HIGH-010, HIGH-011, MEDIUM-009, MEDIUM-010 based on updated HIPAA compliance standards. Updated risk assessment from HIGH to MEDIUM. |
 | January 27, 2026 | HIGH-010 RESOLVED: Removed `lastUsedPatientContext` field from extension storage schema to prevent PHI persistence. |
 | January 27, 2026 | HIGH-011 RESOLVED: Added audit logging for all authorization failures in auth and subscription middleware. |
+| January 27, 2026 | MEDIUM-009 RESOLVED: Added audit logging for note generation failures in notes route. |
 
 ---
 
@@ -578,8 +560,7 @@ No automated dependency vulnerability scanning configured.
 Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
 
 **Remaining Priority Items:**
-- 1 HIPAA audit logging issue requires immediate attention (MEDIUM-009)
+- All HIPAA-critical audit logging issues have been resolved
 - 6 original HIGH severity issues remain open (access controls, CSRF, CSP)
-- Production deployment should wait until MEDIUM-009 is resolved
 
-**Recommended Action:** Address the remaining HIPAA audit logging gap (MEDIUM-009) immediately. Then proceed with remaining HIGH severity items before production deployment.
+**Recommended Action:** Proceed with remaining HIGH severity items (CSRF protection, CSP, account lockout) before production deployment. The HIPAA audit requirements are now satisfied.

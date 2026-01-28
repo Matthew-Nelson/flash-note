@@ -58,6 +58,25 @@ notesRouter.post('/generate', async (req, res, next) => {
       data: result,
     });
   } catch (error) {
+    // HIPAA: Log failed generation attempts (without PHI)
+    const { userId } = (req as AuthenticatedRequest).user;
+    const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
+    const noteType = req.body?.noteType;
+
+    await auditService.log({
+      userId,
+      action: AuditAction.NOTE_GENERATED,
+      status: 'FAILURE',
+      metadata: {
+        noteType: noteType || 'unknown',
+        // Sanitize error - don't include message as it may contain user input
+        errorType: error instanceof z.ZodError ? 'validation_error' : 'generation_error',
+      },
+      ipAddress,
+      userAgent,
+    });
+
     next(error);
   }
 });
