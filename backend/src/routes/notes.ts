@@ -7,6 +7,7 @@ import { aiService } from '../services/ai-service.js';
 import { auditService } from '../services/audit-service.js';
 import { usageService } from '../services/usage-service.js';
 import { AuditAction, type AuthenticatedRequest, type NoteType } from '../types/index.js';
+import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
 export const notesRouter = Router();
 
@@ -24,11 +25,12 @@ const generateNoteSchema = z.object({
 
 // POST /notes/generate
 notesRouter.post('/generate', async (req, res, next) => {
+  const { ipAddress, userAgent } = getRequestMetadata(req);
+  const user = (req as AuthenticatedRequest).user;
+  const userId = user?.userId;
+
   try {
     const { noteType, patientContext, quickNotes } = generateNoteSchema.parse(req.body);
-    const { userId } = (req as AuthenticatedRequest).user;
-    const ipAddress = req.ip ?? undefined;
-    const userAgent = req.get('user-agent');
 
     const result = await aiService.generateSOAPNote(
       quickNotes,
@@ -37,27 +39,51 @@ notesRouter.post('/generate', async (req, res, next) => {
     );
 
     // Log audit (without PHI) - HIPAA compliant
-    await auditService.log({
-      userId,
-      action: AuditAction.NOTE_GENERATED,
-      status: 'SUCCESS',
-      metadata: {
-        noteType,
-        tokensUsed: result.metadata.tokensUsed,
-        generationTimeMs: result.metadata.generationTimeMs,
-      },
-      ipAddress,
-      userAgent,
-    });
+    safeAuditLog(
+      auditService.log({
+        userId: userId ?? null,
+        action: AuditAction.NOTE_GENERATED,
+        status: 'SUCCESS',
+        metadata: {
+          noteType,
+          tokensUsed: result.metadata.tokensUsed,
+          generationTimeMs: result.metadata.generationTimeMs,
+        },
+        ipAddress,
+        userAgent,
+      }),
+      'notes:generate_success'
+    );
 
     // Update usage tracking
-    await usageService.incrementUsage(userId, result.metadata.tokensUsed);
+    if (userId) {
+      await usageService.incrementUsage(userId, result.metadata.tokensUsed);
+    }
 
     res.json({
       success: true,
       data: result,
     });
   } catch (error) {
+    // HIPAA: Log failed generation attempts (without PHI)
+    const noteType = req.body?.noteType;
+
+    safeAuditLog(
+      auditService.log({
+        userId: userId ?? null,
+        action: AuditAction.NOTE_GENERATED,
+        status: 'FAILURE',
+        metadata: {
+          noteType: noteType || 'unknown',
+          // Sanitize error - don't include message as it may contain user input
+          errorType: error instanceof z.ZodError ? 'validation_error' : 'generation_error',
+        },
+        ipAddress,
+        userAgent,
+      }),
+      'notes:generate_failure'
+    );
+
     next(error);
   }
 });

@@ -1,5 +1,27 @@
 # FlashNote - Claude Code Instructions
 
+## ⚠️ CRITICAL: Healthcare Software Standards
+
+**This is healthcare software. Patient safety and data protection are non-negotiable.**
+
+FlashNote operates in clinical environments where code quality directly impacts patient care and privacy. Every line of code must meet the highest standards:
+
+- **HIPAA compliance is mandatory** - Violations carry penalties up to $1.5M per incident and potential criminal charges
+- **MVP-quality code is NOT acceptable** - We do not ship "good enough" code. All code must be production-ready, thoroughly tested, and security-hardened
+- **Protect patient data at all costs** - PHI (Protected Health Information) exposure is catastrophic for patients and the business
+- **When in doubt, be more secure** - Always err on the side of caution with security decisions
+- **No shortcuts on validation or sanitization** - Every input is potentially malicious; treat it accordingly
+- **Audit everything security-relevant** - If it touches auth, PHI, or access control, it gets logged
+
+**Before writing any code, ask yourself:**
+1. Could this leak PHI in logs, errors, or responses?
+2. Is every input validated and sanitized?
+3. Are authentication and authorization properly enforced?
+4. Would this code survive a security audit?
+5. Is this defensive enough for a healthcare environment?
+
+---
+
 ## Project Overview
 
 FlashNote is an AI-powered browser extension that helps Physical Therapists generate SOAP notes from shorthand input. The architecture consists of three main components:
@@ -67,11 +89,26 @@ const schema = z.object({
 });
 ```
 
-### HIPAA Compliance
-- Never log PHI (patient names, notes content)
-- Log all authentication events
-- Log note generation metadata (NOT content)
-- All connections must use TLS
+### HIPAA Compliance (MANDATORY)
+
+**PHI Protection:**
+- NEVER log PHI (patient names, dates of birth, medical record numbers, note content, diagnosis, treatment details)
+- NEVER include PHI in error messages, stack traces, or API responses beyond what's necessary
+- NEVER store PHI in local storage, cookies, or client-side state longer than the active session
+- NEVER transmit PHI without TLS encryption
+- ALWAYS sanitize data before logging - assume any user-provided content may contain PHI
+
+**Audit Requirements:**
+- Log ALL authentication events (login, logout, token refresh, failed attempts)
+- Log ALL authorization failures (access denied events)
+- Log note generation metadata (timestamp, user ID, success/failure) but NEVER content
+- Audit logs must be immutable and retained per HIPAA requirements
+
+**Security Controls:**
+- All connections MUST use TLS 1.2+
+- Implement proper session timeout and invalidation
+- Enforce principle of least privilege on all data access
+- Validate and sanitize ALL inputs without exception
 
 ### Error Codes
 Standard error codes:
@@ -122,6 +159,19 @@ pnpm start        # Start production server
 - JWT refresh tokens: 7 days expiry, stored hashed in DB
 - Rate limiting: 5 login attempts per 15 minutes
 - All endpoints require authentication except /auth/* and /health
+
+## Code Quality Standards
+
+**This is not an MVP. We do not accept shortcuts.**
+
+- **Type Safety**: TypeScript strict mode is mandatory. No `any` types without explicit justification
+- **Input Validation**: Every external input (API requests, user input, URL params) must be validated with Zod schemas
+- **Error Handling**: All errors must be caught and handled appropriately. No unhandled promise rejections. No leaked stack traces to clients
+- **SQL Injection Prevention**: Always use parameterized queries. Never concatenate user input into SQL
+- **XSS Prevention**: Sanitize all user-provided content before rendering. Use appropriate encoding
+- **Testing**: Security-critical code paths require tests. Auth, authorization, and data handling must have coverage
+- **Code Review Mindset**: Write code as if it will be audited by a security firm and reviewed by regulators
+- **Fail Secure**: When something goes wrong, fail closed. Deny access by default. Never expose data in error states
 
 ## Reference Document
 

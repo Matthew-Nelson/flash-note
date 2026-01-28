@@ -56,7 +56,6 @@ export const storedAuthSchema = z.object({
 
 export const storedPreferencesSchema = z.object({
   defaultNoteType: noteTypeSchema.optional(),
-  lastUsedPatientContext: z.string().optional(),
 });
 
 /**
