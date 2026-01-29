@@ -13,12 +13,12 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 
 ### Current Status
 
-| Severity | Original | Resolved | Open | New Issues |
-|----------|----------|----------|------|------------|
-| CRITICAL | 4 | 4 | 0 | 0 |
-| HIGH | 9 | 8 | 3 | 2 |
-| MEDIUM | 8 | 2 | 6 | 5 |
-| LOW | 5 | 0 | 5 | 2 |
+| Severity | Original | Resolved | Accepted | Open | New Issues |
+|----------|----------|----------|----------|------|------------|
+| CRITICAL | 4 | 4 | 0 | 0 | 0 |
+| HIGH | 9 | 8 | 1 | 2 | 2 |
+| MEDIUM | 8 | 3 | 0 | 5 | 5 |
+| LOW | 5 | 0 | 0 | 5 | 2 |
 
 ### Overall Risk Assessment: **MEDIUM** (improved from HIGH)
 
@@ -294,10 +294,10 @@ All audit entries include userId (when available), reason, path, IP address, and
 ## New High Severity Findings (Code Review - January 28, 2026)
 
 ### HIGH-012: Email Logged in Failed Login Audit
-**Status:** OPEN
+**Status:** ACCEPTED RISK
 **File:** `backend/src/routes/auth.ts:73`
-**Severity:** HIGH
-**CVSS:** 5.5
+**Severity:** HIGH (downgraded to LOW after analysis)
+**CVSS:** 5.5 (original), 2.0 (revised)
 
 User-provided email is logged directly in audit metadata for failed login attempts:
 ```typescript
@@ -310,12 +310,20 @@ await auditService.log({
 });
 ```
 
-**Risk:**
+**Original Concerns:**
 - Enables user enumeration through audit log analysis
 - Sets precedent for logging user-supplied data
 - Email addresses may contain PII in some contexts
 
-**Fix:** Log a partial hash of the email or omit entirely. If needed for investigation, store only `emailDomain` or a one-way hash.
+**Risk Acceptance Rationale (January 28, 2026):**
+After analysis, this is accepted as standard security practice:
+1. **Audit logs are internal** - stored in the `audit_logs` database table, accessible only to operators with database access. An attacker with that access could query the `users` table directly.
+2. **Input is validated** - Email is Zod-validated (`z.string().email()`) before logging, ensuring it's a properly-formatted email address, not arbitrary injection content.
+3. **Email is PII, not PHI** - HIPAA primarily concerns Protected Health Information. Email addresses don't reveal health conditions.
+4. **Security investigation value** - Logging failed login emails is essential for investigating brute-force attacks and identifying targeted accounts. This is industry-standard practice.
+5. **Low actual risk** - User enumeration via audit log analysis requires prior database compromise.
+
+**Decision:** Accept risk. The security investigation value outweighs the minimal PII exposure risk in this context.
 
 ---
 
@@ -537,28 +545,36 @@ await db.query(
 
 ---
 
-### MEDIUM-012: Gemini API Error Response May Contain PHI
-**Status:** OPEN
-**File:** `backend/src/services/ai-service.ts:112`
+### MEDIUM-012: LLM API Error Response May Contain PHI
+**Status:** RESOLVED
+**File:** `backend/src/services/ai-service.ts:110-131`
 **Severity:** MEDIUM
 
-Raw API error response is logged without sanitization:
+**Original Issue:** Raw API error response was logged without sanitization:
 ```typescript
 const error = await response.text();
 console.error('Gemini API error:', error);
 ```
 
-**Risk:** Error responses from Gemini may echo back portions of the request (which contains PHI from `quickNotes` and `patientContext`), which would then be logged.
+**Risk:** Error responses from LLM APIs may echo back portions of the request (which contains PHI from `quickNotes` and `patientContext`), which would then be logged.
 
-**Relation to MEDIUM-010:** This is a specific instance of the general concern raised in MEDIUM-010 about PHI leaking through logging paths.
+**Resolution (January 28, 2026):** Implemented provider-agnostic sanitized error logging:
+1. HTTP errors now log only status code and status text, never the response body
+2. Catch block errors log only error type and message, never the full error object
+3. Added security comments explaining the principle for future maintainers
 
-**Fix:** Log only status code and a sanitized error indicator:
 ```typescript
-console.error('Gemini API error:', {
+// HTTP errors - safe fields only
+console.error('LLM API error:', {
   status: response.status,
-  statusText: response.statusText
+  statusText: response.statusText,
 });
+
+// Caught errors - type and message only
+console.error('LLM service error:', { type: error.name, message: error.message });
 ```
+
+**Design Note:** The fix is provider-agnostic. The same principle applies regardless of LLM provider (Gemini, Claude, OpenAI, etc.) - never log raw error responses from APIs that receive PHI.
 
 ---
 
@@ -815,9 +831,7 @@ app.use(express.json({ limit: '100kb' }));
 ### Short-term (Security Hardening)
 1. **HIGH-001 + HIGH-007:** Password reset + email verification (build together)
 2. **HIGH-006:** Device binding for refresh tokens
-3. **HIGH-012:** Remove email from failed login audit (PII concern)
-4. **MEDIUM-005:** Prompt injection protection
-5. **MEDIUM-012:** Sanitize Gemini error logging (PHI concern)
+3. **MEDIUM-005:** Prompt injection protection
 
 ### Medium-term (Performance & Reliability)
 1. **MEDIUM-002 + MEDIUM-011:** Efficient refresh token validation + session limits (address together)
@@ -846,6 +860,7 @@ app.use(express.json({ limit: '100kb' }));
 | January 28, 2026 | **Code Review - New Findings:** Added 2 HIGH (HIGH-012: email in audit logs, HIGH-013: query timeout), 5 MEDIUM (MEDIUM-011: session count limit, MEDIUM-012: Gemini error logging, MEDIUM-013: webhook idempotency, MEDIUM-014: extension retry logic, MEDIUM-015: CORS extension origin), 2 LOW (LOW-006: magic strings, LOW-007: implicit body size limit). Body size limit downgraded from HIGH to LOW as Express defaults to 100KB - fix is for explicitness only. |
 | January 28, 2026 | **Resolved HIGH-013 (Query Statement Timeout):** Added 30-second `statement_timeout` to database pool configuration. Prevents DoS attacks via long-running queries exhausting connection pool. |
 | January 28, 2026 | **Resolved HIGH-003 (Content Security Policy):** Configured CSP appropriate for JSON API: `defaultSrc: 'none'` (no renderable content), `frameAncestors: 'none'` (clickjacking protection). Enabled HSTS with 1-year max-age, includeSubDomains, and preload. |
+| January 28, 2026 | **HIGH-012 Accepted, MEDIUM-012 Resolved:** Marked HIGH-012 (email in failed login audit) as ACCEPTED RISK after analysis - standard security practice with low actual risk. Resolved MEDIUM-012 by implementing provider-agnostic sanitized LLM error logging that logs only status codes and error types, never raw response bodies or full error objects that could contain PHI. |
 
 ---
 
@@ -854,26 +869,26 @@ app.use(express.json({ limit: '100kb' }));
 Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
 
 **Current Issue Count:**
-| Severity | Open | New (This Review) |
-|----------|------|-------------------|
-| CRITICAL | 0 | 0 |
-| HIGH | 5 | 1 |
-| MEDIUM | 11 | 5 |
-| LOW | 7 | 2 |
+| Severity | Open | Accepted | New (This Review) |
+|----------|------|----------|-------------------|
+| CRITICAL | 0 | 0 | 0 |
+| HIGH | 4 | 1 | 2 |
+| MEDIUM | 10 | 0 | 5 |
+| LOW | 7 | 0 | 2 |
 
 **Remaining Priority Items:**
 - All HIPAA-critical audit logging issues have been resolved
 - CSRF protection implemented (HIGH-002 resolved)
 - Query statement timeout implemented (HIGH-013 resolved) - DoS prevention now in place
 - Content Security Policy implemented (HIGH-003 resolved) - XSS defense-in-depth
-- **Remaining:** PHI/PII logging concerns (HIGH-012, MEDIUM-012) - audit logging may inadvertently capture sensitive data
-- 5 HIGH severity issues remain open (access controls, account lockout, email verification, device binding, email in logs)
+- HIGH-012 (email in failed login audit) accepted as standard security practice after risk analysis
+- MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
+- 4 HIGH severity issues remain open (password reset, account lockout, email verification, device binding)
 
 **Recommended Action:**
 1. **Before Production:** HIGH-005 (account lockout)
-2. **Short-term:** Address PII/PHI logging concerns (HIGH-012, MEDIUM-012), implement password reset + email verification
+2. **Short-term:** Implement password reset + email verification (HIGH-001 + HIGH-007)
 
-**Priority Discussion:**
-The email logging issue (HIGH-012) is nuanced - while it doesn't leak PHI, it does log PII (email addresses) and could enable enumeration attacks through log analysis. This is categorized as HIGH due to the healthcare context where any PII logging should be scrutinized.
-
-Note: JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
+**Notes:**
+- JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
+- Email in failed login audit (HIGH-012) marked as ACCEPTED RISK - standard security practice with low actual risk in this context.
