@@ -4,7 +4,8 @@ import type { User } from '../../types/index.js';
 export async function findUserByEmail(email: string): Promise<User | null> {
   const result = await db.query(
     `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
-            subscription_status, trial_ends_at, created_at, updated_at
+            subscription_status, trial_ends_at, created_at, updated_at,
+            failed_login_attempts, locked_until, last_failed_login_at
      FROM users WHERE email = $1`,
     [email]
   );
@@ -22,13 +23,17 @@ export async function findUserByEmail(email: string): Promise<User | null> {
     trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    failedLoginAttempts: row.failed_login_attempts ?? 0,
+    lockedUntil: row.locked_until,
+    lastFailedLoginAt: row.last_failed_login_at,
   };
 }
 
 export async function findUserById(id: string): Promise<User | null> {
   const result = await db.query(
     `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
-            subscription_status, trial_ends_at, created_at, updated_at
+            subscription_status, trial_ends_at, created_at, updated_at,
+            failed_login_attempts, locked_until, last_failed_login_at
      FROM users WHERE id = $1`,
     [id]
   );
@@ -46,6 +51,9 @@ export async function findUserById(id: string): Promise<User | null> {
     trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    failedLoginAttempts: row.failed_login_attempts ?? 0,
+    lockedUntil: row.locked_until,
+    lastFailedLoginAt: row.last_failed_login_at,
   };
 }
 
@@ -57,7 +65,8 @@ export async function createUser(
     `INSERT INTO users (email, password_hash)
      VALUES ($1, $2)
      RETURNING id, email, password_hash, stripe_customer_id, subscription_id,
-               subscription_status, trial_ends_at, created_at, updated_at`,
+               subscription_status, trial_ends_at, created_at, updated_at,
+               failed_login_attempts, locked_until, last_failed_login_at`,
     [email, passwordHash]
   );
 
@@ -72,6 +81,9 @@ export async function createUser(
     trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    failedLoginAttempts: row.failed_login_attempts ?? 0,
+    lockedUntil: row.locked_until,
+    lastFailedLoginAt: row.last_failed_login_at,
   };
 }
 

@@ -63,9 +63,12 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
     const ipAddress = req.ip ?? undefined;
     const userAgent = req.get('user-agent');
 
-    const result = await authService.login(email, password);
+    // Pass context for lockout tracking and audit logging
+    const result = await authService.login(email, password, { ipAddress, userAgent });
 
     if (!result) {
+      // Note: Failed attempt is already recorded by authService.login() via lockoutService
+      // This audit log captures the high-level event for security monitoring
       await auditService.log({
         userId: null,
         action: AuditAction.LOGIN_FAILED,

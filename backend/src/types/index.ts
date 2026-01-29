@@ -11,6 +11,10 @@ export interface User {
   trialEndsAt: Date;
   createdAt: Date;
   updatedAt: Date;
+  // Lockout fields (HIGH-005)
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+  lastFailedLoginAt: Date | null;
 }
 
 export type SubscriptionStatus =
@@ -79,6 +83,9 @@ export enum AuditAction {
   AUTH_FAILED = 'AUTH_FAILED',
   ACCESS_DENIED = 'ACCESS_DENIED',
   CSRF_FAILED = 'CSRF_FAILED',
+  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
+  ACCOUNT_UNLOCKED = 'ACCOUNT_UNLOCKED',
+  LOGIN_BLOCKED_LOCKED = 'LOGIN_BLOCKED_LOCKED',
 }
 
 export interface AuditLogEntry {

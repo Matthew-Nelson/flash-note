@@ -16,7 +16,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Accepted | Open | New Issues |
 |----------|----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 | 0 |
-| HIGH | 9 | 8 | 1 | 2 | 2 |
+| HIGH | 9 | 9 | 1 | 3 | 4 |
 | MEDIUM | 8 | 3 | 0 | 5 | 5 |
 | LOW | 5 | 0 | 0 | 5 | 2 |
 
@@ -169,19 +169,54 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 ---
 
 ### HIGH-005: No Account Lockout Mechanism
-**Status:** OPEN
-**File:** `backend/src/middleware/rate-limit.ts`
+**Status:** RESOLVED
+**Files:** `backend/src/services/lockout-service.ts`, `backend/src/services/auth-service.ts`, `backend/src/db/migrations/002_account_lockout.sql`
 **Severity:** HIGH
 **CVSS:** 5.9
 
-Rate limiting resets after the window. There's no permanent lockout after repeated failures.
+**Original Issue:** Rate limiting resets after the window. There was no permanent lockout after repeated failures, allowing persistent attackers to continue attempts indefinitely by waiting between windows.
 
-**Risk:** Persistent attackers can continue attempts indefinitely by waiting between windows.
+**Resolution:** Implemented database-backed progressive account lockout with timing-safe login:
 
-**Fix:** Implement progressive lockout:
-- After 5 failures: 15-minute cooldown
-- After 10 failures: 1-hour cooldown
-- After 20 failures: Account locked, requires admin unlock
+**Progressive Lockout Thresholds:**
+- 5 failures: 15-minute lockout
+- 10 failures: 1-hour lockout
+- 15 failures: 24-hour lockout
+- 20+ failures: Permanent lockout (requires admin unlock)
+
+**Implementation Details:**
+1. **Database Migration** (`002_account_lockout.sql`):
+   - Added `failed_login_attempts`, `locked_until`, `last_failed_login_at` columns to users table
+   - Added index on `locked_until` for efficient lockout queries
+
+2. **Lockout Service** (`lockout-service.ts`):
+   - `getAccountLockoutStatus()` - Check if account is locked
+   - `recordFailedAttempt()` - Increment failures, apply lockout if threshold exceeded
+   - `resetFailedAttempts()` - Reset on successful login
+   - `unlockAccount()` - Admin function for manual unlock
+
+3. **Timing-Safe Login** (`auth-service.ts`):
+   - Always performs bcrypt comparison (even for non-existent users) to prevent timing attacks
+   - Uses dummy hash comparison when user doesn't exist
+   - Checks lockout AFTER password validation to prevent lockout status from being a timing oracle
+   - Returns identical error for invalid credentials vs locked account
+
+4. **Audit Logging:**
+   - `ACCOUNT_LOCKED` - Logged when lockout is triggered (includes lockout duration, attempt count)
+   - `ACCOUNT_UNLOCKED` - Logged when admin unlocks account
+   - `LOGIN_BLOCKED_LOCKED` - Available for future use when revealing lockout status
+
+**Security Properties:**
+- Consistent response time regardless of account existence (timing-safe)
+- No information leakage about lockout status (same error as invalid credentials)
+- Per-account tracking (not just IP-based)
+- Persists across server restarts (database-backed)
+- Full audit trail for compliance
+
+**Future Enhancements (Documented in SECURITY_AUDIT.md):**
+- Admin API endpoint for unlocking accounts
+- Email notification when account is locked
+- Self-service unlock via verified email
 
 ---
 
@@ -809,7 +844,7 @@ app.use(express.json({ limit: '100kb' }));
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Access Controls | PARTIAL | Missing MFA, account lockout |
+| Access Controls | PARTIAL | Missing MFA; account lockout now implemented (HIGH-005) |
 | Audit Controls | PASS | Auth failures (HIGH-011) and generation failures (MEDIUM-009) now logged |
 | Transmission Security | PASS | TLS enforced |
 | PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
@@ -826,7 +861,7 @@ app.use(express.json({ limit: '100kb' }));
 1. ~~**HIGH-002:** CSRF protection~~ RESOLVED
 2. ~~**HIGH-013:** Query statement timeout (DoS prevention)~~ RESOLVED
 3. ~~**HIGH-003:** Content Security Policy~~ RESOLVED
-4. **HIGH-005:** Account lockout mechanism
+4. ~~**HIGH-005:** Account lockout mechanism~~ RESOLVED
 
 ### Short-term (Security Hardening)
 1. **HIGH-001 + HIGH-007:** Password reset + email verification (build together)
@@ -861,6 +896,7 @@ app.use(express.json({ limit: '100kb' }));
 | January 28, 2026 | **Resolved HIGH-013 (Query Statement Timeout):** Added 30-second `statement_timeout` to database pool configuration. Prevents DoS attacks via long-running queries exhausting connection pool. |
 | January 28, 2026 | **Resolved HIGH-003 (Content Security Policy):** Configured CSP appropriate for JSON API: `defaultSrc: 'none'` (no renderable content), `frameAncestors: 'none'` (clickjacking protection). Enabled HSTS with 1-year max-age, includeSubDomains, and preload. |
 | January 28, 2026 | **HIGH-012 Accepted, MEDIUM-012 Resolved:** Marked HIGH-012 (email in failed login audit) as ACCEPTED RISK after analysis - standard security practice with low actual risk. Resolved MEDIUM-012 by implementing provider-agnostic sanitized LLM error logging that logs only status codes and error types, never raw response bodies or full error objects that could contain PHI. |
+| January 28, 2026 | **Resolved HIGH-005 (Account Lockout):** Implemented database-backed progressive account lockout with timing-safe login. Thresholds: 5 failures → 15 min, 10 → 1 hour, 15 → 24 hours, 20+ → permanent. Added `lockout-service.ts` for lockout logic, migration `002_account_lockout.sql` for database columns. Auth service updated with dummy hash comparison to prevent timing attacks. New audit actions: `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED`, `LOGIN_BLOCKED_LOCKED`. |
 
 ---
 
@@ -872,7 +908,7 @@ Significant progress has been made on security remediation. All critical vulnera
 | Severity | Open | Accepted | New (This Review) |
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 4 | 1 | 2 |
+| HIGH | 3 | 1 | 4 |
 | MEDIUM | 10 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
@@ -881,14 +917,122 @@ Significant progress has been made on security remediation. All critical vulnera
 - CSRF protection implemented (HIGH-002 resolved)
 - Query statement timeout implemented (HIGH-013 resolved) - DoS prevention now in place
 - Content Security Policy implemented (HIGH-003 resolved) - XSS defense-in-depth
+- Account lockout implemented (HIGH-005 resolved) - Progressive lockout with timing-safe login
 - HIGH-012 (email in failed login audit) accepted as standard security practice after risk analysis
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
-- 4 HIGH severity issues remain open (password reset, account lockout, email verification, device binding)
+- 3 HIGH severity issues remain open (password reset, email verification, device binding)
 
 **Recommended Action:**
-1. **Before Production:** HIGH-005 (account lockout)
-2. **Short-term:** Implement password reset + email verification (HIGH-001 + HIGH-007)
+1. **Short-term:** Implement password reset + email verification (HIGH-001 + HIGH-007)
+2. **Medium-term:** Device binding for refresh tokens (HIGH-006)
 
 **Notes:**
 - JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
 - Email in failed login audit (HIGH-012) marked as ACCEPTED RISK - standard security practice with low actual risk in this context.
+- Account lockout admin unlock currently via direct database access; admin API endpoint planned for future.
+
+---
+
+## Future Security Enhancements
+
+### Admin Account Unlock Endpoint
+
+**Priority:** Medium (implement when support staff needs arise)
+**Related Issue:** HIGH-005 (Account Lockout)
+
+Currently, locked accounts can only be unlocked via direct database access:
+```sql
+UPDATE users
+SET failed_login_attempts = 0, locked_until = NULL, last_failed_login_at = NULL
+WHERE email = 'user@example.com';
+```
+
+**Future Implementation:**
+
+1. **Admin API Endpoint** (`POST /admin/users/:userId/unlock`)
+   - Requires admin authentication (separate admin role or API key)
+   - Calls `lockoutService.unlockAccount(userId, context)`
+   - Full audit trail via existing `ACCOUNT_UNLOCKED` action
+
+2. **Admin Dashboard**
+   - View locked accounts list
+   - One-click unlock functionality
+   - View lockout history per user
+
+**Implementation Effort:** Low-Medium
+**Trigger to Build:** When support staff is hired or user volume increases
+
+---
+
+### Email Notification System
+
+**Priority:** High (required for HIGH-001 password reset, HIGH-007 email verification)
+**Related Issues:** HIGH-001, HIGH-007, Account Lockout Notifications
+
+**Recommended Provider:** [Resend](https://resend.com)
+- Modern API with excellent TypeScript SDK
+- Free tier: 3,000 emails/month
+- Built for transactional email (verification, password reset)
+- Simple domain setup
+
+**Alternative Providers:**
+| Provider | Pricing | Notes |
+|----------|---------|-------|
+| Postmark | $15/mo for 10k | Excellent deliverability, healthcare-friendly |
+| AWS SES | ~$0.10/1k emails | Cheapest at scale, more setup |
+| SendGrid | Free: 100/day | Well-known, more complex |
+
+**Prerequisites:**
+1. Sending domain (e.g., `mail.flashnote.app` or `flashnote.app`)
+2. DNS records: SPF, DKIM, DMARC
+3. Environment variable: `RESEND_API_KEY`
+
+**Implementation Pattern:**
+```typescript
+// backend/src/services/email-service.ts
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+export async function sendAccountLockedEmail(email: string, lockoutMinutes: number) {
+  await resend.emails.send({
+    from: 'FlashNote Security <security@flashnote.app>',
+    to: email,
+    subject: 'Your FlashNote account has been temporarily locked',
+    html: `
+      <p>Your account was locked after multiple failed login attempts.</p>
+      <p>You can try again in ${lockoutMinutes} minutes.</p>
+      <p>If you didn't attempt these logins, please contact support.</p>
+    `
+  });
+}
+```
+
+**Use Cases:**
+1. **Account Lockout Notification** - Alert user when account is locked
+2. **Password Reset** (HIGH-001) - Time-limited reset link via email
+3. **Email Verification** (HIGH-007) - Verify email ownership before full access
+4. **Security Alerts** - Login from new device/location (future)
+
+**Implementation Effort:** Medium
+**Trigger to Build:** When implementing HIGH-001 (password reset) or HIGH-007 (email verification)
+
+---
+
+### Self-Service Account Unlock
+
+**Priority:** Low (implement after email verification is in place)
+**Related Issues:** HIGH-005, HIGH-007
+
+Once email verification (HIGH-007) is implemented, users can self-unlock:
+1. User clicks "Unlock my account" on login page
+2. System sends unlock link to verified email
+3. Clicking link resets lockout counter
+4. Full audit trail maintained
+
+**Prerequisites:**
+- Email verification implemented (HIGH-007)
+- Email sending infrastructure in place
+
+**Implementation Effort:** Low (once email is set up)
+**Trigger to Build:** After HIGH-007 is complete

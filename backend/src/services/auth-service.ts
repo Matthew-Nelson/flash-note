@@ -5,12 +5,23 @@ import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUser } from '../db/queries/users.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateCsrfToken } from '../middleware/csrf.js';
+import { lockoutService } from './lockout-service.js';
 import type { TokenPayload, User } from '../types/index.js';
 
 const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
+// SECURITY: Dummy hash for timing-safe password comparison when user doesn't exist
+// This prevents timing attacks that could reveal whether an email is registered
+// Generated with bcrypt.hashSync('dummy_password_never_matches', 12)
+const DUMMY_HASH = '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYq1IpHBBUGK';
+
+interface LoginContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
 
 class AuthService {
   async register(email: string, password: string) {
@@ -41,12 +52,35 @@ class AuthService {
     };
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, password: string, context: LoginContext = {}) {
     const user = await findUserByEmail(email);
-    if (!user) return null;
 
-    const validPassword = await bcrypt.compare(password, user.passwordHash);
-    if (!validPassword) return null;
+    // SECURITY: Always perform bcrypt comparison to prevent timing attacks
+    // If user doesn't exist, compare against dummy hash
+    // This ensures consistent response time regardless of whether email exists
+    const hashToCompare = user?.passwordHash ?? DUMMY_HASH;
+    const validPassword = await bcrypt.compare(password, hashToCompare);
+
+    // If user doesn't exist or password is wrong, record failure (if user exists) and return null
+    if (!user || !validPassword) {
+      if (user) {
+        // Record failed attempt - may trigger lockout
+        await lockoutService.recordFailedAttempt(user.id, context);
+      }
+      return null;
+    }
+
+    // SECURITY: Check lockout status AFTER password validation
+    // This prevents lockout status from being a timing oracle
+    // Even if password is correct, locked accounts cannot log in
+    const lockoutStatus = await lockoutService.getAccountLockoutStatus(user.id);
+    if (lockoutStatus.isLocked) {
+      // Don't reveal that the password was correct - return same error as invalid credentials
+      return null;
+    }
+
+    // Success - reset failed attempts counter
+    await lockoutService.resetFailedAttempts(user.id);
 
     // Generate tokens
     const accessToken = this.generateAccessToken(user.id, user.email);
