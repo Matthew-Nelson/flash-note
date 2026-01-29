@@ -39,6 +39,9 @@ export function createMockUserRow(overrides: Partial<{
   failed_login_attempts: number;
   locked_until: Date | null;
   last_failed_login_at: Date | null;
+  email_verified: boolean;
+  email_verified_at: Date | null;
+  token_version: number;
 }> = {}) {
   return {
     id: 'test-user-id',
@@ -53,6 +56,9 @@ export function createMockUserRow(overrides: Partial<{
     failed_login_attempts: 0,
     locked_until: null,
     last_failed_login_at: null,
+    email_verified: true,
+    email_verified_at: new Date(),
+    token_version: 1,
     ...overrides,
   };
 }

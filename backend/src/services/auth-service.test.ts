@@ -162,5 +162,75 @@ describe('AuthService', () => {
         expect(mockGetLockoutStatus).toHaveBeenCalledWith(user.id);
       });
     });
+
+    describe('lockout service error handling', () => {
+      it('should still reject login if recordFailedAttempt throws', async () => {
+        const user = createMockUserRow({ password_hash: validPasswordHash });
+        mockDbQuery.mockResolvedValueOnce({ rows: [user] });
+        mockRecordFailedAttempt.mockRejectedValueOnce(new Error('Database connection failed'));
+
+        // Mock console.error to verify error is logged
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const result = await authService.login('test@example.com', 'wrongpassword');
+
+        // Login should still be rejected (wrong password)
+        expect(result).toBeNull();
+        // Error should be logged
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Lockout service error during failed attempt recording:',
+          expect.any(Error)
+        );
+
+        consoleErrorSpy.mockRestore();
+      });
+
+      it('should deny login (fail-secure) if getAccountLockoutStatus throws', async () => {
+        const user = createMockUserRow({ password_hash: validPasswordHash });
+        mockDbQuery.mockResolvedValueOnce({ rows: [user] });
+        mockGetLockoutStatus.mockRejectedValueOnce(new Error('Database connection failed'));
+
+        // Mock console.error to verify error is logged
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const result = await authService.login('test@example.com', validPassword);
+
+        // SECURITY: Should deny login when lockout status cannot be checked (fail-secure)
+        expect(result).toBeNull();
+        // Error should be logged
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Lockout service error during status check:',
+          expect.any(Error)
+        );
+
+        consoleErrorSpy.mockRestore();
+      });
+
+      it('should still allow login if resetFailedAttempts throws', async () => {
+        const user = createMockUserRow({ password_hash: validPasswordHash });
+        mockDbQuery
+          .mockResolvedValueOnce({ rows: [user] }) // findUserByEmail
+          .mockResolvedValueOnce({ rows: [] }); // storeRefreshToken
+
+        mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 3 });
+        mockResetFailedAttempts.mockRejectedValueOnce(new Error('Database connection failed'));
+
+        // Mock console.error to verify error is logged
+        const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const result = await authService.login('test@example.com', validPassword);
+
+        // Login should succeed despite reset failure (user has valid credentials)
+        expect(result).not.toBeNull();
+        expect(result!.accessToken).toBeDefined();
+        // Error should be logged
+        expect(consoleErrorSpy).toHaveBeenCalledWith(
+          'Lockout service error during failed attempts reset:',
+          expect.any(Error)
+        );
+
+        consoleErrorSpy.mockRestore();
+      });
+    });
   });
 });

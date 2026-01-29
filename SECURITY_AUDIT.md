@@ -16,11 +16,11 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Accepted | Open | New Issues |
 |----------|----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 | 0 |
-| HIGH | 9 | 9 | 1 | 3 | 4 |
+| HIGH | 9 | 11 | 1 | 1 | 4 |
 | MEDIUM | 8 | 3 | 0 | 5 | 5 |
 | LOW | 5 | 0 | 0 | 5 | 2 |
 
-### Overall Risk Assessment: **MEDIUM** (improved from HIGH)
+### Overall Risk Assessment: **LOW-MEDIUM** (improved from MEDIUM)
 
 All critical vulnerabilities have been remediated. The codebase demonstrates good security fundamentals (parameterized queries, bcrypt hashing, JWT tokens with explicit algorithms, input validation). Remaining gaps are primarily in defense-in-depth controls and HIPAA audit requirements.
 
@@ -82,19 +82,42 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 ## High Severity Findings
 
 ### HIGH-001: No Password Reset Functionality
-**Status:** OPEN
+**Status:** RESOLVED
+**Files:** `backend/src/routes/auth.ts`, `backend/src/services/token-service.ts`, `backend/src/services/email-service.ts`, `web/src/app/forgot-password/page.tsx`, `web/src/app/reset-password/page.tsx`
 **Severity:** HIGH
 **CVSS:** 6.5
 
-**Risk:** Healthcare workers locked out of their accounts cannot recover access. This could:
-- Delay critical patient documentation
-- Force workarounds that bypass security
-- Result in HIPAA violations if users share credentials
+**Original Issue:** Healthcare workers locked out of their accounts could not recover access, potentially causing:
+- Delayed critical patient documentation
+- Workarounds that bypass security
+- HIPAA violations if users share credentials
 
-**Fix:** Implement secure password reset flow with:
-- Email verification
-- Time-limited tokens (15 minutes)
-- Audit logging of reset attempts
+**Resolution:** Implemented secure password reset flow with:
+
+**Token Security:**
+- 256-bit cryptographically random tokens (32 bytes)
+- SHA-256 hashed for storage (appropriate for high-entropy tokens)
+- 15-minute expiry (per security audit recommendation)
+- Single-use enforcement via atomic database operation
+- Previous tokens invalidated when new one is generated
+
+**Endpoints:**
+- `POST /auth/request-password-reset` - Request reset email (rate limited: 3/hour per IP)
+- `GET /auth/validate-reset-token` - Check if token is valid (for UI validation)
+- `POST /auth/reset-password` - Complete reset with new password (rate limited: 5/15min per IP)
+
+**Security Properties:**
+- Enumeration-safe: Same response for existing/non-existing emails
+- Session invalidation: All existing sessions deleted on password reset
+- Lockout reset: Failed login counter cleared on password reset
+- Full audit logging: `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_SUCCESS`, `PASSWORD_RESET_TOKEN_INVALID`
+
+**Web Pages:**
+- `/forgot-password` - Request password reset
+- `/reset-password` - Enter new password (validates token before showing form)
+
+**Extension Integration:**
+- Forgot password flow available inline in LoginForm (no web redirect needed for request)
 
 ---
 
@@ -239,19 +262,62 @@ ALTER TABLE sessions ADD COLUMN user_agent TEXT;
 ---
 
 ### HIGH-007: No Email Verification
-**Status:** OPEN
-**File:** `backend/src/routes/auth.ts`
+**Status:** RESOLVED
+**Files:** `backend/src/routes/auth.ts`, `backend/src/services/token-service.ts`, `backend/src/services/email-service.ts`, `backend/src/middleware/email-verification.ts`, `backend/src/db/migrations/003_email_verification.sql`, `web/src/app/verify-email/page.tsx`, `web/src/app/resend-verification/page.tsx`
 **Severity:** HIGH
 **CVSS:** 5.3
 
-Users can register with any email without verification.
+**Original Issue:** Users could register with any email without verification.
 
 **Risk:**
 - Account takeover via typo-squatting
 - Spam accounts
 - No way to verify identity for password resets
 
-**Fix:** Implement email verification flow before allowing full access.
+**Resolution:** Implemented complete email verification flow:
+
+**Database Schema:**
+- Added `email_verified` (boolean) and `email_verified_at` (timestamp) columns to users table
+- Created `email_tokens` table for secure token storage with types: `email_verification`, `password_reset`
+
+**Token Security:**
+- 256-bit cryptographically random tokens (32 bytes, URL-safe base64)
+- SHA-256 hashed for storage
+- 24-hour expiry for verification tokens
+- Single-use enforcement via atomic UPDATE query
+- Previous tokens invalidated when new one is generated
+
+**Endpoints:**
+- `POST /auth/verify-email` - Verify email with token (handles "already verified" gracefully)
+- `POST /auth/resend-verification` - Resend verification email (rate limited: 3/hour per IP)
+
+**Access Control Middleware:**
+- `requireEmailVerification` middleware blocks unverified users from:
+  - Note generation (`/notes/generate`)
+  - Billing operations (`/billing/checkout`, `/billing/portal`)
+- Returns 403 with `email_not_verified` error code
+- Logs `ACCESS_DENIED` audit event
+
+**Registration Flow:**
+- New users receive verification email automatically on registration
+- Unverified users can log in but see verification banner
+- Extension polls for verification status (auto-clears banner when verified)
+
+**Web Pages:**
+- `/verify-email` - Processes verification token from email link
+- `/resend-verification` - Request new verification email
+
+**Extension UX:**
+- Verification banner shown for unverified users
+- "Resend verification email" button in banner
+- Auto-polling every 10 seconds clears banner when verified (no logout required)
+- Forgot password flow inline in LoginForm
+
+**Audit Logging:**
+- `EMAIL_VERIFICATION_SENT` - On registration
+- `EMAIL_VERIFICATION_SUCCESS` - On successful verification
+- `EMAIL_VERIFICATION_FAILED` - On invalid/expired token
+- `EMAIL_VERIFICATION_RESENT` - On resend request
 
 ---
 
@@ -578,6 +644,8 @@ await db.query(
 );
 ```
 
+**Implementation Note:** The extension UI is already prepared for this feature. The `SessionAlert` component (added January 29, 2026) supports a `session_limit` reason that displays "You were signed out because you signed in on another device." When implementing session limits, dispatch the `AUTH_INVALIDATED_EVENT` with `reason: 'session_limit'` and the UI will handle it automatically.
+
 ---
 
 ### MEDIUM-012: LLM API Error Response May Contain PHI
@@ -844,14 +912,14 @@ app.use(express.json({ limit: '100kb' }));
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Access Controls | PARTIAL | Missing MFA; account lockout now implemented (HIGH-005) |
+| Access Controls | PARTIAL | Missing MFA; account lockout (HIGH-005) and email verification (HIGH-007) implemented |
 | Audit Controls | PASS | Auth failures (HIGH-011) and generation failures (MEDIUM-009) now logged |
 | Transmission Security | PASS | TLS enforced |
 | PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
 | Unique User IDs | PASS | UUID-based |
 | Automatic Logoff | FAIL | No session timeout warning |
 | Encryption | PARTIAL | Tokens not encrypted at rest |
-| Password Management | PARTIAL | No password reset functionality |
+| Password Management | PASS | Password reset (HIGH-001) and email verification (HIGH-007) implemented |
 
 ---
 
@@ -862,11 +930,11 @@ app.use(express.json({ limit: '100kb' }));
 2. ~~**HIGH-013:** Query statement timeout (DoS prevention)~~ RESOLVED
 3. ~~**HIGH-003:** Content Security Policy~~ RESOLVED
 4. ~~**HIGH-005:** Account lockout mechanism~~ RESOLVED
+5. ~~**HIGH-001 + HIGH-007:** Password reset + email verification~~ RESOLVED
 
 ### Short-term (Security Hardening)
-1. **HIGH-001 + HIGH-007:** Password reset + email verification (build together)
-2. **HIGH-006:** Device binding for refresh tokens
-3. **MEDIUM-005:** Prompt injection protection
+1. **HIGH-006:** Device binding for refresh tokens
+2. **MEDIUM-005:** Prompt injection protection
 
 ### Medium-term (Performance & Reliability)
 1. **MEDIUM-002 + MEDIUM-011:** Efficient refresh token validation + session limits (address together)
@@ -897,18 +965,20 @@ app.use(express.json({ limit: '100kb' }));
 | January 28, 2026 | **Resolved HIGH-003 (Content Security Policy):** Configured CSP appropriate for JSON API: `defaultSrc: 'none'` (no renderable content), `frameAncestors: 'none'` (clickjacking protection). Enabled HSTS with 1-year max-age, includeSubDomains, and preload. |
 | January 28, 2026 | **HIGH-012 Accepted, MEDIUM-012 Resolved:** Marked HIGH-012 (email in failed login audit) as ACCEPTED RISK after analysis - standard security practice with low actual risk. Resolved MEDIUM-012 by implementing provider-agnostic sanitized LLM error logging that logs only status codes and error types, never raw response bodies or full error objects that could contain PHI. |
 | January 28, 2026 | **Resolved HIGH-005 (Account Lockout):** Implemented database-backed progressive account lockout with timing-safe login. Thresholds: 5 failures → 15 min, 10 → 1 hour, 15 → 24 hours, 20+ → permanent. Added `lockout-service.ts` for lockout logic, migration `002_account_lockout.sql` for database columns. Auth service updated with dummy hash comparison to prevent timing attacks. New audit actions: `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED`, `LOGIN_BLOCKED_LOCKED`. |
+| January 29, 2026 | **Resolved HIGH-001 (Password Reset) + HIGH-007 (Email Verification):** Implemented complete email verification and password reset flows. Key components: (1) `token-service.ts` - 256-bit cryptographic tokens with SHA-256 storage, atomic single-use consumption; (2) `email-service.ts` - Resend integration with HTML/text templates; (3) `email-verification.ts` middleware - blocks unverified users from note generation and billing; (4) Database migration `003_email_verification.sql` - adds `email_verified`, `email_verified_at` to users, creates `email_tokens` table; (5) Rate limiting on all sensitive endpoints (3-5 requests per window); (6) Web pages for verify-email, forgot-password, reset-password, resend-verification; (7) Extension UX improvements - inline forgot password flow, verification banner with resend button, auto-polling clears banner when verified. Security properties: enumeration-safe responses, session invalidation on password reset, lockout counter reset, full audit trail. |
+| January 29, 2026 | **Token Versioning for Immediate Session Invalidation:** Fixed security gap where stateless JWT access tokens remained valid up to 1 hour after password reset. Implemented token versioning: (1) Database migration `004_token_version.sql` - adds `token_version` column to users; (2) Auth service includes `tokenVersion` in JWT payload; (3) Auth middleware validates token version on every request against database; (4) Password reset increments token version, immediately invalidating all access tokens. Added `SessionAlert` component to extension for consistent logout messaging - supports multiple reasons (session_invalidated, session_expired, session_limit, session_revoked) preparing for MEDIUM-011 session limits implementation. |
 
 ---
 
 ## Summary
 
-Significant progress has been made on security remediation. All critical vulnerabilities have been resolved, substantially reducing the risk of credential theft, API key exposure, and token manipulation attacks.
+Significant progress has been made on security remediation. All critical vulnerabilities and most HIGH severity issues have been resolved, substantially reducing the risk of credential theft, API key exposure, account takeover, and token manipulation attacks.
 
 **Current Issue Count:**
 | Severity | Open | Accepted | New (This Review) |
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 3 | 1 | 4 |
+| HIGH | 1 | 1 | 4 |
 | MEDIUM | 10 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
@@ -918,18 +988,22 @@ Significant progress has been made on security remediation. All critical vulnera
 - Query statement timeout implemented (HIGH-013 resolved) - DoS prevention now in place
 - Content Security Policy implemented (HIGH-003 resolved) - XSS defense-in-depth
 - Account lockout implemented (HIGH-005 resolved) - Progressive lockout with timing-safe login
+- Email verification implemented (HIGH-007 resolved) - Full verification flow with access control
+- Password reset implemented (HIGH-001 resolved) - Secure token-based reset with session invalidation
 - HIGH-012 (email in failed login audit) accepted as standard security practice after risk analysis
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
-- 3 HIGH severity issues remain open (password reset, email verification, device binding)
+- 1 HIGH severity issue remains open (device binding for refresh tokens)
 
 **Recommended Action:**
-1. **Short-term:** Implement password reset + email verification (HIGH-001 + HIGH-007)
-2. **Medium-term:** Device binding for refresh tokens (HIGH-006)
+1. **Short-term:** Device binding for refresh tokens (HIGH-006)
+2. **Medium-term:** Address MEDIUM severity items (prompt injection, session limits, webhook idempotency)
 
 **Notes:**
 - JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
 - Email in failed login audit (HIGH-012) marked as ACCEPTED RISK - standard security practice with low actual risk in this context.
 - Account lockout admin unlock currently via direct database access; admin API endpoint planned for future.
+- Email verification uses Resend for transactional email delivery (falls back to console logging when API key not configured).
+- Extension auto-polls for verification status - banner clears automatically without logout.
 
 ---
 
@@ -966,73 +1040,51 @@ WHERE email = 'user@example.com';
 
 ### Email Notification System
 
-**Priority:** High (required for HIGH-001 password reset, HIGH-007 email verification)
-**Related Issues:** HIGH-001, HIGH-007, Account Lockout Notifications
+**Status:** IMPLEMENTED
+**Related Issues:** HIGH-001 (RESOLVED), HIGH-007 (RESOLVED), Account Lockout Notifications
 
-**Recommended Provider:** [Resend](https://resend.com)
+**Provider:** [Resend](https://resend.com)
 - Modern API with excellent TypeScript SDK
 - Free tier: 3,000 emails/month
 - Built for transactional email (verification, password reset)
 - Simple domain setup
 
-**Alternative Providers:**
-| Provider | Pricing | Notes |
-|----------|---------|-------|
-| Postmark | $15/mo for 10k | Excellent deliverability, healthcare-friendly |
-| AWS SES | ~$0.10/1k emails | Cheapest at scale, more setup |
-| SendGrid | Free: 100/day | Well-known, more complex |
+**Implementation:** `backend/src/services/email-service.ts`
+- `sendVerificationEmail(email, token)` - Email verification link
+- `sendPasswordResetEmail(email, token)` - Password reset link
+- Falls back to console logging when `RESEND_API_KEY` not configured (for development)
 
-**Prerequisites:**
-1. Sending domain (e.g., `mail.flashnote.app` or `flashnote.app`)
-2. DNS records: SPF, DKIM, DMARC
-3. Environment variable: `RESEND_API_KEY`
+**Configuration:**
+- `RESEND_API_KEY` - API key from Resend dashboard
+- `EMAIL_FROM_ADDRESS` - Sender email (default: noreply@flashnote.app)
+- `EMAIL_FROM_NAME` - Sender name (default: FlashNote)
+- `EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS` - Token expiry (default: 24)
+- `PASSWORD_RESET_TOKEN_EXPIRY_MINUTES` - Token expiry (default: 15)
 
-**Implementation Pattern:**
-```typescript
-// backend/src/services/email-service.ts
-import { Resend } from 'resend';
+**Implemented Use Cases:**
+1. ~~**Password Reset** (HIGH-001)~~ - IMPLEMENTED
+2. ~~**Email Verification** (HIGH-007)~~ - IMPLEMENTED
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-export async function sendAccountLockedEmail(email: string, lockoutMinutes: number) {
-  await resend.emails.send({
-    from: 'FlashNote Security <security@flashnote.app>',
-    to: email,
-    subject: 'Your FlashNote account has been temporarily locked',
-    html: `
-      <p>Your account was locked after multiple failed login attempts.</p>
-      <p>You can try again in ${lockoutMinutes} minutes.</p>
-      <p>If you didn't attempt these logins, please contact support.</p>
-    `
-  });
-}
-```
-
-**Use Cases:**
+**Future Use Cases:**
 1. **Account Lockout Notification** - Alert user when account is locked
-2. **Password Reset** (HIGH-001) - Time-limited reset link via email
-3. **Email Verification** (HIGH-007) - Verify email ownership before full access
-4. **Security Alerts** - Login from new device/location (future)
-
-**Implementation Effort:** Medium
-**Trigger to Build:** When implementing HIGH-001 (password reset) or HIGH-007 (email verification)
+2. **Security Alerts** - Login from new device/location
 
 ---
 
 ### Self-Service Account Unlock
 
-**Priority:** Low (implement after email verification is in place)
-**Related Issues:** HIGH-005, HIGH-007
+**Priority:** Low (nice-to-have, email infrastructure now in place)
+**Related Issues:** HIGH-005, HIGH-007 (RESOLVED)
 
-Once email verification (HIGH-007) is implemented, users can self-unlock:
+Now that email verification (HIGH-007) is implemented, users could self-unlock:
 1. User clicks "Unlock my account" on login page
 2. System sends unlock link to verified email
 3. Clicking link resets lockout counter
 4. Full audit trail maintained
 
-**Prerequisites:**
-- Email verification implemented (HIGH-007)
-- Email sending infrastructure in place
+**Prerequisites:** ✅ All met
+- ✅ Email verification implemented (HIGH-007)
+- ✅ Email sending infrastructure in place
 
-**Implementation Effort:** Low (once email is set up)
-**Trigger to Build:** After HIGH-007 is complete
+**Implementation Effort:** Low
+**Trigger to Build:** When user support requests increase or support staff is limited

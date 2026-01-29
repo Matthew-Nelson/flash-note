@@ -45,6 +45,7 @@ export const storedUserSchema = z.object({
   email: z.string().email(),
   subscriptionStatus: z.string(),
   trialEndsAt: z.string().nullable().optional(),
+  emailVerified: z.boolean().optional(),
 });
 
 export const storedAuthSchema = z.object({
@@ -73,6 +74,7 @@ export const authResponseSchema = z.object({
   accessToken: z.string(),
   refreshToken: z.string(),
   csrfToken: z.string(),
+  emailVerificationRequired: z.boolean().optional(),
 });
 
 export const generatedNoteSchema = z.object({

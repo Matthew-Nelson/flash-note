@@ -19,6 +19,16 @@ export class ApiError extends Error {
   }
 }
 
+// Custom event for auth invalidation - allows UI to react to forced logout
+export const AUTH_INVALIDATED_EVENT = 'flashnote:auth-invalidated';
+
+// Reasons for session ending - used by SessionAlert component
+export type SessionEndReason =
+  | 'session_invalidated'  // Password reset, token version mismatch
+  | 'session_expired'      // Refresh token expired naturally
+  | 'session_limit'        // Too many devices, oldest session kicked (MEDIUM-011)
+  | 'session_revoked';     // Admin action or security event
+
 class ApiClient {
   private async getToken(): Promise<string | null> {
     const auth = await storage.getAuth();
@@ -88,9 +98,20 @@ class ApiClient {
     const result = await response.json();
 
     if (!response.ok || !result.success) {
+      const errorCode = result.error?.code ?? 'unknown_error';
+
+      // SECURITY: Auto-logout on invalid token (password was reset, session invalidated, etc.)
+      if (response.status === 401 && errorCode === 'invalid_token') {
+        await storage.clearAuth();
+        // Dispatch event so UI can react to forced logout
+        window.dispatchEvent(new CustomEvent(AUTH_INVALIDATED_EVENT, {
+          detail: { reason: 'session_invalidated' }
+        }));
+      }
+
       throw new ApiError(
         response.status,
-        result.error?.code ?? 'unknown_error',
+        errorCode,
         result.error?.message ?? 'An error occurred'
       );
     }
@@ -141,6 +162,56 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify(input),
     });
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    await this.request('/auth/request-password-reset', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resendVerificationEmail(email: string): Promise<void> {
+    await this.request('/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  /**
+   * Force refresh the access token and get updated user data.
+   * Used to poll for email verification status changes.
+   */
+  async refreshUser(): Promise<AuthResponse | null> {
+    const auth = await storage.getAuth();
+    if (!auth?.refreshToken) return null;
+
+    try {
+      const response = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: auth.refreshToken }),
+      });
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const result = await response.json();
+      const data = result.data as AuthResponse;
+
+      await storage.setAuth({
+        user: data.user,
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        csrfToken: data.csrfToken,
+        expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
+      });
+
+      return data;
+    } catch {
+      return null;
+    }
   }
 }
 

@@ -2,15 +2,23 @@ import { db } from '../db/index.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
 
+const isDev = process.env.NODE_ENV !== 'production';
+
 /**
  * Progressive lockout thresholds
  * After N failed attempts, account is locked for the specified duration
+ * In development, thresholds are 10x higher to avoid lockouts during testing
  */
-const LOCKOUT_THRESHOLDS = [
-  { attempts: 5, durationMinutes: 15 },      // First lockout: 15 minutes
-  { attempts: 10, durationMinutes: 60 },     // Second lockout: 1 hour
+const LOCKOUT_THRESHOLDS = isDev ? [
+  { attempts: 50, durationMinutes: 1 },       // Dev: very lenient
+  { attempts: 100, durationMinutes: 5 },
+  { attempts: 150, durationMinutes: 15 },
+  { attempts: 200, durationMinutes: null },
+] as const : [
+  { attempts: 5, durationMinutes: 15 },       // First lockout: 15 minutes
+  { attempts: 10, durationMinutes: 60 },      // Second lockout: 1 hour
   { attempts: 15, durationMinutes: 60 * 24 }, // Third lockout: 24 hours
-  { attempts: 20, durationMinutes: null },   // Permanent lockout (requires admin unlock)
+  { attempts: 20, durationMinutes: null },    // Permanent lockout (requires admin unlock)
 ] as const;
 
 interface LockoutStatus {
@@ -32,7 +40,7 @@ class LockoutService {
    */
   async getAccountLockoutStatus(userId: string): Promise<LockoutStatus> {
     const result = await db.query(
-      `SELECT failed_login_attempts, locked_until
+      `SELECT failed_login_attempts, locked_until, last_failed_login_at
        FROM users WHERE id = $1`,
       [userId]
     );
@@ -46,11 +54,15 @@ class LockoutService {
       };
     }
 
-    const { failed_login_attempts, locked_until } = result.rows[0];
+    const { failed_login_attempts, locked_until, last_failed_login_at } = result.rows[0];
     const now = new Date();
 
-    // Check if permanently locked (20+ attempts with no expiry)
-    const isPermanentlyLocked = failed_login_attempts >= 20 && locked_until === null;
+    // Check if permanently locked (20+ attempts with a recent failed login)
+    // We check last_failed_login_at to distinguish from fresh accounts (which have
+    // failed_login_attempts = 0, locked_until = null, last_failed_login_at = null)
+    const isPermanentlyLocked = failed_login_attempts >= 20 &&
+      locked_until === null &&
+      last_failed_login_at !== null;
 
     // Check if time-limited lock is still active
     const isTimeLocked = locked_until !== null && new Date(locked_until) > now;
@@ -66,19 +78,33 @@ class LockoutService {
   /**
    * Record a failed login attempt and potentially trigger lockout
    * Returns the new lockout status
+   *
+   * SECURITY: This uses a single atomic SQL query to both increment the counter
+   * AND set the lockout timestamp, preventing race conditions where rapid concurrent
+   * requests could slip through before lockout is applied.
    */
   async recordFailedAttempt(
     userId: string,
     context: LockoutContext
   ): Promise<LockoutStatus> {
-    // Atomically increment failed attempts and get new count
+    // SECURITY: Single atomic query that increments AND sets lockout in one operation
+    // This prevents race conditions where concurrent requests could bypass lockout
+    // Note: Thresholds match LOCKOUT_THRESHOLDS constant (adjusted for dev/prod)
+    const t = LOCKOUT_THRESHOLDS;
     const result = await db.query(
       `UPDATE users
        SET failed_login_attempts = failed_login_attempts + 1,
            last_failed_login_at = NOW(),
-           updated_at = NOW()
+           updated_at = NOW(),
+           locked_until = CASE
+             WHEN failed_login_attempts + 1 >= ${t[3]?.attempts ?? 200} THEN NULL
+             WHEN failed_login_attempts + 1 >= ${t[2]?.attempts ?? 150} THEN NOW() + INTERVAL '${t[2]?.durationMinutes ?? 15} minutes'
+             WHEN failed_login_attempts + 1 >= ${t[1]?.attempts ?? 100} THEN NOW() + INTERVAL '${t[1]?.durationMinutes ?? 5} minutes'
+             WHEN failed_login_attempts + 1 >= ${t[0]?.attempts ?? 50} THEN NOW() + INTERVAL '${t[0]?.durationMinutes ?? 1} minutes'
+             ELSE locked_until
+           END
        WHERE id = $1
-       RETURNING failed_login_attempts`,
+       RETURNING failed_login_attempts, locked_until`,
       [userId]
     );
 
@@ -92,70 +118,37 @@ class LockoutService {
       };
     }
 
-    const newAttemptCount = result.rows[0].failed_login_attempts;
+    const { failed_login_attempts: newAttemptCount, locked_until } = result.rows[0];
 
-    // Determine if we should apply a lockout
+    // Determine if we triggered a lockout (for audit logging)
     const lockout = this.determineLockout(newAttemptCount);
 
     if (lockout) {
-      if (lockout.durationMinutes === null) {
-        // Permanent lockout
-        await db.query(
-          `UPDATE users SET locked_until = NULL WHERE id = $1`,
-          [userId]
-        );
+      const isPermanent = lockout.durationMinutes === null;
+      const lockedUntil = locked_until ? new Date(locked_until) : null;
 
-        // Log permanent lockout event
-        await auditService.log({
-          userId,
-          action: AuditAction.ACCOUNT_LOCKED,
-          status: 'SUCCESS',
-          metadata: {
-            failedAttempts: newAttemptCount,
-            lockoutType: 'permanent',
-            reason: 'Exceeded maximum failed login attempts',
-          },
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-        });
-
-        return {
-          isLocked: true,
-          lockedUntil: null,
+      // Log lockout event (audit logging is async but non-critical)
+      await auditService.log({
+        userId,
+        action: AuditAction.ACCOUNT_LOCKED,
+        status: 'SUCCESS',
+        metadata: {
           failedAttempts: newAttemptCount,
-          isPermanentlyLocked: true,
-        };
-      } else {
-        // Time-limited lockout
-        const lockedUntil = new Date(Date.now() + lockout.durationMinutes * 60 * 1000);
+          lockoutType: isPermanent ? 'permanent' : 'temporary',
+          ...(isPermanent
+            ? { reason: 'Exceeded maximum failed login attempts' }
+            : { lockoutMinutes: lockout.durationMinutes, expiresAt: lockedUntil?.toISOString() }),
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
 
-        await db.query(
-          `UPDATE users SET locked_until = $1 WHERE id = $2`,
-          [lockedUntil, userId]
-        );
-
-        // Log lockout event
-        await auditService.log({
-          userId,
-          action: AuditAction.ACCOUNT_LOCKED,
-          status: 'SUCCESS',
-          metadata: {
-            failedAttempts: newAttemptCount,
-            lockoutType: 'temporary',
-            lockoutMinutes: lockout.durationMinutes,
-            expiresAt: lockedUntil.toISOString(),
-          },
-          ipAddress: context.ipAddress,
-          userAgent: context.userAgent,
-        });
-
-        return {
-          isLocked: true,
-          lockedUntil,
-          failedAttempts: newAttemptCount,
-          isPermanentlyLocked: false,
-        };
-      }
+      return {
+        isLocked: true,
+        lockedUntil,
+        failedAttempts: newAttemptCount,
+        isPermanentlyLocked: isPermanent,
+      };
     }
 
     // No lockout triggered yet

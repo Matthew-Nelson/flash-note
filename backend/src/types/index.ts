@@ -15,6 +15,11 @@ export interface User {
   failedLoginAttempts: number;
   lockedUntil: Date | null;
   lastFailedLoginAt: Date | null;
+  // Email verification fields (HIGH-007)
+  emailVerified: boolean;
+  emailVerifiedAt: Date | null;
+  // Token versioning for immediate session invalidation
+  tokenVersion: number;
 }
 
 export type SubscriptionStatus =
@@ -28,6 +33,7 @@ export type SubscriptionStatus =
 export interface TokenPayload {
   userId: string;
   email: string;
+  tokenVersion: number;
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -86,6 +92,16 @@ export enum AuditAction {
   ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
   ACCOUNT_UNLOCKED = 'ACCOUNT_UNLOCKED',
   LOGIN_BLOCKED_LOCKED = 'LOGIN_BLOCKED_LOCKED',
+  // Email verification (HIGH-007)
+  EMAIL_VERIFICATION_SENT = 'EMAIL_VERIFICATION_SENT',
+  EMAIL_VERIFICATION_SUCCESS = 'EMAIL_VERIFICATION_SUCCESS',
+  EMAIL_VERIFICATION_FAILED = 'EMAIL_VERIFICATION_FAILED',
+  EMAIL_VERIFICATION_RESENT = 'EMAIL_VERIFICATION_RESENT',
+  // Password reset (HIGH-001)
+  PASSWORD_RESET_REQUESTED = 'PASSWORD_RESET_REQUESTED',
+  PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
+  PASSWORD_RESET_FAILED = 'PASSWORD_RESET_FAILED',
+  PASSWORD_RESET_TOKEN_INVALID = 'PASSWORD_RESET_TOKEN_INVALID',
 }
 
 export interface AuditLogEntry {

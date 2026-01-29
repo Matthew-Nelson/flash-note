@@ -6,6 +6,8 @@ import { findUserByEmail, findUserById, createUser } from '../db/queries/users.j
 import { AppError } from '../middleware/error-handler.js';
 import { generateCsrfToken } from '../middleware/csrf.js';
 import { lockoutService } from './lockout-service.js';
+import { tokenService } from './token-service.js';
+import { emailService } from './email-service.js';
 import type { TokenPayload, User } from '../types/index.js';
 
 const BCRYPT_ROUNDS = 12;
@@ -37,8 +39,18 @@ class AuthService {
     // Create user
     const user = await createUser(email, passwordHash);
 
+    // Generate and send verification email
+    // SECURITY: Do this after user creation to ensure audit trail
+    try {
+      const verificationToken = await tokenService.createToken(user.id, 'email_verification');
+      await emailService.sendVerificationEmail(email, verificationToken);
+    } catch (error) {
+      // Log error but don't fail registration - user can resend verification
+      console.error('Failed to send verification email:', error);
+    }
+
     // Generate tokens
-    const accessToken = this.generateAccessToken(user.id, user.email);
+    const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
     const refreshToken = this.generateRefreshToken(user.id);
 
     // Store refresh token
@@ -49,6 +61,7 @@ class AuthService {
       accessToken,
       refreshToken,
       csrfToken: generateCsrfToken(user.id),
+      emailVerificationRequired: true,
     };
   }
 
@@ -65,7 +78,15 @@ class AuthService {
     if (!user || !validPassword) {
       if (user) {
         // Record failed attempt - may trigger lockout
-        await lockoutService.recordFailedAttempt(user.id, context);
+        // SECURITY: Wrap in try-catch to fail-secure. If lockout service fails,
+        // we still reject the login but don't want to leak error info or crash.
+        try {
+          await lockoutService.recordFailedAttempt(user.id, context);
+        } catch (error) {
+          // Log error for investigation but continue with login rejection
+          // This prevents lockout service failures from blocking the auth flow
+          console.error('Lockout service error during failed attempt recording:', error);
+        }
       }
       return null;
     }
@@ -73,17 +94,34 @@ class AuthService {
     // SECURITY: Check lockout status AFTER password validation
     // This prevents lockout status from being a timing oracle
     // Even if password is correct, locked accounts cannot log in
-    const lockoutStatus = await lockoutService.getAccountLockoutStatus(user.id);
+    let lockoutStatus;
+    try {
+      lockoutStatus = await lockoutService.getAccountLockoutStatus(user.id);
+    } catch (error) {
+      // SECURITY: Fail-secure - if we can't check lockout status, deny access
+      // Log error for investigation
+      console.error('Lockout service error during status check:', error);
+      return null;
+    }
+
     if (lockoutStatus.isLocked) {
       // Don't reveal that the password was correct - return same error as invalid credentials
       return null;
     }
 
     // Success - reset failed attempts counter
-    await lockoutService.resetFailedAttempts(user.id);
+    // SECURITY: Wrap in try-catch - if reset fails, still allow login but log error
+    // The user has valid credentials and isn't locked, so blocking them here
+    // would be unnecessarily disruptive
+    try {
+      await lockoutService.resetFailedAttempts(user.id);
+    } catch (error) {
+      // Log error but don't block successful login
+      console.error('Lockout service error during failed attempts reset:', error);
+    }
 
     // Generate tokens
-    const accessToken = this.generateAccessToken(user.id, user.email);
+    const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
     const refreshToken = this.generateRefreshToken(user.id);
 
     // Store refresh token
@@ -114,7 +152,7 @@ class AuthService {
     await this.revokeRefreshToken(payload.userId, refreshToken);
 
     // Generate new tokens
-    const newAccessToken = this.generateAccessToken(user.id, user.email);
+    const newAccessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
     const newRefreshToken = this.generateRefreshToken(user.id);
 
     // Store new refresh token
@@ -133,10 +171,11 @@ class AuthService {
     await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
   }
 
-  private generateAccessToken(userId: string, email: string): string {
+  private generateAccessToken(userId: string, email: string, tokenVersion: number): string {
     // SECURITY: Explicitly specify HS256 algorithm
+    // SECURITY: Include tokenVersion to enable immediate invalidation on password reset
     return jwt.sign(
-      { userId, email } as TokenPayload,
+      { userId, email, tokenVersion } as TokenPayload,
       config.JWT_SECRET,
       { expiresIn: ACCESS_TOKEN_EXPIRY, algorithm: 'HS256' }
     );
@@ -213,6 +252,7 @@ class AuthService {
       email: user.email,
       subscriptionStatus: user.subscriptionStatus,
       trialEndsAt: user.trialEndsAt,
+      emailVerified: user.emailVerified,
     };
   }
 }
