@@ -8,6 +8,7 @@ export const db = new Pool({
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
+  statement_timeout: 30000,
 });
 
 // Test connection on startup

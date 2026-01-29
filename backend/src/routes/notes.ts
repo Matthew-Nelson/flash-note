@@ -10,7 +10,7 @@ import { usageService } from '../services/usage-service.js';
 import { AuditAction, type AuthenticatedRequest, type NoteType } from '../types/index.js';
 import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
-export const notesRouter = Router();
+export const notesRouter: Router = Router();
 
 // All notes routes require authentication, CSRF validation, and active subscription
 notesRouter.use(requireAuth);

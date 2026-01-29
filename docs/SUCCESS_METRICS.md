@@ -104,6 +104,9 @@ These items must be complete before public launch.
 | PROD-13 | BAA template available for customers | Docs | P0 | ❌ Not done |
 | PROD-14 | Incident response plan documented | Docs | P1 | ❌ Not done |
 | PROD-15 | WCAG 2.1 AA accessibility | Web/Ext | P2 | ❌ Not done |
+| PROD-16 | Audit logging workflow complete | Backend | P0 | ❌ Not done |
+
+> **PROD-16 Details:** Implement admin API for viewing/exporting audit logs, add database-level immutability protections, and document retention policy. See [docs/AUDIT_LOGGING_REQUIREMENTS.md](AUDIT_LOGGING_REQUIREMENTS.md) for full requirements and implementation checklist.
 
 ---
 
@@ -375,8 +378,8 @@ These items must be complete before public launch.
 |-------|-------------|-----------|------------|
 | MVP Foundation | 15 | 6 | 40% |
 | Beta Ready | 12 | 0 | 0% |
-| Production Ready | 15 | 1 | 7% |
-| **Overall** | **42** | **7** | **17%** |
+| Production Ready | 16 | 1 | 6% |
+| **Overall** | **43** | **7** | **16%** |
 
 ---
 
@@ -384,6 +387,7 @@ These items must be complete before public launch.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1 | 2025-01-28 | Added PROD-16 for audit logging workflow completion |
 | 1.0 | 2025-01-22 | Initial document based on audit findings |
 
 ---

@@ -8,7 +8,7 @@ import { requireCsrf } from '../middleware/csrf.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 
-export const authRouter = Router();
+export const authRouter: Router = Router();
 
 // Validation schemas
 const registerSchema = z.object({

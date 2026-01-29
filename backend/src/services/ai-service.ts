@@ -13,6 +13,15 @@ if (isProduction && config.USE_MOCK_AI) {
   );
 }
 
+// TODO: This service is currently Gemini-specific. If experimenting with other LLM
+// providers (Claude, OpenAI, etc.), consider:
+// - Extracting a common LLMProvider interface
+// - Renaming GeminiResponse to a generic LLMResponse or creating provider-specific types
+// - Moving provider-specific logic (API URLs, auth headers, response parsing) into
+//   separate adapter classes
+// - Updating config to support provider selection
+// The error logging is already provider-agnostic (see SECURITY comments below).
+
 interface GeminiResponse {
   candidates: Array<{
     content: {
@@ -108,8 +117,13 @@ class AIService {
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        const error = await response.text();
-        console.error('Gemini API error:', error);
+        // SECURITY: Never log raw error response body from LLM APIs.
+        // Error responses may echo back portions of the request, which contains PHI.
+        // This principle applies regardless of LLM provider (Gemini, Claude, OpenAI, etc.)
+        console.error('LLM API error:', {
+          status: response.status,
+          statusText: response.statusText,
+        });
         throw new AppError(500, 'ai_error', 'Failed to generate note');
       }
 
@@ -123,7 +137,10 @@ class AIService {
         throw new AppError(500, 'ai_error', 'Note generation timed out');
       }
 
-      console.error('AI service error:', error);
+      // SECURITY: Log only error type/message, not full error object.
+      // Full error objects may contain request details including PHI.
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('LLM service error:', { type: error instanceof Error ? error.name : 'Unknown', message: errorMessage });
       throw new AppError(500, 'ai_error', 'Failed to generate note');
     }
   }

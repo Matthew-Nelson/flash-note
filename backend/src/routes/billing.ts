@@ -5,7 +5,7 @@ import { requireCsrf } from '../middleware/csrf.js';
 import { billingService } from '../services/billing-service.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
-export const billingRouter = Router();
+export const billingRouter: Router = Router();
 
 // Validation schemas
 const checkoutSchema = z.object({
