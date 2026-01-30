@@ -83,27 +83,43 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
-        <div className="loading-indicator flex flex-col items-center gap-6">
+        <div className="loading-indicator flex flex-col items-center gap-4">
           {/* Loading visual - adapts per theme */}
-          <div className="relative">
+          <div className="relative flex flex-col items-center">
+            {/* Dark AI theme: orb */}
             <div className="loading-orb" />
+            {/* Glassmorphism theme: rings */}
             <div className="loading-rings" />
+            {/* Gradient Accent theme: spinner with orbiting dots */}
+            <div className="loading-spinner">
+              <div className="loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+            {/* Progress bar (gradient theme) */}
             <div className="loading-bar" />
           </div>
 
           {/* Stage indicator */}
-          <div className="text-center">
-            <p className="text-sm font-medium animate-fade-in" key={loadingStage}>
+          <div className="text-center mt-2">
+            <p className="loading-stage text-sm font-medium animate-fade-in" key={loadingStage}>
               {LOADING_STAGES[loadingStage]}
             </p>
-            <div className="flex justify-center gap-1 mt-3">
+            <div className="flex justify-center gap-1.5 mt-3">
               {LOADING_STAGES.map((_, i) => (
                 <div
                   key={i}
-                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                    i === loadingStage ? 'btn-primary scale-125' : 'opacity-30'
+                  className={`loading-stage-dot w-2 h-2 rounded-full transition-all duration-300 ${
+                    i === loadingStage ? 'active scale-125' : ''
                   }`}
-                  style={{ backgroundColor: i === loadingStage ? 'var(--accent-primary, #06b6d4)' : 'currentColor' }}
+                  style={{
+                    backgroundColor: i <= loadingStage
+                      ? `var(--accent-${i % 2 === 0 ? 'primary' : 'secondary'}, #06b6d4)`
+                      : 'var(--bg-tertiary, #e2e8f0)',
+                    opacity: i <= loadingStage ? 1 : 0.4
+                  }}
                 />
               ))}
             </div>
