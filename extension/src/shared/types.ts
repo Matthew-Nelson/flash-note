@@ -12,9 +12,7 @@ export interface GeneratedNote {
   objective: string;
   assessment: string;
   plan: string;
-  metadata: {
-    model: string;
-    tokensUsed: number;
+  metadata?: {
     generationTimeMs: number;
   };
 }

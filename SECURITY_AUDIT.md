@@ -17,7 +17,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 |----------|----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 | 0 |
 | HIGH | 9 | 11 | 1 | 0 | 4 |
-| MEDIUM | 8 | 5 | 0 | 3 | 5 |
+| MEDIUM | 8 | 7 | 0 | 1 | 5 |
 | LOW | 5 | 0 | 0 | 5 | 2 |
 
 ### Overall Risk Assessment: **LOW-MEDIUM** (improved from MEDIUM)
@@ -518,18 +518,35 @@ db.on('error', (err) => {
 ---
 
 ### MEDIUM-005: Prompt Injection Vulnerability
-**Status:** OPEN
-**File:** `backend/src/prompts/pt-prompts.ts:100-128`
+**Status:** RESOLVED
+**Files:** `backend/src/utils/prompt-sanitization.ts`, `backend/src/prompts/pt-prompts.ts`, `backend/src/services/ai-service.ts`
 **Severity:** MEDIUM
 
-User input (`quickNotes`, `patientContext`) is directly concatenated into prompts without sanitization.
+**Original Issue:** User input (`quickNotes`, `patientContext`) was directly concatenated into prompts without sanitization.
 
 **Risk:** Malicious users could inject prompt instructions to:
 - Extract system prompts
 - Generate inappropriate content
 - Bypass safety guidelines
 
-**Fix:** Implement input sanitization and prompt injection detection. Consider using structured prompt formats or XML-style delimiters.
+**Resolution (January 30, 2026):** Implemented defense-in-depth prompt injection protection:
+
+1. **XML Delimiter Wrapping:**
+   - User content wrapped in `<clinician_notes>` and `<patient_context>` tags
+   - System prompt includes instructions to treat delimited content as literal data only
+   - Preserves medical notation (`5/10`, `3+/5`, `<90°`) unchanged
+
+2. **Suspicious Pattern Detection:**
+   - Heuristic detection for common injection patterns (e.g., "ignore previous instructions", "reveal system prompt", "act as admin")
+   - Detection is monitoring-only; requests are NOT blocked
+   - Metadata logged in audit for security analysis: `suspiciousPatternDetected`, `suspiciousPatternCount`
+   - False positive prevention: Legitimate PT documentation (e.g., "instruction given on HEP", "previous visit showed improvement") does not trigger detection
+
+3. **Design Decisions:**
+   - Fail-open for usability: PT staff need reliable note generation
+   - Even if injection succeeds, it only affects that user's own note
+   - XML delimiters + LLM instructions provide the actual protection
+   - Detection is for monitoring/alerting, not blocking
 
 ---
 
@@ -598,10 +615,11 @@ Access and refresh tokens stored in the same storage object.
 ---
 
 ### MEDIUM-010: Prompt Parsing Warnings May Leak Context
-**Status:** OPEN
-**File:** `backend/src/prompts/pt-prompts.ts:164`
+**Status:** RESOLVED
+**File:** `backend/src/prompts/pt-prompts.ts`
 **Severity:** MEDIUM
 
+**Original Issue:**
 ```typescript
 console.warn(`Missing SOAP sections: ${missing.join(', ')}`);
 ```
@@ -610,7 +628,20 @@ While this specific line doesn't log PHI directly, it indicates that error/warni
 
 **Risk:** If logging is expanded or errors bubble up with context, PHI could leak to logs.
 
-**Fix:** Ensure all logging paths are audited for PHI exposure. Consider structured logging that explicitly excludes user content fields.
+**Resolution (January 30, 2026):**
+1. Audited the logging path and confirmed it is PHI-safe:
+   - The warning only logs section names (subjective, objective, assessment, plan)
+   - Section names are fixed strings from pattern matching, NOT user content
+   - Added explicit security comment documenting this for future maintainers
+
+2. Added security comment to `parseSOAPSections()`:
+```typescript
+// SECURITY (MEDIUM-010): This warning only logs section names (subjective, objective, etc.)
+// Section names are NOT PHI - they're fixed strings from our pattern matching.
+// We never log the actual content of sections, only which ones are missing.
+```
+
+**Note:** The code was already PHI-safe; this fix adds documentation to prevent future regressions and satisfy auditors.
 
 ---
 
@@ -1022,23 +1053,33 @@ Both issues were in `backend/src/index.ts:15-19`. Same root cause: hardcoded ori
 
 ---
 
-### Group E: LLM/Prompt Security
+### ~~Group E: LLM/Prompt Security~~ RESOLVED
 **Priority: MEDIUM** | **Issues: MEDIUM-005, MEDIUM-010**
 
-Both in prompt handling code (`backend/src/prompts/`). Address injection and leakage risks together.
+Both issues were in prompt handling code (`backend/src/prompts/`). Addressed injection and leakage risks together.
 
-| Issue | Description | Shared Code |
-|-------|-------------|-------------|
-| MEDIUM-005 | Prompt injection vulnerability | pt-prompts.ts |
-| MEDIUM-010 | Prompt warnings may leak context | pt-prompts.ts logging |
+| Issue | Description | Status |
+|-------|-------------|--------|
+| MEDIUM-005 | Prompt injection vulnerability | ✅ RESOLVED |
+| MEDIUM-010 | Prompt warnings may leak context | ✅ RESOLVED |
 
-**Implementation approach:**
-1. Audit all prompt code for PHI leakage in logs/warnings
-2. Implement input sanitization before LLM submission
-3. Consider XML-style delimiters for user content isolation
-4. Add prompt injection detection heuristics
-
-**Dependencies:** None - isolated to prompt code
+**Implementation (completed January 30, 2026):**
+1. Created `backend/src/utils/prompt-sanitization.ts`:
+   - `wrapWithDelimiters()` - XML delimiter wrapping for user content
+   - `detectSuspiciousPatterns()` - Heuristic detection for injection attempts
+   - `getContentMetadata()` - PHI-safe metadata extraction for logging
+2. Updated `backend/src/prompts/pt-prompts.ts`:
+   - System prompt includes content handling security rules
+   - User content wrapped in `<clinician_notes>` and `<patient_context>` tags
+   - Security reminder at end of prompt
+   - Added PHI protection comment to warning log
+3. Updated `backend/src/services/ai-service.ts`:
+   - Runs detection before prompt building
+   - Includes `securityMetadata` in response
+4. Updated `backend/src/routes/notes.ts`:
+   - Audit logs include detection metadata
+5. Added types: `PromptSecurityMetadata` in `types/index.ts`
+6. Tests: `prompt-sanitization.test.ts` (31 tests), `pt-prompts.test.ts` (20 tests)
 
 ---
 
@@ -1082,9 +1123,9 @@ Phase 1: Security Foundation ✅ COMPLETE
 ├── Group A: Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011) ✅
 └── Group D: CORS Configuration (MEDIUM-007, MEDIUM-015) ✅
 
-Phase 2: Security Hardening
-├── Group E: LLM/Prompt Security (MEDIUM-005, MEDIUM-010)
-└── MEDIUM-013: Webhook Idempotency (standalone)
+Phase 2: Security Hardening ✅ COMPLETE
+├── Group E: LLM/Prompt Security (MEDIUM-005, MEDIUM-010) ✅
+└── MEDIUM-013: Webhook Idempotency (standalone) - REMAINING
 
 Phase 3: Resilience & UX
 ├── Group B: Extension Resilience (MEDIUM-003, MEDIUM-008, MEDIUM-014)
@@ -1097,7 +1138,7 @@ Phase 4: Ongoing
 
 **Rationale:**
 - ~~Phase 1 addresses the only remaining HIGH issue and a quick CORS fix~~ **COMPLETE**
-- Phase 2 handles security-critical prompt injection before it becomes a vector
+- ~~Phase 2 handles security-critical prompt injection before it becomes a vector~~ **MOSTLY COMPLETE** (only MEDIUM-013 webhook idempotency remains)
 - Phase 3 improves reliability and debugging capability
 - Phase 4 is continuous improvement
 
@@ -1120,6 +1161,7 @@ Phase 4: Ongoing
 | January 30, 2026 | **Reorganized Open Issues into Implementation Groups:** Analyzed remaining 17 open issues and organized into 6 logical groups based on shared code paths and dependencies: Group A (Session Infrastructure: HIGH-006, MEDIUM-002, MEDIUM-011), Group B (Extension Resilience: MEDIUM-003, MEDIUM-008, MEDIUM-014), Group C (Observability Stack: LOW-001, MEDIUM-004, MEDIUM-006), Group D (CORS Configuration: MEDIUM-007, MEDIUM-015), Group E (LLM/Prompt Security: MEDIUM-005, MEDIUM-010), Group F (CI/CD Pipeline: LOW-003, LOW-005). Added phased implementation order prioritizing the remaining HIGH severity issue. Standalone items identified for quick wins. |
 | January 30, 2026 | **Resolved Group A - Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011):** Implemented comprehensive session security improvements. (1) HIGH-006 Device Binding: Sessions now store IP address and user agent; mismatches logged as `SESSION_DEVICE_CHANGE` warnings (lenient mode - doesn't block, since PT staff frequently change networks); (2) MEDIUM-002 O(1) Token Validation: Refresh tokens include `sessionId` in JWT payload, enabling primary key lookup instead of O(n) bcrypt loop; legacy tokens fall back gracefully; (3) MEDIUM-011 Session Limits: Max 5 sessions per user enforced, oldest deleted when exceeded, `SESSION_LIMIT_EXCEEDED` audit events logged. Migration: `006_session_device_binding.sql`. Test coverage: 27 auth-service tests. **All HIGH severity issues now resolved.** |
 | January 30, 2026 | **Resolved Group D - CORS Configuration (MEDIUM-007, MEDIUM-015):** Replaced NODE_ENV-based CORS origin logic with explicit `ALLOWED_ORIGINS` environment variable. (1) Added `ALLOWED_ORIGINS` to Zod config schema - parses comma-separated list with whitespace trimming; (2) CORS middleware now uses `config.ALLOWED_ORIGINS` directly; (3) Supports Chrome extension origins (chrome-extension://); (4) Production must explicitly configure allowed origins. Files: `config.ts`, `index.ts`, `.env.example`, `.env`. |
+| January 30, 2026 | **Resolved Group E - LLM/Prompt Security (MEDIUM-005, MEDIUM-010):** Implemented defense-in-depth prompt injection protection. (1) Created `prompt-sanitization.ts` utility with XML delimiter wrapping (`wrapWithDelimiters`), suspicious pattern detection (`detectSuspiciousPatterns`), and PHI-safe metadata extraction; (2) Updated `pt-prompts.ts` - system prompt includes content handling security rules, user content wrapped in `<clinician_notes>` and `<patient_context>` tags, added security reminder at end of prompt, added PHI protection comment to warning log; (3) Updated `ai-service.ts` - runs detection before prompt building, includes `securityMetadata` in response; (4) Updated `notes.ts` - audit logs include detection metadata (`suspiciousPatternDetected`, `suspiciousPatternCount`); (5) Added `PromptSecurityMetadata` type to `types/index.ts`; (6) Added comprehensive tests (51 total). Detection is monitoring-only (fail-open for usability); XML delimiters provide the actual protection. |
 
 ---
 
@@ -1132,7 +1174,7 @@ Significant progress has been made on security remediation. All critical vulnera
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 0 | 1 | 4 |
-| MEDIUM | 6 | 0 | 5 |
+| MEDIUM | 4 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
 **Remaining Priority Items:**
@@ -1147,10 +1189,11 @@ Significant progress has been made on security remediation. All critical vulnera
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
 - Session infrastructure implemented (HIGH-006, MEDIUM-002, MEDIUM-011 resolved) - Device binding, O(1) token validation, session limits
 - CORS configuration implemented (MEDIUM-007, MEDIUM-015 resolved) - Explicit ALLOWED_ORIGINS env var, supports extension origins
+- **Prompt injection protection implemented (MEDIUM-005, MEDIUM-010 resolved)** - XML delimiter wrapping, suspicious pattern detection for monitoring, PHI-safe logging documented
 - **All HIGH severity issues now resolved**
 
 **Recommended Action:**
-1. **Short-term:** Address remaining MEDIUM severity items (prompt injection, webhook idempotency, extension resilience)
+1. **Short-term:** Address remaining MEDIUM severity items (webhook idempotency, extension resilience)
 2. **Medium-term:** Observability stack (structured logging, request ID tracing)
 
 **Notes:**
