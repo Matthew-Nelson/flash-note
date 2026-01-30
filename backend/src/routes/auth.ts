@@ -77,7 +77,8 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
     const ipAddress = req.ip ?? undefined;
     const userAgent = req.get('user-agent');
 
-    const result = await authService.register(email, password);
+    // HIGH-006: Pass context for device binding on session creation
+    const result = await authService.register(email, password, { ipAddress, userAgent });
 
     await auditService.log({
       userId: result.user.id,
@@ -143,8 +144,11 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
 authRouter.post('/refresh', refreshRateLimit, async (req, res, next) => {
   try {
     const { refreshToken } = refreshSchema.parse(req.body);
+    const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
 
-    const result = await authService.refreshTokens(refreshToken);
+    // HIGH-006: Pass context for device binding check and new session creation
+    const result = await authService.refreshTokens(refreshToken, { ipAddress, userAgent });
 
     if (!result) {
       throw new AppError(401, 'invalid_token', 'Invalid or expired refresh token');

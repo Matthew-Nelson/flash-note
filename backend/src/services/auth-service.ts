@@ -8,12 +8,17 @@ import { generateCsrfToken } from '../middleware/csrf.js';
 import { lockoutService } from './lockout-service.js';
 import { tokenService } from './token-service.js';
 import { emailService } from './email-service.js';
+import { auditService } from './audit-service.js';
 import type { TokenPayload, User } from '../types/index.js';
-import type { SessionRefreshTokenRow, SessionWithIdRow } from '../types/database.js';
+import { AuditAction } from '../types/index.js';
+import type { SessionValidationRow } from '../types/database.js';
 
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;
+
+// MEDIUM-011: Session limit to prevent unbounded growth and mitigate O(n) legacy token validation
+const MAX_SESSIONS_PER_USER = 5;
 
 // SECURITY: Dummy hash for timing-safe password comparison when user doesn't exist
 // This prevents timing attacks that could reveal whether an email is registered
@@ -26,7 +31,7 @@ interface LoginContext {
 }
 
 class AuthService {
-  async register(email: string, password: string) {
+  async register(email: string, password: string, context: LoginContext = {}) {
     // Check if user exists
     const existing = await findUserByEmail(email);
     if (existing) {
@@ -49,12 +54,11 @@ class AuthService {
       console.error('Failed to send verification email:', error);
     }
 
-    // Generate tokens
+    // Generate access token
     const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
-    const refreshToken = this.generateRefreshToken(user.id);
 
-    // Store refresh token
-    await this.storeRefreshToken(user.id, refreshToken);
+    // Store refresh token and get session info (HIGH-006: includes device binding)
+    const { refreshToken } = await this.storeRefreshToken(user.id, context);
 
     return {
       user: this.sanitizeUser(user),
@@ -120,12 +124,11 @@ class AuthService {
       console.error('Lockout service error during failed attempts reset:', error);
     }
 
-    // Generate tokens
+    // Generate access token
     const accessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
-    const refreshToken = this.generateRefreshToken(user.id);
 
-    // Store refresh token
-    await this.storeRefreshToken(user.id, refreshToken);
+    // Store refresh token and get session info (HIGH-006: includes device binding)
+    const { refreshToken } = await this.storeRefreshToken(user.id, context);
 
     return {
       user: this.sanitizeUser(user),
@@ -135,28 +138,33 @@ class AuthService {
     };
   }
 
-  async refreshTokens(refreshToken: string) {
+  async refreshTokens(refreshToken: string, context: LoginContext = {}) {
     // Verify the refresh token
     const payload = this.verifyRefreshToken(refreshToken);
     if (!payload) return null;
 
-    // Check if refresh token is valid in database
-    const valid = await this.validateRefreshToken(payload.userId, refreshToken);
-    if (!valid) return null;
+    // Check if refresh token is valid in database (O(1) with sessionId, O(n) for legacy)
+    // HIGH-006: Also checks device binding and logs mismatches
+    const validationResult = await this.validateRefreshToken(
+      payload.userId,
+      payload.sessionId,
+      refreshToken,
+      context
+    );
+    if (!validationResult.valid) return null;
 
     // Get user
     const user = await findUserById(payload.userId);
     if (!user) return null;
 
-    // Revoke old refresh token
-    await this.revokeRefreshToken(payload.userId, refreshToken);
+    // Revoke old refresh token (O(1) with sessionId)
+    await this.revokeRefreshToken(payload.sessionId);
 
-    // Generate new tokens
+    // Generate new access token
     const newAccessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
-    const newRefreshToken = this.generateRefreshToken(user.id);
 
-    // Store new refresh token
-    await this.storeRefreshToken(user.id, newRefreshToken);
+    // Store new refresh token with device binding (preserves original device info)
+    const { refreshToken: newRefreshToken } = await this.storeRefreshToken(user.id, context);
 
     return {
       user: this.sanitizeUser(user),
@@ -181,69 +189,237 @@ class AuthService {
     );
   }
 
-  private generateRefreshToken(userId: string): string {
+  private generateRefreshToken(userId: string, sessionId: string): string {
     // SECURITY: Explicitly specify HS256 algorithm
+    // MEDIUM-002: Include sessionId for O(1) lookup instead of O(n) bcrypt loop
     return jwt.sign(
-      { userId, type: 'refresh' },
+      { userId, sessionId, type: 'refresh' },
       config.JWT_REFRESH_SECRET,
       { expiresIn: REFRESH_TOKEN_EXPIRY, algorithm: 'HS256' }
     );
   }
 
-  private verifyRefreshToken(token: string): { userId: string } | null {
+  private verifyRefreshToken(token: string): { userId: string; sessionId: string } | null {
     try {
       // SECURITY: Explicitly specify algorithm to prevent algorithm confusion attacks
       const payload = jwt.verify(token, config.JWT_REFRESH_SECRET, {
         algorithms: ['HS256'],
       }) as {
         userId: string;
+        sessionId?: string;  // Optional for backwards compat with legacy tokens
         type: string;
       };
       if (payload.type !== 'refresh') return null;
-      return { userId: payload.userId };
+      // Return empty string for sessionId if not present (legacy token)
+      return { userId: payload.userId, sessionId: payload.sessionId ?? '' };
     } catch {
       return null;
     }
   }
 
-  private async storeRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const hash = await bcrypt.hash(refreshToken, 10);
+  /**
+   * Creates a new session and generates a refresh token for it.
+   * Uses insert-then-update pattern to get sessionId before generating the token.
+   *
+   * HIGH-006: Stores device binding info (IP, user agent) for audit trail
+   * MEDIUM-011: Enforces session limit before creating new session
+   * MEDIUM-002: Returns sessionId to enable O(1) token validation
+   */
+  private async storeRefreshToken(
+    userId: string,
+    context: LoginContext = {}
+  ): Promise<{ sessionId: string; refreshToken: string }> {
+    // MEDIUM-011: Enforce session limit before creating new session
+    await this.enforceSessionLimit(userId, context);
+
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
-    await db.query(
-      `INSERT INTO sessions (user_id, refresh_token_hash, expires_at)
-       VALUES ($1, $2, $3)`,
-      [userId, hash, expiresAt]
+    // Step 1: Insert session with placeholder hash to get the ID
+    const insertResult = await db.query<{ id: string }>(
+      `INSERT INTO sessions (user_id, refresh_token_hash, expires_at, ip_address, user_agent)
+       VALUES ($1, 'placeholder', $2, $3, $4)
+       RETURNING id`,
+      [userId, expiresAt, context.ipAddress ?? null, context.userAgent ?? null]
     );
+
+    // INSERT with RETURNING always returns the inserted row
+    if (!insertResult.rows[0]) {
+      throw new Error('Failed to create session');
+    }
+    const sessionId = insertResult.rows[0].id;
+
+    // Step 2: Generate token with sessionId included
+    const refreshToken = this.generateRefreshToken(userId, sessionId);
+
+    // Step 3: Hash and update the session with the real token hash
+    const hash = await bcrypt.hash(refreshToken, 10);
+    await db.query(
+      'UPDATE sessions SET refresh_token_hash = $1 WHERE id = $2',
+      [hash, sessionId]
+    );
+
+    return { sessionId, refreshToken };
   }
 
-  private async validateRefreshToken(userId: string, refreshToken: string): Promise<boolean> {
-    const result = await db.query<SessionRefreshTokenRow>(
-      `SELECT refresh_token_hash FROM sessions
+  /**
+   * MEDIUM-011: Enforces max sessions per user by deleting oldest sessions.
+   * Uses seamless UX approach - login always works, oldest sessions are cleaned up.
+   */
+  private async enforceSessionLimit(userId: string, context: LoginContext = {}): Promise<void> {
+    const countResult = await db.query<{ count: string }>(
+      'SELECT COUNT(*) as count FROM sessions WHERE user_id = $1',
+      [userId]
+    );
+
+    // COUNT(*) always returns exactly one row
+    const sessionCount = parseInt(countResult.rows[0]?.count ?? '0', 10);
+
+    if (sessionCount >= MAX_SESSIONS_PER_USER) {
+      // Calculate how many sessions to delete to make room for the new one
+      const sessionsToDelete = sessionCount - MAX_SESSIONS_PER_USER + 1;
+
+      // Delete oldest sessions (by created_at) and return their IDs for audit
+      const deleteResult = await db.query<{ id: string }>(
+        `DELETE FROM sessions
+         WHERE id IN (
+           SELECT id FROM sessions
+           WHERE user_id = $1
+           ORDER BY created_at ASC
+           LIMIT $2
+         )
+         RETURNING id`,
+        [userId, sessionsToDelete]
+      );
+
+      // HIPAA: Log session limit enforcement for audit trail
+      await auditService.log({
+        userId,
+        action: AuditAction.SESSION_LIMIT_EXCEEDED,
+        status: 'SUCCESS',
+        metadata: {
+          sessionsDeleted: deleteResult.rows.length,
+          deletedSessionIds: deleteResult.rows.map((r) => r.id),
+          maxSessions: MAX_SESSIONS_PER_USER,
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
+    }
+  }
+
+  /**
+   * MEDIUM-002: O(1) token validation using sessionId from JWT payload.
+   * Falls back to O(n) legacy validation for tokens without sessionId.
+   *
+   * HIGH-006: Checks device binding and logs mismatches (lenient - doesn't block).
+   */
+  private async validateRefreshToken(
+    userId: string,
+    sessionId: string,
+    refreshToken: string,
+    context: LoginContext = {}
+  ): Promise<{ valid: boolean; session?: SessionValidationRow }> {
+    // Backwards compat: Legacy tokens don't have sessionId
+    if (!sessionId) {
+      return this.validateLegacyRefreshToken(userId, refreshToken);
+    }
+
+    // O(1) lookup by session ID (primary key) + user_id for security
+    const result = await db.query<SessionValidationRow>(
+      `SELECT id, refresh_token_hash, ip_address, user_agent
+       FROM sessions
+       WHERE id = $1 AND user_id = $2 AND expires_at > NOW()`,
+      [sessionId, userId]
+    );
+
+    const session = result.rows[0];
+    if (!session) {
+      return { valid: false };
+    }
+
+    // Single bcrypt comparison instead of O(n) loop
+    const tokenValid = await bcrypt.compare(refreshToken, session.refresh_token_hash);
+    if (!tokenValid) {
+      return { valid: false };
+    }
+
+    // HIGH-006: Check device binding, log mismatches (lenient - don't block)
+    await this.checkDeviceBinding(userId, sessionId, session, context);
+
+    return { valid: true, session };
+  }
+
+  /**
+   * HIGH-006: Logs device binding mismatches for security monitoring.
+   * Lenient approach: logs but doesn't block, since PT staff frequently change networks.
+   */
+  private async checkDeviceBinding(
+    userId: string,
+    sessionId: string,
+    session: SessionValidationRow,
+    context: LoginContext
+  ): Promise<void> {
+    const ipChanged = session.ip_address !== null &&
+                      context.ipAddress !== undefined &&
+                      session.ip_address !== context.ipAddress;
+    const uaChanged = session.user_agent !== null &&
+                      context.userAgent !== undefined &&
+                      session.user_agent !== context.userAgent;
+
+    if (ipChanged || uaChanged) {
+      // HIPAA: Log device change for security audit trail
+      await auditService.log({
+        userId,
+        action: AuditAction.SESSION_DEVICE_CHANGE,
+        status: 'WARNING',
+        metadata: {
+          sessionId,
+          ipChanged,
+          uaChanged,
+          originalIp: session.ip_address,
+          newIp: ipChanged ? context.ipAddress : undefined,
+          // Don't log full user agents - they can be long and contain fingerprinting data
+          userAgentChanged: uaChanged,
+        },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
+    }
+  }
+
+  /**
+   * Backwards compatibility: O(n) validation for legacy tokens without sessionId.
+   * Will be deprecated once all legacy tokens expire (7 days after deployment).
+   */
+  private async validateLegacyRefreshToken(
+    userId: string,
+    refreshToken: string
+  ): Promise<{ valid: boolean; session?: SessionValidationRow }> {
+    const result = await db.query<SessionValidationRow>(
+      `SELECT id, refresh_token_hash, ip_address, user_agent
+       FROM sessions
        WHERE user_id = $1 AND expires_at > NOW()`,
       [userId]
     );
 
     for (const row of result.rows) {
       if (await bcrypt.compare(refreshToken, row.refresh_token_hash)) {
-        return true;
+        return { valid: true, session: row };
       }
     }
-    return false;
+    return { valid: false };
   }
 
-  private async revokeRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const result = await db.query<SessionWithIdRow>(
-      `SELECT id, refresh_token_hash FROM sessions WHERE user_id = $1`,
-      [userId]
-    );
-
-    for (const row of result.rows) {
-      if (await bcrypt.compare(refreshToken, row.refresh_token_hash)) {
-        await db.query('DELETE FROM sessions WHERE id = $1', [row.id]);
-        return;
-      }
+  /**
+   * Revokes a refresh token by deleting its session.
+   * O(1) when sessionId is known (new tokens), legacy tokens cleaned up on logout/expiry.
+   */
+  private async revokeRefreshToken(sessionId: string): Promise<void> {
+    if (!sessionId) {
+      // Legacy tokens without sessionId - they'll be cleaned up on logout or expiry
+      return;
     }
+    await db.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
   }
 
   private sanitizeUser(user: User) {

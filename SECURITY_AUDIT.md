@@ -932,24 +932,178 @@ app.use(express.json({ limit: '100kb' }));
 4. ~~**HIGH-005:** Account lockout mechanism~~ RESOLVED
 5. ~~**HIGH-001 + HIGH-007:** Password reset + email verification~~ RESOLVED
 
-### Short-term (Security Hardening)
-1. **HIGH-006:** Device binding for refresh tokens
-2. **MEDIUM-005:** Prompt injection protection
+---
 
-### Medium-term (Performance & Reliability)
-1. **MEDIUM-002 + MEDIUM-011:** Efficient refresh token validation + session limits (address together)
-2. **MEDIUM-013:** Webhook idempotency
-3. **MEDIUM-014:** Extension retry logic
-4. **MEDIUM-003:** Session timeout warning
-5. **MEDIUM-006:** Request ID tracing
-6. **LOW-001:** Structured logging
+## Implementation Groups
 
-### Ongoing
-1. **LOW-003:** Test coverage
-2. **LOW-005:** Dependency scanning in CI
-3. **MEDIUM-015:** Verify extension CORS in production
-4. Security testing automation
-5. Penetration testing
+Open issues have been organized into logical groups for efficient implementation. Issues within each group share code paths, dependencies, or architectural concerns.
+
+### Group A: Session Infrastructure (Backend)
+**Priority: HIGH** | **Issues: HIGH-006, MEDIUM-002, MEDIUM-011**
+
+All three issues require changes to the `sessions` table schema and `auth-service.ts`. Implementing together avoids multiple migrations and ensures consistent session handling.
+
+| Issue | Description | Shared Code |
+|-------|-------------|-------------|
+| HIGH-006 | Refresh token not bound to device/IP | sessions table, token storage |
+| MEDIUM-002 | O(n) bcrypt loop on token validation | sessions table, token validation |
+| MEDIUM-011 | No session count limit per user | token storage, session cleanup |
+
+**Implementation approach:**
+1. Single migration adding all columns:
+   ```sql
+   ALTER TABLE sessions ADD COLUMN token_hint VARCHAR(16);  -- Fast lookup
+   ALTER TABLE sessions ADD COLUMN ip_address INET;         -- Device binding
+   ALTER TABLE sessions ADD COLUMN user_agent TEXT;         -- Device binding
+   ALTER TABLE sessions ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+   CREATE INDEX idx_sessions_token_hint ON sessions(user_id, token_hint);
+   ```
+2. Update `storeRefreshToken()`: Store hint + IP + user-agent, enforce max sessions
+3. Update `validateRefreshToken()`: Use hint for O(1) lookup, validate device match
+
+**Dependencies:** None - foundational work
+
+---
+
+### Group B: Extension Resilience
+**Priority: MEDIUM** | **Issues: MEDIUM-003, MEDIUM-008, MEDIUM-014**
+
+All extension-side improvements to authentication resilience and error handling. Touch `extension/src/shared/api.ts` and `storage.ts`.
+
+| Issue | Description | Shared Code |
+|-------|-------------|-------------|
+| MEDIUM-003 | No session timeout warning | storage.ts, token tracking |
+| MEDIUM-008 | Both tokens stored together | storage.ts architecture |
+| MEDIUM-014 | No API retry logic | api.ts request handling |
+
+**Implementation approach:**
+1. Refactor token storage architecture (MEDIUM-008)
+2. Add `expiresAt` tracking and warning UI (MEDIUM-003)
+3. Implement exponential backoff retry for 5xx/network errors (MEDIUM-014)
+
+**Dependencies:** Partially depends on Group A (token response changes)
+
+---
+
+### Group C: Observability Stack
+**Priority: MEDIUM** | **Issues: LOW-001, MEDIUM-004, MEDIUM-006**
+
+All about logging and monitoring infrastructure. If implementing structured logging, naturally include request IDs and proper error handling.
+
+| Issue | Description | Shared Code |
+|-------|-------------|-------------|
+| LOW-001 | Console logging in production | All backend files |
+| MEDIUM-006 | No request ID for tracing | Middleware, logger |
+| MEDIUM-004 | DB connection errors not handled | db/index.ts, logger |
+
+**Implementation approach:**
+1. Add structured logging library (pino recommended for performance)
+2. Add request ID middleware, include in all log entries
+3. Implement DB connection retry with exponential backoff
+4. Replace all `console.log/error` calls with structured logger
+
+**Dependencies:** None - can be done independently
+
+---
+
+### Group D: CORS Configuration
+**Priority: MEDIUM** | **Issues: MEDIUM-007, MEDIUM-015**
+
+Both issues are in `backend/src/index.ts:15-19`. Same root cause: hardcoded origin logic.
+
+| Issue | Description | Shared Code |
+|-------|-------------|-------------|
+| MEDIUM-007 | CORS allows dev origins in staging | index.ts CORS config |
+| MEDIUM-015 | Extension origin missing in prod | index.ts CORS config |
+
+**Implementation approach:**
+1. Add `ALLOWED_ORIGINS` environment variable
+2. Parse as comma-separated list
+3. Include extension ID in production config
+4. Remove NODE_ENV-based logic
+
+**Dependencies:** None - quick win
+
+---
+
+### Group E: LLM/Prompt Security
+**Priority: MEDIUM** | **Issues: MEDIUM-005, MEDIUM-010**
+
+Both in prompt handling code (`backend/src/prompts/`). Address injection and leakage risks together.
+
+| Issue | Description | Shared Code |
+|-------|-------------|-------------|
+| MEDIUM-005 | Prompt injection vulnerability | pt-prompts.ts |
+| MEDIUM-010 | Prompt warnings may leak context | pt-prompts.ts logging |
+
+**Implementation approach:**
+1. Audit all prompt code for PHI leakage in logs/warnings
+2. Implement input sanitization before LLM submission
+3. Consider XML-style delimiters for user content isolation
+4. Add prompt injection detection heuristics
+
+**Dependencies:** None - isolated to prompt code
+
+---
+
+### Group F: CI/CD Pipeline
+**Priority: LOW** | **Issues: LOW-003, LOW-005**
+
+Pipeline improvements rather than code changes.
+
+| Issue | Description | Implementation |
+|-------|-------------|----------------|
+| LOW-003 | Missing test coverage | Add test suites for security-critical paths |
+| LOW-005 | No dependency vulnerability scanning | Add `npm audit` or Snyk to CI |
+
+**Implementation approach:**
+1. Add `npm audit --audit-level=high` to CI pipeline
+2. Consider Dependabot for automated PRs
+3. Add test coverage for auth, authorization, token handling
+
+**Dependencies:** None - can be done anytime
+
+---
+
+### Standalone Items
+
+Quick fixes that don't require grouping:
+
+| Issue | Description | Effort |
+|-------|-------------|--------|
+| MEDIUM-013 | Missing webhook idempotency | Medium - new table + billing-service changes |
+| LOW-002 | Health check authentication | Low - add basic auth or IP restriction |
+| LOW-004 | Extension CSP missing | Low - manifest.json change |
+| LOW-006 | Subscription magic strings | Low - extract to constants |
+| LOW-007 | Body size limit implicit | Low - one-line fix |
+
+---
+
+## Recommended Implementation Order
+
+```
+Phase 1: Security Foundation
+├── Group A: Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011)
+└── Group D: CORS Configuration (MEDIUM-007, MEDIUM-015)
+
+Phase 2: Security Hardening
+├── Group E: LLM/Prompt Security (MEDIUM-005, MEDIUM-010)
+└── MEDIUM-013: Webhook Idempotency (standalone)
+
+Phase 3: Resilience & UX
+├── Group B: Extension Resilience (MEDIUM-003, MEDIUM-008, MEDIUM-014)
+└── Group C: Observability Stack (LOW-001, MEDIUM-004, MEDIUM-006)
+
+Phase 4: Ongoing
+├── Group F: CI/CD Pipeline (LOW-003, LOW-005)
+└── Standalone low-priority items
+```
+
+**Rationale:**
+- Phase 1 addresses the only remaining HIGH issue and a quick CORS fix
+- Phase 2 handles security-critical prompt injection before it becomes a vector
+- Phase 3 improves reliability and debugging capability
+- Phase 4 is continuous improvement
 
 ---
 
@@ -967,6 +1121,7 @@ app.use(express.json({ limit: '100kb' }));
 | January 28, 2026 | **Resolved HIGH-005 (Account Lockout):** Implemented database-backed progressive account lockout with timing-safe login. Thresholds: 5 failures → 15 min, 10 → 1 hour, 15 → 24 hours, 20+ → permanent. Added `lockout-service.ts` for lockout logic, migration `002_account_lockout.sql` for database columns. Auth service updated with dummy hash comparison to prevent timing attacks. New audit actions: `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED`, `LOGIN_BLOCKED_LOCKED`. |
 | January 29, 2026 | **Resolved HIGH-001 (Password Reset) + HIGH-007 (Email Verification):** Implemented complete email verification and password reset flows. Key components: (1) `token-service.ts` - 256-bit cryptographic tokens with SHA-256 storage, atomic single-use consumption; (2) `email-service.ts` - Resend integration with HTML/text templates; (3) `email-verification.ts` middleware - blocks unverified users from note generation and billing; (4) Database migration `003_email_verification.sql` - adds `email_verified`, `email_verified_at` to users, creates `email_tokens` table; (5) Rate limiting on all sensitive endpoints (3-5 requests per window); (6) Web pages for verify-email, forgot-password, reset-password, resend-verification; (7) Extension UX improvements - inline forgot password flow, verification banner with resend button, auto-polling clears banner when verified. Security properties: enumeration-safe responses, session invalidation on password reset, lockout counter reset, full audit trail. |
 | January 29, 2026 | **Token Versioning for Immediate Session Invalidation:** Fixed security gap where stateless JWT access tokens remained valid up to 1 hour after password reset. Implemented token versioning: (1) Database migration `004_token_version.sql` - adds `token_version` column to users; (2) Auth service includes `tokenVersion` in JWT payload; (3) Auth middleware validates token version on every request against database; (4) Password reset increments token version, immediately invalidating all access tokens. Added `SessionAlert` component to extension for consistent logout messaging - supports multiple reasons (session_invalidated, session_expired, session_limit, session_revoked) preparing for MEDIUM-011 session limits implementation. |
+| January 30, 2026 | **Reorganized Open Issues into Implementation Groups:** Analyzed remaining 17 open issues and organized into 6 logical groups based on shared code paths and dependencies: Group A (Session Infrastructure: HIGH-006, MEDIUM-002, MEDIUM-011), Group B (Extension Resilience: MEDIUM-003, MEDIUM-008, MEDIUM-014), Group C (Observability Stack: LOW-001, MEDIUM-004, MEDIUM-006), Group D (CORS Configuration: MEDIUM-007, MEDIUM-015), Group E (LLM/Prompt Security: MEDIUM-005, MEDIUM-010), Group F (CI/CD Pipeline: LOW-003, LOW-005). Added phased implementation order prioritizing the remaining HIGH severity issue. Standalone items identified for quick wins. |
 
 ---
 
