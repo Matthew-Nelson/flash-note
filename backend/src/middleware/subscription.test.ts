@@ -25,10 +25,10 @@ describe('Subscription Middleware', () => {
       user: { userId: 'user-123', email: 'test@example.com', tokenVersion: 1 },
     };
     mockRes = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as unknown as Response['status'],
+      json: jsonMock as unknown as Response['json'],
     };
-    mockNext = vi.fn();
+    mockNext = vi.fn() as unknown as NextFunction;
   });
 
   afterEach(() => {
@@ -238,7 +238,7 @@ describe('Subscription Middleware', () => {
 
   describe('audit logging metadata', () => {
     it('should include request path in audit metadata', async () => {
-      mockReq.path = '/api/notes/generate';
+      // mockReq.path is already set to '/api/notes/generate' in beforeEach
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
@@ -251,7 +251,13 @@ describe('Subscription Middleware', () => {
     });
 
     it('should include IP address in audit log', async () => {
-      mockReq.ip = '203.0.113.42';
+      // Create new request with different IP
+      mockReq = {
+        path: '/api/notes/generate',
+        ip: '203.0.113.42',
+        get: vi.fn().mockReturnValue('TestAgent/1.0'),
+        user: { userId: 'user-123', email: 'test@example.com', tokenVersion: 1 },
+      };
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);

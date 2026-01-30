@@ -37,7 +37,7 @@ describe('AuditService', () => {
   beforeEach(() => {
     mockDbQuery.mockReset();
     mockDbQuery.mockResolvedValue({ rows: [] });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
   });
 
   afterEach(() => {

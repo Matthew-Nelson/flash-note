@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockAuditLog, resetMocks } from '../test/setup.js';
 import { requireEmailVerification } from './email-verification.js';
-import { AuditAction } from '../types/index.js';
+import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import type { Request, Response, NextFunction } from 'express';
 
 // Mock findUserById
@@ -11,7 +11,7 @@ vi.mock('../db/queries/users.js', () => ({
 }));
 
 describe('requireEmailVerification middleware', () => {
-  let mockReq: Partial<Request>;
+  let mockReq: AuthenticatedRequest;
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
   let jsonMock: ReturnType<typeof vi.fn>;
@@ -31,13 +31,13 @@ describe('requireEmailVerification middleware', () => {
       path: '/notes/generate',
       method: 'POST',
       get: vi.fn().mockReturnValue('test-user-agent'),
-      user: { userId: 'test-user-id' },
-    };
+      user: { userId: 'test-user-id', email: 'test@example.com', tokenVersion: 1 },
+    } as unknown as AuthenticatedRequest;
     mockRes = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as unknown as Response['status'],
+      json: jsonMock as unknown as Response['json'],
     };
-    mockNext = vi.fn();
+    mockNext = vi.fn() as unknown as NextFunction;
   });
 
   it('should allow verified users through', async () => {
@@ -112,7 +112,7 @@ describe('requireEmailVerification middleware', () => {
   });
 
   it('should return 401 if userId is missing (fail-secure)', async () => {
-    mockReq.user = undefined;
+    (mockReq as { user?: unknown }).user = undefined;
 
     await requireEmailVerification(
       mockReq as Request,

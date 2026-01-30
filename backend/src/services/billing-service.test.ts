@@ -61,7 +61,7 @@ describe('BillingService', () => {
     mockFindUserById.mockReset();
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
   });
 
   afterEach(() => {

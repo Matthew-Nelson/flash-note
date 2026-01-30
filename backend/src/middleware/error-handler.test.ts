@@ -29,12 +29,12 @@ describe('Error Handler Middleware', () => {
 
     mockReq = {};
     mockRes = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as unknown as Response['status'],
+      json: jsonMock as unknown as Response['json'],
     };
-    mockNext = vi.fn();
+    mockNext = vi.fn() as unknown as NextFunction;
 
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
     mockConfig.NODE_ENV = 'production';
   });
 
@@ -165,7 +165,7 @@ describe('Error Handler Middleware', () => {
 
         errorHandler(zodError!, mockReq as Request, mockRes as Response, mockNext);
 
-        const response = jsonMock.mock.calls[0][0];
+        const response = jsonMock.mock.calls[0]![0];
         expect(response.error.details).toHaveProperty('email');
         expect(response.error.details).toHaveProperty('password');
       });
@@ -307,7 +307,7 @@ describe('Error Handler Middleware', () => {
 
         errorHandler(sensitiveError, mockReq as Request, mockRes as Response, mockNext);
 
-        const response = jsonMock.mock.calls[0][0];
+        const response = jsonMock.mock.calls[0]![0];
         expect(response.error.message).toBe('An unexpected error occurred');
         expect(response.error.message).not.toContain('PostgreSQL');
         expect(response.error.message).not.toContain('user@patient.com');
@@ -319,7 +319,7 @@ describe('Error Handler Middleware', () => {
 
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        const response = jsonMock.mock.calls[0][0];
+        const response = jsonMock.mock.calls[0]![0];
         expect(response).not.toHaveProperty('stack');
         expect(response.error).not.toHaveProperty('stack');
       });
@@ -332,7 +332,7 @@ describe('Error Handler Middleware', () => {
 
         errorHandler(phiError, mockReq as Request, mockRes as Response, mockNext);
 
-        const response = jsonMock.mock.calls[0][0];
+        const response = jsonMock.mock.calls[0]![0];
         expect(response.error.message).toBe('An unexpected error occurred');
         expect(response.error.message).not.toContain('John Doe');
         expect(response.error.message).not.toContain('01/15/1980');
@@ -352,7 +352,7 @@ describe('Error Handler Middleware', () => {
         errorHandler(zodError!, mockReq as Request, mockRes as Response, mockNext);
 
         // The response should only indicate which field failed, not the value
-        const response = jsonMock.mock.calls[0][0];
+        const response = jsonMock.mock.calls[0]![0];
         expect(response.error.message).toBe('Invalid request data');
         // Details contain field names but generic error messages
         expect(response.error.details).toBeDefined();
@@ -369,7 +369,7 @@ describe('Error Handler Middleware', () => {
         errors.forEach((error) => {
           jsonMock.mockClear();
           errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
-          expect(jsonMock.mock.calls[0][0].success).toBe(false);
+          expect(jsonMock.mock.calls[0]![0].success).toBe(false);
         });
       });
 
@@ -382,7 +382,7 @@ describe('Error Handler Middleware', () => {
         errors.forEach((error) => {
           jsonMock.mockClear();
           errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
-          expect(jsonMock.mock.calls[0][0].error.code).toBeDefined();
+          expect(jsonMock.mock.calls[0]![0].error.code).toBeDefined();
         });
       });
 
@@ -396,8 +396,8 @@ describe('Error Handler Middleware', () => {
           jsonMock.mockClear();
           mockConfig.NODE_ENV = 'production';
           errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
-          expect(jsonMock.mock.calls[0][0].error.message).toBeDefined();
-          expect(typeof jsonMock.mock.calls[0][0].error.message).toBe('string');
+          expect(jsonMock.mock.calls[0]![0].error.message).toBeDefined();
+          expect(typeof jsonMock.mock.calls[0]![0].error.message).toBe('string');
         });
       });
     });

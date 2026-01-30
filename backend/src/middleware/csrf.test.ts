@@ -241,12 +241,12 @@ describe('CSRF Middleware', () => {
         originalUrl: '/api/test',
         ip: '127.0.0.1',
         user: { userId: 'user-123', email: 'test@example.com', tokenVersion: 1 },
-      };
+      } as unknown as AuthenticatedRequest;
       mockRes = {
-        status: statusMock,
-        json: jsonMock,
+        status: statusMock as unknown as Response['status'],
+        json: jsonMock as unknown as Response['json'],
       };
-      mockNext = vi.fn();
+      mockNext = vi.fn() as unknown as NextFunction;
     });
 
     it('should return 403 when CSRF token is missing', () => {
@@ -361,11 +361,16 @@ describe('CSRF Middleware', () => {
     });
 
     it('should include IP address and user agent in audit log', () => {
-      mockReq.ip = '192.168.1.1';
-      (mockReq.get as ReturnType<typeof vi.fn>).mockImplementation((header: string) => {
-        if (header === 'user-agent') return 'TestBrowser/1.0';
-        return undefined;
-      });
+      // Create new request with different IP
+      mockReq = {
+        get: vi.fn().mockImplementation((header: string) => {
+          if (header === 'user-agent') return 'TestBrowser/1.0';
+          return undefined;
+        }),
+        originalUrl: '/api/test',
+        ip: '192.168.1.1',
+        user: { userId: 'user-123', email: 'test@example.com', tokenVersion: 1 },
+      } as unknown as AuthenticatedRequest;
 
       requireCsrf(mockReq as Request, mockRes as Response, mockNext);
 
