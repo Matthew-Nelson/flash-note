@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { type GeneratedNote } from '@/shared/schemas';
-import { useStreamingText } from '../hooks/useStreamingText';
 
 interface ResultDisplayProps {
   note: GeneratedNote;
@@ -9,78 +8,12 @@ interface ResultDisplayProps {
 
 type SectionKey = 'subjective' | 'objective' | 'assessment' | 'plan';
 
-const SECTION_CONFIG: { key: SectionKey; label: string; icon: string }[] = [
-  { key: 'subjective', label: 'SUBJECTIVE', icon: '💬' },
-  { key: 'objective', label: 'OBJECTIVE', icon: '📊' },
-  { key: 'assessment', label: 'ASSESSMENT', icon: '🎯' },
-  { key: 'plan', label: 'PLAN', icon: '📝' },
+const SECTIONS: { key: SectionKey; label: string }[] = [
+  { key: 'subjective', label: 'SUBJECTIVE' },
+  { key: 'objective', label: 'OBJECTIVE' },
+  { key: 'assessment', label: 'ASSESSMENT' },
+  { key: 'plan', label: 'PLAN' },
 ];
-
-function StreamingSection({
-  content,
-  onCopy,
-  isCopied,
-  label,
-  icon,
-  delay = 0,
-  staggerClass = ''
-}: {
-  content: string;
-  onCopy: () => void;
-  isCopied: boolean;
-  label: string;
-  icon: string;
-  delay?: number;
-  staggerClass?: string;
-}) {
-  const [shouldStream, setShouldStream] = useState(false);
-  const { displayedText, isComplete } = useStreamingText(
-    shouldStream ? content : '',
-    { speed: 8 }
-  );
-
-  useEffect(() => {
-    const timer = setTimeout(() => setShouldStream(true), delay);
-    return () => clearTimeout(timer);
-  }, [delay]);
-
-  return (
-    <div
-      className={`card section-reveal overflow-hidden ${staggerClass} ${
-        shouldStream ? 'opacity-100' : 'opacity-0 pointer-events-none'
-      }`}
-      aria-hidden={!shouldStream}
-    >
-      <div className="card-header flex items-center justify-between">
-        <h3 className="text-sm font-semibold flex items-center gap-2">
-          <span>{icon}</span>
-          {label}
-        </h3>
-        <button
-          onClick={onCopy}
-          className="icon-btn text-xs flex items-center gap-1 px-2 py-1 rounded"
-        >
-          {isCopied ? (
-            <>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Copied
-            </>
-          ) : (
-            'Copy'
-          )}
-        </button>
-      </div>
-      <div className="p-3">
-        <p className="text-sm whitespace-pre-wrap">
-          {displayedText}
-          {!isComplete && <span className="typing-cursor" />}
-        </p>
-      </div>
-    </div>
-  );
-}
 
 export default function ResultDisplay({ note, onBack }: ResultDisplayProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
@@ -113,7 +46,10 @@ ${note.plan}`;
   return (
     <div className="flex flex-col h-full">
       {/* Action bar */}
-      <div className="flex items-center justify-between px-4 py-3">
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b"
+        style={{ borderColor: 'var(--border-color)' }}
+      >
         <button
           onClick={onBack}
           className="btn-secondary flex items-center text-sm px-3 py-1.5 rounded-lg"
@@ -123,6 +59,7 @@ ${note.plan}`;
           </svg>
           Back
         </button>
+
         <button
           onClick={copyAll}
           className="btn-primary flex items-center px-3 py-1.5 text-sm font-medium rounded-lg"
@@ -145,25 +82,44 @@ ${note.plan}`;
         </button>
       </div>
 
-      {/* Sections with staggered streaming */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
-        {SECTION_CONFIG.map((section, index) => (
-          <StreamingSection
-            key={section.key}
-            content={note[section.key]}
-            label={section.label}
-            icon={section.icon}
-            onCopy={() => copyToClipboard(note[section.key], section.key)}
-            isCopied={copiedSection === section.key}
-            delay={index * 200}
-            staggerClass={`stagger-${index + 1}`}
-          />
-        ))}
+      {/* Document content */}
+      <div className="flex-1 overflow-auto p-4">
+        <div
+          className="document-container rounded-lg p-5"
+          style={{
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-color)',
+          }}
+        >
+          {SECTIONS.map((section, index) => (
+            <div
+              key={section.key}
+              className={`document-section ${index < SECTIONS.length - 1 ? 'mb-5' : ''}`}
+              style={{ animationDelay: `${index * 150}ms` }}
+            >
+              <h4
+                className="document-section-label text-xs font-bold tracking-wide mb-2"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                {section.label}:
+              </h4>
+              <p
+                className="document-section-content text-sm leading-relaxed"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {note[section.key]}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Footer */}
       {note.metadata && (
-        <div className="px-4 py-2 border-t text-xs text-center opacity-50">
+        <div
+          className="px-4 py-2 border-t text-xs text-center"
+          style={{ borderColor: 'var(--border-color)', color: 'var(--text-muted)' }}
+        >
           Generated in {(note.metadata.generationTimeMs / 1000).toFixed(1)}s
         </div>
       )}

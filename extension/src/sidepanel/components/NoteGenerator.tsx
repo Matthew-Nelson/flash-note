@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '@/shared/api';
 import { validateGenerateNote, type NoteType, type GeneratedNote } from '@/shared/schemas';
 
@@ -22,17 +22,22 @@ const LOADING_STAGES = [
   'Finalizing note...',
 ];
 
+type GenerationPhase = 'idle' | 'loading' | 'success';
+
 export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const [noteType, setNoteType] = useState<NoteType>('daily_note');
   const [patientContext, setPatientContext] = useState('');
   const [quickNotes, setQuickNotes] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [phase, setPhase] = useState<GenerationPhase>('idle');
   const [loadingStage, setLoadingStage] = useState(0);
+
+  // Store the generated note temporarily during success animation
+  const generatedNoteRef = useRef<GeneratedNote | null>(null);
 
   // Cycle through loading stages
   useEffect(() => {
-    if (!isLoading) {
+    if (phase !== 'loading') {
       setLoadingStage(0);
       return;
     }
@@ -42,7 +47,23 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
     }, 1500);
 
     return () => clearInterval(interval);
-  }, [isLoading]);
+  }, [phase]);
+
+  // Handle success phase transition to results
+  useEffect(() => {
+    if (phase !== 'success') return;
+
+    // Show success animation for 1.5 seconds, then navigate to results
+    const timeout = setTimeout(() => {
+      if (generatedNoteRef.current) {
+        onNoteGenerated(generatedNoteRef.current);
+        generatedNoteRef.current = null;
+      }
+      setPhase('idle');
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [phase, onNoteGenerated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,19 +81,20 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
       return;
     }
 
-    setIsLoading(true);
+    setPhase('loading');
 
     try {
       const result = await api.generateNote(validation.data);
-      onNoteGenerated(result);
+      // Store result and transition to success phase
+      generatedNoteRef.current = result;
+      setPhase('success');
     } catch (err) {
       if (err instanceof Error) {
         setErrors([err.message]);
       } else {
         setErrors(['Failed to generate note']);
       }
-    } finally {
-      setIsLoading(false);
+      setPhase('idle');
     }
   };
 
@@ -80,17 +102,14 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const charPercentage = (charCount / 5000) * 100;
   const charColor = charPercentage > 90 ? 'text-red-500' : charPercentage > 70 ? 'text-yellow-500' : 'opacity-50';
 
-  if (isLoading) {
+  // Loading state
+  // TODO: Add error state animation (e.g., shake + red X) when API call fails,
+  // instead of immediately returning to idle. This would provide better user feedback.
+  if (phase === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
-        <div className="loading-indicator flex flex-col items-center gap-4">
-          {/* Loading visual - adapts per theme */}
+        <div className="loading-indicator flex flex-col items-center">
           <div className="relative flex flex-col items-center">
-            {/* Dark AI theme: orb */}
-            <div className="loading-orb" />
-            {/* Glassmorphism theme: rings */}
-            <div className="loading-rings" />
-            {/* Gradient Accent theme: spinner with orbiting dots */}
             <div className="loading-spinner">
               <div className="loading-dots">
                 <span></span>
@@ -98,37 +117,66 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
                 <span></span>
               </div>
             </div>
-            {/* Progress bar (gradient theme) */}
-            <div className="loading-bar" />
           </div>
 
           {/* Stage indicator */}
-          <div className="text-center mt-2">
-            <p className="loading-stage text-sm font-medium animate-fade-in" key={loadingStage}>
-              {LOADING_STAGES[loadingStage]}
-            </p>
-            <div className="flex justify-center gap-1.5 mt-3">
-              {LOADING_STAGES.map((_, i) => (
-                <div
-                  key={i}
-                  className={`loading-stage-dot w-2 h-2 rounded-full transition-all duration-300 ${
-                    i === loadingStage ? 'active scale-125' : ''
-                  }`}
-                  style={{
-                    backgroundColor: i <= loadingStage
-                      ? `var(--accent-${i % 2 === 0 ? 'primary' : 'secondary'}, #06b6d4)`
-                      : 'var(--bg-tertiary, #e2e8f0)',
-                    opacity: i <= loadingStage ? 1 : 0.4
-                  }}
-                />
-              ))}
-            </div>
-          </div>
+          <p className="loading-stage text-base font-medium mt-4 animate-fade-in" key={loadingStage}>
+            {LOADING_STAGES[loadingStage]}
+          </p>
         </div>
       </div>
     );
   }
 
+  // Success state - checkmark animation
+  if (phase === 'success') {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
+        <div className="success-checkmark-container hold">
+          <div className="success-checkmark">
+            <svg
+              className="success-checkmark-icon"
+              viewBox="0 0 52 52"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                className="success-checkmark-circle"
+                cx="26"
+                cy="26"
+                r="24"
+                stroke="url(#checkGradientMain)"
+                strokeWidth="3"
+                fill="none"
+              />
+              <path
+                className="success-checkmark-check"
+                d="M15 27l7 7 15-15"
+                stroke="url(#checkGradientMain)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+              <defs>
+                <linearGradient id="checkGradientMain" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="var(--accent-primary)" />
+                  <stop offset="50%" stopColor="var(--accent-secondary)" />
+                  <stop offset="100%" stopColor="var(--accent-tertiary)" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="success-checkmark-shimmer" />
+          </div>
+          <p className="success-checkmark-text mt-4 text-base font-medium">
+            Note generated!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Default: form state
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
       {/* Note Type */}
@@ -208,7 +256,7 @@ e.g., reports 40% pain reduction. flex ROM 50->65. MFR lumbar paraspinals. grade
       <div className="animate-fade-in-up stagger-3">
         <button
           type="submit"
-          disabled={isLoading || quickNotes.length < 10}
+          disabled={phase !== 'idle' || quickNotes.length < 10}
           className="btn-primary w-full flex justify-center items-center gap-2 py-3 px-4 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

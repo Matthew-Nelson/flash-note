@@ -115,15 +115,13 @@ Use the `fn-*` prefixed utilities:
 | `--fn-radius-lg` | 0.75rem (12px) |
 | `--fn-radius-xl` | 1rem (16px) |
 
-## Themes
+## Design Style
 
-The extension supports three themes via CSS classes on the root element:
+FlashNote uses a clean, professional "Gradient Accent" design style featuring:
 
-- `.theme-dark-ai` - Dark mode with cyan accents
-- `.theme-glassmorphism` - Frosted glass aesthetic
-- `.theme-gradient-accent` - Clean white with gradient accents (default)
-
-The web app uses the gradient-accent theme as its default (light mode). The tokens automatically adjust when theme classes are applied.
+- White backgrounds with subtle gradients
+- Cyan (#06b6d4), Violet (#8b5cf6), and Pink (#ec4899) brand accents
+- Modern, accessible styling for healthcare environments
 
 ## Adding New Tokens
 
