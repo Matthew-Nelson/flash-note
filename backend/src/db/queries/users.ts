@@ -2,6 +2,14 @@ import { db } from '../index.js';
 import type { User } from '../../types/index.js';
 import type { UserRow, UserTokenVersionRow } from '../../types/database.js';
 
+// Shared column list - update here when adding new user fields
+const USER_COLUMNS = `
+  id, email, password_hash, stripe_customer_id, subscription_id,
+  subscription_status, trial_ends_at, created_at, updated_at,
+  failed_login_attempts, locked_until, last_failed_login_at,
+  email_verified, email_verified_at, token_version
+`;
+
 /**
  * Helper to transform database row (snake_case) to User type (camelCase)
  */
@@ -27,11 +35,7 @@ function rowToUser(row: UserRow): User {
 
 export async function findUserByEmail(email: string): Promise<User | null> {
   const result = await db.query<UserRow>(
-    `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
-            subscription_status, trial_ends_at, created_at, updated_at,
-            failed_login_attempts, locked_until, last_failed_login_at,
-            email_verified, email_verified_at, token_version
-     FROM users WHERE email = $1`,
+    `SELECT ${USER_COLUMNS} FROM users WHERE email = $1`,
     [email]
   );
 
@@ -41,11 +45,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 
 export async function findUserById(id: string): Promise<User | null> {
   const result = await db.query<UserRow>(
-    `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
-            subscription_status, trial_ends_at, created_at, updated_at,
-            failed_login_attempts, locked_until, last_failed_login_at,
-            email_verified, email_verified_at, token_version
-     FROM users WHERE id = $1`,
+    `SELECT ${USER_COLUMNS} FROM users WHERE id = $1`,
     [id]
   );
 
@@ -60,10 +60,7 @@ export async function createUser(
   const result = await db.query<UserRow>(
     `INSERT INTO users (email, password_hash)
      VALUES ($1, $2)
-     RETURNING id, email, password_hash, stripe_customer_id, subscription_id,
-               subscription_status, trial_ends_at, created_at, updated_at,
-               failed_login_attempts, locked_until, last_failed_login_at,
-               email_verified, email_verified_at, token_version`,
+     RETURNING ${USER_COLUMNS}`,
     [email, passwordHash]
   );
 
@@ -151,4 +148,19 @@ export async function incrementTokenVersion(userId: string): Promise<number> {
   );
 
   return result.rows[0]!.token_version;
+}
+
+/**
+ * Reset lockout state for a user - used after successful password reset
+ */
+export async function resetLockout(userId: string): Promise<void> {
+  await db.query(
+    `UPDATE users
+     SET failed_login_attempts = 0,
+         locked_until = NULL,
+         last_failed_login_at = NULL,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [userId]
+  );
 }
