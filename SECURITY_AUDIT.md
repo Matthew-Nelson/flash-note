@@ -931,6 +931,7 @@ app.use(express.json({ limit: '100kb' }));
 3. ~~**HIGH-003:** Content Security Policy~~ RESOLVED
 4. ~~**HIGH-005:** Account lockout mechanism~~ RESOLVED
 5. ~~**HIGH-001 + HIGH-007:** Password reset + email verification~~ RESOLVED
+6. ~~**HIGH-006 + MEDIUM-002 + MEDIUM-011:** Session infrastructure (device binding, O(1) validation, session limits)~~ RESOLVED
 
 ---
 
@@ -938,30 +939,26 @@ app.use(express.json({ limit: '100kb' }));
 
 Open issues have been organized into logical groups for efficient implementation. Issues within each group share code paths, dependencies, or architectural concerns.
 
-### Group A: Session Infrastructure (Backend)
+### ~~Group A: Session Infrastructure (Backend)~~ RESOLVED
 **Priority: HIGH** | **Issues: HIGH-006, MEDIUM-002, MEDIUM-011**
 
-All three issues require changes to the `sessions` table schema and `auth-service.ts`. Implementing together avoids multiple migrations and ensures consistent session handling.
+All three issues required changes to the `sessions` table schema and `auth-service.ts`. Implemented together with a single migration.
 
-| Issue | Description | Shared Code |
-|-------|-------------|-------------|
-| HIGH-006 | Refresh token not bound to device/IP | sessions table, token storage |
-| MEDIUM-002 | O(n) bcrypt loop on token validation | sessions table, token validation |
-| MEDIUM-011 | No session count limit per user | token storage, session cleanup |
+| Issue | Description | Status |
+|-------|-------------|--------|
+| HIGH-006 | Refresh token not bound to device/IP | ✅ RESOLVED |
+| MEDIUM-002 | O(n) bcrypt loop on token validation | ✅ RESOLVED |
+| MEDIUM-011 | No session count limit per user | ✅ RESOLVED |
 
-**Implementation approach:**
-1. Single migration adding all columns:
-   ```sql
-   ALTER TABLE sessions ADD COLUMN token_hint VARCHAR(16);  -- Fast lookup
-   ALTER TABLE sessions ADD COLUMN ip_address INET;         -- Device binding
-   ALTER TABLE sessions ADD COLUMN user_agent TEXT;         -- Device binding
-   ALTER TABLE sessions ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
-   CREATE INDEX idx_sessions_token_hint ON sessions(user_id, token_hint);
-   ```
-2. Update `storeRefreshToken()`: Store hint + IP + user-agent, enforce max sessions
-3. Update `validateRefreshToken()`: Use hint for O(1) lookup, validate device match
-
-**Dependencies:** None - foundational work
+**Implementation (completed January 30, 2026):**
+1. Migration `006_session_device_binding.sql`:
+   - Added `ip_address` (INET) and `user_agent` (TEXT) columns to sessions
+   - Added `idx_sessions_user_created` index for session cleanup queries
+2. Refresh tokens now include `sessionId` in JWT payload for O(1) lookup
+3. Device binding: IP/user-agent stored on session creation, mismatches logged (lenient mode)
+4. Session limit: Max 5 sessions per user, oldest deleted when exceeded
+5. Backwards compatible: Legacy tokens fall back to O(n) validation
+6. New audit events: `SESSION_DEVICE_CHANGE`, `SESSION_LIMIT_EXCEEDED`
 
 ---
 
@@ -1122,6 +1119,7 @@ Phase 4: Ongoing
 | January 29, 2026 | **Resolved HIGH-001 (Password Reset) + HIGH-007 (Email Verification):** Implemented complete email verification and password reset flows. Key components: (1) `token-service.ts` - 256-bit cryptographic tokens with SHA-256 storage, atomic single-use consumption; (2) `email-service.ts` - Resend integration with HTML/text templates; (3) `email-verification.ts` middleware - blocks unverified users from note generation and billing; (4) Database migration `003_email_verification.sql` - adds `email_verified`, `email_verified_at` to users, creates `email_tokens` table; (5) Rate limiting on all sensitive endpoints (3-5 requests per window); (6) Web pages for verify-email, forgot-password, reset-password, resend-verification; (7) Extension UX improvements - inline forgot password flow, verification banner with resend button, auto-polling clears banner when verified. Security properties: enumeration-safe responses, session invalidation on password reset, lockout counter reset, full audit trail. |
 | January 29, 2026 | **Token Versioning for Immediate Session Invalidation:** Fixed security gap where stateless JWT access tokens remained valid up to 1 hour after password reset. Implemented token versioning: (1) Database migration `004_token_version.sql` - adds `token_version` column to users; (2) Auth service includes `tokenVersion` in JWT payload; (3) Auth middleware validates token version on every request against database; (4) Password reset increments token version, immediately invalidating all access tokens. Added `SessionAlert` component to extension for consistent logout messaging - supports multiple reasons (session_invalidated, session_expired, session_limit, session_revoked) preparing for MEDIUM-011 session limits implementation. |
 | January 30, 2026 | **Reorganized Open Issues into Implementation Groups:** Analyzed remaining 17 open issues and organized into 6 logical groups based on shared code paths and dependencies: Group A (Session Infrastructure: HIGH-006, MEDIUM-002, MEDIUM-011), Group B (Extension Resilience: MEDIUM-003, MEDIUM-008, MEDIUM-014), Group C (Observability Stack: LOW-001, MEDIUM-004, MEDIUM-006), Group D (CORS Configuration: MEDIUM-007, MEDIUM-015), Group E (LLM/Prompt Security: MEDIUM-005, MEDIUM-010), Group F (CI/CD Pipeline: LOW-003, LOW-005). Added phased implementation order prioritizing the remaining HIGH severity issue. Standalone items identified for quick wins. |
+| January 30, 2026 | **Resolved Group A - Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011):** Implemented comprehensive session security improvements. (1) HIGH-006 Device Binding: Sessions now store IP address and user agent; mismatches logged as `SESSION_DEVICE_CHANGE` warnings (lenient mode - doesn't block, since PT staff frequently change networks); (2) MEDIUM-002 O(1) Token Validation: Refresh tokens include `sessionId` in JWT payload, enabling primary key lookup instead of O(n) bcrypt loop; legacy tokens fall back gracefully; (3) MEDIUM-011 Session Limits: Max 5 sessions per user enforced, oldest deleted when exceeded, `SESSION_LIMIT_EXCEEDED` audit events logged. Migration: `006_session_device_binding.sql`. Test coverage: 27 auth-service tests. **All HIGH severity issues now resolved.** |
 
 ---
 
@@ -1133,8 +1131,8 @@ Significant progress has been made on security remediation. All critical vulnera
 | Severity | Open | Accepted | New (This Review) |
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 1 | 1 | 4 |
-| MEDIUM | 10 | 0 | 5 |
+| HIGH | 0 | 1 | 4 |
+| MEDIUM | 8 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
 **Remaining Priority Items:**
@@ -1147,16 +1145,18 @@ Significant progress has been made on security remediation. All critical vulnera
 - Password reset implemented (HIGH-001 resolved) - Secure token-based reset with session invalidation
 - HIGH-012 (email in failed login audit) accepted as standard security practice after risk analysis
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
-- 1 HIGH severity issue remains open (device binding for refresh tokens)
+- Session infrastructure implemented (HIGH-006, MEDIUM-002, MEDIUM-011 resolved) - Device binding, O(1) token validation, session limits
+- **All HIGH severity issues now resolved**
 
 **Recommended Action:**
-1. **Short-term:** Device binding for refresh tokens (HIGH-006)
-2. **Medium-term:** Address MEDIUM severity items (prompt injection, session limits, webhook idempotency)
+1. **Short-term:** Address remaining MEDIUM severity items (prompt injection, webhook idempotency, extension resilience)
+2. **Medium-term:** Observability stack (structured logging, request ID tracing)
 
 **Notes:**
 - JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
 - Email in failed login audit (HIGH-012) marked as ACCEPTED RISK - standard security practice with low actual risk in this context.
 - Account lockout admin unlock currently via direct database access; admin API endpoint planned for future.
+- Device binding uses lenient mode (log, don't block) to avoid false positives for PT staff who frequently switch networks and devices.
 - Email verification uses Resend for transactional email delivery (falls back to console logging when API key not configured).
 - Extension auto-polls for verification status - banner clears automatically without logout.
 

@@ -634,9 +634,8 @@ CREATE TABLE sessions (
   refresh_token_hash VARCHAR(255) NOT NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
-
-  -- Index for token lookup
-  CONSTRAINT sessions_user_id_idx UNIQUE (user_id, refresh_token_hash)
+  ip_address INET,              -- Device binding for audit trail
+  user_agent TEXT               -- Device binding for audit trail
 );
 
 -- Audit logs (HIPAA requirement)
@@ -669,6 +668,7 @@ CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_stripe_customer ON users(stripe_customer_id);
 CREATE INDEX idx_sessions_user ON sessions(user_id);
 CREATE INDEX idx_sessions_expires ON sessions(expires_at);
+CREATE INDEX idx_sessions_user_created ON sessions(user_id, created_at);  -- For session limit enforcement
 CREATE INDEX idx_audit_user_created ON audit_logs(user_id, created_at);
 CREATE INDEX idx_audit_action ON audit_logs(action);
 CREATE INDEX idx_usage_user_month ON usage(user_id, month);
@@ -681,6 +681,7 @@ CREATE INDEX idx_usage_user_month ON usage(user_id, month);
 3. **HIPAA audit logs:** Track all significant actions
 4. **Usage tracking:** For billing limits and analytics
 5. **Session management:** Support token refresh and invalidation
+6. **Session security:** Device binding (IP/user-agent) for audit trail, max 5 sessions per user
 
 ---
 
@@ -1384,6 +1385,9 @@ Simple JWT-based authentication with refresh tokens. Built in-house to avoid exp
 | Refresh token rotation | New refresh token on each refresh |
 | Brute force protection | 5 attempts per 15 minutes |
 | Session invalidation | Logout deletes refresh token |
+| Session limit | Max 5 sessions per user (oldest deleted) |
+| Device binding | IP/user-agent stored for audit trail |
+| O(1) token validation | sessionId in JWT for fast lookup |
 
 ### Implementation
 
