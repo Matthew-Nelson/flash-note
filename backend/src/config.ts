@@ -40,6 +40,22 @@ const envSchema = z.object({
   WEB_URL: z.string().url().default('http://localhost:3000'),
   API_URL: z.string().url().default('http://localhost:4000'),
 
+  // CORS Configuration
+  // Comma-separated list of allowed origins (URLs or chrome-extension:// URIs)
+  ALLOWED_ORIGINS: z
+    .string()
+    .transform((val) => val.split(',').map((origin) => origin.trim()).filter(Boolean))
+    .refine(
+      (origins) => origins.every((origin) =>
+        /^https?:\/\/.+/.test(origin) || /^chrome-extension:\/\/[a-z]{32}$/.test(origin)
+      ),
+      {
+        message:
+          'Each origin must be a valid http(s):// URL or chrome-extension:// URI (32 lowercase letters)',
+      }
+    )
+    .default('http://localhost:3000,http://localhost:5173'),
+
   // GCP (for production HIPAA compliance)
   GCP_PROJECT_ID: z.string().optional(),
 
@@ -57,6 +73,14 @@ function loadConfig() {
   if (!parsed.success) {
     console.error('Invalid environment variables:');
     console.error(parsed.error.flatten().fieldErrors);
+    process.exit(1);
+  }
+
+  // SECURITY: Ensure ALLOWED_ORIGINS is configured in production
+  // Empty origins would silently block all CORS requests
+  if (parsed.data.NODE_ENV === 'production' && parsed.data.ALLOWED_ORIGINS.length === 0) {
+    console.error('SECURITY ERROR: ALLOWED_ORIGINS cannot be empty in production.');
+    console.error('Set ALLOWED_ORIGINS to your web app URL and extension ID.');
     process.exit(1);
   }
 
