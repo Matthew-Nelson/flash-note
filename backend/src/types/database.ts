@@ -37,6 +37,8 @@ export interface SessionRow {
   refresh_token_hash: string;
   expires_at: Date;
   created_at: Date;
+  ip_address: string | null;  // HIGH-006: Device binding
+  user_agent: string | null;  // HIGH-006: Device binding
 }
 
 /**
@@ -130,4 +132,15 @@ export interface SessionRefreshTokenRow {
 export interface SessionWithIdRow {
   id: string;
   refresh_token_hash: string;
+}
+
+/**
+ * Session data needed for O(1) token validation (MEDIUM-002)
+ * Includes device binding fields for audit logging (HIGH-006)
+ */
+export interface SessionValidationRow {
+  id: string;
+  refresh_token_hash: string;
+  ip_address: string | null;
+  user_agent: string | null;
 }

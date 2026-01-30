@@ -102,12 +102,15 @@ export enum AuditAction {
   PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
   PASSWORD_RESET_FAILED = 'PASSWORD_RESET_FAILED',
   PASSWORD_RESET_TOKEN_INVALID = 'PASSWORD_RESET_TOKEN_INVALID',
+  // Session management (HIGH-006, MEDIUM-011)
+  SESSION_DEVICE_CHANGE = 'SESSION_DEVICE_CHANGE',
+  SESSION_LIMIT_EXCEEDED = 'SESSION_LIMIT_EXCEEDED',
 }
 
 export interface AuditLogEntry {
   userId: string | null;
   action: AuditAction;
-  status: 'SUCCESS' | 'FAILURE';
+  status: 'SUCCESS' | 'FAILURE' | 'WARNING';
   metadata?: Record<string, unknown>;
   ipAddress?: string;
   userAgent?: string;
