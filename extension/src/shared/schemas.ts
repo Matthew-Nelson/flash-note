@@ -83,8 +83,6 @@ export const generatedNoteSchema = z.object({
   assessment: z.string(),
   plan: z.string(),
   metadata: z.object({
-    model: z.string(),
-    tokensUsed: z.number(),
     generationTimeMs: z.number(),
   }).optional(),
 });

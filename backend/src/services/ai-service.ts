@@ -2,7 +2,8 @@ import { config, isProduction } from '../config.js';
 import { buildSOAPPrompt, parseSOAPSections } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateMockSOAPNote } from './mock-ai-service.js';
-import type { GeneratedNote, NoteType } from '../types/index.js';
+import { detectSuspiciousPatterns } from '../utils/prompt-sanitization.js';
+import type { GeneratedNote, NoteType, PromptSecurityMetadata } from '../types/index.js';
 
 // SECURITY: Prevent mock AI from being used in production
 // This could result in fake clinical notes that could harm patients
@@ -57,9 +58,23 @@ class AIService {
     noteType: NoteType,
     patientContext?: string
   ): Promise<GeneratedNote> {
+    // SECURITY (MEDIUM-005): Detect suspicious patterns for monitoring
+    // This is detection-only; we do NOT block requests based on this
+    // XML delimiters in buildSOAPPrompt provide the actual protection
+    const quickNotesDetection = detectSuspiciousPatterns(quickNotes);
+    const contextDetection = patientContext
+      ? detectSuspiciousPatterns(patientContext)
+      : { detected: false, count: 0 };
+
+    const securityMetadata: PromptSecurityMetadata = {
+      suspiciousPatternDetected: quickNotesDetection.detected || contextDetection.detected,
+      suspiciousPatternCount: quickNotesDetection.count + contextDetection.count,
+    };
+
     // Use mock response in development when USE_MOCK_AI is enabled
     if (config.USE_MOCK_AI) {
-      return generateMockSOAPNote(quickNotes, noteType, patientContext);
+      const mockResult = await generateMockSOAPNote(quickNotes, noteType, patientContext);
+      return { ...mockResult, securityMetadata };
     }
 
     const startTime = Date.now();
@@ -83,6 +98,7 @@ class AIService {
         tokensUsed: response.usageMetadata.totalTokenCount,
         generationTimeMs,
       },
+      securityMetadata,
     };
   }
 

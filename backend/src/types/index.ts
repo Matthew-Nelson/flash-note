@@ -53,6 +53,12 @@ export interface GenerateNoteInput {
   quickNotes: string;
 }
 
+// Prompt security metadata for audit logging (MEDIUM-005)
+export interface PromptSecurityMetadata {
+  suspiciousPatternDetected: boolean;
+  suspiciousPatternCount: number;
+}
+
 export interface GeneratedNote {
   subjective: string;
   objective: string;
@@ -63,6 +69,9 @@ export interface GeneratedNote {
     tokensUsed: number;
     generationTimeMs: number;
   };
+  // Security metadata for audit purposes (MEDIUM-005)
+  // Optional for backwards compatibility with mock service
+  securityMetadata?: PromptSecurityMetadata;
 }
 
 // AI types

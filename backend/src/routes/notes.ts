@@ -43,6 +43,7 @@ notesRouter.post('/generate', async (req, res, next) => {
     );
 
     // Log audit (without PHI) - HIPAA compliant
+    // SECURITY (MEDIUM-005): Include security metadata for monitoring prompt injection attempts
     safeAuditLog(
       auditService.log({
         userId: userId ?? null,
@@ -52,6 +53,9 @@ notesRouter.post('/generate', async (req, res, next) => {
           noteType,
           tokensUsed: result.metadata.tokensUsed,
           generationTimeMs: result.metadata.generationTimeMs,
+          // Security monitoring - does NOT include PHI, only detection flags
+          suspiciousPatternDetected: result.securityMetadata?.suspiciousPatternDetected ?? false,
+          suspiciousPatternCount: result.securityMetadata?.suspiciousPatternCount ?? 0,
         },
         ipAddress,
         userAgent,
@@ -64,9 +68,23 @@ notesRouter.post('/generate', async (req, res, next) => {
       await usageService.incrementUsage(userId, result.metadata.tokensUsed);
     }
 
+    // SECURITY: Only return data the frontend actually needs
+    // - securityMetadata: NEVER expose (helps attackers refine injection attempts)
+    // - metadata.model, metadata.tokensUsed: Not used by FE, unnecessary exposure
+    // - metadata.generationTimeMs: Used by FE for "Generated in X.Xs" display
+    const clientResponse = {
+      subjective: result.subjective,
+      objective: result.objective,
+      assessment: result.assessment,
+      plan: result.plan,
+      metadata: {
+        generationTimeMs: result.metadata.generationTimeMs,
+      },
+    };
+
     res.json({
       success: true,
-      data: result,
+      data: clientResponse,
     });
   } catch (error) {
     // HIPAA: Log failed generation attempts (without PHI)
