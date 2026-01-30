@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/shared/storage';
-import { api } from '@/shared/api';
+import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
 
 interface User {
   id: string;
   email: string;
   subscriptionStatus: string;
   trialEndsAt?: string | null;
+  emailVerified?: boolean;
 }
 
 export function useAuth() {
@@ -15,6 +16,18 @@ export function useAuth() {
 
   useEffect(() => {
     loadAuth();
+  }, []);
+
+  // Listen for forced logout (e.g., password reset invalidated token)
+  useEffect(() => {
+    const handleAuthInvalidated = () => {
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_INVALIDATED_EVENT, handleAuthInvalidated);
+    return () => {
+      window.removeEventListener(AUTH_INVALIDATED_EVENT, handleAuthInvalidated);
+    };
   }, []);
 
   const loadAuth = async () => {
@@ -53,11 +66,25 @@ export function useAuth() {
     setUser(null);
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const response = await api.refreshUser();
+      if (response?.user) {
+        setUser(response.user);
+        return response.user;
+      }
+    } catch (error) {
+      console.error('Failed to refresh user:', error);
+    }
+    return null;
+  }, []);
+
   return {
     user,
     isLoading,
     login,
     register,
     logout,
+    refreshUser,
   };
 }

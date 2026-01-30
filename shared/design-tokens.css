@@ -1,0 +1,435 @@
+/**
+ * FlashNote Design Tokens
+ *
+ * Shared design system tokens for consistency between web and extension.
+ * Import this file in both applications to ensure visual coherence.
+ *
+ * Usage:
+ *   @import '../../shared/design-tokens.css';
+ */
+
+/* ============================================
+   CORE BRAND COLORS
+   These are the foundational palette colors.
+   Use semantic tokens below for actual styling.
+   ============================================ */
+
+:root {
+  /* Primary Brand - Cyan */
+  --fn-cyan-50: #ecfeff;
+  --fn-cyan-100: #cffafe;
+  --fn-cyan-200: #a5f3fc;
+  --fn-cyan-300: #67e8f9;
+  --fn-cyan-400: #22d3ee;
+  --fn-cyan-500: #06b6d4;
+  --fn-cyan-600: #0891b2;
+  --fn-cyan-700: #0e7490;
+  --fn-cyan-800: #155e75;
+  --fn-cyan-900: #164e63;
+
+  /* Secondary Brand - Violet */
+  --fn-violet-50: #f5f3ff;
+  --fn-violet-100: #ede9fe;
+  --fn-violet-200: #ddd6fe;
+  --fn-violet-300: #c4b5fd;
+  --fn-violet-400: #a78bfa;
+  --fn-violet-500: #8b5cf6;
+  --fn-violet-600: #7c3aed;
+  --fn-violet-700: #6d28d9;
+  --fn-violet-800: #5b21b6;
+  --fn-violet-900: #4c1d95;
+
+  /* Accent - Pink */
+  --fn-pink-50: #fdf2f8;
+  --fn-pink-100: #fce7f3;
+  --fn-pink-200: #fbcfe8;
+  --fn-pink-300: #f9a8d4;
+  --fn-pink-400: #f472b6;
+  --fn-pink-500: #ec4899;
+  --fn-pink-600: #db2777;
+  --fn-pink-700: #be185d;
+  --fn-pink-800: #9d174d;
+  --fn-pink-900: #831843;
+
+  /* Neutral - Slate */
+  --fn-slate-50: #f8fafc;
+  --fn-slate-100: #f1f5f9;
+  --fn-slate-200: #e2e8f0;
+  --fn-slate-300: #cbd5e1;
+  --fn-slate-400: #94a3b8;
+  --fn-slate-500: #64748b;
+  --fn-slate-600: #475569;
+  --fn-slate-700: #334155;
+  --fn-slate-800: #1e293b;
+  --fn-slate-900: #0f172a;
+  --fn-slate-950: #020617;
+
+  /* Semantic - Success */
+  --fn-success-light: #d1fae5;
+  --fn-success: #10b981;
+  --fn-success-dark: #059669;
+
+  /* Semantic - Error */
+  --fn-error-light: #fef2f2;
+  --fn-error: #ef4444;
+  --fn-error-dark: #dc2626;
+
+  /* Semantic - Warning */
+  --fn-warning-light: #fef3c7;
+  --fn-warning: #f59e0b;
+  --fn-warning-dark: #d97706;
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+
+  --fn-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --fn-font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas,
+    'Liberation Mono', 'Courier New', monospace;
+
+  /* Font Sizes */
+  --fn-text-xs: 0.75rem;      /* 12px */
+  --fn-text-sm: 0.875rem;     /* 14px */
+  --fn-text-base: 1rem;       /* 16px */
+  --fn-text-lg: 1.125rem;     /* 18px */
+  --fn-text-xl: 1.25rem;      /* 20px */
+  --fn-text-2xl: 1.5rem;      /* 24px */
+  --fn-text-3xl: 1.875rem;    /* 30px */
+  --fn-text-4xl: 2.25rem;     /* 36px */
+
+  /* Line Heights */
+  --fn-leading-tight: 1.25;
+  --fn-leading-normal: 1.5;
+  --fn-leading-relaxed: 1.625;
+
+  /* Font Weights */
+  --fn-font-normal: 400;
+  --fn-font-medium: 500;
+  --fn-font-semibold: 600;
+  --fn-font-bold: 700;
+
+  /* ============================================
+     SPACING & SIZING
+     ============================================ */
+
+  --fn-space-1: 0.25rem;      /* 4px */
+  --fn-space-2: 0.5rem;       /* 8px */
+  --fn-space-3: 0.75rem;      /* 12px */
+  --fn-space-4: 1rem;         /* 16px */
+  --fn-space-5: 1.25rem;      /* 20px */
+  --fn-space-6: 1.5rem;       /* 24px */
+  --fn-space-8: 2rem;         /* 32px */
+  --fn-space-10: 2.5rem;      /* 40px */
+  --fn-space-12: 3rem;        /* 48px */
+  --fn-space-16: 4rem;        /* 64px */
+
+  /* ============================================
+     BORDER RADIUS
+     ============================================ */
+
+  --fn-radius-sm: 0.25rem;    /* 4px */
+  --fn-radius-base: 0.5rem;   /* 8px */
+  --fn-radius-md: 0.625rem;   /* 10px */
+  --fn-radius-lg: 0.75rem;    /* 12px */
+  --fn-radius-xl: 1rem;       /* 16px */
+  --fn-radius-full: 9999px;
+
+  /* ============================================
+     SHADOWS
+     ============================================ */
+
+  --fn-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --fn-shadow-base: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --fn-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --fn-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --fn-shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+
+  /* ============================================
+     TRANSITIONS
+     ============================================ */
+
+  --fn-transition-fast: 150ms;
+  --fn-transition-base: 200ms;
+  --fn-transition-slow: 300ms;
+  --fn-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --fn-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --fn-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --fn-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================
+   DEFAULT THEME (Gradient Accent - for Web)
+
+   This is the default light theme used by the
+   web application. Clean, professional, and
+   accessible for healthcare environments.
+   ============================================ */
+
+:root {
+  /* Backgrounds */
+  --fn-bg-primary: #ffffff;
+  --fn-bg-secondary: var(--fn-slate-50);
+  --fn-bg-tertiary: var(--fn-slate-100);
+  --fn-bg-inverse: var(--fn-slate-900);
+
+  /* Text */
+  --fn-text-primary: var(--fn-slate-900);
+  --fn-text-secondary: var(--fn-slate-600);
+  --fn-text-muted: var(--fn-slate-500);
+  --fn-text-inverse: var(--fn-slate-50);
+
+  /* Borders */
+  --fn-border-color: var(--fn-slate-200);
+  --fn-border-subtle: var(--fn-slate-100);
+
+  /* Brand Accents */
+  --fn-accent-primary: var(--fn-cyan-500);
+  --fn-accent-secondary: var(--fn-violet-500);
+  --fn-accent-tertiary: var(--fn-pink-500);
+
+  /* Glow Effects */
+  --fn-accent-glow: rgba(139, 92, 246, 0.4);
+  --fn-accent-glow-light: rgba(139, 92, 246, 0.1);
+
+  /* Interactive States */
+  --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow-light);
+  --fn-hover-bg: var(--fn-slate-50);
+
+  /* Component-specific */
+  --fn-btn-disabled-bg: var(--fn-slate-100);
+  --fn-input-bg: var(--fn-bg-primary);
+  --fn-card-bg: var(--fn-bg-primary);
+}
+
+/* ============================================
+   THEME: Dark AI
+
+   ChatGPT/v0.dev inspired dark aesthetic.
+   Used in extension for low-light environments.
+   ============================================ */
+
+.theme-dark-ai {
+  --fn-bg-primary: var(--fn-slate-900);
+  --fn-bg-secondary: var(--fn-slate-800);
+  --fn-bg-tertiary: var(--fn-slate-700);
+  --fn-bg-inverse: var(--fn-slate-50);
+
+  --fn-text-primary: var(--fn-slate-50);
+  --fn-text-secondary: var(--fn-slate-300);
+  --fn-text-muted: var(--fn-slate-400);
+  --fn-text-inverse: var(--fn-slate-900);
+
+  --fn-border-color: var(--fn-slate-600);
+  --fn-border-subtle: var(--fn-slate-700);
+
+  --fn-accent-primary: var(--fn-cyan-500);
+  --fn-accent-secondary: #a855f7; /* Purple-500 */
+
+  --fn-accent-glow: rgba(6, 182, 212, 0.5);
+  --fn-accent-glow-light: rgba(6, 182, 212, 0.1);
+  --fn-glow-color: rgba(6, 182, 212, 0.4);
+
+  --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow);
+  --fn-hover-bg: var(--fn-slate-800);
+
+  --fn-btn-disabled-bg: var(--fn-slate-700);
+  --fn-input-bg: var(--fn-slate-800);
+  --fn-card-bg: var(--fn-slate-800);
+
+  /* Error states for dark mode */
+  --fn-error-bg: rgba(239, 68, 68, 0.1);
+  --fn-error-text: #fca5a5;
+
+  /* Trial banner */
+  --fn-trial-bg: linear-gradient(135deg, rgba(6, 182, 212, 0.1) 0%, rgba(168, 85, 247, 0.1) 100%);
+  --fn-trial-border: rgba(6, 182, 212, 0.3);
+
+  /* Link hover */
+  --fn-link-hover: #22d3ee;
+}
+
+/* ============================================
+   THEME: Glassmorphism
+
+   Apple/Stripe inspired frosted glass aesthetic.
+   Used in extension for modern look.
+   ============================================ */
+
+.theme-glassmorphism {
+  --fn-bg-primary: transparent;
+  --fn-bg-secondary: rgba(255, 255, 255, 0.7);
+  --fn-bg-tertiary: rgba(255, 255, 255, 0.5);
+  --fn-bg-inverse: var(--fn-slate-900);
+
+  --fn-text-primary: var(--fn-slate-800);
+  --fn-text-secondary: var(--fn-slate-600);
+  --fn-text-muted: var(--fn-slate-500);
+  --fn-text-inverse: var(--fn-slate-50);
+
+  --fn-border-color: rgba(255, 255, 255, 0.5);
+  --fn-border-subtle: rgba(255, 255, 255, 0.3);
+
+  --fn-accent-primary: #6366f1; /* Indigo-500 */
+  --fn-accent-secondary: #a855f7; /* Purple-500 */
+
+  --fn-accent-glow: rgba(99, 102, 241, 0.3);
+  --fn-accent-glow-light: rgba(99, 102, 241, 0.1);
+  --fn-glow-color: rgba(99, 102, 241, 0.4);
+
+  --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow-light);
+  --fn-hover-bg: rgba(255, 255, 255, 0.9);
+
+  --fn-btn-disabled-bg: var(--fn-slate-300);
+  --fn-input-bg: rgba(255, 255, 255, 0.8);
+  --fn-card-bg: rgba(255, 255, 255, 0.7);
+
+  /* Error states */
+  --fn-error-bg: rgba(239, 68, 68, 0.1);
+  --fn-error-text: var(--fn-error);
+
+  /* Trial banner */
+  --fn-trial-bg: rgba(99, 102, 241, 0.1);
+  --fn-trial-border: rgba(99, 102, 241, 0.2);
+
+  /* Link hover */
+  --fn-link-hover: var(--fn-accent-secondary);
+
+  /* Glass-specific backdrop */
+  --fn-glass-blur: blur(12px);
+  --fn-glass-bg-gradient: linear-gradient(135deg, #e0e7ff 0%, #fae8ff 100%);
+}
+
+/* ============================================
+   THEME: Gradient Accent
+
+   Vercel/Supabase inspired vibrant SaaS aesthetic.
+   Default for web, option in extension.
+   ============================================ */
+
+.theme-gradient-accent {
+  --fn-bg-primary: #ffffff;
+  --fn-bg-secondary: var(--fn-slate-50);
+  --fn-bg-tertiary: var(--fn-slate-100);
+  --fn-bg-inverse: var(--fn-slate-900);
+
+  --fn-text-primary: var(--fn-slate-900);
+  --fn-text-secondary: var(--fn-slate-600);
+  --fn-text-muted: var(--fn-slate-500);
+  --fn-text-inverse: var(--fn-slate-50);
+
+  --fn-border-color: var(--fn-slate-200);
+  --fn-border-subtle: var(--fn-slate-100);
+
+  --fn-accent-primary: var(--fn-cyan-500);
+  --fn-accent-secondary: var(--fn-violet-500);
+  --fn-accent-tertiary: var(--fn-pink-500);
+
+  --fn-accent-glow: rgba(139, 92, 246, 0.4);
+  --fn-accent-glow-light: rgba(139, 92, 246, 0.1);
+
+  --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow-light);
+  --fn-hover-bg: var(--fn-slate-50);
+
+  --fn-btn-disabled-bg: var(--fn-slate-100);
+  --fn-input-bg: var(--fn-bg-primary);
+  --fn-card-bg: var(--fn-bg-primary);
+
+  /* Error states */
+  --fn-error-bg: #fef2f2;
+  --fn-error-text: var(--fn-error);
+
+  /* Trial banner */
+  --fn-trial-bg: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(139, 92, 246, 0.05), rgba(236, 72, 153, 0.05));
+  --fn-trial-border: var(--fn-cyan-500);
+}
+
+/* ============================================
+   ANIMATIONS
+
+   Shared keyframe animations for both apps.
+   ============================================ */
+
+@keyframes fn-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px var(--fn-glow-color, rgba(6, 182, 212, 0.3));
+  }
+  50% {
+    box-shadow: 0 0 40px var(--fn-glow-color, rgba(6, 182, 212, 0.6));
+  }
+}
+
+@keyframes fn-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes fn-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fn-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fn-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fn-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes fn-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes fn-breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
+@keyframes fn-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ============================================
+   REDUCED MOTION
+
+   Respect user preferences for reduced motion.
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

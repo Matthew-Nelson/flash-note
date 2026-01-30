@@ -160,6 +160,19 @@ pnpm start        # Start production server
 - Rate limiting: 5 login attempts per 15 minutes
 - All endpoints require authentication except /auth/* and /health
 
+### Password Policy (Source of Truth: `backend/src/routes/auth.ts`)
+
+Password requirements are enforced by Zod schemas in the backend:
+- Minimum 8 characters
+- At least one uppercase letter (`/[A-Z]/`)
+- At least one lowercase letter (`/[a-z]/`)
+- At least one number (`/[0-9]/`)
+
+**When updating password policy, sync changes to:**
+1. `backend/src/routes/auth.ts` - `registerSchema` and `resetPasswordSchema` (SOURCE OF TRUTH)
+2. `web/src/app/reset-password/page.tsx` - client-side validation
+3. `extension/src/shared/schemas.ts` - client-side validation
+
 ## Code Quality Standards
 
 **This is not an MVP. We do not accept shortcuts.**
