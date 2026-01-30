@@ -16,8 +16,8 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 | Severity | Original | Resolved | Accepted | Open | New Issues |
 |----------|----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 | 0 |
-| HIGH | 9 | 11 | 1 | 1 | 4 |
-| MEDIUM | 8 | 3 | 0 | 5 | 5 |
+| HIGH | 9 | 11 | 1 | 0 | 4 |
+| MEDIUM | 8 | 5 | 0 | 3 | 5 |
 | LOW | 5 | 0 | 0 | 5 | 2 |
 
 ### Overall Risk Assessment: **LOW-MEDIUM** (improved from MEDIUM)
@@ -546,10 +546,11 @@ No request ID is generated for log correlation.
 ---
 
 ### MEDIUM-007: CORS Allows Development Origins
-**Status:** OPEN
-**File:** `backend/src/index.ts:15-19`
+**Status:** RESOLVED
+**File:** `backend/src/index.ts:29-32`, `backend/src/config.ts`
 **Severity:** MEDIUM
 
+**Original Issue:**
 ```typescript
 origin: config.NODE_ENV === 'production'
   ? [config.WEB_URL]
@@ -558,7 +559,11 @@ origin: config.NODE_ENV === 'production'
 
 **Risk:** In staging/test environments that aren't "production", CORS is permissive.
 
-**Fix:** Use explicit environment checks or whitelist approach. Consider `ALLOWED_ORIGINS` env var.
+**Resolution:** Replaced NODE_ENV-based logic with explicit `ALLOWED_ORIGINS` environment variable:
+- Added `ALLOWED_ORIGINS` to Zod config schema (parses comma-separated list)
+- CORS middleware now uses `config.ALLOWED_ORIGINS` directly
+- Production deployments must explicitly configure allowed origins
+- Supports Chrome extension origins (chrome-extension://)
 
 ---
 
@@ -761,29 +766,24 @@ private async requestWithRetry<T>(
 ---
 
 ### MEDIUM-015: CORS Missing Extension Origin in Production
-**Status:** OPEN
-**File:** `backend/src/index.ts:15-19`
+**Status:** RESOLVED
+**File:** `backend/src/index.ts:29-32`, `backend/src/config.ts`
 **Severity:** MEDIUM
 
-**Update to MEDIUM-007:** In addition to the staging/test environment concern, the production CORS configuration only allows `config.WEB_URL`:
-```typescript
-origin: config.NODE_ENV === 'production'
-  ? [config.WEB_URL]
-  : ['http://localhost:3000', 'http://localhost:5173'],
-```
+**Original Issue:** The production CORS configuration only allowed `config.WEB_URL`, missing Chrome extension origins (`chrome-extension://<extension-id>`).
 
 **Risk:** Chrome extensions make requests from `chrome-extension://<extension-id>` origins. If the extension makes direct API calls in production, they may be blocked by CORS.
 
-**Note:** The extension may work via different mechanisms (e.g., service worker fetch without CORS, or if the API doesn't enforce CORS for Bearer-authenticated requests). This should be verified.
+**Resolution:** Implemented alongside MEDIUM-007. The `ALLOWED_ORIGINS` environment variable now supports:
+- Standard web URLs (https://flashnote.com)
+- Chrome extension origins (chrome-extension://abcdefghijklmnop)
 
-**Fix:** If extension requires CORS, add the extension ID to allowed origins:
-```typescript
-origin: config.NODE_ENV === 'production'
-  ? [config.WEB_URL, 'chrome-extension://YOUR_EXTENSION_ID']
-  : ['http://localhost:3000', 'http://localhost:5173'],
+**Production Configuration Example:**
+```bash
+ALLOWED_ORIGINS=https://flashnote.com,chrome-extension://YOUR_EXTENSION_ID
 ```
 
-Or use a CORS configuration that allows credentialed requests from extensions.
+**Note:** The Chrome extension ID is assigned when published to the Chrome Web Store. Update this value after publishing.
 
 ---
 
@@ -1003,23 +1003,22 @@ All about logging and monitoring infrastructure. If implementing structured logg
 
 ---
 
-### Group D: CORS Configuration
+### ~~Group D: CORS Configuration~~ RESOLVED
 **Priority: MEDIUM** | **Issues: MEDIUM-007, MEDIUM-015**
 
-Both issues are in `backend/src/index.ts:15-19`. Same root cause: hardcoded origin logic.
+Both issues were in `backend/src/index.ts:15-19`. Same root cause: hardcoded origin logic.
 
-| Issue | Description | Shared Code |
-|-------|-------------|-------------|
-| MEDIUM-007 | CORS allows dev origins in staging | index.ts CORS config |
-| MEDIUM-015 | Extension origin missing in prod | index.ts CORS config |
+| Issue | Description | Status |
+|-------|-------------|--------|
+| MEDIUM-007 | CORS allows dev origins in staging | ✅ RESOLVED |
+| MEDIUM-015 | Extension origin missing in prod | ✅ RESOLVED |
 
-**Implementation approach:**
-1. Add `ALLOWED_ORIGINS` environment variable
-2. Parse as comma-separated list
-3. Include extension ID in production config
-4. Remove NODE_ENV-based logic
-
-**Dependencies:** None - quick win
+**Implementation (completed January 30, 2026):**
+1. Added `ALLOWED_ORIGINS` to Zod config schema with comma-separated parsing
+2. CORS middleware now uses `config.ALLOWED_ORIGINS` directly
+3. Removed NODE_ENV-based origin logic
+4. Default value for development: `http://localhost:3000,http://localhost:5173`
+5. Production config supports Chrome extension origins
 
 ---
 
@@ -1079,9 +1078,9 @@ Quick fixes that don't require grouping:
 ## Recommended Implementation Order
 
 ```
-Phase 1: Security Foundation
-├── Group A: Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011)
-└── Group D: CORS Configuration (MEDIUM-007, MEDIUM-015)
+Phase 1: Security Foundation ✅ COMPLETE
+├── Group A: Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011) ✅
+└── Group D: CORS Configuration (MEDIUM-007, MEDIUM-015) ✅
 
 Phase 2: Security Hardening
 ├── Group E: LLM/Prompt Security (MEDIUM-005, MEDIUM-010)
@@ -1097,7 +1096,7 @@ Phase 4: Ongoing
 ```
 
 **Rationale:**
-- Phase 1 addresses the only remaining HIGH issue and a quick CORS fix
+- ~~Phase 1 addresses the only remaining HIGH issue and a quick CORS fix~~ **COMPLETE**
 - Phase 2 handles security-critical prompt injection before it becomes a vector
 - Phase 3 improves reliability and debugging capability
 - Phase 4 is continuous improvement
@@ -1120,6 +1119,7 @@ Phase 4: Ongoing
 | January 29, 2026 | **Token Versioning for Immediate Session Invalidation:** Fixed security gap where stateless JWT access tokens remained valid up to 1 hour after password reset. Implemented token versioning: (1) Database migration `004_token_version.sql` - adds `token_version` column to users; (2) Auth service includes `tokenVersion` in JWT payload; (3) Auth middleware validates token version on every request against database; (4) Password reset increments token version, immediately invalidating all access tokens. Added `SessionAlert` component to extension for consistent logout messaging - supports multiple reasons (session_invalidated, session_expired, session_limit, session_revoked) preparing for MEDIUM-011 session limits implementation. |
 | January 30, 2026 | **Reorganized Open Issues into Implementation Groups:** Analyzed remaining 17 open issues and organized into 6 logical groups based on shared code paths and dependencies: Group A (Session Infrastructure: HIGH-006, MEDIUM-002, MEDIUM-011), Group B (Extension Resilience: MEDIUM-003, MEDIUM-008, MEDIUM-014), Group C (Observability Stack: LOW-001, MEDIUM-004, MEDIUM-006), Group D (CORS Configuration: MEDIUM-007, MEDIUM-015), Group E (LLM/Prompt Security: MEDIUM-005, MEDIUM-010), Group F (CI/CD Pipeline: LOW-003, LOW-005). Added phased implementation order prioritizing the remaining HIGH severity issue. Standalone items identified for quick wins. |
 | January 30, 2026 | **Resolved Group A - Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011):** Implemented comprehensive session security improvements. (1) HIGH-006 Device Binding: Sessions now store IP address and user agent; mismatches logged as `SESSION_DEVICE_CHANGE` warnings (lenient mode - doesn't block, since PT staff frequently change networks); (2) MEDIUM-002 O(1) Token Validation: Refresh tokens include `sessionId` in JWT payload, enabling primary key lookup instead of O(n) bcrypt loop; legacy tokens fall back gracefully; (3) MEDIUM-011 Session Limits: Max 5 sessions per user enforced, oldest deleted when exceeded, `SESSION_LIMIT_EXCEEDED` audit events logged. Migration: `006_session_device_binding.sql`. Test coverage: 27 auth-service tests. **All HIGH severity issues now resolved.** |
+| January 30, 2026 | **Resolved Group D - CORS Configuration (MEDIUM-007, MEDIUM-015):** Replaced NODE_ENV-based CORS origin logic with explicit `ALLOWED_ORIGINS` environment variable. (1) Added `ALLOWED_ORIGINS` to Zod config schema - parses comma-separated list with whitespace trimming; (2) CORS middleware now uses `config.ALLOWED_ORIGINS` directly; (3) Supports Chrome extension origins (chrome-extension://); (4) Production must explicitly configure allowed origins. Files: `config.ts`, `index.ts`, `.env.example`, `.env`. |
 
 ---
 
@@ -1132,7 +1132,7 @@ Significant progress has been made on security remediation. All critical vulnera
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 0 | 1 | 4 |
-| MEDIUM | 8 | 0 | 5 |
+| MEDIUM | 6 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
 **Remaining Priority Items:**
@@ -1146,6 +1146,7 @@ Significant progress has been made on security remediation. All critical vulnera
 - HIGH-012 (email in failed login audit) accepted as standard security practice after risk analysis
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
 - Session infrastructure implemented (HIGH-006, MEDIUM-002, MEDIUM-011 resolved) - Device binding, O(1) token validation, session limits
+- CORS configuration implemented (MEDIUM-007, MEDIUM-015 resolved) - Explicit ALLOWED_ORIGINS env var, supports extension origins
 - **All HIGH severity issues now resolved**
 
 **Recommended Action:**

@@ -40,6 +40,13 @@ const envSchema = z.object({
   WEB_URL: z.string().url().default('http://localhost:3000'),
   API_URL: z.string().url().default('http://localhost:4000'),
 
+  // CORS Configuration
+  // Comma-separated list of allowed origins (URLs or chrome-extension:// URIs)
+  ALLOWED_ORIGINS: z
+    .string()
+    .transform((val) => val.split(',').map((origin) => origin.trim()).filter(Boolean))
+    .default('http://localhost:3000,http://localhost:5173'),
+
   // GCP (for production HIPAA compliance)
   GCP_PROJECT_ID: z.string().optional(),
 

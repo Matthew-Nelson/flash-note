@@ -187,6 +187,7 @@
 - [ ] **Generate production secrets**
   - JWT_SECRET (256-bit random)
   - JWT_REFRESH_SECRET (256-bit random)
+  - CSRF_SECRET (256-bit random)
   - Use: `openssl rand -base64 32`
 - [ ] **Verify TLS configuration**
   - TLS 1.2+ only
@@ -194,6 +195,11 @@
 - [ ] **Enable database encryption**
   - At-rest encryption
   - In-transit encryption (SSL connections)
+- [ ] **Clean up unused environment variables**
+  - Remove `API_URL` (defined but never used in code)
+  - Remove `GCP_PROJECT_ID` (placeholder, not used until Vertex AI migration)
+  - Remove `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` (prices set in Stripe dashboard, not env)
+  - See `backend/src/config.ts` for full schema
 
 **Estimated Monthly Cost:** ~$15-50/month (basic) to $100-300/month (HIPAA-compliant cloud)
 
@@ -203,21 +209,26 @@
 
 Based on `SECURITY_AUDIT.md`, these should be addressed before handling real patient data:
 
-### Must Fix Before Launch
-- [ ] **HIGH-013: Query statement timeout** - DoS prevention
-- [ ] **HIGH-003: Content Security Policy** - XSS protection
-- [ ] **HIGH-005: Account lockout mechanism** - Brute force protection
+### Resolved ✅
+- [x] **HIGH-013: Query statement timeout** - DoS prevention
+- [x] **HIGH-003: Content Security Policy** - XSS protection
+- [x] **HIGH-005: Account lockout mechanism** - Brute force protection
+- [x] **HIGH-012: Email in failed login audit** - Accepted risk (standard practice)
+- [x] **MEDIUM-012: Sanitize LLM error logging** - PHI leakage prevention
+- [x] **HIGH-001 + HIGH-007: Password reset + email verification**
+- [x] **HIGH-006 + MEDIUM-002 + MEDIUM-011: Session infrastructure** - Device binding, O(1) token validation, session limits
+- [x] **MEDIUM-007 + MEDIUM-015: CORS configuration** - Explicit ALLOWED_ORIGINS env var
 
 ### Should Fix Before Launch
-- [ ] **HIGH-012: Remove email from failed login audit** - PII concern
-- [ ] **MEDIUM-012: Sanitize Gemini error logging** - PHI leakage risk
-- [ ] **HIGH-001 + HIGH-007: Password reset + email verification**
+- [ ] **MEDIUM-005: Prompt injection mitigation** - Input sanitization for LLM
+- [ ] **MEDIUM-010: Prompt warnings may leak context** - Audit logging paths
 
 ### Can Address Post-Launch
-- [ ] HIGH-006: Device binding for refresh tokens
-- [ ] MEDIUM-002 + MEDIUM-011: Session management improvements
+- [ ] MEDIUM-003: Session timeout warning (UX improvement)
+- [ ] MEDIUM-008: Extension token storage separation
 - [ ] MEDIUM-013: Webhook idempotency
 - [ ] MEDIUM-014: Extension retry logic
+- [ ] LOW-001: Structured logging (replace console.log)
 
 ---
 

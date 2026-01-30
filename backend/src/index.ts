@@ -27,9 +27,7 @@ app.use(
   })
 );
 app.use(cors({
-  origin: config.NODE_ENV === 'production'
-    ? [config.WEB_URL]
-    : ['http://localhost:3000', 'http://localhost:5173'],
+  origin: config.ALLOWED_ORIGINS,
   credentials: true,
 }));
 
