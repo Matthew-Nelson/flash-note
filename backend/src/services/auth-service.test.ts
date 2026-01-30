@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, mockAuditLog, resetMocks, createMockUserRow } from '../test/setup.js';
+import { mockDbQuery, resetMocks, createMockUserRow } from '../test/setup.js';
 import bcrypt from 'bcryptjs';
 
 // Mock config before any imports that use it

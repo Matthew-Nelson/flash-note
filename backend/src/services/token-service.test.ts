@@ -18,7 +18,7 @@ describe('TokenService', () => {
 
   describe('generateToken', () => {
     it('should generate a token with 256 bits of entropy', () => {
-      const { token, tokenHash } = tokenService.generateToken();
+      const { token } = tokenService.generateToken();
 
       // URL-safe base64 encoded 32 bytes should be ~43 characters
       expect(token.length).toBeGreaterThanOrEqual(40);
@@ -127,7 +127,7 @@ describe('TokenService', () => {
       const afterCreate = new Date();
 
       // Extract expires_at from the INSERT call
-      const insertArgs = mockDbQuery.mock.calls[1];
+      const insertArgs = mockDbQuery.mock.calls[1] as [string, unknown[]];
       const expiresAt = insertArgs[1][3] as Date;
 
       // Should be approximately 24 hours in the future
@@ -146,7 +146,7 @@ describe('TokenService', () => {
       await tokenService.createToken('user-123', 'password_reset');
       const afterCreate = new Date();
 
-      const insertArgs = mockDbQuery.mock.calls[1];
+      const insertArgs = mockDbQuery.mock.calls[1] as [string, unknown[]];
       const expiresAt = insertArgs[1][3] as Date;
 
       // Should be approximately 15 minutes in the future
@@ -276,7 +276,7 @@ describe('TokenService', () => {
 
   describe('cleanupExpiredTokens', () => {
     it('should delete tokens expired more than 7 days ago', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rowCount: 5 });
+      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 5 });
 
       const deletedCount = await tokenService.cleanupExpiredTokens();
 
@@ -290,7 +290,7 @@ describe('TokenService', () => {
     });
 
     it('should return 0 when no tokens to cleanup', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rowCount: 0 });
+      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
 
       const deletedCount = await tokenService.cleanupExpiredTokens();
 
@@ -298,7 +298,7 @@ describe('TokenService', () => {
     });
 
     it('should handle null rowCount gracefully', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rowCount: null });
+      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: undefined });
 
       const deletedCount = await tokenService.cleanupExpiredTokens();
 
@@ -314,7 +314,7 @@ describe('TokenService', () => {
       const token = await tokenService.createToken('user-123', 'email_verification');
 
       // The INSERT query should contain a hash, not the plain token
-      const insertCall = mockDbQuery.mock.calls[1];
+      const insertCall = mockDbQuery.mock.calls[1] as [string, unknown[]];
       const storedValue = insertCall[1][1]; // token_hash parameter
 
       expect(storedValue).not.toBe(token);

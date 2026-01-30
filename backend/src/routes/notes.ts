@@ -70,7 +70,9 @@ notesRouter.post('/generate', async (req, res, next) => {
     });
   } catch (error) {
     // HIPAA: Log failed generation attempts (without PHI)
-    const noteType = req.body?.noteType;
+    // Type-safe access to req.body for error logging
+    const body = req.body as Record<string, unknown> | undefined;
+    const noteType = typeof body?.noteType === 'string' ? body.noteType : 'unknown';
 
     safeAuditLog(
       auditService.log({
@@ -78,7 +80,7 @@ notesRouter.post('/generate', async (req, res, next) => {
         action: AuditAction.NOTE_GENERATED,
         status: 'FAILURE',
         metadata: {
-          noteType: noteType || 'unknown',
+          noteType,
           // Sanitize error - don't include message as it may contain user input
           errorType: error instanceof z.ZodError ? 'validation_error' : 'generation_error',
         },

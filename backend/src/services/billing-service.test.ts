@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { mockAuditLog, mockDbQuery, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
+import { mockAuditLog, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
 import { AuditAction } from '../types/index.js';
 
 // Mock Stripe

@@ -1,4 +1,5 @@
 import { db } from '../db/index.js';
+import type { UsageStatsRow } from '../types/database.js';
 
 class UsageService {
   async incrementUsage(userId: string, tokensUsed: number): Promise<void> {
@@ -24,7 +25,7 @@ class UsageService {
   async getMonthlyUsage(userId: string): Promise<{ notesGenerated: number; tokensUsed: number }> {
     const month = this.getCurrentMonth();
 
-    const result = await db.query(
+    const result = await db.query<UsageStatsRow>(
       `SELECT notes_generated, tokens_used FROM usage
        WHERE user_id = $1 AND month = $2`,
       [userId, month]
@@ -35,8 +36,8 @@ class UsageService {
     }
 
     return {
-      notesGenerated: result.rows[0].notes_generated,
-      tokensUsed: result.rows[0].tokens_used,
+      notesGenerated: result.rows[0]!.notes_generated,
+      tokensUsed: result.rows[0]!.tokens_used,
     };
   }
 

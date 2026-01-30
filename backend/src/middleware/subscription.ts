@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
 import { auditService } from '../services/audit-service.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
+import type { UserSubscriptionRow } from '../types/database.js';
 import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
 // Middleware to check subscription status
@@ -37,13 +38,12 @@ export async function requireActiveSubscription(
 
     const userId = authenticatedReq.user.userId;
 
-    const result = await db.query(
+    const result = await db.query<UserSubscriptionRow>(
       `SELECT subscription_status, trial_ends_at FROM users WHERE id = $1`,
       [userId]
     );
 
-    const user = result.rows[0];
-    if (!user) {
+    if (result.rows.length === 0) {
       safeAuditLog(
         auditService.log({
           userId,
@@ -62,9 +62,11 @@ export async function requireActiveSubscription(
       return;
     }
 
+    const user = result.rows[0]!;
+
     // Check if in active trial
     if (user.subscription_status === 'trialing') {
-      if (new Date() < new Date(user.trial_ends_at)) {
+      if (new Date() < user.trial_ends_at) {
         next();
         return;
       }

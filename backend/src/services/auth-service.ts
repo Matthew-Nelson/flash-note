@@ -9,6 +9,7 @@ import { lockoutService } from './lockout-service.js';
 import { tokenService } from './token-service.js';
 import { emailService } from './email-service.js';
 import type { TokenPayload, User } from '../types/index.js';
+import type { SessionRefreshTokenRow, SessionWithIdRow } from '../types/database.js';
 
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';
@@ -217,7 +218,7 @@ class AuthService {
   }
 
   private async validateRefreshToken(userId: string, refreshToken: string): Promise<boolean> {
-    const result = await db.query(
+    const result = await db.query<SessionRefreshTokenRow>(
       `SELECT refresh_token_hash FROM sessions
        WHERE user_id = $1 AND expires_at > NOW()`,
       [userId]
@@ -232,7 +233,7 @@ class AuthService {
   }
 
   private async revokeRefreshToken(userId: string, refreshToken: string): Promise<void> {
-    const result = await db.query(
+    const result = await db.query<SessionWithIdRow>(
       `SELECT id, refresh_token_hash FROM sessions WHERE user_id = $1`,
       [userId]
     );

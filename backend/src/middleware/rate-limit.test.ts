@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { Request, Response, NextFunction } from 'express';
 
 /**
  * Rate limit middleware configuration tests
@@ -146,7 +145,8 @@ describe('Rate Limit Middleware', () => {
   describe('security documentation', () => {
     it('should have rate limiters for all sensitive endpoints', () => {
       // This test ensures we have rate limiting for all security-sensitive endpoints
-      const securitySensitiveEndpoints = [
+      // The list below documents what endpoints are covered (not used in runtime)
+      const _securitySensitiveEndpoints = [
         'login',       // loginRateLimit
         'register',    // registerRateLimit
         'refresh',     // refreshRateLimit

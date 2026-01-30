@@ -240,7 +240,7 @@ describe('LockoutService', () => {
       expect(mockDbQuery).toHaveBeenCalledTimes(1);
 
       // Verify the query contains both the increment AND the CASE for locked_until
-      const queryArg = mockDbQuery.mock.calls[0][0];
+      const queryArg = mockDbQuery.mock.calls[0]![0] as string;
       expect(queryArg).toContain('failed_login_attempts = failed_login_attempts + 1');
       expect(queryArg).toContain('locked_until = CASE');
       expect(queryArg).toContain('RETURNING failed_login_attempts, locked_until');
