@@ -1,23 +1,42 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach, beforeAll } from 'vitest';
 import { AuditAction } from '../types/index.js';
 
-// Create a separate mock for db that we can control in this test
-const mockDbQuery = vi.fn();
+// First, unmock the audit-service that setup.ts mocks globally
+// We want to test the REAL audit service, not the mock
+vi.unmock('../services/audit-service.js');
+vi.unmock('./audit-service.js');
 
+// Create our own mock for the db module - use vi.hoisted to ensure
+// the mock is defined before vi.mock hoisting occurs
+const { mockDbQuery } = vi.hoisted(() => ({
+  mockDbQuery: vi.fn(),
+}));
+
+// Mock only the db module - we'll test the real audit service against this mock
 vi.mock('../db/index.js', () => ({
   db: {
     query: (...args: unknown[]) => mockDbQuery(...args),
   },
 }));
 
-// Import after mocking
-const { auditService } = await import('./audit-service.js');
+// We need to dynamically import after mocks are set up
+let auditService: typeof import('./audit-service.js').auditService;
 
 describe('AuditService', () => {
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
+  beforeAll(async () => {
+    // Reset modules to ensure our mock is used
+    vi.resetModules();
+
+    // Now import the audit service - it will use our mocked db
+    const module = await import('./audit-service.js');
+    auditService = module.auditService;
+  });
+
   beforeEach(() => {
     mockDbQuery.mockReset();
+    mockDbQuery.mockResolvedValue({ rows: [] });
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -27,8 +46,6 @@ describe('AuditService', () => {
 
   describe('log', () => {
     it('should insert audit log entry into database', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGIN,
@@ -42,8 +59,6 @@ describe('AuditService', () => {
     });
 
     it('should include all required fields in INSERT', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGIN,
@@ -60,8 +75,6 @@ describe('AuditService', () => {
     });
 
     it('should handle null userId for unauthenticated events', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: null,
         action: AuditAction.LOGIN_FAILED,
@@ -75,8 +88,6 @@ describe('AuditService', () => {
     });
 
     it('should serialize metadata to JSON', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.NOTE_GENERATED,
@@ -97,8 +108,6 @@ describe('AuditService', () => {
     });
 
     it('should use empty object when metadata is undefined', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGOUT,
@@ -112,8 +121,6 @@ describe('AuditService', () => {
     });
 
     it('should handle null ipAddress and userAgent', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGIN,
@@ -169,8 +176,6 @@ describe('AuditService', () => {
 
   describe('HIPAA compliance properties', () => {
     it('should include user-agent for complete audit trail', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.NOTE_GENERATED,
@@ -185,8 +190,6 @@ describe('AuditService', () => {
     });
 
     it('should include IP address for security auditing', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGIN,
@@ -201,8 +204,6 @@ describe('AuditService', () => {
     });
 
     it('should support all audit action types', async () => {
-      mockDbQuery.mockResolvedValue({ rows: [] });
-
       const allActions = Object.values(AuditAction);
 
       for (const action of allActions) {
@@ -217,8 +218,6 @@ describe('AuditService', () => {
     });
 
     it('should support SUCCESS and FAILURE status values', async () => {
-      mockDbQuery.mockResolvedValue({ rows: [] });
-
       await auditService.log({
         userId: 'user-123',
         action: AuditAction.LOGIN,
@@ -237,8 +236,6 @@ describe('AuditService', () => {
     });
 
     it('should use parameterized queries to prevent SQL injection', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
       await auditService.log({
         userId: "user-123'; DROP TABLE audit_logs; --",
         action: AuditAction.LOGIN,
