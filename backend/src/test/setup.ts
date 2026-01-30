@@ -28,7 +28,8 @@ vi.mock('../db/index.js', () => ({
 }));
 
 // Mock audit service to prevent actual logging during tests
-export const mockAuditLog = vi.fn();
+// Must return a Promise since safeAuditLog expects one
+export const mockAuditLog = vi.fn().mockResolvedValue(undefined);
 
 vi.mock('../services/audit-service.js', () => ({
   auditService: {
@@ -56,6 +57,8 @@ export const TEST_CONFIG_DEFAULTS = {
 export function resetMocks() {
   mockDbQuery.mockReset();
   mockAuditLog.mockReset();
+  // Restore default Promise return value for auditLog
+  mockAuditLog.mockResolvedValue(undefined);
 }
 
 /**
