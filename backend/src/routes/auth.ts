@@ -10,6 +10,7 @@ import {
   registerRateLimit,
   refreshRateLimit,
   verificationResendRateLimit,
+  verificationCompleteRateLimit,
   passwordResetRequestRateLimit,
   passwordResetCompleteRateLimit,
 } from '../middleware/rate-limit.js';
@@ -19,6 +20,7 @@ import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion } from '../db/queries/users.js';
 import { db } from '../db/index.js';
+import { BCRYPT_ROUNDS } from '../config.js';
 
 export const authRouter: Router = Router();
 
@@ -67,8 +69,6 @@ const resetPasswordSchema = z.object({
 const validateResetTokenSchema = z.object({
   token: z.string().min(1, 'Token is required'),
 });
-
-const BCRYPT_ROUNDS = 12;
 
 // POST /auth/register
 authRouter.post('/register', registerRateLimit, async (req, res, next) => {
@@ -186,7 +186,7 @@ authRouter.post('/logout', requireAuth, requireCsrf, async (req, res, next) => {
 });
 
 // POST /auth/verify-email - Verify email with token
-authRouter.post('/verify-email', async (req, res, next) => {
+authRouter.post('/verify-email', verificationCompleteRateLimit, async (req, res, next) => {
   try {
     const { token } = verifyEmailSchema.parse(req.body);
     const ipAddress = req.ip ?? undefined;

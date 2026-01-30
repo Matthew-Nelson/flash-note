@@ -68,3 +68,8 @@ export const config = loadConfig();
 export const isProduction = config.NODE_ENV === 'production';
 export const isDevelopment = config.NODE_ENV === 'development';
 export const isTest = config.NODE_ENV === 'test';
+
+// Security constants
+// SECURITY: 12 rounds provides ~250ms hash time, balancing security and UX
+// Increasing to 13+ would double hash time; adjust only if hardware improves significantly
+export const BCRYPT_ROUNDS = 12;

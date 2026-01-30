@@ -1,5 +1,20 @@
 /**
  * Test setup and utilities for vitest
+ *
+ * This file provides centralized mocking for common dependencies:
+ * - Database queries (mockDbQuery)
+ * - Audit service (mockAuditLog)
+ * - Config values (mockConfig - see below)
+ *
+ * Usage:
+ *   import { mockDbQuery, mockAuditLog, resetMocks } from '../test/setup.js';
+ *
+ * For config mocking, tests can either:
+ * 1. Use the real config (if the test doesn't depend on specific values)
+ * 2. Mock specific config values with vi.mock('../config.js', ...) in the test file
+ *
+ * The second approach is preferred when tests need predictable config values
+ * (e.g., token expiry times).
  */
 import { vi } from 'vitest';
 
@@ -20,6 +35,20 @@ vi.mock('../services/audit-service.js', () => ({
     log: (...args: unknown[]) => mockAuditLog(...args),
   },
 }));
+
+/**
+ * Default test config values
+ * Tests can use these when mocking config to ensure consistency
+ */
+export const TEST_CONFIG_DEFAULTS = {
+  JWT_SECRET: 'test-jwt-secret-minimum-32-characters-long',
+  JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars',
+  CSRF_SECRET: 'test-csrf-secret-minimum-32-characters',
+  EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS: 24,
+  PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: 15,
+  WEB_URL: 'http://localhost:3000',
+  API_URL: 'http://localhost:4000',
+};
 
 /**
  * Reset all mocks between tests

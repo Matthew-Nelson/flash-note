@@ -120,3 +120,20 @@ export const passwordResetCompleteRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
+// SECURITY: Rate limit for email verification token submission
+// Defense-in-depth against token brute force (tokens have 256-bit entropy,
+// but rate limiting adds another layer of protection)
+export const verificationCompleteRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 100 : 10, // 10 attempts per 15 minutes per IP in prod, 100 in dev
+  message: {
+    success: false,
+    error: {
+      code: 'too_many_attempts',
+      message: 'Too many verification attempts. Please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});

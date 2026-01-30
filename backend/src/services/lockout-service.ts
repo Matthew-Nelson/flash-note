@@ -2,22 +2,17 @@ import { db } from '../db/index.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
 
-const isDev = process.env.NODE_ENV !== 'production';
-
 /**
  * Progressive lockout thresholds
  * After N failed attempts, account is locked for the specified duration
- * In development, thresholds are 10x higher to avoid lockouts during testing
+ *
+ * These thresholds are the same in all environments to ensure consistent
+ * security behavior and proper testing of lockout functionality.
  */
-const LOCKOUT_THRESHOLDS = isDev ? [
-  { attempts: 50, durationMinutes: 1 },       // Dev: very lenient
-  { attempts: 100, durationMinutes: 5 },
-  { attempts: 150, durationMinutes: 15 },
-  { attempts: 200, durationMinutes: null },
-] as const : [
+const LOCKOUT_THRESHOLDS = [
   { attempts: 5, durationMinutes: 15 },       // First lockout: 15 minutes
   { attempts: 10, durationMinutes: 60 },      // Second lockout: 1 hour
-  { attempts: 15, durationMinutes: 60 * 24 }, // Third lockout: 24 hours
+  { attempts: 15, durationMinutes: 1440 },    // Third lockout: 24 hours (1440 minutes)
   { attempts: 20, durationMinutes: null },    // Permanent lockout (requires admin unlock)
 ] as const;
 
@@ -89,18 +84,22 @@ class LockoutService {
   ): Promise<LockoutStatus> {
     // SECURITY: Single atomic query that increments AND sets lockout in one operation
     // This prevents race conditions where concurrent requests could bypass lockout
-    // Note: Thresholds match LOCKOUT_THRESHOLDS constant (adjusted for dev/prod)
-    const t = LOCKOUT_THRESHOLDS;
+    //
+    // Thresholds (must match LOCKOUT_THRESHOLDS constant):
+    //   5 attempts  -> 15 minute lockout
+    //   10 attempts -> 60 minute lockout
+    //   15 attempts -> 1440 minute (24 hour) lockout
+    //   20 attempts -> permanent lockout (NULL = no expiry)
     const result = await db.query(
       `UPDATE users
        SET failed_login_attempts = failed_login_attempts + 1,
            last_failed_login_at = NOW(),
            updated_at = NOW(),
            locked_until = CASE
-             WHEN failed_login_attempts + 1 >= ${t[3]?.attempts ?? 200} THEN NULL
-             WHEN failed_login_attempts + 1 >= ${t[2]?.attempts ?? 150} THEN NOW() + INTERVAL '${t[2]?.durationMinutes ?? 15} minutes'
-             WHEN failed_login_attempts + 1 >= ${t[1]?.attempts ?? 100} THEN NOW() + INTERVAL '${t[1]?.durationMinutes ?? 5} minutes'
-             WHEN failed_login_attempts + 1 >= ${t[0]?.attempts ?? 50} THEN NOW() + INTERVAL '${t[0]?.durationMinutes ?? 1} minutes'
+             WHEN failed_login_attempts + 1 >= 20 THEN NULL
+             WHEN failed_login_attempts + 1 >= 15 THEN NOW() + INTERVAL '1440 minutes'
+             WHEN failed_login_attempts + 1 >= 10 THEN NOW() + INTERVAL '60 minutes'
+             WHEN failed_login_attempts + 1 >= 5 THEN NOW() + INTERVAL '15 minutes'
              ELSE locked_until
            END
        WHERE id = $1

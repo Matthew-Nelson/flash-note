@@ -102,11 +102,17 @@ class ApiClient {
 
       // SECURITY: Auto-logout on invalid token (password was reset, session invalidated, etc.)
       if (response.status === 401 && errorCode === 'invalid_token') {
-        await storage.clearAuth();
-        // Dispatch event so UI can react to forced logout
+        // Dispatch event FIRST to ensure UI updates regardless of storage errors
         window.dispatchEvent(new CustomEvent(AUTH_INVALIDATED_EVENT, {
           detail: { reason: 'session_invalidated' }
         }));
+
+        // Then clear storage (non-critical if this fails - user will see login prompt anyway)
+        try {
+          await storage.clearAuth();
+        } catch (storageError) {
+          console.error('Failed to clear auth storage:', storageError);
+        }
       }
 
       throw new ApiError(

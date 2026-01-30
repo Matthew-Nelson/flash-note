@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { config } from '../config.js';
+import { config, BCRYPT_ROUNDS } from '../config.js';
 import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUser } from '../db/queries/users.js';
 import { AppError } from '../middleware/error-handler.js';
@@ -10,7 +10,6 @@ import { tokenService } from './token-service.js';
 import { emailService } from './email-service.js';
 import type { TokenPayload, User } from '../types/index.js';
 
-const BCRYPT_ROUNDS = 12;
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY = '7d';
 const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000;

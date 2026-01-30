@@ -1009,10 +1009,22 @@ Significant progress has been made on security remediation. All critical vulnera
 
 ## Future Security Enhancements
 
-### Admin Account Unlock Endpoint
+### Admin Role System and Account Management
 
-**Priority:** Medium (implement when support staff needs arise)
-**Related Issue:** HIGH-005 (Account Lockout)
+**Priority:** Medium-term (implement before scaling support operations)
+**Related Issues:** HIGH-005 (Account Lockout), MEDIUM-011 (Session Limits)
+**Ticket ID:** ADMIN-001
+
+#### Overview
+
+As FlashNote scales, we need a proper admin system to manage user accounts without direct database access. This includes unlocking locked accounts, managing sessions, and potentially suspending accounts for policy violations.
+
+#### Current State
+
+- `lockoutService.unlockAccount()` function exists but has no API endpoint
+- Admin operations require direct database access
+- No role differentiation between users
+- No admin authentication system
 
 Currently, locked accounts can only be unlocked via direct database access:
 ```sql
@@ -1021,20 +1033,128 @@ SET failed_login_attempts = 0, locked_until = NULL, last_failed_login_at = NULL
 WHERE email = 'user@example.com';
 ```
 
-**Future Implementation:**
+#### Proposed Role Hierarchy
 
-1. **Admin API Endpoint** (`POST /admin/users/:userId/unlock`)
-   - Requires admin authentication (separate admin role or API key)
-   - Calls `lockoutService.unlockAccount(userId, context)`
-   - Full audit trail via existing `ACCOUNT_UNLOCKED` action
+| Role | Scope | Capabilities |
+|------|-------|--------------|
+| **Super Admin** | System-wide | All admin actions, manage org admins, system configuration |
+| **Org Admin** | Single organization | Unlock accounts, view audit logs, manage org users |
+| **User** | Self | Standard user capabilities |
 
-2. **Admin Dashboard**
-   - View locked accounts list
-   - One-click unlock functionality
-   - View lockout history per user
+**Note:** Organization support is not currently implemented. Initial implementation may only need Super Admin role, with Org Admin added when multi-tenancy is introduced.
 
-**Implementation Effort:** Low-Medium
-**Trigger to Build:** When support staff is hired or user volume increases
+#### Required Components
+
+**1. Database Schema Changes**
+```sql
+-- Admin roles table
+CREATE TABLE admin_roles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role VARCHAR(50) NOT NULL, -- 'super_admin', 'org_admin'
+  organization_id UUID REFERENCES organizations(id), -- NULL for super_admin
+  granted_by UUID REFERENCES users(id),
+  granted_at TIMESTAMPTZ DEFAULT NOW(),
+  revoked_at TIMESTAMPTZ,
+  UNIQUE(user_id, role, organization_id)
+);
+
+CREATE INDEX idx_admin_roles_user ON admin_roles(user_id) WHERE revoked_at IS NULL;
+```
+
+**2. Admin Authentication**
+- Option A: Separate admin login with MFA requirement
+- Option B: Elevated permissions on existing accounts with MFA step-up
+- Recommendation: Option B for simplicity, with mandatory MFA for admin actions
+
+**3. Admin API Endpoints**
+```
+POST   /admin/users/:userId/unlock          - Unlock locked account
+POST   /admin/users/:userId/sessions/revoke - Revoke all user sessions
+GET    /admin/users/:userId/audit-log       - View user's audit history
+GET    /admin/locked-accounts               - List all locked accounts
+POST   /admin/users/:userId/suspend         - Suspend account (future)
+```
+
+**4. Authorization Middleware**
+```typescript
+// Example middleware
+export function requireAdmin(allowedRoles: ('super_admin' | 'org_admin')[]) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = (req as AuthenticatedRequest).user.userId;
+    const role = await getAdminRole(userId);
+
+    if (!role || !allowedRoles.includes(role)) {
+      await auditService.log({
+        userId,
+        action: AuditAction.ADMIN_ACCESS_DENIED,
+        status: 'FAILURE',
+        metadata: { attemptedAction: req.path },
+      });
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    next();
+  };
+}
+```
+
+**5. Audit Logging**
+New audit actions needed:
+- `ADMIN_ACCOUNT_UNLOCKED` - Admin unlocked a user account
+- `ADMIN_SESSIONS_REVOKED` - Admin revoked user sessions
+- `ADMIN_ACCOUNT_SUSPENDED` - Admin suspended an account
+- `ADMIN_ACCESS_DENIED` - Unauthorized admin action attempted
+- `ADMIN_ROLE_GRANTED` - Admin role assigned to user
+- `ADMIN_ROLE_REVOKED` - Admin role removed from user
+
+#### Security Considerations
+
+| Risk | Mitigation |
+|------|------------|
+| Privilege escalation | Strict role validation, audit all admin actions |
+| Compromised admin account | MFA required for admin actions, session monitoring |
+| Social engineering | Identity verification procedures (operational), audit trail |
+| Insider threat | Audit correlation, alerts on sensitive actions, principle of least privilege |
+| Admin unlocks then brute forces | Alert on unlock followed by failed login attempts within 24h |
+
+#### Implementation Phases
+
+**Phase 1: Super Admin Only (MVP)**
+- Add `is_super_admin` boolean to users table (simpler than full roles table)
+- Create `/admin/users/:userId/unlock` endpoint
+- Require existing auth + super admin check
+- Full audit logging
+
+**Phase 2: Admin Dashboard**
+- Web-based admin interface
+- View locked accounts, audit logs
+- One-click unlock with reason/ticket field
+
+**Phase 3: Org Admin Support**
+- Full roles table schema
+- Organization scoping
+- Delegated administration
+
+**Phase 4: Advanced Features**
+- MFA step-up for admin actions
+- Admin action approval workflows
+- Automated alerts for suspicious patterns
+
+#### Implementation Effort
+
+| Phase | Effort | Trigger |
+|-------|--------|---------|
+| Phase 1 | 1-2 days | Support staff hired or >100 users |
+| Phase 2 | 3-5 days | Regular unlock requests (>5/week) |
+| Phase 3 | 1-2 weeks | Multi-tenancy / enterprise customers |
+| Phase 4 | 2-3 weeks | Compliance requirements or security incident |
+
+#### Existing Infrastructure to Leverage
+
+- `lockoutService.unlockAccount(userId, context)` - Already implemented with audit logging
+- `AuditAction.ACCOUNT_UNLOCKED` - Audit action already exists
+- `SessionAlert` component - Already supports `session_revoked` reason for UI messaging
 
 ---
 

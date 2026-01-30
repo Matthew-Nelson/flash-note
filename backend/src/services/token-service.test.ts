@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, resetMocks } from '../test/setup.js';
+import { mockDbQuery, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
 import { tokenService } from './token-service.js';
 import crypto from 'crypto';
 
-// Mock config
+// Mock config using centralized test defaults
 vi.mock('../config.js', () => ({
   config: {
-    EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS: 24,
-    PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: 15,
+    EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS: TEST_CONFIG_DEFAULTS.EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS,
+    PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: TEST_CONFIG_DEFAULTS.PASSWORD_RESET_TOKEN_EXPIRY_MINUTES,
   },
 }));
 
