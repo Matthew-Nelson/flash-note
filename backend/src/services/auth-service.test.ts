@@ -1,7 +1,20 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, mockAuditLog, resetMocks, createMockUserRow } from '../test/setup.js';
-import { authService } from './auth-service.js';
+import { mockDbQuery, resetMocks, createMockUserRow } from '../test/setup.js';
 import bcrypt from 'bcryptjs';
+
+// Mock config before any imports that use it
+// Use vi.hoisted to ensure mock values are available before vi.mock hoisting
+const { mockConfig } = vi.hoisted(() => ({
+  mockConfig: {
+    JWT_SECRET: 'test-jwt-secret-minimum-32-characters-long',
+    JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars',
+    NODE_ENV: 'production' as const,
+  },
+}));
+
+vi.mock('../config.js', () => ({
+  config: mockConfig,
+}));
 
 // We need to mock lockoutService separately since it's imported by auth-service
 const mockGetLockoutStatus = vi.fn();
@@ -20,6 +33,9 @@ vi.mock('./lockout-service.js', () => ({
 vi.mock('../middleware/csrf.js', () => ({
   generateCsrfToken: () => 'mock-csrf-token',
 }));
+
+// Import after mocking
+import { authService } from './auth-service.js';
 
 describe('AuthService', () => {
   beforeEach(() => {

@@ -1,8 +1,32 @@
 import { db } from '../index.js';
 import type { User } from '../../types/index.js';
+import type { UserRow, UserTokenVersionRow } from '../../types/database.js';
+
+/**
+ * Helper to transform database row (snake_case) to User type (camelCase)
+ */
+function rowToUser(row: UserRow): User {
+  return {
+    id: row.id,
+    email: row.email,
+    passwordHash: row.password_hash,
+    stripeCustomerId: row.stripe_customer_id,
+    subscriptionId: row.subscription_id,
+    subscriptionStatus: row.subscription_status,
+    trialEndsAt: row.trial_ends_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    failedLoginAttempts: row.failed_login_attempts ?? 0,
+    lockedUntil: row.locked_until,
+    lastFailedLoginAt: row.last_failed_login_at,
+    emailVerified: row.email_verified ?? false,
+    emailVerifiedAt: row.email_verified_at,
+    tokenVersion: row.token_version ?? 1,
+  };
+}
 
 export async function findUserByEmail(email: string): Promise<User | null> {
-  const result = await db.query(
+  const result = await db.query<UserRow>(
     `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
             subscription_status, trial_ends_at, created_at, updated_at,
             failed_login_attempts, locked_until, last_failed_login_at,
@@ -12,29 +36,11 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   );
 
   if (result.rows.length === 0) return null;
-
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    email: row.email,
-    passwordHash: row.password_hash,
-    stripeCustomerId: row.stripe_customer_id,
-    subscriptionId: row.subscription_id,
-    subscriptionStatus: row.subscription_status,
-    trialEndsAt: row.trial_ends_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    failedLoginAttempts: row.failed_login_attempts ?? 0,
-    lockedUntil: row.locked_until,
-    lastFailedLoginAt: row.last_failed_login_at,
-    emailVerified: row.email_verified ?? false,
-    emailVerifiedAt: row.email_verified_at,
-    tokenVersion: row.token_version ?? 1,
-  };
+  return rowToUser(result.rows[0]!);
 }
 
 export async function findUserById(id: string): Promise<User | null> {
-  const result = await db.query(
+  const result = await db.query<UserRow>(
     `SELECT id, email, password_hash, stripe_customer_id, subscription_id,
             subscription_status, trial_ends_at, created_at, updated_at,
             failed_login_attempts, locked_until, last_failed_login_at,
@@ -44,32 +50,14 @@ export async function findUserById(id: string): Promise<User | null> {
   );
 
   if (result.rows.length === 0) return null;
-
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    email: row.email,
-    passwordHash: row.password_hash,
-    stripeCustomerId: row.stripe_customer_id,
-    subscriptionId: row.subscription_id,
-    subscriptionStatus: row.subscription_status,
-    trialEndsAt: row.trial_ends_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    failedLoginAttempts: row.failed_login_attempts ?? 0,
-    lockedUntil: row.locked_until,
-    lastFailedLoginAt: row.last_failed_login_at,
-    emailVerified: row.email_verified ?? false,
-    emailVerifiedAt: row.email_verified_at,
-    tokenVersion: row.token_version ?? 1,
-  };
+  return rowToUser(result.rows[0]!);
 }
 
 export async function createUser(
   email: string,
   passwordHash: string
 ): Promise<User> {
-  const result = await db.query(
+  const result = await db.query<UserRow>(
     `INSERT INTO users (email, password_hash)
      VALUES ($1, $2)
      RETURNING id, email, password_hash, stripe_customer_id, subscription_id,
@@ -79,24 +67,7 @@ export async function createUser(
     [email, passwordHash]
   );
 
-  const row = result.rows[0];
-  return {
-    id: row.id,
-    email: row.email,
-    passwordHash: row.password_hash,
-    stripeCustomerId: row.stripe_customer_id,
-    subscriptionId: row.subscription_id,
-    subscriptionStatus: row.subscription_status,
-    trialEndsAt: row.trial_ends_at,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-    failedLoginAttempts: row.failed_login_attempts ?? 0,
-    lockedUntil: row.locked_until,
-    lastFailedLoginAt: row.last_failed_login_at,
-    emailVerified: row.email_verified ?? false,
-    emailVerifiedAt: row.email_verified_at,
-    tokenVersion: row.token_version ?? 1,
-  };
+  return rowToUser(result.rows[0]!);
 }
 
 export async function updateUserSubscription(
@@ -156,13 +127,13 @@ export async function updatePassword(
  * Returns null if user not found
  */
 export async function getTokenVersion(userId: string): Promise<number | null> {
-  const result = await db.query(
+  const result = await db.query<UserTokenVersionRow>(
     'SELECT token_version FROM users WHERE id = $1',
     [userId]
   );
 
   if (result.rows.length === 0) return null;
-  return result.rows[0].token_version ?? 1;
+  return result.rows[0]!.token_version ?? 1;
 }
 
 /**
@@ -170,7 +141,7 @@ export async function getTokenVersion(userId: string): Promise<number | null> {
  * SECURITY: Call this on password reset to immediately invalidate all sessions
  */
 export async function incrementTokenVersion(userId: string): Promise<number> {
-  const result = await db.query(
+  const result = await db.query<UserTokenVersionRow>(
     `UPDATE users
      SET token_version = token_version + 1,
          updated_at = NOW()
@@ -179,5 +150,5 @@ export async function incrementTokenVersion(userId: string): Promise<number> {
     [userId]
   );
 
-  return result.rows[0].token_version;
+  return result.rows[0]!.token_version;
 }

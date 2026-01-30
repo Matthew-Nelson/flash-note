@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { db } from '../db/index.js';
 import { config } from '../config.js';
+import type { TokenUserIdRow } from '../types/database.js';
 
 /**
  * Token types for email verification and password reset
@@ -100,7 +101,7 @@ class TokenService {
     const tokenHash = this.hashToken(token);
 
     // Atomic: find valid token and mark as used in one query
-    const result = await db.query(
+    const result = await db.query<TokenUserIdRow>(
       `UPDATE email_tokens
        SET used_at = NOW()
        WHERE token_hash = $1
@@ -115,7 +116,7 @@ class TokenService {
       return null;
     }
 
-    return result.rows[0].user_id;
+    return result.rows[0]!.user_id;
   }
 
   /**
@@ -144,7 +145,7 @@ class TokenService {
   async findUserIdFromToken(token: string, type: TokenType): Promise<string | null> {
     const tokenHash = this.hashToken(token);
 
-    const result = await db.query(
+    const result = await db.query<TokenUserIdRow>(
       `SELECT user_id FROM email_tokens
        WHERE token_hash = $1 AND token_type = $2
        ORDER BY created_at DESC
@@ -156,7 +157,7 @@ class TokenService {
       return null;
     }
 
-    return result.rows[0].user_id;
+    return result.rows[0]!.user_id;
   }
 
   /**

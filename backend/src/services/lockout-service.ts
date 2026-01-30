@@ -1,6 +1,7 @@
 import { db } from '../db/index.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
+import type { UserLockoutRow, LockoutUpdateRow } from '../types/database.js';
 
 /**
  * Progressive lockout thresholds
@@ -34,7 +35,7 @@ class LockoutService {
    * Returns lockout status including time remaining
    */
   async getAccountLockoutStatus(userId: string): Promise<LockoutStatus> {
-    const result = await db.query(
+    const result = await db.query<UserLockoutRow>(
       `SELECT failed_login_attempts, locked_until, last_failed_login_at
        FROM users WHERE id = $1`,
       [userId]
@@ -49,7 +50,7 @@ class LockoutService {
       };
     }
 
-    const { failed_login_attempts, locked_until, last_failed_login_at } = result.rows[0];
+    const { failed_login_attempts, locked_until, last_failed_login_at } = result.rows[0]!;
     const now = new Date();
 
     // Check if permanently locked (20+ attempts with a recent failed login)
@@ -60,11 +61,12 @@ class LockoutService {
       last_failed_login_at !== null;
 
     // Check if time-limited lock is still active
-    const isTimeLocked = locked_until !== null && new Date(locked_until) > now;
+    // Note: pg returns Date objects directly, no need to wrap with new Date()
+    const isTimeLocked = locked_until !== null && locked_until > now;
 
     return {
       isLocked: isPermanentlyLocked || isTimeLocked,
-      lockedUntil: locked_until ? new Date(locked_until) : null,
+      lockedUntil: locked_until,
       failedAttempts: failed_login_attempts,
       isPermanentlyLocked,
     };
@@ -90,7 +92,7 @@ class LockoutService {
     //   10 attempts -> 60 minute lockout
     //   15 attempts -> 1440 minute (24 hour) lockout
     //   20 attempts -> permanent lockout (NULL = no expiry)
-    const result = await db.query(
+    const result = await db.query<LockoutUpdateRow>(
       `UPDATE users
        SET failed_login_attempts = failed_login_attempts + 1,
            last_failed_login_at = NOW(),
@@ -117,14 +119,15 @@ class LockoutService {
       };
     }
 
-    const { failed_login_attempts: newAttemptCount, locked_until } = result.rows[0];
+    const { failed_login_attempts: newAttemptCount, locked_until } = result.rows[0]!;
 
     // Determine if we triggered a lockout (for audit logging)
     const lockout = this.determineLockout(newAttemptCount);
 
     if (lockout) {
       const isPermanent = lockout.durationMinutes === null;
-      const lockedUntil = locked_until ? new Date(locked_until) : null;
+      // Note: pg returns Date objects directly, no need to wrap with new Date()
+      const lockedUntil = locked_until;
 
       // Log lockout event (audit logging is async but non-critical)
       await auditService.log({

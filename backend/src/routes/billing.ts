@@ -61,7 +61,7 @@ billingRouter.post(
     try {
       const signature = req.headers['stripe-signature'] as string;
 
-      await billingService.handleWebhook(req.body, signature);
+      await billingService.handleWebhook(req.body as Buffer, signature);
 
       res.json({ received: true });
     } catch (error) {

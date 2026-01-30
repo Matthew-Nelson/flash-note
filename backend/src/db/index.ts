@@ -21,8 +21,9 @@ db.on('error', (err) => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+process.on('SIGTERM', () => {
   console.log('Shutting down database pool...');
-  await db.end();
-  process.exit(0);
+  void db.end().then(() => {
+    process.exit(0);
+  });
 });

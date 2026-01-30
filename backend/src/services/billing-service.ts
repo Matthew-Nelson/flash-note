@@ -1,6 +1,5 @@
 import Stripe from 'stripe';
 import { config } from '../config.js';
-import { db } from '../db/index.js';
 import { findUserById, updateUserSubscription, updateSubscriptionStatus } from '../db/queries/users.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
@@ -65,19 +64,19 @@ class BillingService {
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
+        const session = event.data.object;
         await this.handleCheckoutComplete(session);
         break;
       }
 
       case 'customer.subscription.updated': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object;
         await this.handleSubscriptionUpdate(subscription);
         break;
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object;
         await this.handleSubscriptionDelete(subscription);
         break;
       }

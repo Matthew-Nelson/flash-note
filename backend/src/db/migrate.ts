@@ -19,7 +19,7 @@ async function migrate() {
     `);
 
     // Get list of applied migrations
-    const appliedResult = await db.query('SELECT name FROM migrations');
+    const appliedResult = await db.query<{ name: string }>('SELECT name FROM migrations');
     const appliedMigrations = new Set(appliedResult.rows.map(r => r.name));
 
     // Get migration files
@@ -58,4 +58,4 @@ async function migrate() {
   }
 }
 
-migrate();
+void migrate();

@@ -1,16 +1,32 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockAuditLog, resetMocks } from '../test/setup.js';
-import { requireAuth } from './auth.js';
 import { AuditAction } from '../types/index.js';
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { config } from '../config.js';
+
+// Mock config before any imports that use it
+// Use vi.hoisted to ensure mock values are available before vi.mock hoisting
+const { mockConfig } = vi.hoisted(() => ({
+  mockConfig: {
+    JWT_SECRET: 'test-jwt-secret-minimum-32-characters-long',
+    JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars',
+    NODE_ENV: 'production' as const,
+  },
+}));
+
+vi.mock('../config.js', () => ({
+  config: mockConfig,
+}));
 
 // Mock getTokenVersion from users queries
 const mockGetTokenVersion = vi.fn();
 vi.mock('../db/queries/users.js', () => ({
   getTokenVersion: (...args: unknown[]) => mockGetTokenVersion(...args),
 }));
+
+// Import after mocking
+import { requireAuth } from './auth.js';
+const config = mockConfig;
 
 describe('requireAuth middleware', () => {
   let mockReq: Partial<Request>;
@@ -38,10 +54,10 @@ describe('requireAuth middleware', () => {
       get: vi.fn().mockReturnValue('test-user-agent'),
     };
     mockRes = {
-      status: statusMock,
-      json: jsonMock,
+      status: statusMock as unknown as Response['status'],
+      json: jsonMock as unknown as Response['json'],
     };
-    mockNext = vi.fn();
+    mockNext = vi.fn() as unknown as NextFunction;
   });
 
   describe('token presence validation', () => {

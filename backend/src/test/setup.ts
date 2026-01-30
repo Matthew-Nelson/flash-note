@@ -19,20 +19,22 @@
 import { vi } from 'vitest';
 
 // Mock the database module
-export const mockDbQuery = vi.fn();
+export const mockDbQuery = vi.fn<unknown[], Promise<{ rows: unknown[]; rowCount?: number }>>();
 
 vi.mock('../db/index.js', () => ({
   db: {
-    query: (...args: unknown[]) => mockDbQuery(...args),
+    query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>
+      mockDbQuery(...args) as Promise<{ rows: unknown[]; rowCount?: number }>,
   },
 }));
 
 // Mock audit service to prevent actual logging during tests
-export const mockAuditLog = vi.fn();
+// Must return a Promise since safeAuditLog expects one
+export const mockAuditLog = vi.fn<unknown[], Promise<void>>().mockResolvedValue(undefined);
 
 vi.mock('../services/audit-service.js', () => ({
   auditService: {
-    log: (...args: unknown[]) => mockAuditLog(...args),
+    log: (...args: unknown[]): Promise<void> => mockAuditLog(...args),
   },
 }));
 
@@ -56,6 +58,8 @@ export const TEST_CONFIG_DEFAULTS = {
 export function resetMocks() {
   mockDbQuery.mockReset();
   mockAuditLog.mockReset();
+  // Restore default Promise return value for auditLog
+  mockAuditLog.mockResolvedValue(undefined);
 }
 
 /**
