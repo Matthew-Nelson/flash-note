@@ -436,8 +436,9 @@ describe('AuthService', () => {
 
         // Verify O(1) lookup was used (query includes session id)
         const lookupCall = mockDbQuery.mock.calls[0];
-        expect(lookupCall[0]).toContain('WHERE id = $1 AND user_id = $2');
-        expect(lookupCall[1]).toContain('session-123');
+        expect(lookupCall).toBeDefined();
+        expect(lookupCall![0]).toContain('WHERE id = $1 AND user_id = $2');
+        expect(lookupCall![1]).toContain('session-123');
       });
 
       it('should delete old session with O(1) operation', async () => {
@@ -499,8 +500,9 @@ describe('AuthService', () => {
 
         // Verify O(n) lookup was used (query only has user_id, not session id)
         const lookupCall = mockDbQuery.mock.calls[0];
-        expect(lookupCall[0]).toContain('WHERE user_id = $1');
-        expect(lookupCall[0]).not.toContain('WHERE id = $1');
+        expect(lookupCall).toBeDefined();
+        expect(lookupCall![0]).toContain('WHERE user_id = $1');
+        expect(lookupCall![0]).not.toContain('WHERE id = $1');
       });
 
       it('should not call revokeRefreshToken for legacy tokens', async () => {
