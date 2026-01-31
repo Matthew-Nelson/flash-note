@@ -14,6 +14,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -24,7 +25,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     // Validate input with Zod
     const validation = viewMode === 'signup'
-      ? validateRegister({ email, password })
+      ? validateRegister({ email, password, confirmPassword })
       : validateLogin({ email, password });
 
     if (!validation.success) {
@@ -231,6 +232,24 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
           />
         </div>
 
+        {viewMode === 'signup' && (
+          <div>
+            <label htmlFor="confirmPassword" className="label block text-sm mb-1">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              required
+              minLength={8}
+              className="input-field w-full px-3 py-2"
+              placeholder="Re-enter your password"
+            />
+          </div>
+        )}
+
         {errors.length > 0 && (
           <div className="error-message text-sm px-3 py-2 animate-fade-in">
             {errors.length === 1 ? (
@@ -271,6 +290,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
           type="button"
           onClick={() => {
             setViewMode(viewMode === 'signup' ? 'login' : 'signup');
+            setConfirmPassword('');
             setErrors([]);
           }}
           className="link text-sm"
