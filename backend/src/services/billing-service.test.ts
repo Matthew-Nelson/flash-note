@@ -288,8 +288,8 @@ describe('BillingService', () => {
         expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
         // Verify structured logging was called
         expect(consoleErrorSpy).toHaveBeenCalled();
-        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
-        const parsed = JSON.parse(loggedMessage);
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
         expect(parsed.event).toBe('webhook_missing_user_id');
         expect(parsed.eventType).toBe('checkout.session.completed');
       });
@@ -331,8 +331,8 @@ describe('BillingService', () => {
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
         // Verify structured logging was called
         expect(consoleErrorSpy).toHaveBeenCalled();
-        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
-        const parsed = JSON.parse(loggedMessage);
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
         expect(parsed.event).toBe('webhook_missing_user_id');
         expect(parsed.eventType).toBe('customer.subscription.updated');
       });
@@ -395,8 +395,8 @@ describe('BillingService', () => {
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
         // Verify structured logging was called
         expect(consoleErrorSpy).toHaveBeenCalled();
-        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
-        const parsed = JSON.parse(loggedMessage);
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
         expect(parsed.event).toBe('webhook_missing_user_id');
         expect(parsed.eventType).toBe('customer.subscription.deleted');
       });
