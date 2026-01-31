@@ -112,18 +112,52 @@
   - Enable subscription management
   - Enable payment method updates
   - Enable invoice history
-- [ ] **Set up Webhook endpoint**
-  - Point to your production API
+
+#### Webhook Setup
+
+**For Local Development (using Stripe CLI):**
+1. Install the Stripe CLI:
+   ```bash
+   # macOS
+   brew install stripe/stripe-cli/stripe
+
+   # Windows (scoop)
+   scoop install stripe
+
+   # Or download from https://stripe.com/docs/stripe-cli
+   ```
+2. Login to your Stripe account:
+   ```bash
+   stripe login
+   ```
+3. Start the webhook listener (run this while developing):
+   ```bash
+   stripe listen --forward-to localhost:4000/billing/webhook
+   ```
+4. Copy the webhook signing secret (`whsec_xxx`) it outputs and add to your `.env`:
+   ```
+   STRIPE_WEBHOOK_SECRET=whsec_xxx
+   ```
+5. Keep the listener running while testing - it tunnels Stripe events to localhost
+
+**For Production:**
+- [ ] **Set up Webhook endpoint in Stripe Dashboard**
+  - Go to Developers → Webhooks → Add endpoint
+  - Endpoint URL: `https://api.flashnote.app/billing/webhook`
   - Subscribe to required events:
     - `checkout.session.completed`
     - `customer.subscription.updated`
     - `customer.subscription.deleted`
     - `invoice.payment_failed`
+    - `invoice.paid`
+  - Copy the signing secret to production environment variables
+
 - [ ] **Test Stripe integration in test mode**
   - Complete checkout flow
   - Test subscription updates
   - Test cancellation
-  - Test failed payments
+  - Test failed payments (use card `4000000000000341`)
+  - Test successful renewal
 - [ ] **Switch to Stripe live mode** when ready
 
 ### Tax & Accounting

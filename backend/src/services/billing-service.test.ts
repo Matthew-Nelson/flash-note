@@ -100,6 +100,7 @@ describe('BillingService', () => {
         line_items: [{ price: 'price_monthly', quantity: 1 }],
         success_url: expect.stringContaining('/dashboard?success=true'),
         cancel_url: expect.stringContaining('/pricing?canceled=true'),
+        allow_promotion_codes: true,
         metadata: { userId: 'user-123' },
         subscription_data: {
           metadata: { userId: 'user-123' },
@@ -183,6 +184,7 @@ describe('BillingService', () => {
       const signature = 'sig_123';
 
       mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+        id: 'evt_verify_sig',
         type: 'checkout.session.completed',
         data: { object: { metadata: {}, customer: 'cus_123', subscription: 'sub_123' } },
       });
@@ -209,6 +211,7 @@ describe('BillingService', () => {
     describe('checkout.session.completed', () => {
       it('should update user subscription on checkout complete', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_update',
           type: 'checkout.session.completed',
           data: {
             object: {
@@ -231,6 +234,7 @@ describe('BillingService', () => {
 
       it('should log subscription created audit event', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_audit',
           type: 'checkout.session.completed',
           data: {
             object: {
@@ -256,6 +260,7 @@ describe('BillingService', () => {
 
       it('should handle missing userId in metadata gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_no_user',
           type: 'checkout.session.completed',
           data: {
             object: {
@@ -279,6 +284,7 @@ describe('BillingService', () => {
     describe('customer.subscription.updated', () => {
       it('should update subscription status', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_updated',
           type: 'customer.subscription.updated',
           data: {
             object: {
@@ -295,6 +301,7 @@ describe('BillingService', () => {
 
       it('should handle missing userId gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_updated_no_user',
           type: 'customer.subscription.updated',
           data: {
             object: {
@@ -316,6 +323,7 @@ describe('BillingService', () => {
     describe('customer.subscription.deleted', () => {
       it('should set subscription status to canceled', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -332,6 +340,7 @@ describe('BillingService', () => {
 
       it('should log subscription cancelled audit event', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted_audit',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -353,6 +362,7 @@ describe('BillingService', () => {
 
       it('should handle missing userId gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted_no_user',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -374,6 +384,7 @@ describe('BillingService', () => {
     describe('unknown event types', () => {
       it('should ignore unknown event types without error', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_unknown',
           type: 'unknown.event.type',
           data: { object: {} },
         });
@@ -389,6 +400,7 @@ describe('BillingService', () => {
   describe('security properties', () => {
     it('should use webhook secret for signature verification', async () => {
       mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+        id: 'evt_security_test',
         type: 'ping',
         data: { object: {} },
       });
