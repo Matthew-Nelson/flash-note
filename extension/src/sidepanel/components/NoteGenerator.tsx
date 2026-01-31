@@ -22,7 +22,7 @@ const LOADING_STAGES = [
   'Finalizing note...',
 ];
 
-type GenerationPhase = 'idle' | 'loading' | 'success';
+type GenerationPhase = 'idle' | 'loading' | 'success' | 'error';
 
 export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const [noteType, setNoteType] = useState<NoteType>('daily_note');
@@ -34,6 +34,9 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
 
   // Store the generated note temporarily during success animation
   const generatedNoteRef = useRef<GeneratedNote | null>(null);
+
+  // Store error message temporarily during error animation
+  const errorMessageRef = useRef<string | null>(null);
 
   // Cycle through loading stages while loading
   useEffect(() => {
@@ -64,6 +67,22 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
     return () => clearTimeout(timeout);
   }, [phase, onNoteGenerated]);
 
+  // Handle error phase transition back to idle
+  useEffect(() => {
+    if (phase !== 'error') return;
+
+    // Show error animation for 1.5 seconds, then return to form with error message
+    const timeout = setTimeout(() => {
+      if (errorMessageRef.current) {
+        setErrors([errorMessageRef.current]);
+        errorMessageRef.current = null;
+      }
+      setPhase('idle');
+    }, 1500);
+
+    return () => clearTimeout(timeout);
+  }, [phase]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
@@ -89,12 +108,13 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
       generatedNoteRef.current = result;
       setPhase('success');
     } catch (err) {
+      // Store error and transition to error phase for animation
       if (err instanceof Error) {
-        setErrors([err.message]);
+        errorMessageRef.current = err.message;
       } else {
-        setErrors(['Failed to generate note']);
+        errorMessageRef.current = 'Failed to generate note';
       }
-      setPhase('idle');
+      setPhase('error');
     }
   };
 
@@ -103,8 +123,6 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const charColor = charPercentage > 90 ? 'text-red-500' : charPercentage > 70 ? 'text-yellow-500' : 'opacity-50';
 
   // Loading state
-  // TODO: Add error state animation (e.g., shake + red X) when API call fails,
-  // instead of immediately returning to idle. This would provide better user feedback.
   if (phase === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
@@ -122,6 +140,53 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
           {/* Stage indicator */}
           <p className="loading-stage text-base font-medium mt-4 animate-fade-in" key={loadingStage}>
             {LOADING_STAGES[loadingStage]}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state - animated X mark with shake
+  if (phase === 'error') {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
+        <div className="error-x-container">
+          <div className="error-x-mark">
+            <svg
+              className="error-x-icon"
+              viewBox="0 0 52 52"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <circle
+                className="error-x-circle"
+                cx="26"
+                cy="26"
+                r="24"
+                stroke="var(--error)"
+                strokeWidth="3"
+                fill="none"
+              />
+              <path
+                className="error-x-line error-x-line-1"
+                d="M17 17l18 18"
+                stroke="var(--error)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                fill="none"
+              />
+              <path
+                className="error-x-line error-x-line-2"
+                d="M35 17l-18 18"
+                stroke="var(--error)"
+                strokeWidth="3"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          </div>
+          <p className="error-x-text mt-4 text-base font-medium">
+            Something went wrong
           </p>
         </div>
       </div>
