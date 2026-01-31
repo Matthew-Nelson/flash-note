@@ -31,8 +31,14 @@ app.use(cors({
   credentials: true,
 }));
 
-// Body parsing
-app.use(express.json());
+// Body parsing - skip JSON parsing for Stripe webhook (needs raw body for signature verification)
+app.use((req, res, next) => {
+  if (req.originalUrl === '/billing/webhook') {
+    next();
+  } else {
+    express.json()(req, res, next);
+  }
+});
 
 // Routes
 app.use('/health', healthRouter);

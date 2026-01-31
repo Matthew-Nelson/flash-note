@@ -194,3 +194,6 @@ See `FLASHNOTE_HANDOFF.md` for complete project specification including:
 - PT-specific AI prompts
 - HIPAA compliance checklist
 - Deployment strategy
+
+## Additional Rules
+- Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.

@@ -17,7 +17,7 @@ This audit was originally conducted in January 2026 and identified **4 critical*
 |----------|----------|----------|----------|------|------------|
 | CRITICAL | 4 | 4 | 0 | 0 | 0 |
 | HIGH | 9 | 11 | 1 | 0 | 4 |
-| MEDIUM | 8 | 7 | 0 | 1 | 5 |
+| MEDIUM | 8 | 8 | 0 | 0 | 5 |
 | LOW | 5 | 0 | 0 | 5 | 2 |
 
 ### Overall Risk Assessment: **LOW-MEDIUM** (improved from MEDIUM)
@@ -718,40 +718,51 @@ console.error('LLM service error:', { type: error.name, message: error.message }
 ---
 
 ### MEDIUM-013: Missing Webhook Idempotency Check
-**Status:** OPEN
-**File:** `backend/src/services/billing-service.ts:52-85`
+**Status:** RESOLVED
+**Files:** `backend/src/services/billing-service.ts`, `backend/src/db/queries/webhooks.ts`, `backend/src/db/migrations/007_webhook_idempotency.sql`
 **Severity:** MEDIUM
 
-Stripe webhooks are processed without checking for duplicate events:
-```typescript
-async handleWebhook(body: Buffer, signature: string): Promise<void> {
-  // No idempotency check for event.id
-  switch (event.type) {
-    case 'checkout.session.completed':
-      await this.handleCheckoutComplete(session);
-```
+**Original Issue:** Stripe webhooks were processed without checking for duplicate events.
 
 **Risk:** Stripe may retry webhooks on delivery failures. Without idempotency checks:
 - Duplicate subscription status updates
 - Potential billing inconsistencies
 - Duplicate audit log entries
 
-**Fix:** Store processed event IDs and skip duplicates:
-```typescript
-// Check if already processed
-const existing = await db.query(
-  'SELECT id FROM webhook_events WHERE stripe_event_id = $1',
-  [event.id]
-);
-if (existing.rows.length > 0) {
-  return; // Already processed
-}
-// Process and record
-await db.query(
-  'INSERT INTO webhook_events (stripe_event_id) VALUES ($1)',
-  [event.id]
-);
-```
+**Resolution (January 30, 2026):** Implemented database-backed webhook idempotency:
+
+1. **Database Migration** (`007_webhook_idempotency.sql`):
+   - Created `processed_webhook_events` table with `event_id` primary key
+   - Added `event_type` for debugging/monitoring
+   - Index on `processed_at` for efficient cleanup queries
+
+2. **Atomic Idempotency Check** (`webhooks.ts`):
+   ```typescript
+   export async function tryMarkWebhookProcessed(eventId: string, eventType: string): Promise<boolean> {
+     const result = await db.query(
+       `INSERT INTO processed_webhook_events (event_id, event_type)
+        VALUES ($1, $2)
+        ON CONFLICT (event_id) DO NOTHING`,
+       [eventId, eventType]
+     );
+     return (result.rowCount ?? 0) > 0;
+   }
+   ```
+   - Uses `INSERT ... ON CONFLICT DO NOTHING` for atomic check-and-mark
+   - Returns `true` if new event (should process), `false` if duplicate (skip)
+   - No race conditions between check and insert
+
+3. **Cleanup Function** (`webhooks.ts`):
+   - `cleanupOldWebhookEvents(daysToKeep)` available for scheduled cleanup
+   - Recommended: Set up cron job to run daily, retain 7 days
+
+**Security Properties:**
+- Survives server restarts (database-backed)
+- Works across multiple server instances (shared database)
+- Atomic operation prevents race conditions
+- 7-day retention is safe (Stripe retries for up to 72 hours)
+
+**Operational Note:** Cleanup job must be configured before production. See `docs/STRIPE_TODOS.md` Operations section for setup options.
 
 ---
 
@@ -1106,13 +1117,13 @@ Pipeline improvements rather than code changes.
 
 Quick fixes that don't require grouping:
 
-| Issue | Description | Effort |
-|-------|-------------|--------|
-| MEDIUM-013 | Missing webhook idempotency | Medium - new table + billing-service changes |
-| LOW-002 | Health check authentication | Low - add basic auth or IP restriction |
-| LOW-004 | Extension CSP missing | Low - manifest.json change |
-| LOW-006 | Subscription magic strings | Low - extract to constants |
-| LOW-007 | Body size limit implicit | Low - one-line fix |
+| Issue | Description | Effort | Status |
+|-------|-------------|--------|--------|
+| ~~MEDIUM-013~~ | ~~Missing webhook idempotency~~ | ~~Medium~~ | ✅ RESOLVED |
+| LOW-002 | Health check authentication | Low - add basic auth or IP restriction | Open |
+| LOW-004 | Extension CSP missing | Low - manifest.json change | Open |
+| LOW-006 | Subscription magic strings | Low - extract to constants | Open |
+| LOW-007 | Body size limit implicit | Low - one-line fix | Open |
 
 ---
 
@@ -1125,7 +1136,7 @@ Phase 1: Security Foundation ✅ COMPLETE
 
 Phase 2: Security Hardening ✅ COMPLETE
 ├── Group E: LLM/Prompt Security (MEDIUM-005, MEDIUM-010) ✅
-└── MEDIUM-013: Webhook Idempotency (standalone) - REMAINING
+└── MEDIUM-013: Webhook Idempotency (standalone) ✅
 
 Phase 3: Resilience & UX
 ├── Group B: Extension Resilience (MEDIUM-003, MEDIUM-008, MEDIUM-014)
@@ -1138,7 +1149,7 @@ Phase 4: Ongoing
 
 **Rationale:**
 - ~~Phase 1 addresses the only remaining HIGH issue and a quick CORS fix~~ **COMPLETE**
-- ~~Phase 2 handles security-critical prompt injection before it becomes a vector~~ **MOSTLY COMPLETE** (only MEDIUM-013 webhook idempotency remains)
+- ~~Phase 2 handles security-critical prompt injection before it becomes a vector~~ **COMPLETE**
 - Phase 3 improves reliability and debugging capability
 - Phase 4 is continuous improvement
 
@@ -1162,19 +1173,20 @@ Phase 4: Ongoing
 | January 30, 2026 | **Resolved Group A - Session Infrastructure (HIGH-006, MEDIUM-002, MEDIUM-011):** Implemented comprehensive session security improvements. (1) HIGH-006 Device Binding: Sessions now store IP address and user agent; mismatches logged as `SESSION_DEVICE_CHANGE` warnings (lenient mode - doesn't block, since PT staff frequently change networks); (2) MEDIUM-002 O(1) Token Validation: Refresh tokens include `sessionId` in JWT payload, enabling primary key lookup instead of O(n) bcrypt loop; legacy tokens fall back gracefully; (3) MEDIUM-011 Session Limits: Max 5 sessions per user enforced, oldest deleted when exceeded, `SESSION_LIMIT_EXCEEDED` audit events logged. Migration: `006_session_device_binding.sql`. Test coverage: 27 auth-service tests. **All HIGH severity issues now resolved.** |
 | January 30, 2026 | **Resolved Group D - CORS Configuration (MEDIUM-007, MEDIUM-015):** Replaced NODE_ENV-based CORS origin logic with explicit `ALLOWED_ORIGINS` environment variable. (1) Added `ALLOWED_ORIGINS` to Zod config schema - parses comma-separated list with whitespace trimming; (2) CORS middleware now uses `config.ALLOWED_ORIGINS` directly; (3) Supports Chrome extension origins (chrome-extension://); (4) Production must explicitly configure allowed origins. Files: `config.ts`, `index.ts`, `.env.example`, `.env`. |
 | January 30, 2026 | **Resolved Group E - LLM/Prompt Security (MEDIUM-005, MEDIUM-010):** Implemented defense-in-depth prompt injection protection. (1) Created `prompt-sanitization.ts` utility with XML delimiter wrapping (`wrapWithDelimiters`), suspicious pattern detection (`detectSuspiciousPatterns`), and PHI-safe metadata extraction; (2) Updated `pt-prompts.ts` - system prompt includes content handling security rules, user content wrapped in `<clinician_notes>` and `<patient_context>` tags, added security reminder at end of prompt, added PHI protection comment to warning log; (3) Updated `ai-service.ts` - runs detection before prompt building, includes `securityMetadata` in response; (4) Updated `notes.ts` - audit logs include detection metadata (`suspiciousPatternDetected`, `suspiciousPatternCount`); (5) Added `PromptSecurityMetadata` type to `types/index.ts`; (6) Added comprehensive tests (51 total). Detection is monitoring-only (fail-open for usability); XML delimiters provide the actual protection. |
+| January 30, 2026 | **Resolved MEDIUM-013 (Webhook Idempotency):** Implemented database-backed webhook idempotency for Stripe webhooks. (1) Created `007_webhook_idempotency.sql` migration with `processed_webhook_events` table and cleanup index; (2) Added `tryMarkWebhookProcessed()` in `webhooks.ts` using atomic `INSERT ... ON CONFLICT DO NOTHING` with rowCount check - prevents race conditions; (3) Added `cleanupOldWebhookEvents()` for scheduled cleanup (7-day retention recommended); (4) Updated `billing-service.ts` to use database check instead of in-memory Map; (5) Added price ID validation to billing routes using Zod schema with `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` env vars; (6) Added structured JSON logging for missing userId errors with `WEBHOOK_PROCESSING_FAILED` audit action. **Phase 2 now complete.** |
 
 ---
 
 ## Summary
 
-Significant progress has been made on security remediation. All critical vulnerabilities and most HIGH severity issues have been resolved, substantially reducing the risk of credential theft, API key exposure, account takeover, and token manipulation attacks.
+Significant progress has been made on security remediation. All critical vulnerabilities and all HIGH severity issues have been resolved, substantially reducing the risk of credential theft, API key exposure, account takeover, and token manipulation attacks.
 
 **Current Issue Count:**
 | Severity | Open | Accepted | New (This Review) |
 |----------|------|----------|-------------------|
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 0 | 1 | 4 |
-| MEDIUM | 4 | 0 | 5 |
+| MEDIUM | 3 | 0 | 5 |
 | LOW | 7 | 0 | 2 |
 
 **Remaining Priority Items:**
@@ -1189,12 +1201,15 @@ Significant progress has been made on security remediation. All critical vulnera
 - MEDIUM-012 (LLM API error logging) resolved - errors now logged without PHI exposure risk
 - Session infrastructure implemented (HIGH-006, MEDIUM-002, MEDIUM-011 resolved) - Device binding, O(1) token validation, session limits
 - CORS configuration implemented (MEDIUM-007, MEDIUM-015 resolved) - Explicit ALLOWED_ORIGINS env var, supports extension origins
-- **Prompt injection protection implemented (MEDIUM-005, MEDIUM-010 resolved)** - XML delimiter wrapping, suspicious pattern detection for monitoring, PHI-safe logging documented
+- Prompt injection protection implemented (MEDIUM-005, MEDIUM-010 resolved) - XML delimiter wrapping, suspicious pattern detection for monitoring, PHI-safe logging documented
+- **Webhook idempotency implemented (MEDIUM-013 resolved)** - Database-backed atomic INSERT, price validation, structured error logging
 - **All HIGH severity issues now resolved**
+- **Phase 2 (Security Hardening) complete**
 
 **Recommended Action:**
-1. **Short-term:** Address remaining MEDIUM severity items (webhook idempotency, extension resilience)
+1. **Short-term:** Address remaining MEDIUM severity items (extension resilience: MEDIUM-003, MEDIUM-008, MEDIUM-014)
 2. **Medium-term:** Observability stack (structured logging, request ID tracing)
+3. **Operational:** Configure webhook event cleanup job before production (see `docs/STRIPE_TODOS.md`)
 
 **Notes:**
 - JSON body size limit (LOW-007) was downgraded from HIGH as Express already defaults to 100KB - the fix is about making this explicit for code clarity, not addressing an active vulnerability.
@@ -1203,6 +1218,7 @@ Significant progress has been made on security remediation. All critical vulnera
 - Device binding uses lenient mode (log, don't block) to avoid false positives for PT staff who frequently switch networks and devices.
 - Email verification uses Resend for transactional email delivery (falls back to console logging when API key not configured).
 - Extension auto-polls for verification status - banner clears automatically without logout.
+- Webhook idempotency requires cleanup job configuration before production - see `docs/STRIPE_TODOS.md` Operations section.
 
 ---
 

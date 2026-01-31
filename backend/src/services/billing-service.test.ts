@@ -47,6 +47,13 @@ vi.mock('../db/queries/users.js', () => ({
   updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
 }));
 
+// Mock webhook queries for idempotency
+const mockTryMarkWebhookProcessed = vi.fn();
+
+vi.mock('../db/queries/webhooks.js', () => ({
+  tryMarkWebhookProcessed: (...args: unknown[]) => mockTryMarkWebhookProcessed(...args),
+}));
+
 // Import after mocking
 const { billingService } = await import('./billing-service.js');
 
@@ -61,6 +68,9 @@ describe('BillingService', () => {
     mockFindUserById.mockReset();
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
+    mockTryMarkWebhookProcessed.mockReset();
+    // Default: allow all events to be processed (return true = new event)
+    mockTryMarkWebhookProcessed.mockResolvedValue(true);
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
   });
 
@@ -100,6 +110,7 @@ describe('BillingService', () => {
         line_items: [{ price: 'price_monthly', quantity: 1 }],
         success_url: expect.stringContaining('/dashboard?success=true'),
         cancel_url: expect.stringContaining('/pricing?canceled=true'),
+        allow_promotion_codes: true,
         metadata: { userId: 'user-123' },
         subscription_data: {
           metadata: { userId: 'user-123' },
@@ -183,6 +194,7 @@ describe('BillingService', () => {
       const signature = 'sig_123';
 
       mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+        id: 'evt_verify_sig',
         type: 'checkout.session.completed',
         data: { object: { metadata: {}, customer: 'cus_123', subscription: 'sub_123' } },
       });
@@ -209,6 +221,7 @@ describe('BillingService', () => {
     describe('checkout.session.completed', () => {
       it('should update user subscription on checkout complete', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_update',
           type: 'checkout.session.completed',
           data: {
             object: {
@@ -231,6 +244,7 @@ describe('BillingService', () => {
 
       it('should log subscription created audit event', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_audit',
           type: 'checkout.session.completed',
           data: {
             object: {
@@ -256,9 +270,11 @@ describe('BillingService', () => {
 
       it('should handle missing userId in metadata gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_checkout_no_user',
           type: 'checkout.session.completed',
           data: {
             object: {
+              id: 'cs_123',
               metadata: {},
               customer: 'cus_abc',
               subscription: 'sub_xyz',
@@ -266,19 +282,23 @@ describe('BillingService', () => {
           },
         });
 
-        // Should not throw, just log error
+        // Should not throw, just log structured error and audit
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Checkout session missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('checkout.session.completed');
       });
     });
 
     describe('customer.subscription.updated', () => {
       it('should update subscription status', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_updated',
           type: 'customer.subscription.updated',
           data: {
             object: {
@@ -295,9 +315,11 @@ describe('BillingService', () => {
 
       it('should handle missing userId gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_updated_no_user',
           type: 'customer.subscription.updated',
           data: {
             object: {
+              id: 'sub_123',
               metadata: {},
               status: 'active',
             },
@@ -307,15 +329,19 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Subscription missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('customer.subscription.updated');
       });
     });
 
     describe('customer.subscription.deleted', () => {
       it('should set subscription status to canceled', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -332,6 +358,7 @@ describe('BillingService', () => {
 
       it('should log subscription cancelled audit event', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted_audit',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -353,6 +380,7 @@ describe('BillingService', () => {
 
       it('should handle missing userId gracefully', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_deleted_no_user',
           type: 'customer.subscription.deleted',
           data: {
             object: {
@@ -365,15 +393,19 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Subscription missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('customer.subscription.deleted');
       });
     });
 
     describe('unknown event types', () => {
       it('should ignore unknown event types without error', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_unknown',
           type: 'unknown.event.type',
           data: { object: {} },
         });
@@ -389,6 +421,7 @@ describe('BillingService', () => {
   describe('security properties', () => {
     it('should use webhook secret for signature verification', async () => {
       mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+        id: 'evt_security_test',
         type: 'ping',
         data: { object: {} },
       });

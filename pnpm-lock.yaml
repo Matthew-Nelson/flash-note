@@ -42,8 +42,8 @@ importers:
         specifier: ^6.9.1
         version: 6.9.1
       stripe:
-        specifier: ^14.12.0
-        version: 14.25.0
+        specifier: ^20.3.0
+        version: 20.3.0(@types/node@20.19.30)
       zod:
         specifier: ^3.22.4
         version: 3.25.76
@@ -5313,12 +5313,16 @@ packages:
       js-tokens: 9.0.1
     dev: true
 
-  /stripe@14.25.0:
-    resolution: {integrity: sha512-wQS3GNMofCXwH8TSje8E1SE8zr6ODiGtHQgPtO95p9Mb4FhKC9jvXR2NUTpZ9ZINlckJcFidCmaTFV4P6vsb9g==}
-    engines: {node: '>=12.*'}
+  /stripe@20.3.0(@types/node@20.19.30):
+    resolution: {integrity: sha512-DYzcmV1MfYhycr1GwjCjeQVYk9Gu8dpxyTlu7qeDCsuguug7oUTxPsUQuZeSf/OPzK7pofqobvOKVqAwlpgf/Q==}
+    engines: {node: '>=16'}
+    peerDependencies:
+      '@types/node': '>=16'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
     dependencies:
       '@types/node': 20.19.30
-      qs: 6.14.1
     dev: false
 
   /styled-jsx@5.1.1(react@18.3.1):
