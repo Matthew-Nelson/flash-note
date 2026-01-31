@@ -47,6 +47,13 @@ vi.mock('../db/queries/users.js', () => ({
   updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
 }));
 
+// Mock webhook queries for idempotency
+const mockTryMarkWebhookProcessed = vi.fn();
+
+vi.mock('../db/queries/webhooks.js', () => ({
+  tryMarkWebhookProcessed: (...args: unknown[]) => mockTryMarkWebhookProcessed(...args),
+}));
+
 // Import after mocking
 const { billingService } = await import('./billing-service.js');
 
@@ -61,6 +68,9 @@ describe('BillingService', () => {
     mockFindUserById.mockReset();
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
+    mockTryMarkWebhookProcessed.mockReset();
+    // Default: allow all events to be processed (return true = new event)
+    mockTryMarkWebhookProcessed.mockResolvedValue(true);
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
   });
 
@@ -264,6 +274,7 @@ describe('BillingService', () => {
           type: 'checkout.session.completed',
           data: {
             object: {
+              id: 'cs_123',
               metadata: {},
               customer: 'cus_abc',
               subscription: 'sub_xyz',
@@ -271,13 +282,16 @@ describe('BillingService', () => {
           },
         });
 
-        // Should not throw, just log error
+        // Should not throw, just log structured error and audit
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Checkout session missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
+        const parsed = JSON.parse(loggedMessage);
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('checkout.session.completed');
       });
     });
 
@@ -305,6 +319,7 @@ describe('BillingService', () => {
           type: 'customer.subscription.updated',
           data: {
             object: {
+              id: 'sub_123',
               metadata: {},
               status: 'active',
             },
@@ -314,9 +329,12 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Subscription missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
+        const parsed = JSON.parse(loggedMessage);
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('customer.subscription.updated');
       });
     });
 
@@ -375,9 +393,12 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Subscription missing userId in metadata'
-        );
+        // Verify structured logging was called
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0][0];
+        const parsed = JSON.parse(loggedMessage);
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('customer.subscription.deleted');
       });
     });
 

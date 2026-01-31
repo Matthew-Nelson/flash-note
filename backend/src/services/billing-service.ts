@@ -1,29 +1,12 @@
 import Stripe from 'stripe';
 import { config } from '../config.js';
 import { findUserById, updateUserSubscription, updateSubscriptionStatus } from '../db/queries/users.js';
+import { tryMarkWebhookProcessed } from '../db/queries/webhooks.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 
 const stripe = new Stripe(config.STRIPE_SECRET_KEY);
-
-// In-memory idempotency cache for webhook events
-// TODO: For production, replace with database-backed storage (see MEDIUM-013 in security audit)
-// This prevents duplicate event processing but is lost on server restart
-const processedEvents = new Map<string, number>();
-const IDEMPOTENCY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-function cleanupOldEvents(): void {
-  const now = Date.now();
-  for (const [eventId, timestamp] of processedEvents) {
-    if (now - timestamp > IDEMPOTENCY_TTL_MS) {
-      processedEvents.delete(eventId);
-    }
-  }
-}
-
-// Run cleanup every hour
-setInterval(cleanupOldEvents, 60 * 60 * 1000);
 
 class BillingService {
   async createCheckoutSession(
@@ -75,19 +58,19 @@ class BillingService {
         config.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
-      console.error('Webhook signature verification failed:', err);
+      // SECURITY: Only log error message, not full error object which may contain sensitive Stripe SDK details
+      console.error('Webhook signature verification failed:', err instanceof Error ? err.message : 'Unknown error');
       throw new AppError(400, 'webhook_error', 'Invalid signature');
     }
 
-    // Idempotency check - skip if already processed
-    if (processedEvents.has(event.id)) {
+    // Database-backed idempotency check (MEDIUM-013)
+    // Atomic INSERT prevents race conditions and survives server restarts
+    const isNewEvent = await tryMarkWebhookProcessed(event.id, event.type);
+    if (!isNewEvent) {
       // eslint-disable-next-line no-console -- Intentional logging for webhook debugging
       console.log(`Skipping duplicate webhook event: ${event.id}`);
       return;
     }
-
-    // Mark as processed before handling (prevents concurrent duplicates)
-    processedEvents.set(event.id, Date.now());
 
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -125,7 +108,10 @@ class BillingService {
   private async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     const userId = session.metadata?.userId;
     if (!userId) {
-      console.error('Checkout session missing userId in metadata');
+      await this.logMissingUserIdError('checkout.session.completed', {
+        sessionId: session.id,
+        customerId: session.customer,
+      });
       return;
     }
 
@@ -150,7 +136,9 @@ class BillingService {
   private async handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
     const userId = subscription.metadata.userId;
     if (!userId) {
-      console.error('Subscription missing userId in metadata');
+      await this.logMissingUserIdError('customer.subscription.updated', {
+        subscriptionId: subscription.id,
+      });
       return;
     }
 
@@ -160,7 +148,9 @@ class BillingService {
   private async handleSubscriptionDelete(subscription: Stripe.Subscription): Promise<void> {
     const userId = subscription.metadata.userId;
     if (!userId) {
-      console.error('Subscription missing userId in metadata');
+      await this.logMissingUserIdError('customer.subscription.deleted', {
+        subscriptionId: subscription.id,
+      });
       return;
     }
 
@@ -186,7 +176,10 @@ class BillingService {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const userId = subscription.metadata.userId;
     if (!userId) {
-      console.error('Subscription missing userId in metadata for invoice');
+      await this.logMissingUserIdError('invoice.paid', {
+        subscriptionId: subscription.id,
+        invoiceId: invoice.id,
+      });
       return;
     }
 
@@ -218,7 +211,10 @@ class BillingService {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const userId = subscription.metadata.userId;
     if (!userId) {
-      console.error('Subscription missing userId in metadata for failed invoice');
+      await this.logMissingUserIdError('invoice.payment_failed', {
+        subscriptionId: subscription.id,
+        invoiceId: invoice.id,
+      });
       return;
     }
 
@@ -254,6 +250,38 @@ class BillingService {
       return subDetails.subscription;
     }
     return subDetails.subscription.id;
+  }
+
+  /**
+   * Log missing userId in webhook metadata with structured logging and audit trail.
+   * This happens when a subscription wasn't created through our checkout flow
+   * (e.g., created manually in Stripe Dashboard).
+   */
+  private async logMissingUserIdError(
+    eventType: string,
+    context: Record<string, unknown>
+  ): Promise<void> {
+    // Structured logging for alerting systems (can be parsed by log aggregators)
+    // eslint-disable-next-line no-console
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'webhook_missing_user_id',
+      eventType,
+      ...context,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // Audit trail for HIPAA compliance
+    await auditService.log({
+      userId: 'SYSTEM',
+      action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+      status: 'FAILURE',
+      metadata: {
+        reason: 'missing_user_metadata',
+        eventType,
+        ...context,
+      },
+    });
   }
 }
 

@@ -4,13 +4,30 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCsrf } from '../middleware/csrf.js';
 import { requireEmailVerification } from '../middleware/email-verification.js';
 import { billingService } from '../services/billing-service.js';
+import { config } from '../config.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 export const billingRouter: Router = Router();
 
+// SECURITY: Only allow configured Stripe price IDs to prevent arbitrary price attacks
+// If price env vars aren't configured, validation is skipped (development mode)
+const allowedPriceIds: string[] = [
+  config.STRIPE_PRICE_MONTHLY,
+  config.STRIPE_PRICE_ANNUAL,
+].filter((id): id is string => typeof id === 'string' && id.startsWith('price_'));
+
 // Validation schemas
 const checkoutSchema = z.object({
-  priceId: z.string().min(1),
+  priceId: z.string().min(1).refine(
+    (id) => {
+      // If no valid price IDs configured, allow any (development mode)
+      if (allowedPriceIds.length === 0) {
+        return true;
+      }
+      return allowedPriceIds.includes(id);
+    },
+    { message: 'Invalid price ID' }
+  ),
 });
 
 // POST /billing/checkout - Create Stripe checkout session

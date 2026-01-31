@@ -114,6 +114,8 @@ export enum AuditAction {
   // Session management (HIGH-006, MEDIUM-011)
   SESSION_DEVICE_CHANGE = 'SESSION_DEVICE_CHANGE',
   SESSION_LIMIT_EXCEEDED = 'SESSION_LIMIT_EXCEEDED',
+  // Webhook processing (MEDIUM-013)
+  WEBHOOK_PROCESSING_FAILED = 'WEBHOOK_PROCESSING_FAILED',
 }
 
 export interface AuditLogEntry {
