@@ -658,6 +658,87 @@ body,
   opacity: 0;
 }
 
+/* ============================================
+   ERROR STATE ANIMATIONS
+   ============================================ */
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  10%, 30%, 50%, 70%, 90% {
+    transform: translateX(-4px);
+  }
+  20%, 40%, 60%, 80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes draw-x-line {
+  0% {
+    stroke-dashoffset: 26;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes error-hold {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.error-x-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  animation: shake 0.5s ease-out, error-hold 1.5s ease-out forwards;
+}
+
+.error-x-mark {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  overflow: hidden;
+}
+
+.error-x-icon {
+  width: 100%;
+  height: 100%;
+}
+
+.error-x-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  animation: draw-circle 0.4s ease-out forwards;
+}
+
+.error-x-line {
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+}
+
+.error-x-line-1 {
+  animation: draw-x-line 0.2s ease-out 0.35s forwards;
+}
+
+.error-x-line-2 {
+  animation: draw-x-line 0.2s ease-out 0.45s forwards;
+}
+
+.error-x-text {
+  color: var(--error);
+  animation: content-reveal 0.3s ease-out 0.5s forwards;
+  opacity: 0;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *,
