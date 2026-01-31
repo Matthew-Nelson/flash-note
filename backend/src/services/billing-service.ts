@@ -271,9 +271,9 @@ class BillingService {
       timestamp: new Date().toISOString(),
     }));
 
-    // Audit trail for HIPAA compliance
+    // Audit trail for HIPAA compliance (userId null for system-level events)
     await auditService.log({
-      userId: 'SYSTEM',
+      userId: null,
       action: AuditAction.WEBHOOK_PROCESSING_FAILED,
       status: 'FAILURE',
       metadata: {
