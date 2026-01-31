@@ -1,6 +1,22 @@
 import { storage } from './storage';
 import type { AuthResponse, GenerateNoteInput, GeneratedNote } from './schemas';
 
+// API response envelope types
+interface ApiSuccessResponse<T> {
+  success: true;
+  data: T;
+}
+
+interface ApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+  };
+}
+
+type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
+
 // API URL is set via environment variables at build time
 // Development: VITE_API_URL=http://localhost:4000 (from .env.development)
 // Production: VITE_API_URL=https://api.flashnote.com (from .env.production)
@@ -60,9 +76,13 @@ class ApiClient {
         return null;
       }
 
-      const result = await response.json();
-      const data = result.data as AuthResponse;
+      const result = (await response.json()) as ApiResponse<AuthResponse>;
+      if (!result.success) {
+        await storage.clearAuth();
+        return null;
+      }
 
+      const data = result.data;
       await storage.setAuth({
         user: data.user,
         accessToken: data.accessToken,
@@ -95,10 +115,11 @@ class ApiClient {
       },
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiResponse<T>;
 
     if (!response.ok || !result.success) {
-      const errorCode = result.error?.code ?? 'unknown_error';
+      const errorCode = result.success === false ? result.error.code : 'unknown_error';
+      const errorMessage = result.success === false ? result.error.message : 'An error occurred';
 
       // SECURITY: Auto-logout on invalid token (password was reset, session invalidated, etc.)
       if (response.status === 401 && errorCode === 'invalid_token') {
@@ -118,11 +139,11 @@ class ApiClient {
       throw new ApiError(
         response.status,
         errorCode,
-        result.error?.message ?? 'An error occurred'
+        errorMessage
       );
     }
 
-    return result.data as T;
+    return result.data;
   }
 
   async login(email: string, password: string): Promise<AuthResponse> {
@@ -203,9 +224,12 @@ class ApiClient {
         return null;
       }
 
-      const result = await response.json();
-      const data = result.data as AuthResponse;
+      const result = (await response.json()) as ApiResponse<AuthResponse>;
+      if (!result.success) {
+        return null;
+      }
 
+      const data = result.data;
       await storage.setAuth({
         user: data.user,
         accessToken: data.accessToken,

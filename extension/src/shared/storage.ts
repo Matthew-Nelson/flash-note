@@ -21,7 +21,7 @@ export interface StoredPreferences {
 export const storage = {
   async getAuth(): Promise<StoredAuth | null> {
     const result = await chrome.storage.local.get('auth');
-    return result.auth ?? null;
+    return (result.auth as StoredAuth | undefined) ?? null;
   },
 
   async setAuth(auth: StoredAuth): Promise<void> {
@@ -34,7 +34,7 @@ export const storage = {
 
   async getPreferences(): Promise<StoredPreferences> {
     const result = await chrome.storage.local.get('preferences');
-    return result.preferences ?? {
+    return (result.preferences as StoredPreferences | undefined) ?? {
       defaultNoteType: 'daily_note',
     };
   },

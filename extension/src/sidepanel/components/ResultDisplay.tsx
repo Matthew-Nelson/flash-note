@@ -40,7 +40,7 @@ ${note.assessment}
 
 PLAN:
 ${note.plan}`;
-    copyToClipboard(fullNote, 'all');
+    void copyToClipboard(fullNote, 'all');
   };
 
   return (

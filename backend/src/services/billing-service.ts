@@ -7,10 +7,11 @@ import { AuditAction } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 
 const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
-  // IMPORTANT: Pin API version for predictable behavior across SDK upgrades
-  // Webhook events use your Dashboard's default version - keep them in sync
+  // IMPORTANT: Pin API version to match Dashboard webhook endpoint (cannot be changed after creation)
+  // SDK types expect 2026-01-28.clover but our webhook is locked to 2025-12-15.clover
   // See: https://stripe.com/docs/api/versioning
-  apiVersion: '2023-10-16',
+  // @ts-expect-error stripe-version-2025-12-15 - webhook locked to older version
+  apiVersion: '2025-12-15.clover',
 });
 
 class BillingService {
@@ -243,17 +244,18 @@ class BillingService {
 
   /**
    * Extract subscription ID from invoice.
-   * In API version 2023-10-16, subscription is a direct property on the invoice.
+   * In API version 2025-12-15.clover, subscription is nested in parent.subscription_details
    */
   private getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
-    // subscription can be string ID or expanded Subscription object
-    if (!invoice.subscription) {
+    const subDetails = invoice.parent?.subscription_details;
+    if (!subDetails?.subscription) {
       return null;
     }
-    if (typeof invoice.subscription === 'string') {
-      return invoice.subscription;
+    // subscription can be string ID or expanded Subscription object
+    if (typeof subDetails.subscription === 'string') {
+      return subDetails.subscription;
     }
-    return invoice.subscription.id;
+    return subDetails.subscription.id;
   }
 
   /**
@@ -266,7 +268,6 @@ class BillingService {
     context: Record<string, unknown>
   ): Promise<void> {
     // Structured logging for alerting systems (can be parsed by log aggregators)
-    // eslint-disable-next-line no-console
     console.error(JSON.stringify({
       level: 'error',
       event: 'webhook_missing_user_id',

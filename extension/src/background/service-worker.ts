@@ -1,24 +1,29 @@
 // FlashNote Background Service Worker
 // Handles extension lifecycle events and side panel
 
+// Message types for runtime messaging
+interface ExtensionMessage {
+  type: string;
+}
+
 // Log when the extension is installed or updated
 chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') {
-    console.log('FlashNote extension installed');
-  } else if (details.reason === 'update') {
-    console.log(`FlashNote extension updated to version ${chrome.runtime.getManifest().version}`);
+  if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
+    console.warn('FlashNote extension installed');
+  } else if (details.reason === chrome.runtime.OnInstalledReason.UPDATE) {
+    console.warn(`FlashNote extension updated to version ${chrome.runtime.getManifest().version}`);
   }
 });
 
 // Open side panel when extension icon is clicked
-chrome.action.onClicked.addListener(async (tab) => {
+chrome.action.onClicked.addListener((tab) => {
   if (tab.id) {
-    await chrome.sidePanel.open({ tabId: tab.id });
+    void chrome.sidePanel.open({ tabId: tab.id });
   }
 });
 
 // Handle messages from side panel or content scripts
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
   if (message.type === 'PING') {
     sendResponse({ type: 'PONG' });
     return true;

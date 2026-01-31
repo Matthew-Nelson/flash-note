@@ -15,7 +15,7 @@ export function useAuth() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadAuth();
+    void loadAuth();
   }, []);
 
   // Listen for forced logout (e.g., password reset invalidated token)
