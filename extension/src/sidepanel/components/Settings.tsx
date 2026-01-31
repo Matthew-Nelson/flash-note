@@ -1,3 +1,5 @@
+import { useState } from 'react';
+
 interface User {
   id: string;
   email: string;
@@ -11,10 +13,13 @@ interface SettingsProps {
 }
 
 export default function Settings({ user, onLogout }: SettingsProps) {
+  // Use lazy initializer to capture time once at mount (pure during re-renders)
+  const [mountTime] = useState(() => Date.now());
+
   const isTrialing = user.subscriptionStatus === 'trialing';
   const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
   const daysLeft = trialEndsAt
-    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - mountTime) / (1000 * 60 * 60 * 24)))
     : 0;
 
   return (

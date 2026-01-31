@@ -6,7 +6,12 @@ import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 
-const stripe = new Stripe(config.STRIPE_SECRET_KEY);
+const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
+  // IMPORTANT: Pin API version for predictable behavior across SDK upgrades
+  // Webhook events use your Dashboard's default version - keep them in sync
+  // See: https://stripe.com/docs/api/versioning
+  apiVersion: '2023-10-16',
+});
 
 class BillingService {
   async createCheckoutSession(
@@ -238,18 +243,17 @@ class BillingService {
 
   /**
    * Extract subscription ID from invoice.
-   * In Stripe API 2026+, subscription is nested in parent.subscription_details
+   * In API version 2023-10-16, subscription is a direct property on the invoice.
    */
   private getSubscriptionIdFromInvoice(invoice: Stripe.Invoice): string | null {
-    const subDetails = invoice.parent?.subscription_details;
-    if (!subDetails?.subscription) {
+    // subscription can be string ID or expanded Subscription object
+    if (!invoice.subscription) {
       return null;
     }
-    // subscription can be string or expanded Subscription object
-    if (typeof subDetails.subscription === 'string') {
-      return subDetails.subscription;
+    if (typeof invoice.subscription === 'string') {
+      return invoice.subscription;
     }
-    return subDetails.subscription.id;
+    return invoice.subscription.id;
   }
 
   /**

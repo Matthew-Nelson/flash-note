@@ -15,54 +15,6 @@ const VERIFICATION_POLL_INTERVAL = 10 * 1000;
 
 function AppContent() {
   const { user, isLoading, login, register, logout, refreshUser } = useAuth();
-  const [view, setView] = useState<View>('generator');
-  const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
-  const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
-
-  // Reset view when logging out
-  useEffect(() => {
-    if (!user) {
-      setView('generator');
-      setGeneratedNote(null);
-      setResendStatus('idle');
-    }
-  }, [user]);
-
-  // Poll for email verification status when user hasn't verified
-  useEffect(() => {
-    if (!user || user.emailVerified !== false) {
-      return;
-    }
-
-    const pollVerification = async () => {
-      const refreshedUser = await refreshUser();
-      if (refreshedUser?.emailVerified) {
-        // User verified - polling will stop automatically since condition no longer met
-        setResendStatus('idle');
-      }
-    };
-
-    const intervalId = setInterval(pollVerification, VERIFICATION_POLL_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [user, user?.emailVerified, refreshUser]);
-
-  const handleResendVerification = async () => {
-    if (!user?.email || resendStatus === 'sending') return;
-
-    setResendStatus('sending');
-    try {
-      await api.resendVerificationEmail(user.email);
-      setResendStatus('sent');
-    } catch (err) {
-      // Show sent even on most errors to prevent enumeration
-      if (err instanceof Error && err.message.includes('Too many')) {
-        setResendStatus('error');
-      } else {
-        setResendStatus('sent');
-      }
-    }
-  };
 
   if (isLoading) {
     return (
@@ -78,6 +30,66 @@ function AppContent() {
   if (!user) {
     return <LoginForm onLogin={login} onRegister={register} />;
   }
+
+  // Key on user.id ensures fresh state when user changes (logout/login)
+  return (
+    <AuthenticatedApp
+      key={user.id}
+      user={user}
+      logout={logout}
+      refreshUser={refreshUser}
+    />
+  );
+}
+
+function AuthenticatedApp({
+  user,
+  logout,
+  refreshUser,
+}: {
+  user: NonNullable<ReturnType<typeof useAuth>['user']>;
+  logout: () => void;
+  refreshUser: () => Promise<ReturnType<typeof useAuth>['user']>;
+}) {
+  const [view, setView] = useState<View>('generator');
+  const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
+  const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
+
+  // Poll for email verification status when user hasn't verified
+  useEffect(() => {
+    if (user.emailVerified !== false) {
+      return;
+    }
+
+    const pollVerification = async () => {
+      const refreshedUser = await refreshUser();
+      if (refreshedUser?.emailVerified) {
+        // User verified - polling will stop automatically since condition no longer met
+        setResendStatus('idle');
+      }
+    };
+
+    const intervalId = setInterval(pollVerification, VERIFICATION_POLL_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [user.emailVerified, refreshUser]);
+
+  const handleResendVerification = async () => {
+    if (resendStatus === 'sending') return;
+
+    setResendStatus('sending');
+    try {
+      await api.resendVerificationEmail(user.email);
+      setResendStatus('sent');
+    } catch (err) {
+      // Show sent even on most errors to prevent enumeration
+      if (err instanceof Error && err.message.includes('Too many')) {
+        setResendStatus('error');
+      } else {
+        setResendStatus('sent');
+      }
+    }
+  };
 
   const handleNoteGenerated = (note: GeneratedNote) => {
     setGeneratedNote(note);
@@ -123,7 +135,7 @@ function AppContent() {
       </header>
 
       {/* Email verification banner */}
-      {user && user.emailVerified === false && (
+      {user.emailVerified === false && (
         <div className="bg-amber-50 dark:bg-amber-900/30 border-b border-amber-200 dark:border-amber-800 px-4 py-3">
           <div className="flex items-start gap-2">
             <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -6,13 +6,13 @@ const { mockResendSend } = vi.hoisted(() => ({
   mockResendSend: vi.fn(),
 }));
 
-// Mock Resend class
+// Mock Resend class - use a class to work with 'new Resend()'
 vi.mock('resend', () => ({
-  Resend: vi.fn().mockImplementation(() => ({
-    emails: {
+  Resend: class MockResend {
+    emails = {
       send: mockResendSend,
-    },
-  })),
+    };
+  },
 }));
 
 // Mock config

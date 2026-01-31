@@ -35,10 +35,9 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   // Store the generated note temporarily during success animation
   const generatedNoteRef = useRef<GeneratedNote | null>(null);
 
-  // Cycle through loading stages
+  // Cycle through loading stages while loading
   useEffect(() => {
     if (phase !== 'loading') {
-      setLoadingStage(0);
       return;
     }
 
@@ -82,6 +81,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
     }
 
     setPhase('loading');
+    setLoadingStage(0); // Reset loading stage in event handler, not effect
 
     try {
       const result = await api.generateNote(validation.data);

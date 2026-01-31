@@ -55,12 +55,8 @@ export default defineConfig({
     // Timeout for tests (ms)
     testTimeout: 10000,
 
-    // Pool options
+    // Pool options (Vitest v4: poolOptions moved to top-level)
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    singleFork: true,
   },
 });

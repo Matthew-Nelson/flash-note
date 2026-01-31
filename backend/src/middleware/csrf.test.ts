@@ -193,35 +193,15 @@ describe('CSRF Middleware', () => {
     });
 
     it('should use timing-safe comparison to prevent timing attacks', () => {
-      // This test verifies the implementation uses crypto.timingSafeEqual
-      // by checking that validation takes similar time for valid/invalid signatures
+      // Verify the implementation uses crypto.timingSafeEqual by spying on it
+      // Note: Timing-based tests are inherently flaky and unreliable in CI environments
+      const timingSafeEqualSpy = vi.spyOn(crypto, 'timingSafeEqual');
+
       const token = generateCsrfToken('user-123');
+      validateCsrfToken(token, 'user-123');
 
-      // Run multiple iterations to detect timing differences
-      const iterations = 100;
-      const validTimes: number[] = [];
-      const invalidTimes: number[] = [];
-
-      for (let i = 0; i < iterations; i++) {
-        const start1 = process.hrtime.bigint();
-        validateCsrfToken(token, 'user-123');
-        const end1 = process.hrtime.bigint();
-        validTimes.push(Number(end1 - start1));
-
-        const start2 = process.hrtime.bigint();
-        validateCsrfToken(token, 'wrong-user');
-        const end2 = process.hrtime.bigint();
-        invalidTimes.push(Number(end2 - start2));
-      }
-
-      // The average times should be relatively close
-      // This is a soft assertion since timing can vary
-      const avgValid = validTimes.reduce((a, b) => a + b, 0) / iterations;
-      const avgInvalid = invalidTimes.reduce((a, b) => a + b, 0) / iterations;
-
-      // Times should be within same order of magnitude
-      // (this is a weak assertion but better than nothing)
-      expect(Math.abs(avgValid - avgInvalid)).toBeLessThan(avgValid * 10);
+      expect(timingSafeEqualSpy).toHaveBeenCalled();
+      timingSafeEqualSpy.mockRestore();
     });
   });
 

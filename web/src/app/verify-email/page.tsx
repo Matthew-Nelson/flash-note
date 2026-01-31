@@ -2,35 +2,28 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState, useEffect, useRef, Suspense } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+
+interface VerifyEmailResponse {
+  success: boolean;
+  data?: { alreadyVerified?: boolean };
+  error?: { message: string };
+}
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
-  const [status, setStatus] = useState<'verifying' | 'success' | 'already_verified' | 'error'>('verifying');
-  const [message, setMessage] = useState('');
+  // Derive initial status from token presence - avoids setState in effect
+  const [status, setStatus] = useState<'verifying' | 'success' | 'already_verified' | 'error'>(
+    () => (token ? 'verifying' : 'error')
+  );
+  const [message, setMessage] = useState(() => (token ? '' : 'No verification token provided'));
   // Prevent double-verification in React 18 Strict Mode
   const verificationStarted = useRef(false);
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('error');
-      setMessage('No verification token provided');
-      return;
-    }
-
-    // Prevent duplicate calls from React 18 Strict Mode double-render
-    if (verificationStarted.current) {
-      return;
-    }
-    verificationStarted.current = true;
-
-    verifyEmail(token);
-  }, [token]);
-
-  const verifyEmail = async (verificationToken: string) => {
+  const verifyEmail = useCallback(async (verificationToken: string) => {
     try {
       const response = await fetch(`${API_URL}/auth/verify-email`, {
         method: 'POST',
@@ -38,7 +31,7 @@ function VerifyEmailContent() {
         body: JSON.stringify({ token: verificationToken }),
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as VerifyEmailResponse;
 
       if (response.ok && result.success) {
         if (result.data?.alreadyVerified) {
@@ -50,13 +43,29 @@ function VerifyEmailContent() {
         }
       } else {
         setStatus('error');
-        setMessage(result.error?.message || 'Invalid or expired verification link');
+        setMessage(result.error?.message ?? 'Invalid or expired verification link');
       }
     } catch {
       setStatus('error');
       setMessage('An error occurred while verifying your email');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    // Prevent duplicate calls from React 18 Strict Mode double-render
+    if (verificationStarted.current) {
+      return;
+    }
+    verificationStarted.current = true;
+
+    // Data fetching on mount is a valid pattern - setState in async callback is intentional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void verifyEmail(token);
+  }, [token, verifyEmail]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">

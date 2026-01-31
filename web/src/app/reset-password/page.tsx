@@ -2,33 +2,38 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
+
+interface ValidateTokenResponse {
+  success: boolean;
+  data?: { valid: boolean };
+  error?: { message: string };
+}
+
+interface ResetPasswordResponse {
+  success: boolean;
+  error?: { message: string };
+}
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [status, setStatus] = useState<'validating' | 'ready' | 'submitting' | 'success' | 'invalid'>('validating');
+  // Derive initial status from token presence - avoids setState in effect
+  const [status, setStatus] = useState<'validating' | 'ready' | 'submitting' | 'success' | 'invalid'>(
+    () => (token ? 'validating' : 'invalid')
+  );
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (!token) {
-      setStatus('invalid');
-      return;
-    }
-
-    validateToken(token);
-  }, [token]);
-
-  const validateToken = async (resetToken: string) => {
+  const validateToken = useCallback(async (resetToken: string) => {
     try {
       const response = await fetch(`${API_URL}/auth/validate-reset-token?token=${encodeURIComponent(resetToken)}`);
-      const result = await response.json();
+      const result = (await response.json()) as ValidateTokenResponse;
 
-      if (response.ok && result.success && result.data.valid) {
+      if (response.ok && result.success && result.data?.valid) {
         setStatus('ready');
       } else {
         setStatus('invalid');
@@ -36,7 +41,17 @@ function ResetPasswordContent() {
     } catch {
       setStatus('invalid');
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+
+    // Data fetching on mount is a valid pattern - setState in async callback is intentional
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void validateToken(token);
+  }, [token, validateToken]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,13 +88,13 @@ function ResetPasswordContent() {
         body: JSON.stringify({ token, password }),
       });
 
-      const result = await response.json();
+      const result = (await response.json()) as ResetPasswordResponse;
 
       if (response.ok && result.success) {
         setStatus('success');
       } else {
         setStatus('ready');
-        setError(result.error?.message || 'Failed to reset password');
+        setError(result.error?.message ?? 'Failed to reset password');
       }
     } catch {
       setStatus('ready');

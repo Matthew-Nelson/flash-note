@@ -34,6 +34,7 @@ This document tracks all outstanding work for the Stripe payment integration bef
 - [ ] Subscription reactivation flow
 - [ ] Customer portal configuration in Stripe Dashboard
 - [ ] Webhook event cleanup job (see Operations section below)
+- [ ] Make sure a user that goes through checkout flow immediately has their subscription status updated within extension and can use the app
 
 ---
 

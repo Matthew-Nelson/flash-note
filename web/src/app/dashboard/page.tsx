@@ -1,13 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
 
 export default function DashboardPage() {
+  // Use lazy initializer to capture time once at mount (pure during re-renders)
+  const [trialEndDate] = useState(() =>
+    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString()
+  );
+
   // TODO: Get actual user data
   const user = {
     email: 'user@example.com',
     subscriptionStatus: 'trialing',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    trialEndsAt: trialEndDate,
   };
 
   const usage = {

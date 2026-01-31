@@ -10,7 +10,7 @@ export default function SignupPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -26,14 +26,10 @@ export default function SignupPage() {
 
     setIsLoading(true);
 
-    try {
-      // TODO: Implement registration
-      console.log('Register:', { email, password });
-    } catch (err) {
-      setError('Registration failed. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // TODO: Implement registration
+    // eslint-disable-next-line no-console
+    console.log('Register:', { email, password });
+    setIsLoading(false);
   };
 
   return (

@@ -5,6 +5,11 @@ import { useState } from 'react';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:4000';
 
+interface PasswordResetResponse {
+  success: boolean;
+  error?: { code: string; message: string };
+}
+
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
@@ -26,7 +31,7 @@ export default function ForgotPasswordPage() {
       if (response.ok) {
         setStatus('success');
       } else {
-        const result = await response.json();
+        const result = (await response.json()) as PasswordResetResponse;
         // Only show error for rate limiting
         if (result.error?.code === 'too_many_attempts') {
           setStatus('error');

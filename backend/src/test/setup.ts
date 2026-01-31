@@ -18,19 +18,23 @@
  */
 import { vi } from 'vitest';
 
+// Type for the mock function signature (Vitest v4 uses single type parameter)
+type MockDbQueryFn = (...args: unknown[]) => Promise<{ rows: unknown[]; rowCount?: number }>;
+
 // Mock the database module
-export const mockDbQuery = vi.fn<unknown[], Promise<{ rows: unknown[]; rowCount?: number }>>();
+export const mockDbQuery = vi.fn<MockDbQueryFn>();
 
 vi.mock('../db/index.js', () => ({
   db: {
     query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>
-      mockDbQuery(...args) as Promise<{ rows: unknown[]; rowCount?: number }>,
+      mockDbQuery(...args),
   },
 }));
 
 // Mock audit service to prevent actual logging during tests
 // Must return a Promise since safeAuditLog expects one
-export const mockAuditLog = vi.fn<unknown[], Promise<void>>().mockResolvedValue(undefined);
+type MockAuditLogFn = (...args: unknown[]) => Promise<void>;
+export const mockAuditLog = vi.fn<MockAuditLogFn>().mockResolvedValue(undefined);
 
 vi.mock('../services/audit-service.js', () => ({
   auditService: {

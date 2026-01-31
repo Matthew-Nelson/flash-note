@@ -2,28 +2,35 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mockAuditLog, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
 import { AuditAction } from '../types/index.js';
 
-// Mock Stripe
-const mockStripeCheckoutCreate = vi.fn();
-const mockStripeBillingPortalCreate = vi.fn();
-const mockStripeWebhooksConstructEvent = vi.fn();
+// Use vi.hoisted to ensure mocks are available before vi.mock factory runs
+const {
+  mockStripeCheckoutCreate,
+  mockStripeBillingPortalCreate,
+  mockStripeWebhooksConstructEvent,
+} = vi.hoisted(() => ({
+  mockStripeCheckoutCreate: vi.fn(),
+  mockStripeBillingPortalCreate: vi.fn(),
+  mockStripeWebhooksConstructEvent: vi.fn(),
+}));
 
+// Mock Stripe - use a class to work with 'new Stripe()'
 vi.mock('stripe', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      checkout: {
+    default: class MockStripe {
+      checkout = {
         sessions: {
           create: mockStripeCheckoutCreate,
         },
-      },
-      billingPortal: {
+      };
+      billingPortal = {
         sessions: {
           create: mockStripeBillingPortalCreate,
         },
-      },
-      webhooks: {
+      };
+      webhooks = {
         constructEvent: mockStripeWebhooksConstructEvent,
-      },
-    })),
+      };
+    },
   };
 });
 
@@ -125,7 +132,10 @@ describe('BillingService', () => {
 
       await billingService.createCheckoutSession('user-abc', 'test@example.com', 'price_123');
 
-      const callArgs = mockStripeCheckoutCreate.mock.calls[0][0];
+      const callArgs = mockStripeCheckoutCreate.mock.calls[0]?.[0] as {
+        metadata: { userId: string };
+        subscription_data: { metadata: { userId: string } };
+      };
       expect(callArgs.metadata.userId).toBe('user-abc');
       expect(callArgs.subscription_data.metadata.userId).toBe('user-abc');
     });

@@ -30,8 +30,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      console.error('Backend webhook error:', error);
+      const errorBody: unknown = await response.json();
+      console.error('Backend webhook error:', errorBody);
       return NextResponse.json(
         { error: 'Webhook processing failed' },
         { status: response.status }

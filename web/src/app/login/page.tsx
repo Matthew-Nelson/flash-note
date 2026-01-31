@@ -9,20 +9,15 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    try {
-      // TODO: Implement login - redirect to extension for now
-      // Login is handled by the Chrome extension, not the web app
-      setError('Please use the Chrome extension to log in');
-    } catch (err) {
-      setError('Invalid email or password');
-    } finally {
-      setIsLoading(false);
-    }
+    // TODO: Implement login - redirect to extension for now
+    // Login is handled by the Chrome extension, not the web app
+    setError('Please use the Chrome extension to log in');
+    setIsLoading(false);
   };
 
   return (
