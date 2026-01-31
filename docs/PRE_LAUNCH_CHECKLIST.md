@@ -158,6 +158,10 @@
   - Test cancellation
   - Test failed payments (use card `4000000000000341`)
   - Test successful renewal
+- [ ] **Configure webhook event cleanup job**
+  - The `processed_webhook_events` table needs periodic cleanup
+  - Set up daily cron job to delete events older than 7 days
+  - See `docs/STRIPE_TODOS.md` Operations section for options
 - [ ] **Switch to Stripe live mode** when ready
 
 ### Tax & Accounting

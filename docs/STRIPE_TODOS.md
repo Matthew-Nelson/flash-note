@@ -1,6 +1,6 @@
 # Stripe Integration TODOs
 
-**Last Updated:** January 2026
+**Last Updated:** January 30, 2026
 
 This document tracks all outstanding work for the Stripe payment integration before go-live.
 
@@ -21,16 +21,19 @@ This document tracks all outstanding work for the Stripe payment integration bef
 - [x] User metadata propagation (userId in subscription metadata)
 - [x] Audit logging for subscription events
 - [x] Promotion codes support (`allow_promotion_codes: true`)
-- [x] Webhook idempotency (in-memory, see TODO below)
+- [x] Webhook idempotency (database-backed, atomic INSERT)
 - [x] Raw body parsing for webhook signature verification
+- [x] Price validation (Zod schema validates against allowed price IDs)
+- [x] Structured logging for webhook processing failures
+- [x] Audit trail for missing userId in webhook metadata
 
 ### Not Implemented
 - [ ] Subscription enforcement middleware (block expired trials)
 - [ ] Failed payment email notifications
 - [ ] Trial ending soon notifications
 - [ ] Subscription reactivation flow
-- [ ] Price validation (verify priceId is allowed)
 - [ ] Customer portal configuration in Stripe Dashboard
+- [ ] Webhook event cleanup job (see Operations section below)
 
 ---
 
@@ -83,26 +86,10 @@ In Stripe Dashboard → Developers → Webhooks, subscribe to:
 - Canceled users get 402 `subscription_required` error
 - Past due users get grace period (configurable)
 
-#### 2. Price Validation
-**Location:** `backend/src/routes/billing.ts`
-
-Currently any priceId is accepted. Should validate against allowed prices:
-
-```typescript
-const ALLOWED_PRICE_IDS = [
-  config.STRIPE_PRICE_MONTHLY,
-  config.STRIPE_PRICE_ANNUAL,
-];
-
-if (!ALLOWED_PRICE_IDS.includes(priceId)) {
-  throw new AppError(400, 'invalid_price', 'Invalid price ID');
-}
-```
-
 ### MEDIUM Priority (Before Launch)
 
-#### 3. Failed Payment Email Notification
-**Location:** `backend/src/services/billing-service.ts:238`
+#### 2. Failed Payment Email Notification
+**Location:** `backend/src/services/billing-service.ts` (see TODO comment)
 
 ```typescript
 // TODO: Send email notification to user about failed payment
@@ -114,34 +101,65 @@ if (!ALLOWED_PRICE_IDS.includes(priceId)) {
 - Include link to update payment method (billing portal)
 - Consider retry schedule information
 
-#### 4. Database-Backed Webhook Idempotency
-**Location:** `backend/src/services/billing-service.ts:11`
-
-```typescript
-// TODO: For production, replace with database-backed storage (see MEDIUM-013 in security audit)
-// This prevents duplicate event processing but is lost on server restart
-```
-
-**Current State:** In-memory Map that's lost on server restart
-**Recommended:** Add `processed_webhook_events` table or use Redis
-
 ### LOW Priority (Post-Launch)
 
-#### 5. Trial Ending Soon Notification
+#### 3. Trial Ending Soon Notification
 Send email 3 days before trial expires to encourage conversion.
 
-#### 6. Subscription Reactivation Flow
+#### 4. Subscription Reactivation Flow
 Allow users to resubscribe after cancellation without creating new checkout session.
 
-#### 7. Add SUBSCRIPTION_RENEWED Audit Action
+#### 5. Add SUBSCRIPTION_RENEWED Audit Action
 **Location:** `backend/src/types/index.ts`
 
 Currently reusing `SUBSCRIPTION_CREATED` for renewals. Consider adding distinct action.
 
-#### 8. Add PAYMENT_FAILED Audit Action
+#### 6. Add PAYMENT_FAILED Audit Action
 **Location:** `backend/src/types/index.ts`
 
 Currently reusing `SUBSCRIPTION_CANCELLED` with FAILURE status. Consider adding distinct action.
+
+---
+
+## Operations
+
+### Webhook Event Cleanup Job
+
+**Status:** NOT CONFIGURED - Required before production
+
+The `processed_webhook_events` table stores event IDs to prevent duplicate processing. This table will grow indefinitely without cleanup.
+
+**Required:** Set up a scheduled job to clean up old events. Options:
+
+**Option A: pg_cron (PostgreSQL extension)**
+```sql
+-- Run daily at 3 AM UTC
+SELECT cron.schedule('cleanup-webhook-events', '0 3 * * *', $$
+  DELETE FROM processed_webhook_events
+  WHERE processed_at < NOW() - INTERVAL '7 days'
+$$);
+```
+
+**Option B: External cron job**
+```bash
+# Add to crontab or use a scheduler like AWS EventBridge
+0 3 * * * curl -X POST https://api.flashnote.app/admin/cleanup-webhook-events
+```
+
+**Option C: Application-level scheduled task**
+```typescript
+// Using node-cron or similar
+import { cleanupOldWebhookEvents } from './db/queries/webhooks.js';
+
+cron.schedule('0 3 * * *', async () => {
+  const deleted = await cleanupOldWebhookEvents(7);
+  console.log(`Cleaned up ${deleted} old webhook events`);
+});
+```
+
+**Retention:** 7 days is safe (Stripe retries for up to 72 hours).
+
+**Query available:** `cleanupOldWebhookEvents(daysToKeep)` in `backend/src/db/queries/webhooks.ts`
 
 ---
 
@@ -204,15 +222,24 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx
    - userId stored in subscription metadata, not just session
    - Prevents metadata loss on subscription lifecycle events
 
-3. **Idempotency** - ⚠️ Partial
-   - In-memory cache implemented
-   - Should upgrade to database-backed for production
+3. **Idempotency** - ✅ Implemented (MEDIUM-013 resolved)
+   - Database-backed with `processed_webhook_events` table
+   - Atomic `INSERT ... ON CONFLICT DO NOTHING` prevents race conditions
+   - Survives server restarts and works across multiple instances
+   - See Operations section for cleanup job requirement
 
 4. **HTTPS Only** - ✅ Required by Stripe
    - Production webhook must use HTTPS
 
-5. **Price Validation** - ❌ Not Implemented
-   - Should validate priceId against allowed values
+5. **Price Validation** - ✅ Implemented
+   - Zod schema validates priceId against `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL`
+   - Development mode fallback when env vars not configured
+   - Prevents arbitrary price ID attacks
+
+6. **Error Handling** - ✅ Implemented
+   - Webhook signature errors log only message, not full error object
+   - Missing userId logged with structured JSON for alerting
+   - Audit trail via `WEBHOOK_PROCESSING_FAILED` action
 
 ---
 
@@ -243,4 +270,4 @@ Stripe → webhook endpoint → signature verification → event routing → dat
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Section 3: Financial & Payment Setup
 - [API.md](./API.md) - Billing endpoints documentation
 - [BUSINESS_COST_ANALYSIS.md](./BUSINESS_COST_ANALYSIS.md) - Stripe fee analysis
-- Security Audit: MEDIUM-013 (webhook idempotency)
+- [SECURITY_AUDIT.md](../SECURITY_AUDIT.md) - MEDIUM-013 (webhook idempotency) - ✅ RESOLVED
