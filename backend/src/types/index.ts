@@ -9,6 +9,7 @@ import type {
 // Re-export all billing/goals types from LLM schemas
 // This ensures type consistency between LLM structured output and API responses
 export type {
+  SuggestedCode,
   BillingCharge,
   BillingSummary,
   GoalStatus,

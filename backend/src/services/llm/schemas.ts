@@ -11,7 +11,24 @@ import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
- * Billing charge entry for a single CPT code.
+ * Suggested CPT code without time data.
+ * Used when clinician mentions an intervention but doesn't provide explicit times.
+ * This prevents hallucination of billing times while still providing value.
+ */
+export const SuggestedCodeSchema = z.object({
+  cptCode: z
+    .string()
+    .describe('CPT code (e.g., "97110", "97140", "97530")'),
+  description: z
+    .string()
+    .describe('Service description (e.g., "Therapeutic Exercise", "Manual Therapy")'),
+});
+
+export type SuggestedCode = z.infer<typeof SuggestedCodeSchema>;
+
+/**
+ * Billing charge entry for a single CPT code with verified time data.
+ * ONLY used when clinician explicitly provides time in their notes.
  */
 export const BillingChargeSchema = z.object({
   cptCode: z
@@ -24,7 +41,7 @@ export const BillingChargeSchema = z.object({
     .number()
     .int()
     .min(1)
-    .describe('Time spent in minutes'),
+    .describe('Time spent in minutes - ONLY include if clinician explicitly stated time'),
   units: z
     .number()
     .int()
@@ -36,6 +53,9 @@ export type BillingCharge = z.infer<typeof BillingChargeSchema>;
 
 /**
  * Goal status tracking for short-term and long-term goals.
+ *
+ * Trust principle: Status can be inferred from language ("making progress" → progressing),
+ * but percentComplete should ONLY be included if the clinician explicitly states a percentage.
  */
 export const GoalStatusSchema = z.object({
   description: z
@@ -43,35 +63,71 @@ export const GoalStatusSchema = z.object({
     .describe('Goal description (e.g., "Knee flexion >= 110 degrees")'),
   status: z
     .enum(['not_started', 'progressing', 'met', 'discontinued'])
-    .describe('Current status of the goal'),
+    .describe(
+      'Current status of the goal. Can be inferred from language: ' +
+      '"making progress" → progressing, "achieved" → met, "stopped" → discontinued'
+    ),
   percentComplete: z
     .number()
     .int()
     .min(0)
     .max(100)
     .optional()
-    .describe('Estimated percentage complete toward goal'),
+    .describe(
+      'Percentage complete toward goal. ' +
+      'ONLY include if clinician explicitly states a percentage (e.g., "75% toward goal"). ' +
+      'NEVER estimate or hallucinate percentages - omit this field if not explicitly stated.'
+    ),
 });
 
 export type GoalStatus = z.infer<typeof GoalStatusSchema>;
 
 /**
- * Billing summary with charges and totals.
+ * Billing summary with two-tier output:
+ *
+ * Tier 1 (charges): ONLY populated when clinician provides explicit times
+ *   - Full CPT codes with minutes and units
+ *   - Calculated totals
+ *
+ * Tier 2 (suggestedCodes): ALWAYS populated when interventions are mentioned
+ *   - CPT code and description only
+ *   - NO time or unit data (prevents hallucination)
+ *
+ * This approach builds clinician trust by never fabricating billing times.
  */
 export const BillingSummarySchema = z.object({
+  // Tier 1: Only when explicit times are provided by clinician
   charges: z
     .array(BillingChargeSchema)
-    .describe('Individual CPT code charges with time and units'),
+    .optional()
+    .describe(
+      'Individual CPT code charges with time and units. ' +
+      'ONLY include if clinician explicitly stated times (e.g., "manual therapy 15 min"). ' +
+      'NEVER estimate or hallucinate times.'
+    ),
   totalTimedMinutes: z
     .number()
     .int()
     .min(0)
-    .describe('Total timed service minutes'),
+    .optional()
+    .describe('Total timed service minutes - only if charges are present'),
   totalUnits: z
     .number()
     .int()
     .min(0)
-    .describe('Total billable units'),
+    .optional()
+    .describe('Total billable units - only if charges are present'),
+
+  // Tier 2: Always when interventions are mentioned (even without times)
+  suggestedCodes: z
+    .array(SuggestedCodeSchema)
+    .optional()
+    .describe(
+      'Suggested CPT codes based on interventions mentioned (without times). ' +
+      'Include when therapist mentions interventions but does not specify times. ' +
+      'Helps clinician identify correct codes to bill without fabricating time data.'
+    ),
+
   suggestedModifiers: z
     .array(z.string())
     .optional()

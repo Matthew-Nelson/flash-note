@@ -77,11 +77,64 @@ export const authResponseSchema = z.object({
   emailVerificationRequired: z.boolean().optional(),
 });
 
+/**
+ * Billing Schemas
+ *
+ * Two-tier billing output:
+ * - Tier 1 (charges): Only when clinician provides explicit times
+ * - Tier 2 (suggestedCodes): When interventions mentioned without times
+ */
+export const suggestedCodeSchema = z.object({
+  cptCode: z.string(),
+  description: z.string(),
+});
+
+export const billingChargeSchema = z.object({
+  cptCode: z.string(),
+  description: z.string(),
+  minutes: z.number().int().min(1),
+  units: z.number().int().min(1),
+});
+
+export const billingSummarySchema = z.object({
+  // Tier 1: Only when explicit times are provided
+  charges: z.array(billingChargeSchema).optional(),
+  totalTimedMinutes: z.number().int().min(0).optional(),
+  totalUnits: z.number().int().min(0).optional(),
+
+  // Tier 2: When interventions mentioned (even without times)
+  suggestedCodes: z.array(suggestedCodeSchema).optional(),
+
+  suggestedModifiers: z.array(z.string()).optional(),
+});
+
+/**
+ * Goals Tracking Schemas
+ *
+ * Trust principle: Status can be inferred, but percentComplete
+ * is ONLY included if explicitly stated by clinician.
+ */
+export const goalStatusSchema = z.object({
+  description: z.string(),
+  // Can be inferred from language ("making progress" → progressing)
+  status: z.enum(['not_started', 'progressing', 'met', 'discontinued']),
+  // ONLY present if clinician explicitly stated a percentage
+  percentComplete: z.number().int().min(0).max(100).optional(),
+});
+
+export const goalsTrackingSchema = z.object({
+  shortTerm: z.array(goalStatusSchema).optional(),
+  longTerm: z.array(goalStatusSchema).optional(),
+});
+
 export const generatedNoteSchema = z.object({
   subjective: z.string(),
   objective: z.string(),
   assessment: z.string(),
   plan: z.string(),
+  billing: billingSummarySchema.optional(),
+  goals: goalsTrackingSchema.optional(),
+  alerts: z.array(z.string()).optional(),
   metadata: z.object({
     generationTimeMs: z.number(),
   }).optional(),
@@ -97,6 +150,11 @@ export type GenerateNoteInput = z.infer<typeof generateNoteSchema>;
 export type StoredAuth = z.infer<typeof storedAuthSchema>;
 export type StoredPreferences = z.infer<typeof storedPreferencesSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
+export type SuggestedCode = z.infer<typeof suggestedCodeSchema>;
+export type BillingCharge = z.infer<typeof billingChargeSchema>;
+export type BillingSummary = z.infer<typeof billingSummarySchema>;
+export type GoalStatus = z.infer<typeof goalStatusSchema>;
+export type GoalsTracking = z.infer<typeof goalsTrackingSchema>;
 export type GeneratedNote = z.infer<typeof generatedNoteSchema>;
 
 /**

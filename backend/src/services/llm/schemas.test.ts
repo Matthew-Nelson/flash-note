@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   PTNoteOutputSchema,
   BillingChargeSchema,
+  SuggestedCodeSchema,
+  BillingSummarySchema,
   GoalStatusSchema,
   getPTNoteJsonSchema,
   validatePTNoteOutput,
@@ -9,8 +11,36 @@ import {
 } from './schemas.js';
 
 describe('LLM Schemas', () => {
+  describe('SuggestedCodeSchema', () => {
+    it('should validate a suggested code (Tier 2 - no times)', () => {
+      const code = {
+        cptCode: '97110',
+        description: 'Therapeutic Exercise',
+      };
+
+      const result = SuggestedCodeSchema.parse(code);
+      expect(result).toEqual(code);
+    });
+
+    it('should reject missing cptCode', () => {
+      const code = {
+        description: 'Therapeutic Exercise',
+      };
+
+      expect(() => SuggestedCodeSchema.parse(code)).toThrow();
+    });
+
+    it('should reject missing description', () => {
+      const code = {
+        cptCode: '97110',
+      };
+
+      expect(() => SuggestedCodeSchema.parse(code)).toThrow();
+    });
+  });
+
   describe('BillingChargeSchema', () => {
-    it('should validate a valid billing charge', () => {
+    it('should validate a valid billing charge (Tier 1 - with times)', () => {
       const charge = {
         cptCode: '97110',
         description: 'Therapeutic Exercise',
@@ -45,8 +75,77 @@ describe('LLM Schemas', () => {
     });
   });
 
-  describe('GoalStatusSchema', () => {
-    it('should validate a goal with all fields', () => {
+  describe('BillingSummarySchema - Two-Tier Billing', () => {
+    it('should validate Tier 1 + Tier 2 billing (full charges with suggested codes)', () => {
+      const billing = {
+        charges: [
+          { cptCode: '97110', description: 'Therapeutic Exercise', minutes: 23, units: 2 },
+          { cptCode: '97140', description: 'Manual Therapy', minutes: 15, units: 1 },
+        ],
+        totalTimedMinutes: 38,
+        totalUnits: 3,
+        suggestedCodes: [
+          { cptCode: '97110', description: 'Therapeutic Exercise' },
+          { cptCode: '97140', description: 'Manual Therapy' },
+        ],
+        suggestedModifiers: ['GP'],
+      };
+
+      const result = BillingSummarySchema.parse(billing);
+      expect(result.charges).toHaveLength(2);
+      expect(result.suggestedCodes).toHaveLength(2);
+      expect(result.totalUnits).toBe(3);
+    });
+
+    it('should validate Tier 2 only billing (suggested codes without times)', () => {
+      // This is the key safety feature - when clinician doesn't provide times
+      const billing = {
+        suggestedCodes: [
+          { cptCode: '97110', description: 'Therapeutic Exercise' },
+          { cptCode: '97140', description: 'Manual Therapy' },
+        ],
+        suggestedModifiers: ['GP'],
+      };
+
+      const result = BillingSummarySchema.parse(billing);
+      expect(result.charges).toBeUndefined();
+      expect(result.totalTimedMinutes).toBeUndefined();
+      expect(result.totalUnits).toBeUndefined();
+      expect(result.suggestedCodes).toHaveLength(2);
+    });
+
+    it('should validate partial Tier 1 (some interventions have times, others do not)', () => {
+      // Clinician provided time for one intervention but not the other
+      const billing = {
+        charges: [
+          { cptCode: '97110', description: 'Therapeutic Exercise', minutes: 23, units: 2 },
+        ],
+        totalTimedMinutes: 23,
+        totalUnits: 2,
+        suggestedCodes: [
+          { cptCode: '97110', description: 'Therapeutic Exercise' },
+          { cptCode: '97140', description: 'Manual Therapy' }, // No time provided for this one
+        ],
+      };
+
+      const result = BillingSummarySchema.parse(billing);
+      expect(result.charges).toHaveLength(1);
+      expect(result.suggestedCodes).toHaveLength(2);
+    });
+
+    it('should validate empty billing summary', () => {
+      // Edge case: no interventions mentioned at all
+      const billing = {};
+
+      const result = BillingSummarySchema.parse(billing);
+      expect(result.charges).toBeUndefined();
+      expect(result.suggestedCodes).toBeUndefined();
+    });
+  });
+
+  describe('GoalStatusSchema - Trust-Based Output', () => {
+    it('should validate a goal with explicit percentComplete (clinician stated percentage)', () => {
+      // Clinician said "about 75% toward goal"
       const goal = {
         description: 'Knee flexion >= 110 degrees',
         status: 'progressing' as const,
@@ -57,9 +156,44 @@ describe('LLM Schemas', () => {
       expect(result).toEqual(goal);
     });
 
-    it('should validate a goal without percentComplete', () => {
+    it('should validate a goal without percentComplete (clinician did not state percentage)', () => {
+      // Clinician just said "making progress" - no percentage stated
+      // percentComplete should be omitted, NOT hallucinated
       const goal = {
         description: 'Return to running',
+        status: 'progressing' as const,
+      };
+
+      const result = GoalStatusSchema.parse(goal);
+      expect(result.percentComplete).toBeUndefined();
+    });
+
+    it('should validate a "met" goal with 100% (implied by achievement)', () => {
+      // When a goal is met, 100% is implied and can be included
+      const goal = {
+        description: 'Reduce pain to <= 3/10',
+        status: 'met' as const,
+        percentComplete: 100,
+      };
+
+      const result = GoalStatusSchema.parse(goal);
+      expect(result.percentComplete).toBe(100);
+    });
+
+    it('should validate a "met" goal without percentComplete', () => {
+      // Even for met goals, percentComplete is optional
+      const goal = {
+        description: 'Reduce pain to <= 3/10',
+        status: 'met' as const,
+      };
+
+      const result = GoalStatusSchema.parse(goal);
+      expect(result.percentComplete).toBeUndefined();
+    });
+
+    it('should validate a "not_started" goal without percentComplete', () => {
+      const goal = {
+        description: 'Return to overhead reaching',
         status: 'not_started' as const,
       };
 
@@ -81,6 +215,16 @@ describe('LLM Schemas', () => {
         description: 'Some goal',
         status: 'progressing' as const,
         percentComplete: 150,
+      };
+
+      expect(() => GoalStatusSchema.parse(goal)).toThrow();
+    });
+
+    it('should reject negative percentComplete', () => {
+      const goal = {
+        description: 'Some goal',
+        status: 'progressing' as const,
+        percentComplete: -10,
       };
 
       expect(() => GoalStatusSchema.parse(goal)).toThrow();
@@ -107,7 +251,7 @@ describe('LLM Schemas', () => {
       expect(result.alerts).toBeUndefined();
     });
 
-    it('should validate a note with billing information', () => {
+    it('should validate a note with full billing (Tier 1 + Tier 2)', () => {
       const noteWithBilling = {
         ...validNote,
         billing: {
@@ -117,6 +261,10 @@ describe('LLM Schemas', () => {
           ],
           totalTimedMinutes: 38,
           totalUnits: 3,
+          suggestedCodes: [
+            { cptCode: '97110', description: 'Therapeutic Exercise' },
+            { cptCode: '97140', description: 'Manual Therapy' },
+          ],
           suggestedModifiers: ['GP'],
         },
       };
@@ -125,26 +273,54 @@ describe('LLM Schemas', () => {
       expect(result.billing).toBeDefined();
       expect(result.billing!.charges).toHaveLength(2);
       expect(result.billing!.totalUnits).toBe(3);
+      expect(result.billing!.suggestedCodes).toHaveLength(2);
       expect(result.billing!.suggestedModifiers).toEqual(['GP']);
     });
 
-    it('should validate a note with goal tracking', () => {
+    it('should validate a note with Tier 2 only billing (no times provided)', () => {
+      const noteWithSuggestedOnly = {
+        ...validNote,
+        billing: {
+          suggestedCodes: [
+            { cptCode: '97110', description: 'Therapeutic Exercise' },
+            { cptCode: '97140', description: 'Manual Therapy' },
+          ],
+          suggestedModifiers: ['GP'],
+        },
+      };
+
+      const result = PTNoteOutputSchema.parse(noteWithSuggestedOnly);
+      expect(result.billing).toBeDefined();
+      expect(result.billing!.charges).toBeUndefined();
+      expect(result.billing!.totalTimedMinutes).toBeUndefined();
+      expect(result.billing!.suggestedCodes).toHaveLength(2);
+    });
+
+    it('should validate a note with goal tracking (mixed percentComplete)', () => {
+      // Realistic scenario: some goals have explicit percentages, others don't
       const noteWithGoals = {
         ...validNote,
         goals: {
           shortTerm: [
-            { description: 'Knee flexion >= 110 degrees', status: 'met' as const, percentComplete: 100 },
+            // Clinician said "achieved pain goal" - met implies 100%
+            { description: 'Reduce pain to <= 3/10', status: 'met' as const, percentComplete: 100 },
+            // Clinician said "about 75% toward flexion goal"
+            { description: 'Knee flexion >= 110 degrees', status: 'progressing' as const, percentComplete: 75 },
           ],
           longTerm: [
-            { description: 'Return to running', status: 'progressing' as const, percentComplete: 50 },
+            // Clinician just said "making progress" - no percentage, so omit
+            { description: 'Return to running', status: 'progressing' as const },
           ],
         },
       };
 
       const result = PTNoteOutputSchema.parse(noteWithGoals);
       expect(result.goals).toBeDefined();
-      expect(result.goals!.shortTerm).toHaveLength(1);
-      expect(result.goals!.shortTerm![0]!.status).toBe('met');
+      expect(result.goals!.shortTerm).toHaveLength(2);
+      expect(result.goals!.shortTerm![0]!.percentComplete).toBe(100);
+      expect(result.goals!.shortTerm![1]!.percentComplete).toBe(75);
+      // Long-term goal should NOT have percentComplete
+      expect(result.goals!.longTerm![0]!.percentComplete).toBeUndefined();
     });
 
     it('should validate a note with alerts', () => {
