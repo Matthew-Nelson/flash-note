@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 2026
-**Overall Progress:** 16% (7/43 quality gates complete)
+**Last Updated:** February 1, 2026
+**Overall Progress:** 19% (8/43 quality gates complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -20,7 +20,6 @@ This document consolidates all pending work from across the project. Use this as
 | Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | Not started |
 | Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | Not started |
 | Connect web app auth to backend | SUCCESS_METRICS MVP-08 | Not started |
-| Subscription enforcement middleware | STRIPE_TODOS | Not started |
 | Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs testing |
 | Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs testing |
 
@@ -28,9 +27,9 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Fix extension fixed width issue | UI_ISSUES_PLAN #1 | Not started |
-| Fix jittery view transitions | UI_ISSUES_PLAN #3 | Not started |
 | Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | Not started |
+| 24-hour grace period for past_due users | STRIPE_TODOS | Not started |
+| Post-checkout subscription sync for extension | STRIPE_TODOS | Not started |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
 
 ---
@@ -128,10 +127,10 @@ These are researched but not prioritized for current development.
 
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
-| MVP Foundation | 15 | 6 | 40% |
+| MVP Foundation | 15 | 7 | 47% |
 | Beta Ready | 12 | 0 | 0% |
 | Production Ready | 16 | 1 | 6% |
-| **Total** | **43** | **7** | **16%** |
+| **Total** | **43** | **8** | **19%** |
 
 ---
 

@@ -12,7 +12,6 @@ This folder contains all project documentation organized by purpose.
 | [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) | Quality gates and progress tracking (16% complete) |
 | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Business, legal, and operational launch requirements |
 | [STRIPE_TODOS.md](./STRIPE_TODOS.md) | Stripe payment integration tasks |
-| [UI_ISSUES_PLAN.md](./UI_ISSUES_PLAN.md) | Extension UI fixes (3 issues) |
 
 ---
 
@@ -69,6 +68,7 @@ Historical documentation for completed work. Kept for reference.
 |----------|-------------|
 | [CODE_REVIEW_AUTH_HARDENING.md](./archive/CODE_REVIEW_AUTH_HARDENING.md) | Auth security hardening review (completed) |
 | [CODE_REVIEW_PLAN.md](./archive/CODE_REVIEW_PLAN.md) | Code review tracking (completed) |
+| [UI_ISSUES_PLAN.md](./archive/UI_ISSUES_PLAN.md) | Extension UI fixes - fixed width, animations (completed) |
 
 ---
 

@@ -202,7 +202,7 @@ Rationale:
                                  ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │  Google Gemini API (or Vertex AI for HIPAA production)                  │
-│  • Model: gemini-2.0-flash                                              │
+│  • Model: gemini-2.5-flash                                              │
 │  • Cost: ~$0.00018 per note                                             │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -480,7 +480,7 @@ Key patterns to port:
 // Key configuration
 const GEMINI_CONFIG = {
   apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
-  model: 'gemini-2.0-flash',
+  model: 'gemini-2.5-flash',
   maxTokens: 2000,
   temperature: 0.7,
   timeout: 30000,
@@ -820,7 +820,7 @@ Response 200:
   "assessment": "Patient demonstrating good progress toward functional goals...",
   "plan": "Continue current plan of care. Progress home exercise program...",
   "metadata": {
-    "model": "gemini-2.0-flash",
+    "model": "gemini-2.5-flash",
     "tokensUsed": 847,
     "generationTimeMs": 1234
   }
@@ -1150,7 +1150,7 @@ After generation:
 ```typescript
 // Environment variables
 GEMINI_API_KEY=your_api_key_here
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
 GEMINI_MAX_TOKENS=2000
 GEMINI_TEMPERATURE=0.7
 GEMINI_TIMEOUT_MS=30000
@@ -1351,10 +1351,10 @@ export function parseSOAPSections(content: string): {
 ### Cost Tracking
 
 ```typescript
-// Estimated token costs for Gemini 2.0 Flash (January 2025)
+// Estimated token costs for Gemini 2.5 Flash (February 2026)
 const GEMINI_PRICING = {
-  inputPer1M: 0.10,   // $0.10 per 1M input tokens
-  outputPer1M: 0.40,  // $0.40 per 1M output tokens
+  inputPer1M: 0.15,   // $0.15 per 1M input tokens
+  outputPer1M: 0.60,  // $0.60 per 1M output tokens
 };
 
 export function calculateCost(promptTokens: number, completionTokens: number): number {
@@ -1363,7 +1363,7 @@ export function calculateCost(promptTokens: number, completionTokens: number): n
   return inputCost + outputCost;
 }
 
-// Typical note: ~400 input, ~500 output = $0.00024
+// Typical note: ~400 input, ~500 output = $0.00036
 ```
 
 ---
@@ -1907,7 +1907,7 @@ JWT_REFRESH_SECRET=another-256-bit-secret-here
 
 # AI
 GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.5-flash
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_xxx

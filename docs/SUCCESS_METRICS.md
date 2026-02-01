@@ -133,7 +133,7 @@ These items must be complete before public launch.
 | **DB** | UUID primary keys | Handoff §7 | ✅ Done |
 | **DB** | Audit logs table | HIPAA | ✅ Done |
 | **DB** | No PHI stored | HIPAA | ✅ Done |
-| **AI** | Gemini 2.0 Flash | Handoff §10 | ✅ Done |
+| **AI** | Gemini 2.5 Flash | Handoff §10 | ✅ Done |
 | **AI** | SOAP section parsing | Handoff §10 | ✅ Done |
 | **AI** | Token usage tracking | Handoff §10 | ✅ Done |
 | **Billing** | Stripe webhook verification | Handoff §13 | ✅ Done |
