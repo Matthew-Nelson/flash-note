@@ -56,16 +56,16 @@ describe('EmailService (no Resend)', () => {
       expect(consoleLogSpy).toHaveBeenCalled();
 
       // Check for the email header/footer markers
-      const calls = consoleLogSpy.mock.calls.map((call) => call[0]);
+      const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string);
       expect(calls).toContain('EMAIL SERVICE: Resend not configured, logging email:');
-      expect(calls.some((call) => call.includes('To: user@example.com'))).toBe(true);
-      expect(calls.some((call) => call.includes('Subject: Verify your FlashNote email address'))).toBe(true);
+      expect(calls.some((call: string) => call.includes('To: user@example.com'))).toBe(true);
+      expect(calls.some((call: string) => call.includes('Subject: Verify your FlashNote email address'))).toBe(true);
     });
 
     it('should include verification URL in logged email', async () => {
       await emailService.sendVerificationEmail('user@example.com', 'my-token');
 
-      const allLogOutput = consoleLogSpy.mock.calls.map((call) => call[0]).join('\n');
+      const allLogOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string).join('\n');
       expect(allLogOutput).toContain('verify-email?token=my-token');
     });
 
@@ -86,14 +86,14 @@ describe('EmailService (no Resend)', () => {
       // Should log to console
       expect(consoleLogSpy).toHaveBeenCalled();
 
-      const calls = consoleLogSpy.mock.calls.map((call) => call[0]);
-      expect(calls.some((call) => call.includes('Subject: Reset your FlashNote password'))).toBe(true);
+      const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string);
+      expect(calls.some((call: string) => call.includes('Subject: Reset your FlashNote password'))).toBe(true);
     });
 
     it('should include reset URL in logged email', async () => {
       await emailService.sendPasswordResetEmail('user@example.com', 'my-reset-token');
 
-      const allLogOutput = consoleLogSpy.mock.calls.map((call) => call[0]).join('\n');
+      const allLogOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string).join('\n');
       expect(allLogOutput).toContain('reset-password?token=my-reset-token');
     });
 
@@ -108,16 +108,16 @@ describe('EmailService (no Resend)', () => {
     it('should use separator lines for readability', async () => {
       await emailService.sendVerificationEmail('user@example.com', 'token');
 
-      const calls = consoleLogSpy.mock.calls.map((call) => call[0]);
+      const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string);
       // Check for separator lines (60 equal signs or dashes)
-      expect(calls.some((call) => typeof call === 'string' && call.includes('='.repeat(60)))).toBe(true);
-      expect(calls.some((call) => typeof call === 'string' && call.includes('-'.repeat(60)))).toBe(true);
+      expect(calls.some((call: string) => call.includes('='.repeat(60)))).toBe(true);
+      expect(calls.some((call: string) => call.includes('-'.repeat(60)))).toBe(true);
     });
 
     it('should include plain text version of email', async () => {
       await emailService.sendVerificationEmail('user@example.com', 'token');
 
-      const allLogOutput = consoleLogSpy.mock.calls.map((call) => call[0]).join('\n');
+      const allLogOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string).join('\n');
       // Plain text content should include the welcome message
       expect(allLogOutput).toContain('Welcome to FlashNote');
       expect(allLogOutput).toContain('verify your email address');

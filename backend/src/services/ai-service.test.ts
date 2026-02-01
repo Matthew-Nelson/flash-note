@@ -111,7 +111,7 @@ describe('AIService', () => {
 
       expect(result.billing).toBeDefined();
       expect(result.billing!.charges).toHaveLength(1);
-      expect(result.billing!.charges[0]!.cptCode).toBe('97110');
+      expect(result.billing!.charges![0]!.cptCode).toBe('97110');
     });
 
     it('should include security metadata in response', async () => {
