@@ -197,9 +197,9 @@ describe('BaseLLMProvider', () => {
   describe('withRetry', () => {
     it('should succeed on first attempt', async () => {
       let callCount = 0;
-      const result = await provider.testWithRetry(async () => {
+      const result = await provider.testWithRetry(() => {
         callCount++;
-        return 'success';
+        return Promise.resolve('success');
       });
 
       expect(result).toBe('success');
@@ -208,12 +208,12 @@ describe('BaseLLMProvider', () => {
 
     it('should retry on retryable error and succeed', async () => {
       let callCount = 0;
-      const result = await provider.testWithRetry(async () => {
+      const result = await provider.testWithRetry(() => {
         callCount++;
         if (callCount < 2) {
-          throw new RateLimitError('gemini');
+          return Promise.reject(new RateLimitError('gemini'));
         }
-        return 'success';
+        return Promise.resolve('success');
       });
 
       expect(result).toBe('success');
@@ -225,9 +225,9 @@ describe('BaseLLMProvider', () => {
       let callCount = 0;
 
       await expect(
-        provider.testWithRetry(async () => {
+        provider.testWithRetry(() => {
           callCount++;
-          throw new NetworkError('gemini');
+          return Promise.reject(new NetworkError('gemini'));
         })
       ).rejects.toThrow(NetworkError);
 
@@ -239,9 +239,9 @@ describe('BaseLLMProvider', () => {
       let callCount = 0;
 
       await expect(
-        provider.testWithRetry(async () => {
+        provider.testWithRetry(() => {
           callCount++;
-          throw new AuthenticationError('gemini');
+          return Promise.reject(new AuthenticationError('gemini'));
         })
       ).rejects.toThrow(AuthenticationError);
 
@@ -253,9 +253,9 @@ describe('BaseLLMProvider', () => {
       const customError = new Error('Custom error');
 
       await expect(
-        provider.testWithRetry(async () => {
+        provider.testWithRetry(() => {
           callCount++;
-          throw customError;
+          return Promise.reject(customError);
         })
       ).rejects.toThrow(customError);
 
@@ -263,13 +263,10 @@ describe('BaseLLMProvider', () => {
     });
 
     it('should log retry attempts with correct metadata', async () => {
-      let callCount = 0;
-
       // Note: retryAfterMs is ignored for test assertions since we use fast retry config
       await expect(
-        provider.testWithRetry(async () => {
-          callCount++;
-          throw new RateLimitError('gemini'); // Don't specify retryAfterMs to use fast config
+        provider.testWithRetry(() => {
+          return Promise.reject(new RateLimitError('gemini')); // Don't specify retryAfterMs to use fast config
         })
       ).rejects.toThrow(RateLimitError);
 
@@ -320,12 +317,12 @@ describe('BaseLLMProvider', () => {
         usage: { inputTokens: 0, outputTokens: 0, totalTokens: 0 },
       };
 
-      provider.doGeneratePTNoteImpl = vi.fn().mockImplementation(async () => {
+      provider.doGeneratePTNoteImpl = vi.fn().mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
-          throw new NetworkError('gemini');
+          return Promise.reject(new NetworkError('gemini'));
         }
-        return expectedResult;
+        return Promise.resolve(expectedResult);
       });
 
       const result = await provider.generatePTNote('test', {
@@ -371,12 +368,12 @@ describe('BaseLLMProvider', () => {
         provider: 'gemini',
       };
 
-      provider.doGenerateCompletionImpl = vi.fn().mockImplementation(async () => {
+      provider.doGenerateCompletionImpl = vi.fn().mockImplementation(() => {
         callCount++;
         if (callCount < 2) {
-          throw new RateLimitError('gemini');
+          return Promise.reject(new RateLimitError('gemini'));
         }
-        return expectedResult;
+        return Promise.resolve(expectedResult);
       });
 
       const result = await provider.generateCompletion('test', {
