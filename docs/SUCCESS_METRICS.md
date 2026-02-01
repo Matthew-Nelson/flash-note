@@ -98,10 +98,10 @@ These items must be complete before public launch.
 | PROD-07 | Database encrypted at rest | Infra | P0 | ❌ Not deployed |
 | PROD-08 | TLS 1.2+ enforced | Infra | P0 | ❌ Not deployed |
 | PROD-09 | Vertex AI BAA signed (HIPAA) | Infra | P0 | ❌ Not done |
-| PROD-10 | Audit logs retained 6 years | Backend | P0 | ⚠️ Code ready |
+| PROD-10 | Audit logs retained 6 years | Backend | P0 | ❌ Not implemented |
 | PROD-11 | Error tracking (Sentry) configured | All | P1 | ❌ Not done |
 | PROD-12 | Chrome Web Store listing complete | Extension | P0 | ❌ Not done |
-| PROD-13 | BAA template available for customers | Docs | P0 | ❌ Not done |
+| PROD-13 | BAA template available for customers | Docs | P0 | ⚠️ Template ready, needs legal review |
 | PROD-14 | Incident response plan documented | Docs | P1 | ❌ Not done |
 | PROD-15 | WCAG 2.1 AA accessibility | Web/Ext | P2 | ❌ Not done |
 | PROD-16 | Audit logging workflow complete | Backend | P0 | ❌ Not done |
@@ -230,7 +230,7 @@ These items must be complete before public launch.
 | Include user ID in logs | ✅ | ❌ | |
 | Include timestamp in logs | ✅ | ❌ | |
 | Include IP address in logs | ✅ | ❌ | |
-| Log retention (6 years) | ⚠️ | ❌ | Code ready, needs policy |
+| Log retention (6 years) | ❌ | ❌ | No retention automation implemented |
 
 ### Infrastructure Security
 
@@ -358,7 +358,7 @@ These items must be complete before public launch.
 |-------------|--------|-------|
 | Privacy policy | ❌ | Template in docs/ |
 | Terms of service | ❌ | Template in docs/ |
-| BAA template for customers | ❌ | Template in docs/ |
+| BAA template for customers | ⚠️ | Template ready with pass-through model language, needs legal review |
 | HIPAA compliance documentation | ❌ | |
 
 ### Infrastructure

@@ -91,7 +91,7 @@ This document consolidates all pending work from across the project. Use this as
 | Task | Source | Status |
 |------|--------|--------|
 | Chrome Web Store listing | SUCCESS_METRICS PROD-12 | Not done |
-| BAA template for customers | SUCCESS_METRICS PROD-13 | Template exists, needs legal review |
+| BAA template for customers | SUCCESS_METRICS PROD-13 | ⚠️ Template ready with pass-through model, needs legal review |
 | Incident response plan | SUCCESS_METRICS PROD-14 | Not documented |
 
 ---

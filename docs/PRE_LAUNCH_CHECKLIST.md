@@ -63,7 +63,9 @@
   - Cloud SQL (GCP), RDS (AWS), or Azure Database all offer BAAs
 
 **BAA You Need to PROVIDE (to customers):**
-- [~] **Customer BAA Template** - Draft exists at `docs/BAA_TEMPLATE.md`
+- [~] **Customer BAA Template** - Template at `docs/legal/BAA_TEMPLATE.md`
+  - [x] Pass-through processing model language added (no PHI storage)
+  - [x] Subcontractor compliance exhibit added (provider-agnostic)
   - [ ] Have healthcare attorney review template
   - [ ] Finalize and host on website
   - [ ] Create signing workflow (DocuSign, HelloSign, or manual)
@@ -88,10 +90,10 @@
   - Brief statement about HIPAA compliance for marketing
   - Can be part of Privacy Policy or separate page
 
-- [ ] **Refund Policy**
-  - Define trial period handling
-  - Define subscription refund terms
-  - Can be part of Terms of Service
+- [x] **Refund Policy** - Added inline to Terms of Service
+  - Monthly: No partial refunds
+  - Annual: Pro-rata within 30 days
+  - See `docs/legal/TERMS_OF_SERVICE.md` §4
 
 **Estimated Legal Cost:** $0 (templates only) to $1,500-3,000 (attorney review)
 

@@ -35,7 +35,7 @@ FlashNote is an AI-powered documentation tool that helps physical therapists gen
 
 ### Billing
 - Subscriptions are billed in advance on a monthly or annual basis
-- Refunds are provided according to our refund policy
+- Payment is processed securely through Stripe
 
 ### Free Trial
 - New users receive a 14-day free trial
@@ -43,9 +43,15 @@ FlashNote is an AI-powered documentation tool that helps physical therapists gen
 - Trial automatically ends after 14 days
 
 ### Cancellation
-- You may cancel your subscription at any time
-- Access continues until the end of the billing period
-- No refunds for partial periods
+- You may cancel your subscription at any time through your account dashboard
+- Access continues until the end of your current billing period
+- Cancellation takes effect at the end of the billing period; no partial refunds are provided
+
+### Refund Policy
+- **Monthly subscriptions**: No refunds for partial billing periods. You retain access until the end of your current billing cycle.
+- **Annual subscriptions**: You may request a pro-rata refund within the first 30 days of your subscription or renewal. After 30 days, no refunds are provided, but you retain access for the remainder of your annual term.
+- **Exceptions**: Refunds are not available for accounts terminated due to Terms of Service violations.
+- **How to request a refund**: Contact us at support@flashnote.com with your account email and reason for the request. Approved refunds are processed within 5-10 business days.
 
 ## 5. Acceptable Use
 

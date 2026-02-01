@@ -1665,12 +1665,12 @@ const AI_CONFIG = {
 We need to provide a BAA to customers. Key terms:
 
 1. We are a Business Associate
-2. We will safeguard PHI
+2. We will safeguard PHI (pass-through processing model - no PHI stored)
 3. We will report breaches within 72 hours
 4. We will not use PHI for marketing
-5. We will return/destroy PHI on termination
+5. Upon termination, we certify no PHI is retained (pass-through model)
 
-Template location: `docs/BAA_TEMPLATE.md`
+Template location: `docs/legal/BAA_TEMPLATE.md`
 
 ### Security Checklist
 
