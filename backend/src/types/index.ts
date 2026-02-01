@@ -1,5 +1,22 @@
 import { Request } from 'express';
 
+// Import Zod-inferred types from LLM schemas for use in this file
+import type {
+  BillingSummary,
+  GoalsTracking,
+} from '../services/llm/schemas.js';
+
+// Re-export all billing/goals types from LLM schemas
+// This ensures type consistency between LLM structured output and API responses
+export type {
+  SuggestedCode,
+  BillingCharge,
+  BillingSummary,
+  GoalStatus,
+  GoalsTracking,
+  PTNoteOutput,
+} from '../services/llm/schemas.js';
+
 // User types
 export interface User {
   id: string;
@@ -60,15 +77,30 @@ export interface PromptSecurityMetadata {
 }
 
 export interface GeneratedNote {
+  // Core SOAP sections
   subjective: string;
   objective: string;
   assessment: string;
   plan: string;
+
+  // Structured billing reference (optional)
+  // Not for pasting into EMR billing - for visual reference
+  billing?: BillingSummary;
+
+  // Goal tracking (optional)
+  goals?: GoalsTracking;
+
+  // Alerts for the therapist (optional)
+  // Billing warnings, documentation gaps, modifier reminders
+  alerts?: string[];
+
+  // Metadata
   metadata: {
     model: string;
     tokensUsed: number;
     generationTimeMs: number;
   };
+
   // Security metadata for audit purposes (MEDIUM-005)
   // Optional for backwards compatibility with mock service
   securityMetadata?: PromptSecurityMetadata;

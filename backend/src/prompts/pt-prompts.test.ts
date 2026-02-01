@@ -119,12 +119,11 @@ tx: manual, ther ex
         expect(prompt).toContain(PT_SYSTEM_PROMPT);
       });
 
-      it('should include SOAP format instructions', () => {
+      it('should include billing documentation guidance', () => {
         const prompt = buildSOAPPrompt('notes', 'daily_note');
-        expect(prompt).toContain('SUBJECTIVE:');
-        expect(prompt).toContain('OBJECTIVE:');
-        expect(prompt).toContain('ASSESSMENT:');
-        expect(prompt).toContain('PLAN:');
+        expect(prompt).toContain('Billing Documentation');
+        expect(prompt).toContain('8-minute rule');
+        expect(prompt).toContain('CPT codes');
       });
     });
   });
