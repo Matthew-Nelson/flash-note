@@ -7,6 +7,10 @@ import {
   ContentBlockedError,
   TimeoutError,
   ParseError,
+  InvalidRequestError,
+  ProviderError,
+  OutputTruncatedError,
+  NetworkError,
 } from './errors.js';
 import type { LLMRequestConfig, LLMRetryConfig } from './types.js';
 
@@ -61,7 +65,7 @@ describe('ClaudeProvider', () => {
   });
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch.mockReset(); // Reset mock implementations, not just call history
     provider = new ClaudeProvider({
       apiKey: 'test-api-key',
       model: 'claude-sonnet-4-20250514',
@@ -432,6 +436,452 @@ describe('ClaudeProvider', () => {
       );
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('HTTP error handling', () => {
+    it('should throw InvalidRequestError for 400 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'invalid_request_error', message: 'Bad request' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        InvalidRequestError
+      );
+    });
+
+    it('should throw AuthenticationError for 403 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 403,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'permission_error', message: 'Forbidden' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        AuthenticationError
+      );
+    });
+
+    it('should throw ProviderError for 500 response after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'api_error', message: 'Internal error' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+
+    it('should throw ProviderError for 502 response after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 502,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'api_error', message: 'Bad gateway' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+
+    it('should throw ProviderError for 503 response after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'api_error', message: 'Service unavailable' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+
+    it('should throw ProviderError for unexpected status codes after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 418,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'unknown', message: 'Teapot' } }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+  });
+
+  describe('API error handling', () => {
+    it('should handle invalid_request_error in response body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'invalid_request_error', message: 'Invalid request' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        InvalidRequestError
+      );
+    });
+
+    it('should handle authentication_error in response body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'authentication_error', message: 'Invalid API key' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        AuthenticationError
+      );
+    });
+
+    it('should handle rate_limit_error in response body after retries exhausted', async () => {
+      // Rate limit error is retryable, so use persistent mock
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'rate_limit_error', message: 'Rate limited' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        RateLimitError
+      );
+    });
+
+    it('should handle overloaded_error in response body after retries exhausted', async () => {
+      // Overloaded error is retryable, so use persistent mock
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'overloaded_error', message: 'Overloaded' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        OverloadedError
+      );
+    });
+
+    it('should handle api_error in response body after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'api_error', message: 'Server error' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+
+    it('should handle unknown error type in response body after retries exhausted', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'unknown_error_type', message: 'Unknown' },
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        ProviderError
+      );
+    });
+  });
+
+  describe('stop reason handling', () => {
+    it('should throw OutputTruncatedError for max_tokens with no tool_use block', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Truncated text' }],
+            stop_reason: 'max_tokens',
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        OutputTruncatedError
+      );
+    });
+
+    it('should throw OutputTruncatedError for max_tokens when schema validation fails', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_123',
+                name: 'generate_pt_note',
+                input: { subjective: 'only' }, // Invalid - missing required fields
+              },
+            ],
+            stop_reason: 'max_tokens',
+          }),
+      });
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        OutputTruncatedError
+      );
+    });
+
+    it('should map stop_sequence stop reason to complete', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Some content' }],
+            stop_reason: 'stop_sequence',
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.finishReason).toBe('complete');
+    });
+
+    it('should map tool_use stop reason to complete', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Some content' }],
+            stop_reason: 'tool_use',
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.finishReason).toBe('complete');
+    });
+
+    it('should map pause_turn stop reason to complete', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Some content' }],
+            stop_reason: 'pause_turn',
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.finishReason).toBe('complete');
+    });
+
+    it('should map refusal stop reason to content_filter', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Some content' }],
+            stop_reason: 'refusal',
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.finishReason).toBe('content_filter');
+    });
+
+    it('should map undefined stop reason to error', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [{ type: 'text', text: 'Some content' }],
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.finishReason).toBe('error');
+    });
+  });
+
+  describe('network error handling', () => {
+    it('should throw NetworkError for generic fetch errors after retries exhausted', async () => {
+      mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        NetworkError
+      );
+    });
+
+    it('should throw NetworkError for non-Error objects after retries exhausted', async () => {
+      mockFetch.mockRejectedValue('some string error');
+
+      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+        NetworkError
+      );
+    });
+  });
+
+  describe('usage metadata handling', () => {
+    it('should handle missing usage metadata', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            content: [
+              {
+                type: 'tool_use',
+                id: 'toolu_123',
+                name: 'generate_pt_note',
+                input: validPTNoteInput,
+              },
+            ],
+            stop_reason: 'tool_use',
+          }),
+      });
+
+      const result = await provider.generatePTNote('test prompt', requestConfig);
+
+      expect(result.usage.inputTokens).toBe(0);
+      expect(result.usage.outputTokens).toBe(0);
+      expect(result.usage.totalTokens).toBe(0);
+    });
+  });
+
+  describe('generateCompletion error handling', () => {
+    it('should throw TimeoutError on abort in generateCompletion', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      mockFetch.mockRejectedValue(abortError);
+
+      await expect(provider.generateCompletion('test prompt', requestConfig)).rejects.toThrow(
+        TimeoutError
+      );
+    });
+
+    it('should throw NetworkError for fetch errors in generateCompletion', async () => {
+      mockFetch.mockRejectedValue(new Error('Network failed'));
+
+      await expect(provider.generateCompletion('test prompt', requestConfig)).rejects.toThrow(
+        NetworkError
+      );
+    });
+
+    it('should handle HTTP errors in generateCompletion', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        json: () => Promise.resolve({ error: { type: 'authentication_error' } }),
+      });
+
+      await expect(provider.generateCompletion('test prompt', requestConfig)).rejects.toThrow(
+        AuthenticationError
+      );
+    });
+
+    it('should handle API errors in generateCompletion', async () => {
+      // Rate limit error is retryable, so use persistent mock
+      mockFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            error: { type: 'rate_limit_error' },
+          }),
+      });
+
+      await expect(provider.generateCompletion('test prompt', requestConfig)).rejects.toThrow(
+        RateLimitError
+      );
+    });
+
+    it('should handle missing content in generateCompletion', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () =>
+          Promise.resolve({
+            stop_reason: 'end_turn',
+          }),
+      });
+
+      const result = await provider.generateCompletion('test prompt', requestConfig);
+
+      expect(result.content).toBe('');
+    });
+  });
+
+  describe('custom configuration', () => {
+    it('should use custom API URL when provided', async () => {
+      const customProvider = new ClaudeProvider({
+        apiKey: 'test-key',
+        model: 'claude-3-5-sonnet-20241022',
+        apiUrl: 'https://custom.api.com',
+        retryConfig: FAST_RETRY_CONFIG,
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
+      });
+
+      await customProvider.generatePTNote('test', requestConfig);
+
+      const [url] = mockFetch.mock.calls[0]!;
+      expect(url).toBe('https://custom.api.com/v1/messages');
+    });
+
+    it('should use custom API version when provided', async () => {
+      const customProvider = new ClaudeProvider({
+        apiKey: 'test-key',
+        model: 'claude-3-5-sonnet-20241022',
+        apiVersion: '2024-01-01',
+        retryConfig: FAST_RETRY_CONFIG,
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
+      });
+
+      await customProvider.generatePTNote('test', requestConfig);
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      const headers = (options as { headers: Record<string, string> }).headers;
+      expect(headers['anthropic-version']).toBe('2024-01-01');
     });
   });
 });

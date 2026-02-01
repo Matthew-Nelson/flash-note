@@ -271,4 +271,141 @@ describe('AIService', () => {
       }
     );
   });
+
+  describe('error mapping', () => {
+    it('should map content_blocked error to 422 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: '' }] },
+                finishReason: 'SAFETY',
+              },
+            ],
+          }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 422,
+        code: 'ai_content_blocked',
+      });
+    });
+
+    it('should map output_truncated error to 500 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: '' }] },
+                finishReason: 'MAX_TOKENS',
+              },
+            ],
+          }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'ai_error',
+      });
+    });
+
+    it('should map auth_error to 500 with config error message', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: { status: 'UNAUTHENTICATED' } }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'ai_config_error',
+      });
+    });
+
+    it('should map timeout error to 504 response', async () => {
+      const abortError = new Error('Aborted');
+      abortError.name = 'AbortError';
+      mockFetch.mockRejectedValue(abortError);
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 504,
+        code: 'ai_timeout',
+      });
+    });
+
+    it('should map network_error to 502 response', async () => {
+      mockFetch.mockRejectedValue(new Error('Network failed'));
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        code: 'ai_unavailable',
+      });
+    });
+
+    it('should map provider_error (503) to 502 response', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({ error: { status: 'SERVICE_UNAVAILABLE' } }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 502,
+        code: 'ai_unavailable',
+      });
+    });
+
+    it('should map invalid_request error to 500 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: { status: 'INVALID_ARGUMENT' } }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'ai_error',
+      });
+    });
+
+    it('should map parse_error to 500 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: 'not valid json' }] },
+                finishReason: 'STOP',
+              },
+            ],
+          }),
+      });
+
+      await expect(
+        aiService.generateSOAPNote('quick notes', 'daily_note')
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'ai_error',
+      });
+    });
+  });
 });
