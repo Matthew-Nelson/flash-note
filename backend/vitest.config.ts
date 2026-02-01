@@ -41,14 +41,14 @@ export default defineConfig({
 
       // Minimum coverage thresholds - fail if below these
       // NOTE: These thresholds apply only to included files (services, middleware, utils)
-      // Current coverage: ~74% lines, ~69% functions, ~90% branches
-      // TODO: Increase thresholds as more tests are added for ai-service, usage-service, etc.
+      // HEALTHCARE STANDARDS: High coverage requirements for patient safety and HIPAA compliance
+      // Current coverage: ~97% statements, ~92% branches, ~98% functions, ~97% lines
       thresholds: {
-        // Global thresholds for the codebase (excluding routes/config/db)
-        lines: 70,
-        functions: 65,
-        branches: 85,
-        statements: 70,
+        // Healthcare-grade thresholds for the codebase (excluding routes/config/db)
+        lines: 95,
+        functions: 95,
+        branches: 90,
+        statements: 95,
       },
     },
 

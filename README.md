@@ -88,7 +88,7 @@ cd web && pnpm build
 
 ## Documentation
 
-- [Handoff Document](./FLASHNOTE_HANDOFF.md) - Complete project specification
+- [Handoff Document](./docs/FLASHNOTE_HANDOFF.md) - Complete project specification
 - [API Documentation](./docs/API.md) - API endpoints and usage
 - [Extension Architecture](./docs/EXTENSION.md) - Browser extension details
 

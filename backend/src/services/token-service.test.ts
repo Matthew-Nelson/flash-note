@@ -306,6 +306,92 @@ describe('TokenService', () => {
     });
   });
 
+  describe('findUserIdFromToken', () => {
+    it('should return user ID when token found', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ user_id: 'user-123' }],
+      });
+
+      const userId = await tokenService.findUserIdFromToken(
+        'some-token',
+        'email_verification'
+      );
+
+      expect(userId).toBe('user-123');
+    });
+
+    it('should return null when token not found', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const userId = await tokenService.findUserIdFromToken(
+        'nonexistent-token',
+        'email_verification'
+      );
+
+      expect(userId).toBeNull();
+    });
+
+    it('should hash token before querying', async () => {
+      const token = 'plain-text-token';
+      const expectedHash = tokenService.hashToken(token);
+
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await tokenService.findUserIdFromToken(token, 'password_reset');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.arrayContaining([expectedHash])
+      );
+    });
+
+    it('should filter by token type', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await tokenService.findUserIdFromToken('token', 'password_reset');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND token_type = $2'),
+        expect.arrayContaining(['password_reset'])
+      );
+    });
+
+    it('should order by created_at DESC and limit to 1', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await tokenService.findUserIdFromToken('token', 'email_verification');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('ORDER BY created_at DESC'),
+        expect.any(Array)
+      );
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('LIMIT 1'),
+        expect.any(Array)
+      );
+    });
+
+    it('should find token regardless of used_at or expires_at status', async () => {
+      // This function finds tokens even if they're used or expired
+      // (used to check if user is already verified)
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ user_id: 'user-123' }],
+      });
+
+      const userId = await tokenService.findUserIdFromToken(
+        'used-token',
+        'email_verification'
+      );
+
+      expect(userId).toBe('user-123');
+      // Should NOT contain used_at IS NULL or expires_at > NOW()
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.not.stringContaining('used_at IS NULL'),
+        expect.any(Array)
+      );
+    });
+  });
+
   describe('security properties', () => {
     it('should not store plain tokens in database', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });

@@ -7,10 +7,12 @@ const {
   mockStripeCheckoutCreate,
   mockStripeBillingPortalCreate,
   mockStripeWebhooksConstructEvent,
+  mockStripeSubscriptionsRetrieve,
 } = vi.hoisted(() => ({
   mockStripeCheckoutCreate: vi.fn(),
   mockStripeBillingPortalCreate: vi.fn(),
   mockStripeWebhooksConstructEvent: vi.fn(),
+  mockStripeSubscriptionsRetrieve: vi.fn(),
 }));
 
 // Mock Stripe - use a class to work with 'new Stripe()'
@@ -29,6 +31,9 @@ vi.mock('stripe', () => {
       };
       webhooks = {
         constructEvent: mockStripeWebhooksConstructEvent,
+      };
+      subscriptions = {
+        retrieve: mockStripeSubscriptionsRetrieve,
       };
     },
   };
@@ -72,6 +77,7 @@ describe('BillingService', () => {
     mockStripeCheckoutCreate.mockReset();
     mockStripeBillingPortalCreate.mockReset();
     mockStripeWebhooksConstructEvent.mockReset();
+    mockStripeSubscriptionsRetrieve.mockReset();
     mockFindUserById.mockReset();
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
@@ -424,6 +430,347 @@ describe('BillingService', () => {
         await expect(
           billingService.handleWebhook(Buffer.from(''), 'sig')
         ).resolves.not.toThrow();
+      });
+    });
+
+    describe('invoice.paid', () => {
+      it('should skip non-subscription invoices', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_no_sub',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_123',
+              parent: null, // No subscription details
+            },
+          },
+        });
+
+        // Should not throw and should not update subscription
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      });
+
+      it('should skip invoices with missing subscription_details', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_empty',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_123',
+              parent: {
+                subscription_details: null,
+              },
+            },
+          },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      });
+
+      it('should update subscription status to active on payment', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_123',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_123',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_123',
+          metadata: { userId: 'user-123' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      });
+
+      it('should log audit event for subscription renewal', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_renewal',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_456',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_456',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_456',
+          metadata: { userId: 'user-456' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockAuditLog).toHaveBeenCalledWith({
+          userId: 'user-456',
+          action: AuditAction.SUBSCRIPTION_CREATED,
+          status: 'SUCCESS',
+          metadata: {
+            subscriptionId: 'sub_456',
+            invoiceId: 'inv_456',
+            billingReason: 'renewal',
+          },
+        });
+      });
+
+      it('should not log audit event for non-renewal invoices', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_initial',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_789',
+              billing_reason: 'subscription_create', // Initial payment, not renewal
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_789',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_789',
+          metadata: { userId: 'user-789' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        // Should update status
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-789', 'active');
+        // Should NOT log audit (billing_reason is not 'subscription_cycle')
+        expect(mockAuditLog).not.toHaveBeenCalled();
+      });
+
+      it('should handle missing userId in subscription metadata', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_no_user',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_no_user',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_no_user',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_no_user',
+          metadata: {}, // No userId
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        // Should log error
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('invoice.paid');
+      });
+
+      it('should handle expanded subscription object in invoice', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_expanded',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_expanded',
+              billing_reason: 'subscription_update',
+              parent: {
+                subscription_details: {
+                  // Subscription is an expanded object, not a string
+                  subscription: {
+                    id: 'sub_expanded',
+                    status: 'active',
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_expanded',
+          metadata: { userId: 'user-expanded' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockStripeSubscriptionsRetrieve).toHaveBeenCalledWith('sub_expanded');
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-expanded', 'active');
+      });
+    });
+
+    describe('invoice.payment_failed', () => {
+      it('should skip non-subscription invoices', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_failed_no_sub',
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: 'inv_123',
+              parent: {
+                subscription_details: null,
+              },
+            },
+          },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      });
+
+      it('should update subscription status to past_due on payment failure', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_failed',
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: 'inv_failed',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_failed',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_failed',
+          metadata: { userId: 'user-failed' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-failed', 'past_due');
+      });
+
+      it('should log audit event for payment failure', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_failed_audit',
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: 'inv_failed_audit',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_failed_audit',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_failed_audit',
+          metadata: { userId: 'user-failed-audit' },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockAuditLog).toHaveBeenCalledWith({
+          userId: 'user-failed-audit',
+          action: AuditAction.SUBSCRIPTION_CANCELLED,
+          status: 'FAILURE',
+          metadata: {
+            subscriptionId: 'sub_failed_audit',
+            invoiceId: 'inv_failed_audit',
+            reason: 'payment_failed',
+          },
+        });
+      });
+
+      it('should handle missing userId in subscription metadata', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_failed_no_user',
+          type: 'invoice.payment_failed',
+          data: {
+            object: {
+              id: 'inv_failed_no_user',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_failed_no_user',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_failed_no_user',
+          metadata: {}, // No userId
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('webhook_missing_user_id');
+        expect(parsed.eventType).toBe('invoice.payment_failed');
+      });
+    });
+
+    describe('duplicate event handling (idempotency)', () => {
+      it('should skip duplicate events', async () => {
+        mockTryMarkWebhookProcessed.mockResolvedValue(false); // Already processed
+
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_duplicate',
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              customer: 'cus_abc',
+              subscription: 'sub_xyz',
+            },
+          },
+        });
+
+        const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        // Should not process the event
+        expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+        // Should log the skip
+        expect(consoleLogSpy).toHaveBeenCalledWith(
+          expect.stringContaining('Skipping duplicate webhook event')
+        );
+
+        consoleLogSpy.mockRestore();
       });
     });
   });
