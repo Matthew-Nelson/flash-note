@@ -732,4 +732,127 @@ describe('AuthService', () => {
       );
     });
   });
+
+  describe('register', () => {
+    it('should throw 409 error when email already exists', async () => {
+      const existingUser = createMockUserRow({ email: 'existing@example.com' });
+      mockDbQuery.mockResolvedValueOnce({ rows: [existingUser] });
+
+      await expect(
+        authService.register('existing@example.com', 'ValidPass123')
+      ).rejects.toThrow('Email already registered');
+    });
+
+    it('should still succeed if verification email fails', async () => {
+      // User not found (email doesn't exist)
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      // Create user
+      const newUser = createMockUserRow({
+        id: 'new-user-id',
+        email: 'new@example.com',
+        token_version: 1,
+      });
+      mockDbQuery.mockResolvedValueOnce({ rows: [newUser] });
+
+      // Token creation for email verification
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+
+      // Mock email sending to fail
+      const { emailService } = await import('./email-service.js');
+      const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
+        .mockRejectedValueOnce(new Error('SMTP error'));
+
+      // Mock console.error for the error logging
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Session limit check
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
+      // Insert session
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
+      // Update token hash
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await authService.register('new@example.com', 'ValidPass123');
+
+      // Registration should succeed despite email failure
+      expect(result).not.toBeNull();
+      expect(result.user.email).toBe('new@example.com');
+      expect(result.emailVerificationRequired).toBe(true);
+
+      // Error should be logged
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Failed to send verification email:',
+        expect.any(Error)
+      );
+
+      sendVerificationSpy.mockRestore();
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
+  describe('refreshTokens edge cases', () => {
+    it('should return null for token with wrong type', async () => {
+      const jwt = await import('jsonwebtoken');
+      // Create token with wrong type
+      const wrongTypeToken = jwt.sign(
+        { userId: 'user-123', sessionId: 'session-123', type: 'access' }, // Wrong type
+        mockConfig.JWT_REFRESH_SECRET,
+        { algorithm: 'HS256', expiresIn: '7d' }
+      );
+
+      const result = await authService.refreshTokens(wrongTypeToken);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when legacy token has no matching hash', async () => {
+      const user = createMockUserRow();
+      const jwt = await import('jsonwebtoken');
+
+      // Legacy token WITHOUT sessionId
+      const legacyToken = jwt.sign(
+        { userId: user.id, type: 'refresh' },
+        mockConfig.JWT_REFRESH_SECRET,
+        { algorithm: 'HS256', expiresIn: '7d' }
+      );
+
+      // Return sessions but none will match the token hash
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [
+          { id: 'session-1', refresh_token_hash: '$2a$10$differenthash1' },
+          { id: 'session-2', refresh_token_hash: '$2a$10$differenthash2' },
+        ],
+      });
+
+      const result = await authService.refreshTokens(legacyToken);
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when token hash does not match session hash', async () => {
+      const user = createMockUserRow();
+      const jwt = await import('jsonwebtoken');
+      const token = jwt.sign(
+        { userId: user.id, sessionId: 'session-123', type: 'refresh' },
+        mockConfig.JWT_REFRESH_SECRET,
+        { algorithm: 'HS256', expiresIn: '7d' }
+      );
+
+      // Session found but hash won't match
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{
+          id: 'session-123',
+          refresh_token_hash: '$2a$10$completelydifferenthash',
+          ip_address: null,
+          user_agent: null,
+        }],
+      });
+
+      const result = await authService.refreshTokens(token);
+
+      expect(result).toBeNull();
+    });
+  });
 });

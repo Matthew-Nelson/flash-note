@@ -32,23 +32,21 @@ export default defineConfig({
         'src/types/**',
         'src/index.ts', // Entry point
         'src/db/migrate.ts', // Migration script
-        // Exclude files that need integration tests (routes, config, db)
-        'src/config.ts',
-        'src/db/index.ts',
-        'src/routes/**',
-        'src/prompts/**',
+        // Exclude files that require external dependencies (not unit-testable)
+        'src/config.ts', // Environment-dependent - validated through mocking in other tests
+        'src/db/index.ts', // Database connection pool - needs real PostgreSQL
+        'src/routes/**', // HTTP route handlers - need supertest integration tests
       ],
 
       // Minimum coverage thresholds - fail if below these
-      // NOTE: These thresholds apply only to included files (services, middleware, utils)
-      // Current coverage: ~74% lines, ~69% functions, ~90% branches
-      // TODO: Increase thresholds as more tests are added for ai-service, usage-service, etc.
+      // NOTE: These thresholds apply only to included files (services, middleware, utils, prompts)
+      // HEALTHCARE STANDARDS: High coverage requirements for patient safety and HIPAA compliance
       thresholds: {
-        // Global thresholds for the codebase (excluding routes/config/db)
-        lines: 70,
-        functions: 65,
-        branches: 85,
-        statements: 70,
+        // Healthcare-grade thresholds - do not lower these
+        lines: 95,
+        functions: 95,
+        branches: 90,
+        statements: 95,
       },
     },
 
