@@ -17,12 +17,23 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   CSRF_SECRET: z.string().min(32),
 
-  // Gemini AI
-  GEMINI_API_KEY: z.string().min(1),
+  // LLM Provider Selection
+  // Determines which LLM provider to use: 'gemini' or 'claude'
+  LLM_PROVIDER: z.enum(['gemini', 'claude']).default('gemini'),
+
+  // Gemini AI (required when LLM_PROVIDER=gemini)
+  GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_MAX_TOKENS: z.string().transform(Number).default('2000'),
   GEMINI_TEMPERATURE: z.string().transform(Number).default('0.7'),
   GEMINI_TIMEOUT_MS: z.string().transform(Number).default('30000'),
+
+  // Anthropic Claude (required when LLM_PROVIDER=claude)
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-20250514'),
+  ANTHROPIC_MAX_TOKENS: z.string().transform(Number).default('2000'),
+  ANTHROPIC_TEMPERATURE: z.string().transform(Number).default('0.7'),
+  ANTHROPIC_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
   // Development
   USE_MOCK_AI: z
@@ -81,6 +92,16 @@ function loadConfig() {
   if (parsed.data.NODE_ENV === 'production' && parsed.data.ALLOWED_ORIGINS.length === 0) {
     console.error('SECURITY ERROR: ALLOWED_ORIGINS cannot be empty in production.');
     console.error('Set ALLOWED_ORIGINS to your web app URL and extension ID.');
+    process.exit(1);
+  }
+
+  // Validate that the selected LLM provider's API key is configured
+  if (parsed.data.LLM_PROVIDER === 'gemini' && !parsed.data.GEMINI_API_KEY) {
+    console.error('Configuration error: GEMINI_API_KEY is required when LLM_PROVIDER=gemini');
+    process.exit(1);
+  }
+  if (parsed.data.LLM_PROVIDER === 'claude' && !parsed.data.ANTHROPIC_API_KEY) {
+    console.error('Configuration error: ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude');
     process.exit(1);
   }
 

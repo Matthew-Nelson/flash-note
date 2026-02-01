@@ -1,9 +1,15 @@
 import { config, isProduction } from '../config.js';
-import { buildSOAPPrompt, parseSOAPSections } from '../prompts/pt-prompts.js';
+import { buildSOAPPrompt } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateMockSOAPNote } from './mock-ai-service.js';
 import { detectSuspiciousPatterns } from '../utils/prompt-sanitization.js';
 import type { GeneratedNote, NoteType, PromptSecurityMetadata } from '../types/index.js';
+import {
+  getConfiguredProvider,
+  LLMError,
+  type LLMProvider,
+  type LLMRequestConfig,
+} from './llm/index.js';
 
 // SECURITY: Prevent mock AI from being used in production
 // This could result in fake clinical notes that could harm patients
@@ -14,45 +20,53 @@ if (isProduction && config.USE_MOCK_AI) {
   );
 }
 
-// TODO: This service is currently Gemini-specific. If experimenting with other LLM
-// providers (Claude, OpenAI, etc.), consider:
-// - Extracting a common LLMProvider interface
-// - Renaming GeminiResponse to a generic LLMResponse or creating provider-specific types
-// - Moving provider-specific logic (API URLs, auth headers, response parsing) into
-//   separate adapter classes
-// - Updating config to support provider selection
-// The error logging is already provider-agnostic (see SECURITY comments below).
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text: string }>;
-    };
-  }>;
-  usageMetadata: {
-    promptTokenCount: number;
-    candidatesTokenCount: number;
-    totalTokenCount: number;
-  };
-}
-
+/**
+ * AI Service for generating PT SOAP notes.
+ *
+ * Uses the unified LLM provider abstraction to support multiple providers
+ * (Gemini, Claude) with consistent response handling and retry logic.
+ */
 class AIService {
-  private readonly apiUrl: string;
-  private readonly apiKey: string;
-  private readonly model: string;
-  private readonly maxTokens: number;
-  private readonly temperature: number;
-  private readonly timeout: number;
+  private readonly provider: LLMProvider;
+  private readonly requestConfig: LLMRequestConfig;
 
   constructor() {
-    this.apiUrl = 'https://generativelanguage.googleapis.com/v1beta';
-    this.apiKey = config.GEMINI_API_KEY;
-    this.model = config.GEMINI_MODEL;
-    this.maxTokens = config.GEMINI_MAX_TOKENS;
-    this.temperature = config.GEMINI_TEMPERATURE;
-    this.timeout = config.GEMINI_TIMEOUT_MS;
+    // Initialize the configured LLM provider
+    this.provider = getConfiguredProvider({
+      provider: config.LLM_PROVIDER,
+      geminiApiKey: config.GEMINI_API_KEY,
+      geminiModel: config.GEMINI_MODEL,
+      claudeApiKey: config.ANTHROPIC_API_KEY,
+      claudeModel: config.ANTHROPIC_MODEL,
+    });
+
+    // Set up request configuration based on provider
+    if (config.LLM_PROVIDER === 'gemini') {
+      this.requestConfig = {
+        maxTokens: config.GEMINI_MAX_TOKENS,
+        temperature: config.GEMINI_TEMPERATURE,
+        timeoutMs: config.GEMINI_TIMEOUT_MS,
+      };
+    } else {
+      this.requestConfig = {
+        maxTokens: config.ANTHROPIC_MAX_TOKENS,
+        temperature: config.ANTHROPIC_TEMPERATURE,
+        timeoutMs: config.ANTHROPIC_TIMEOUT_MS,
+      };
+    }
   }
 
+  /**
+   * Generate a SOAP note from quick notes.
+   *
+   * Uses structured JSON output from the LLM provider (JSON mode for Gemini,
+   * tool use for Claude) for reliable parsing.
+   *
+   * @param quickNotes - The clinician's shorthand notes
+   * @param noteType - The type of note (daily, initial eval, progress, discharge)
+   * @param patientContext - Optional patient context
+   * @returns Generated note with SOAP sections, billing info, and metadata
+   */
   async generateSOAPNote(
     quickNotes: string,
     noteType: NoteType,
@@ -81,83 +95,77 @@ class AIService {
 
     const prompt = buildSOAPPrompt(quickNotes, noteType, patientContext);
 
-    const response = await this.callGemini(prompt);
-    const generationTimeMs = Date.now() - startTime;
+    try {
+      const result = await this.provider.generatePTNote(prompt, this.requestConfig);
+      const generationTimeMs = Date.now() - startTime;
 
-    const content = response.candidates[0]?.content?.parts[0]?.text;
-    if (!content) {
-      throw new AppError(500, 'ai_error', 'Failed to generate note: empty response');
+      return {
+        // Core SOAP sections
+        subjective: result.note.subjective,
+        objective: result.note.objective,
+        assessment: result.note.assessment,
+        plan: result.note.plan,
+
+        // Structured billing reference (optional)
+        billing: result.note.billing,
+
+        // Goal tracking (optional)
+        goals: result.note.goals,
+
+        // Alerts for the therapist (optional)
+        alerts: result.note.alerts,
+
+        // Metadata
+        metadata: {
+          model: this.provider.model,
+          tokensUsed: result.usage.totalTokens,
+          generationTimeMs,
+        },
+        securityMetadata,
+      };
+    } catch (error) {
+      // Map LLM errors to AppError for HTTP response
+      if (error instanceof LLMError) {
+        throw this.mapLLMErrorToAppError(error);
+      }
+      throw error;
     }
-
-    const sections = parseSOAPSections(content);
-
-    return {
-      ...sections,
-      metadata: {
-        model: this.model,
-        tokensUsed: response.usageMetadata.totalTokenCount,
-        generationTimeMs,
-      },
-      securityMetadata,
-    };
   }
 
-  private async callGemini(prompt: string): Promise<GeminiResponse> {
-    // SECURITY: API key moved to header instead of URL to prevent logging exposure
-    const url = `${this.apiUrl}/models/${this.model}:generateContent`;
+  /**
+   * Map LLMError to AppError for HTTP responses.
+   *
+   * SECURITY: Error messages are kept generic to avoid leaking internal details.
+   */
+  private mapLLMErrorToAppError(error: LLMError): AppError {
+    // SECURITY: Log only safe error details (no PHI)
+    console.error('LLM error:', error.toSafeLogObject());
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+    switch (error.code) {
+      case 'rate_limited':
+        return new AppError(429, 'ai_rate_limited', 'AI service is temporarily rate limited. Please try again.');
 
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': this.apiKey,
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: this.maxTokens,
-            temperature: this.temperature,
-          },
-        }),
-        signal: controller.signal,
-      });
+      case 'content_blocked':
+        return new AppError(422, 'ai_content_blocked', 'Unable to process this content. Please modify and try again.');
 
-      clearTimeout(timeoutId);
+      case 'output_truncated':
+        return new AppError(500, 'ai_error', 'Generated note was truncated. Please try with shorter input.');
 
-      if (!response.ok) {
-        // SECURITY: Never log raw error response body from LLM APIs.
-        // Error responses may echo back portions of the request, which contains PHI.
-        // This principle applies regardless of LLM provider (Gemini, Claude, OpenAI, etc.)
-        console.error('LLM API error:', {
-          status: response.status,
-          statusText: response.statusText,
-        });
-        throw new AppError(500, 'ai_error', 'Failed to generate note');
-      }
+      case 'auth_error':
+        return new AppError(500, 'ai_config_error', 'AI service configuration error. Please contact support.');
 
-      return (await response.json()) as GeminiResponse;
-    } catch (error) {
-      clearTimeout(timeoutId);
+      case 'timeout':
+        return new AppError(504, 'ai_timeout', 'Note generation timed out. Please try again.');
 
-      if (error instanceof AppError) throw error;
+      case 'network_error':
+      case 'overloaded':
+      case 'provider_error':
+        return new AppError(502, 'ai_unavailable', 'AI service is temporarily unavailable. Please try again.');
 
-      if (error instanceof Error && error.name === 'AbortError') {
-        throw new AppError(500, 'ai_error', 'Note generation timed out');
-      }
-
-      // SECURITY: Log only error type/message, not full error object.
-      // Full error objects may contain request details including PHI.
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('LLM service error:', { type: error instanceof Error ? error.name : 'Unknown', message: errorMessage });
-      throw new AppError(500, 'ai_error', 'Failed to generate note');
+      case 'invalid_request':
+      case 'parse_error':
+      default:
+        return new AppError(500, 'ai_error', 'Failed to generate note');
     }
   }
 }
