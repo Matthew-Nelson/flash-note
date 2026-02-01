@@ -4,6 +4,10 @@
   "version": "0.1.0",
   "description": "Generate professional PT documentation in seconds. Type shorthand, get complete SOAP notes.",
 
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
+
   "permissions": [
     "storage",
     "sidePanel"

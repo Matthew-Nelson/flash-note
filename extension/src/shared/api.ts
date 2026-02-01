@@ -45,7 +45,36 @@ export type SessionEndReason =
   | 'session_limit'        // Too many devices, oldest session kicked (MEDIUM-011)
   | 'session_revoked';     // Admin action or security event
 
+// Retry configuration for transient failures
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelayMs: 1000, // 1s, 2s, 4s with exponential backoff
+  retryableStatusCodes: [500, 502, 503, 504, 520, 521, 522, 523, 524],
+};
+
 class ApiClient {
+  /**
+   * Determines if an error is retryable (network failure or 5xx server error)
+   */
+  private isRetryableError(error: unknown): boolean {
+    // Network failures (fetch throws TypeError for network errors)
+    if (error instanceof TypeError) {
+      return true;
+    }
+    // Server errors (5xx)
+    if (error instanceof ApiError) {
+      return RETRY_CONFIG.retryableStatusCodes.includes(error.status);
+    }
+    return false;
+  }
+
+  /**
+   * Sleeps for the specified duration
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
   private async getToken(): Promise<string | null> {
     const auth = await storage.getAuth();
     if (!auth) return null;
@@ -146,6 +175,50 @@ class ApiClient {
     return result.data;
   }
 
+  /**
+   * Makes a request with automatic retry for transient failures.
+   * Uses exponential backoff: 1s, 2s, 4s between retries.
+   * Only retries on network errors and 5xx server errors.
+   *
+   * MEDIUM-014: Prevents lost work in clinical environments with unstable networks.
+   */
+  private async requestWithRetry<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    maxRetries: number = RETRY_CONFIG.maxRetries
+  ): Promise<T> {
+    let lastError: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await this.request<T>(endpoint, options);
+      } catch (error) {
+        lastError = error;
+
+        // Don't retry on non-retryable errors (4xx, auth errors, etc.)
+        if (!this.isRetryableError(error)) {
+          throw error;
+        }
+
+        // Don't retry after the last attempt
+        if (attempt === maxRetries) {
+          break;
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        const delayMs = RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt);
+        console.warn(
+          `Request to ${endpoint} failed (attempt ${attempt + 1}/${maxRetries + 1}), ` +
+          `retrying in ${delayMs}ms...`
+        );
+        await this.sleep(delayMs);
+      }
+    }
+
+    // All retries exhausted
+    throw lastError;
+  }
+
   async login(email: string, password: string): Promise<AuthResponse> {
     const data = await this.request<AuthResponse>('/auth/login', {
       method: 'POST',
@@ -185,7 +258,9 @@ class ApiClient {
   }
 
   async generateNote(input: GenerateNoteInput): Promise<GeneratedNote> {
-    return this.request<GeneratedNote>('/notes/generate', {
+    // Use retry logic for note generation - this is critical for clinical UX
+    // A transient network failure shouldn't lose the user's work
+    return this.requestWithRetry<GeneratedNote>('/notes/generate', {
       method: 'POST',
       body: JSON.stringify(input),
     });
