@@ -257,16 +257,18 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 - [x] **HIGH-006 + MEDIUM-002 + MEDIUM-011: Session infrastructure** - Device binding, O(1) token validation, session limits
 - [x] **MEDIUM-007 + MEDIUM-015: CORS configuration** - Explicit ALLOWED_ORIGINS env var
 
-### Should Fix Before Launch
-- [ ] **MEDIUM-005: Prompt injection mitigation** - Input sanitization for LLM
-- [ ] **MEDIUM-010: Prompt warnings may leak context** - Audit logging paths
+### Resolved ✅ (continued)
+- [x] **MEDIUM-005: Prompt injection mitigation** - XML delimiters + detection
+- [x] **MEDIUM-010: Prompt warnings may leak context** - Verified PHI-safe
+- [x] **MEDIUM-013: Webhook idempotency** - Database-backed deduplication
+- [x] **MEDIUM-014: Extension retry logic** - Exponential backoff implemented
 
-### Can Address Post-Launch
-- [ ] MEDIUM-003: Session timeout warning (UX improvement)
-- [ ] MEDIUM-008: Extension token storage separation
-- [ ] MEDIUM-013: Webhook idempotency
-- [ ] MEDIUM-014: Extension retry logic
-- [ ] LOW-001: Structured logging (replace console.log)
+### Accepted Risk (Low Priority)
+- [x] MEDIUM-003: Session timeout warning - Silent refresh already implemented
+- [x] MEDIUM-008: Extension token storage separation - Device binding mitigates
+
+### Deferred (Observability Track)
+- [ ] LOW-001: Structured logging - See `docs/planning/MONITORING_SETUP.md`
 
 ---
 
@@ -311,10 +313,16 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 ### Functional Testing (Production Environment)
 - [ ] **Auth flows**
   - [ ] Register new account
+  - [ ] Email verification (click link from email)
+  - [ ] Resend verification email
   - [ ] Login with valid credentials
   - [ ] Login with invalid credentials (rate limiting)
+  - [ ] Login with unverified email (should work but flag `emailVerified: false`)
   - [ ] Token refresh
   - [ ] Logout
+  - [ ] Request password reset
+  - [ ] Complete password reset (click link from email)
+  - [ ] Login with new password after reset
 - [ ] **Note generation**
   - [ ] All 4 note types (daily, initial eval, progress, discharge)
   - [ ] Copy individual sections

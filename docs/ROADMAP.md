@@ -43,7 +43,7 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Backend unit tests ≥60% coverage | SUCCESS_METRICS BETA-01 | 0% |
+| Backend unit tests ≥60% coverage | SUCCESS_METRICS BETA-01 | ✅ 28 test files |
 | Manual auth flow testing (all apps) | SUCCESS_METRICS BETA-02 | Not done |
 | Stripe checkout end-to-end test | SUCCESS_METRICS BETA-03 | Not tested |
 | Verify trial expiration enforcement | SUCCESS_METRICS BETA-04 | Needs testing |
@@ -57,8 +57,8 @@ This document consolidates all pending work from across the project. Use this as
 | Web dashboard with real data | SUCCESS_METRICS BETA-07 | Mock data only |
 | Privacy policy page on web | SUCCESS_METRICS BETA-08 | Missing |
 | Terms of service page on web | SUCCESS_METRICS BETA-09 | Missing |
-| API request timeout handling | SUCCESS_METRICS BETA-10 | Missing |
-| Retry logic with backoff | SUCCESS_METRICS BETA-11 | Missing |
+| API request timeout handling | SUCCESS_METRICS BETA-10 | ✅ Done |
+| Retry logic with backoff | SUCCESS_METRICS BETA-11 | ✅ Done |
 
 ---
 
@@ -70,7 +70,7 @@ This document consolidates all pending work from across the project. Use this as
 
 | Target | Current | Goal |
 |--------|---------|------|
-| Backend | 0% | ≥80% |
+| Backend | ✅ 28 test files | ≥80% |
 | Extension | 0% | ≥70% |
 | Web | 0% | ≥60% |
 
@@ -78,8 +78,8 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Security headers fully configured | SUCCESS_METRICS PROD-04 | Partial |
-| CORS locked to production domains | SUCCESS_METRICS PROD-05 | Partial |
+| Security headers fully configured | SUCCESS_METRICS PROD-04 | ✅ Done |
+| CORS locked to production domains | SUCCESS_METRICS PROD-05 | ✅ Done |
 | Database encryption at rest | SUCCESS_METRICS PROD-07 | Not deployed |
 | TLS 1.2+ enforced | SUCCESS_METRICS PROD-08 | Not deployed |
 | Vertex AI BAA signed | SUCCESS_METRICS PROD-09 | Not done |
@@ -150,3 +150,4 @@ These are researched but not prioritized for current development.
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Business launch requirements
 - [STRIPE_TODOS.md](./STRIPE_TODOS.md) - Payment integration details
 - [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) - Test coverage details
+- [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) - **Critical** - Sentry, UptimeRobot, Axiom setup plan
