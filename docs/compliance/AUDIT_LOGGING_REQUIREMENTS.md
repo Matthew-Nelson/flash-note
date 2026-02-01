@@ -205,7 +205,7 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 **Current Status:** Partial
 
 **What's Documented:**
-- `docs/guides/OPERATIONS.md` mentions monthly review of audit logs for suspicious patterns
+- `docs/planning/MONITORING_SETUP.md` mentions monthly review of audit logs for suspicious patterns
 
 **Gap:**
 - Without viewing tools, regular review is impractical
@@ -238,7 +238,7 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 |-------------|----------|---------------|---------------|
 | **Retention enforcement** | High | No policy enforced | Documented 6-year policy + optional archival job |
 | **Log integrity protection** | High | App-level only | Database triggers to prevent DELETE/UPDATE |
-| **Regular review process** | High | Documented in OPERATIONS.md | Tooling to make reviews practical |
+| **Regular review process** | High | Documented in MONITORING_SETUP.md | Tooling to make reviews practical |
 
 ---
 
@@ -292,7 +292,8 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-01-28 | Initial document |
-| 1.1 | 2025-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status, updated OPERATIONS.md path |
+| 1.1 | 2025-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status |
+| 1.2 | 2026-02-01 | Updated OPERATIONS.md references to MONITORING_SETUP.md (moved to planning folder) |
 
 ---
 

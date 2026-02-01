@@ -25,13 +25,13 @@ Operational guides and API documentation for developers.
 |----------|-------------|
 | [API.md](./guides/API.md) | REST API endpoint reference |
 | [EXTENSION_DEPLOYMENT.md](./guides/EXTENSION_DEPLOYMENT.md) | Chrome Web Store deployment guide |
-| [OPERATIONS.md](./guides/OPERATIONS.md) | Production operational procedures |
 
 ### `/planning` - Future Features
 Research and planning docs for features not yet implemented.
 
 | Document | Description |
 |----------|-------------|
+| [MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) | **Critical** - Sentry, UptimeRobot, Axiom setup plan |
 | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | OAuth/social login implementation analysis |
 | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | Product strategy for clinician trust (conversational mode, review mode) |
 | [UNIFIED_STYLING_PLAN.md](./planning/UNIFIED_STYLING_PLAN.md) | CSS consolidation plan for extension + web |
