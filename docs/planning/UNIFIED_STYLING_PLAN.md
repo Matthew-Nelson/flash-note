@@ -44,9 +44,9 @@ Both apps import:
 
 ### Files to Modify
 - `/shared/design-tokens.css` - Add missing tokens:
-  - `--fn-error-bg` (currently only in extension as `--error-bg`)
-  - `--fn-success-bg`
-  - `--fn-trial-bg`, `--fn-trial-border`
+  - `--fn-trial-bg`, `--fn-trial-border` (currently only in extension)
+
+  Note: `--fn-error-light` and `--fn-success-light` already exist in shared tokens.
 
 - `/shared/tailwind-preset.js` - Add Tailwind utilities for new tokens
 
