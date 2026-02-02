@@ -1,0 +1,409 @@
+/**
+ * FlashNote Shared Component Styles
+ *
+ * Reusable CSS component classes for consistency between web and extension.
+ * Requires design-tokens.css to be imported first.
+ *
+ * Usage:
+ *   @import '../../shared/components.css';
+ */
+
+/* ============================================
+   BUTTONS
+   ============================================ */
+
+/* Primary Button - Gradient background with animation */
+.btn-primary {
+  color: white;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    var(--fn-accent-primary) 0%,
+    var(--fn-accent-secondary) 50%,
+    var(--fn-accent-tertiary) 100%
+  );
+  background-size: 200% 200%;
+  border-radius: var(--fn-radius-md);
+  animation: fn-gradient-shift 3s ease infinite;
+  transition: transform var(--fn-transition-slow) var(--fn-ease-default),
+              box-shadow var(--fn-transition-slow) var(--fn-ease-default);
+  font-weight: var(--fn-font-medium);
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: scale(1.02);
+  box-shadow: 0 4px 20px var(--fn-accent-glow);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 2px 10px var(--fn-accent-glow);
+  transition: transform 0.1s ease;
+}
+
+.btn-primary:disabled {
+  background: var(--fn-btn-disabled-bg);
+  color: var(--fn-text-muted);
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
+  animation: none;
+  cursor: not-allowed;
+}
+
+/* Secondary Button - Gradient border */
+.btn-secondary {
+  color: var(--fn-text-primary);
+  background: var(--fn-bg-primary);
+  border: 2px solid transparent;
+  background-image: linear-gradient(white, white),
+    linear-gradient(
+      135deg,
+      var(--fn-accent-primary),
+      var(--fn-accent-secondary),
+      var(--fn-accent-tertiary)
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border-radius: var(--fn-radius-md);
+  transition: box-shadow var(--fn-transition-slow) var(--fn-ease-default),
+              transform var(--fn-transition-fast) var(--fn-ease-default);
+  font-weight: var(--fn-font-medium);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  box-shadow: 0 4px 15px var(--fn-accent-glow-light);
+}
+
+.btn-secondary:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   CARDS
+   ============================================ */
+
+.card {
+  border-radius: var(--fn-radius-lg);
+  overflow: hidden;
+  transition: box-shadow var(--fn-transition-slow) var(--fn-ease-default);
+  background: var(--fn-card-bg);
+  border: 1px solid var(--fn-border-color);
+}
+
+.card:hover {
+  box-shadow: var(--fn-shadow-lg);
+}
+
+.card-header {
+  padding: var(--fn-space-3) var(--fn-space-4);
+  background: var(--fn-bg-secondary);
+  border-bottom: 1px solid var(--fn-border-color);
+  position: relative;
+}
+
+.card-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(
+    180deg,
+    var(--fn-accent-primary),
+    var(--fn-accent-secondary),
+    var(--fn-accent-tertiary)
+  );
+}
+
+/* ============================================
+   FORM ELEMENTS
+   ============================================ */
+
+.input-field {
+  color: var(--fn-text-primary);
+  border-radius: var(--fn-radius-md);
+  transition: border-color var(--fn-transition-base) var(--fn-ease-default),
+              box-shadow var(--fn-transition-base) var(--fn-ease-default),
+              background var(--fn-transition-base) var(--fn-ease-default);
+  background: var(--fn-input-bg);
+  border: 2px solid var(--fn-border-color);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: transparent;
+  background-image: linear-gradient(white, white),
+    linear-gradient(
+      135deg,
+      var(--fn-accent-primary),
+      var(--fn-accent-secondary),
+      var(--fn-accent-tertiary)
+    );
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: var(--fn-focus-ring);
+}
+
+.input-field::placeholder {
+  color: var(--fn-text-muted);
+}
+
+.input-field-error {
+  border-color: var(--fn-error);
+}
+
+.input-field-error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.label {
+  color: var(--fn-text-secondary);
+  font-weight: var(--fn-font-semibold);
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  position: relative;
+}
+
+/* Outer rotating ring */
+.loading-spinner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--fn-bg-tertiary);
+  border-top-color: var(--fn-accent-primary);
+  border-right-color: var(--fn-accent-secondary);
+  animation: fn-spin 1s linear infinite;
+}
+
+/* Inner pulsing gradient core */
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--fn-accent-primary),
+    var(--fn-accent-secondary),
+    var(--fn-accent-tertiary)
+  );
+  background-size: 200% 200%;
+  animation: fn-gradient-shift 2s ease infinite, fn-breathe 2s ease-in-out infinite;
+  opacity: 0.8;
+}
+
+/* Small inline spinner */
+.loading-spinner-sm {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--fn-bg-tertiary);
+  border-top-color: currentColor;
+  animation: fn-spin 0.6s linear infinite;
+}
+
+/* Orbiting dots container */
+.loading-dots {
+  position: absolute;
+  inset: -8px;
+  animation: fn-spin 3s linear infinite;
+}
+
+.loading-dots span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fn-accent-primary);
+}
+
+.loading-dots span:nth-child(1) {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fn-accent-primary);
+}
+
+.loading-dots span:nth-child(2) {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--fn-accent-tertiary);
+}
+
+.loading-dots span:nth-child(3) {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--fn-accent-secondary);
+}
+
+/* ============================================
+   ERROR MESSAGE
+   ============================================ */
+
+.error-message {
+  border-radius: var(--fn-radius-md);
+  background: var(--fn-error-light);
+  border: 1px solid var(--fn-error);
+  color: var(--fn-error);
+}
+
+/* ============================================
+   LINKS
+   ============================================ */
+
+.link {
+  transition: color var(--fn-transition-base) var(--fn-ease-default);
+  background: linear-gradient(
+    135deg,
+    var(--fn-accent-primary),
+    var(--fn-accent-secondary)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: var(--fn-font-medium);
+}
+
+.link:hover {
+  background: linear-gradient(
+    135deg,
+    var(--fn-accent-secondary),
+    var(--fn-accent-tertiary)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+/* ============================================
+   STATUS INDICATORS
+   ============================================ */
+
+.status-active {
+  color: var(--fn-success);
+}
+
+.status-expired {
+  color: var(--fn-error);
+}
+
+.status-trial {
+  background: linear-gradient(
+    135deg,
+    var(--fn-accent-primary),
+    var(--fn-accent-secondary)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================
+   ANIMATION UTILITIES
+   ============================================ */
+
+.animate-fade-in {
+  animation: fn-fade-in var(--fn-transition-slow) var(--fn-ease-out);
+}
+
+.animate-fade-in-up {
+  animation: fn-fade-in-up var(--fn-transition-slow) var(--fn-ease-out);
+  animation-fill-mode: both;
+}
+
+.animate-slide-in-right {
+  animation: fn-slide-in-right var(--fn-transition-slow) var(--fn-ease-out);
+}
+
+/* Stagger delays for animations */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* ============================================
+   ALERT VARIANTS
+   ============================================ */
+
+.alert {
+  border-radius: var(--fn-radius-md);
+  padding: var(--fn-space-3) var(--fn-space-4);
+  border: 1px solid;
+}
+
+.alert-success {
+  background: var(--fn-success-light);
+  border-color: var(--fn-success);
+  color: var(--fn-success-dark);
+}
+
+.alert-error {
+  background: var(--fn-error-light);
+  border-color: var(--fn-error);
+  color: var(--fn-error-dark);
+}
+
+.alert-warning {
+  background: var(--fn-warning-light);
+  border-color: var(--fn-warning);
+  color: var(--fn-warning-dark);
+}
+
+.alert-info {
+  background: var(--fn-cyan-50);
+  border-color: var(--fn-accent-primary);
+  color: var(--fn-cyan-700);
+}
+
+/* ============================================
+   BADGE VARIANTS
+   ============================================ */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--fn-space-1) var(--fn-space-3);
+  border-radius: var(--fn-radius-full);
+  font-size: var(--fn-text-sm);
+  font-weight: var(--fn-font-medium);
+}
+
+.badge-trial {
+  background: linear-gradient(
+    135deg,
+    rgba(6, 182, 212, 0.1),
+    rgba(139, 92, 246, 0.1)
+  );
+  color: var(--fn-accent-secondary);
+  border: 1px solid var(--fn-accent-secondary);
+}
+
+.badge-active {
+  background: var(--fn-success-light);
+  color: var(--fn-success-dark);
+}
+
+.badge-expired {
+  background: var(--fn-error-light);
+  color: var(--fn-error-dark);
+}

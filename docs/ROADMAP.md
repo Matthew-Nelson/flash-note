@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 1, 2026
-**Overall Progress:** 39% (19/49 quality gates complete)
+**Last Updated:** February 2, 2026
+**Overall Progress:** 45% (22/49 quality gates complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -19,7 +19,7 @@ This document consolidates all pending work from across the project. Use this as
 | Add Zod validation to extension | SUCCESS_METRICS MVP-12 | ✅ Done |
 | Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | ✅ Done |
 | Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | ✅ Done |
-| Connect web app auth to backend | SUCCESS_METRICS MVP-08 | Not started |
+| Connect web app auth to backend | SUCCESS_METRICS MVP-08 | ✅ Done |
 | Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs automated testing |
 | Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs to change to account for new "trust" paradigm |
 
@@ -28,9 +28,11 @@ This document consolidates all pending work from across the project. Use this as
 | Task | Source | Status |
 |------|--------|--------|
 | Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | ✅ Done |
-| Post-checkout subscription sync for extension | STRIPE_TODOS | Not started |
+| **Fix stale user data bug (extension)** | [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) | ⚠️ P0 - Launch blocker |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
 | Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |
+
+> **Note:** The stale user data bug affects extension users who complete checkout on the web app - their subscription status doesn't sync back to the extension. See [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) for full analysis and recommended fix (focus-based refresh).
 
 ---
 
@@ -70,9 +72,10 @@ These items are **required for production** with real patient data. They should 
 | Task | Source | Status |
 |------|--------|--------|
 | Extension password validation | SUCCESS_METRICS BETA-06 | ✅ Done |
-| Web dashboard with real data | SUCCESS_METRICS BETA-07 | Mock data only |
-| Privacy policy page on web | SUCCESS_METRICS BETA-08 | Missing |
-| Terms of service page on web | SUCCESS_METRICS BETA-09 | Missing |
+| Backend `/usage/stats` endpoint | Web buildout dependency | Not started |
+| Web dashboard with real data | SUCCESS_METRICS BETA-07 | ⚠️ Auth/subscription live, usage mock |
+| Privacy policy page on web | SUCCESS_METRICS BETA-08 | ✅ Done |
+| Terms of service page on web | SUCCESS_METRICS BETA-09 | ✅ Done |
 | API request timeout handling | SUCCESS_METRICS BETA-10 | ✅ Done |
 | Retry logic with backoff | SUCCESS_METRICS BETA-11 | ✅ Done |
 
@@ -166,11 +169,11 @@ These are researched but not prioritized for current development.
 
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
-| MVP Foundation | 15 | 11 | 73% |
-| Beta Ready | 12 | 4 | 33% |
+| MVP Foundation | 15 | 12 | 80% |
+| Beta Ready | 12 | 6 | 50% |
 | Production Ready | 16 | 4 | 25% |
 | HIPAA Critical Path | 6 | 0 | 0% |
-| **Total** | **49** | **19** | **39%** |
+| **Total** | **49** | **22** | **45%** |
 
 ---
 

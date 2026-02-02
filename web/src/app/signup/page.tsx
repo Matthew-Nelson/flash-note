@@ -1,144 +1,174 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useAuth, ApiError } from '@/lib/auth-context';
+import { registerSchema } from '@/lib/schemas';
+import { Button, Input, Alert } from '@/components/ui';
 
 export default function SignupPage() {
+  const router = useRouter();
+  const { register, isAuthenticated, isLoading } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string;
+    password?: string;
+    confirmPassword?: string;
+  }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setFieldErrors({});
 
-    if (password !== confirmPassword) {
-      setError('Passwords do not match');
+    // Validate input
+    const result = registerSchema.safeParse({ email, password, confirmPassword });
+    if (!result.success) {
+      const errors: { email?: string; password?: string; confirmPassword?: string } = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as 'email' | 'password' | 'confirmPassword';
+        errors[field] = err.message;
+      });
+      setFieldErrors(errors);
       return;
     }
 
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
-      return;
+    setIsSubmitting(true);
+
+    try {
+      const response = await register(email, password);
+
+      // Check if email verification is required
+      if (response.emailVerificationRequired) {
+        router.push('/verify-email');
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        // Handle specific error codes
+        switch (err.code) {
+          case 'email_exists':
+            setFieldErrors({ email: 'An account with this email already exists' });
+            break;
+          case 'weak_password':
+            setFieldErrors({ password: 'Password does not meet requirements' });
+            break;
+          default:
+            setError(err.message || 'Failed to create account');
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsLoading(true);
-
-    // TODO: Implement registration
-    // eslint-disable-next-line no-console
-    console.log('Register:', { email, password });
-    setIsLoading(false);
   };
 
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center">
-          <span className="text-3xl font-bold text-primary-600">FlashNote</span>
+          <span className="text-3xl font-bold text-gradient">FlashNote</span>
         </Link>
-        <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
+        <h2 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
           Create your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-fn-text-secondary">
           Start your 14-day free trial
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="card py-8 px-4 sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
+            <Input
+              label="Email address"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={fieldErrors.email}
+            />
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  minLength={8}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Min 8 chars, 1 uppercase, 1 number"
-                />
-              </div>
-            </div>
+            <Input
+              label="Password"
+              name="password"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              error={fieldErrors.password}
+              hint="Min 8 characters, 1 uppercase, 1 lowercase, 1 number"
+            />
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  autoComplete="new-password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
+            <Input
+              label="Confirm Password"
+              name="confirmPassword"
+              type="password"
+              autoComplete="new-password"
+              required
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              error={fieldErrors.confirmPassword}
+            />
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </div>
+              <Alert variant="error">{error}</Alert>
             )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-              >
-                {isLoading ? 'Creating account...' : 'Create account'}
-              </button>
-            </div>
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              className="w-full"
+            >
+              Create account
+            </Button>
           </form>
 
           <div className="mt-6">
-            <p className="text-center text-sm text-gray-600">
+            <p className="text-center text-sm text-fn-text-secondary">
               Already have an account?{' '}
-              <Link href="/login" className="text-primary-600 hover:text-primary-500">
+              <Link href="/login" className="link">
                 Sign in
               </Link>
             </p>
           </div>
 
           <div className="mt-4">
-            <p className="text-center text-xs text-gray-500">
+            <p className="text-center text-xs text-fn-text-muted">
               By creating an account, you agree to our{' '}
-              <Link href="/terms" className="text-primary-600 hover:underline">
+              <Link href="/terms" className="link">
                 Terms of Service
               </Link>{' '}
               and{' '}
-              <Link href="/privacy" className="text-primary-600 hover:underline">
+              <Link href="/privacy" className="link">
                 Privacy Policy
               </Link>
             </p>

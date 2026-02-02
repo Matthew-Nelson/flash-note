@@ -5,7 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.text();
+    // CRITICAL: Read body as ArrayBuffer to preserve exact bytes for signature verification
+    // Using request.text() could modify encoding and break signature validation
+    const bodyBuffer = await request.arrayBuffer();
     const signature = request.headers.get('stripe-signature');
 
     if (!signature) {
@@ -16,7 +18,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Forward the webhook to the backend API
-    // SECURITY: Forward raw body without modifying Content-Type to preserve signature integrity
+    // SECURITY: Forward raw bytes without modifying Content-Type to preserve signature integrity
     const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
 
     const response = await fetch(`${backendUrl}/billing/webhook`, {
@@ -26,11 +28,16 @@ export async function POST(request: NextRequest) {
         'Content-Type': request.headers.get('content-type') || 'application/json',
         'Stripe-Signature': signature,
       },
-      body,
+      body: bodyBuffer,
     });
 
     if (!response.ok) {
-      const errorBody: unknown = await response.json();
+      let errorBody: unknown;
+      try {
+        errorBody = await response.json();
+      } catch {
+        errorBody = await response.text();
+      }
       console.error('Backend webhook error:', errorBody);
       return NextResponse.json(
         { error: 'Webhook processing failed' },

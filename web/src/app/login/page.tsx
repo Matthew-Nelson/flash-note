@@ -1,108 +1,159 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useAuth, ApiError } from '@/lib/auth-context';
+import { loginSchema } from '@/lib/schemas';
+import { Button, Input, Alert } from '@/components/ui';
+import { SessionAlert } from '@/components/auth';
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login, isAuthenticated, isLoading, sessionEndReason, clearSessionEndReason } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      router.push('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, router]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
+    setFieldErrors({});
 
-    // TODO: Implement login - redirect to extension for now
-    // Login is handled by the Chrome extension, not the web app
-    setError('Please use the Chrome extension to log in');
-    setIsLoading(false);
+    // Validate input
+    const result = loginSchema.safeParse({ email, password });
+    if (!result.success) {
+      const errors: { email?: string; password?: string } = {};
+      result.error.errors.forEach((err) => {
+        const field = err.path[0] as 'email' | 'password';
+        errors[field] = err.message;
+      });
+      setFieldErrors(errors);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await login(email, password);
+
+      // Check if email verification is required
+      if (response.emailVerificationRequired) {
+        router.push('/verify-email');
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        // Handle specific error codes
+        switch (err.code) {
+          case 'invalid_credentials':
+            setError('Invalid email or password');
+            break;
+          case 'account_locked':
+            setError('Account temporarily locked. Please try again later.');
+            break;
+          case 'email_not_verified':
+            setError('Please verify your email before signing in.');
+            break;
+          default:
+            setError(err.message || 'Failed to sign in');
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
+  // Show loading while checking auth state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center">
-          <span className="text-3xl font-bold text-primary-600">FlashNote</span>
+          <span className="text-3xl font-bold text-gradient">FlashNote</span>
         </Link>
-        <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
+        <h2 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
           Sign in to your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-fn-text-secondary">
           Or{' '}
-          <Link href="/signup" className="text-primary-600 hover:text-primary-500">
+          <Link href="/signup" className="link">
             create a new account
           </Link>
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+        <div className="card py-8 px-4 sm:px-10">
+          {sessionEndReason && (
+            <SessionAlert reason={sessionEndReason} onDismiss={clearSessionEndReason} />
+          )}
+
           <form className="space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email address
-              </label>
-              <div className="mt-1">
-                <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
-            </div>
+            <Input
+              label="Email address"
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={fieldErrors.email}
+            />
 
             <div>
-              <div className="flex items-center justify-between">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <div className="flex items-center justify-between mb-1.5">
+                <label htmlFor="password" className="label text-sm">
                   Password
                 </label>
-                <Link href="/forgot-password" className="text-sm text-primary-600 hover:text-primary-500">
+                <Link href="/forgot-password" className="text-sm link">
                   Forgot password?
                 </Link>
               </div>
-              <div className="mt-1">
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-                />
-              </div>
+              <Input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                error={fieldErrors.password}
+              />
             </div>
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-md">
-                {error}
-              </div>
+              <Alert variant="error">{error}</Alert>
             )}
 
-            <div>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-              >
-                {isLoading ? 'Signing in...' : 'Sign in'}
-              </button>
-            </div>
+            <Button
+              type="submit"
+              loading={isSubmitting}
+              className="w-full"
+            >
+              Sign in
+            </Button>
           </form>
-
-          <div className="mt-6">
-            <p className="text-center text-sm text-gray-600">
-              Use the Chrome extension to access FlashNote
-            </p>
-          </div>
         </div>
       </div>
     </div>
