@@ -119,8 +119,9 @@ function ResetPasswordContent() {
     return (
       <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <Link href="/" className="flex justify-center">
+          <Link href="/" className="flex justify-center items-center gap-2">
             <span className="text-3xl font-bold text-gradient">FlashNote</span>
+            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
           </Link>
         </div>
 
@@ -155,8 +156,9 @@ function ResetPasswordContent() {
     return (
       <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
         <div className="sm:mx-auto sm:w-full sm:max-w-md">
-          <Link href="/" className="flex justify-center">
+          <Link href="/" className="flex justify-center items-center gap-2">
             <span className="text-3xl font-bold text-gradient">FlashNote</span>
+            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
           </Link>
         </div>
 

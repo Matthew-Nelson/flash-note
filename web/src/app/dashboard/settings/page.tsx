@@ -46,8 +46,9 @@ function SettingsContent() {
       <nav className="bg-fn-bg-primary border-b border-fn-border-color">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <Link href="/" className="text-2xl font-bold text-gradient">
-              FlashNote
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-gradient">FlashNote</span>
+              <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
             </Link>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-fn-text-secondary">{user?.email}</span>

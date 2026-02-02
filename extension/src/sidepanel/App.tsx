@@ -104,8 +104,9 @@ function AuthenticatedApp({
     <div className="app-container flex flex-col flex-1">
       {/* Header */}
       <header className="app-header flex items-center justify-between px-4 py-3">
-        <h1 className="app-title text-lg font-semibold">
-          FlashNote
+        <h1 className="flex items-center gap-2">
+          <span className="app-title text-lg font-semibold">FlashNote</span>
+          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
         </h1>
         <button
           onClick={() => setView(view === 'settings' ? 'generator' : 'settings')}

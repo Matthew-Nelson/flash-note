@@ -89,7 +89,10 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     return (
       <div className="app-container flex flex-col justify-center flex-1 px-6 py-8">
         <div className="text-center mb-8 animate-fade-in-up">
-          <h1 className="app-title text-2xl font-bold">FlashNote</h1>
+          <h1 className="flex items-center justify-center gap-2">
+            <span className="app-title text-2xl font-bold">FlashNote</span>
+            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
+          </h1>
           <p className="text-sm opacity-70 mt-2">
             Reset your password
           </p>
@@ -176,7 +179,10 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   return (
     <div className="app-container flex flex-col justify-center flex-1 px-6 py-8">
       <div className="text-center mb-8 animate-fade-in-up">
-        <h1 className="app-title text-2xl font-bold">FlashNote</h1>
+        <h1 className="flex items-center justify-center gap-2">
+          <span className="app-title text-2xl font-bold">FlashNote</span>
+          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
+        </h1>
         <p className="text-sm opacity-70 mt-2">
           AI-powered SOAP notes for PTs
         </p>

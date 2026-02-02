@@ -1,0 +1,15 @@
+<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="minimalBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="50%" stop-color="#14b8a6" />
+      <stop offset="100%" stop-color="#0d9488" />
+    </linearGradient>
+  </defs>
+  <!-- Background - rounded square -->
+  <rect width="128" height="128" rx="24" fill="url(#minimalBg)" />
+  <!-- White ring approximation -->
+  <rect x="8" y="8" width="112" height="112" rx="20" fill="none" stroke="white" stroke-width="3" stroke-opacity="0.2" />
+  <!-- Bold lightning bolt -->
+  <path d="M72 20L40 68h20L48 108l40-52H68l4-36z" fill="white" />
+</svg>
