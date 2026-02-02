@@ -161,7 +161,12 @@ These are researched but not prioritized for current development.
 | OAuth/Social Login | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | Google OAuth recommended |
 | Conversational Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI asks clarifying questions |
 | Review Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI reviews therapist's draft |
-| Unified Styling System | [UNIFIED_STYLING_PLAN.md](./planning/UNIFIED_STYLING_PLAN.md) | Shared CSS components |
+
+## Recently Completed
+
+| Feature | Notes |
+|---------|-------|
+| Unified Styling System | ✅ Implemented "Warm Wellness" theme - shared design tokens, component CSS, consistent green/teal palette across extension and web. See `/shared/README.md`. |
 
 ---
 

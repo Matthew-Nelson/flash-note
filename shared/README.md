@@ -1,33 +1,51 @@
 # FlashNote Shared Design System
 
-Lightweight shared design tokens for visual consistency between the web app and browser extension.
+Shared design tokens and component styles for visual consistency between the web app and browser extension.
 
 ## Philosophy
 
-This is **not** a shared component library. Each app owns its components independently. We only share:
+This is **not** a shared component library. Each app owns its React components independently. We share:
 
 1. **Design tokens** (colors, typography, spacing)
-2. **Tailwind preset** (extends both apps with the same design vocabulary)
+2. **Component CSS classes** (buttons, inputs, cards, etc.)
+3. **Tailwind preset** (extends both apps with the same design vocabulary)
 
-This approach gives us visual consistency without the complexity overhead of a monorepo component library.
+This approach gives us visual consistency without the complexity of a monorepo component library.
+
+## Current Theme: Warm Wellness
+
+The design system uses a **green-forward, warm background** aesthetic designed for healthcare/physical therapy environments:
+
+| Element | Value | Purpose |
+|---------|-------|---------|
+| Primary | Emerald `#10b981` | Healing, growth, recovery |
+| Secondary | Teal `#14b8a6` | Clinical + modern |
+| Accent | Amber `#f59e0b` | Warm highlights |
+| Background | Cream `#fdfcfb` | Reduces eye strain, human-centered |
+| Neutrals | Stone palette | Warm grays (not cool slate) |
 
 ## Files
 
 ```
 shared/
-├── design-tokens.css   # CSS custom properties for colors, spacing, etc.
-├── tailwind-preset.js  # Shared Tailwind configuration
-└── README.md           # This file
+├── design-tokens-warm.css   # Warm Wellness theme tokens (CURRENT)
+├── design-tokens.css        # Original theme tokens (archived)
+├── components.css           # Shared component classes
+├── tailwind-preset-warm.js  # Warm theme Tailwind config (CURRENT)
+├── tailwind-preset.js       # Original Tailwind config (archived)
+└── README.md                # This file
 ```
 
 ## Usage
 
 ### In CSS
 
-Both apps import the design tokens in their main CSS file:
+Both apps import the design tokens and components in their main CSS file:
 
 ```css
-@import '../../../shared/design-tokens.css';
+/* For Warm Wellness theme (current) */
+@import '../../../shared/design-tokens-warm.css';
+@import '../../../shared/components.css';
 ```
 
 Use the `--fn-*` prefixed variables:
@@ -45,7 +63,8 @@ Use the `--fn-*` prefixed variables:
 Both apps extend from the shared preset in their `tailwind.config`:
 
 ```js
-presets: [require('../shared/tailwind-preset.js')]
+// For Warm Wellness theme (current)
+presets: [require('../shared/tailwind-preset-warm.js')]
 ```
 
 Use the `fn-*` prefixed utilities:
@@ -60,21 +79,49 @@ Use the `fn-*` prefixed utilities:
 </button>
 ```
 
+### Component Classes
+
+Use shared component classes for consistent styling:
+
+```html
+<!-- Buttons -->
+<button class="btn-primary px-4 py-2">Primary Action</button>
+<button class="btn-secondary px-4 py-2">Secondary Action</button>
+
+<!-- Forms -->
+<input class="input-field px-3 py-2" placeholder="Enter text..." />
+<label class="label">Field Label</label>
+
+<!-- Cards -->
+<div class="card">
+  <div class="card-header">Header</div>
+  <div class="p-4">Content</div>
+</div>
+
+<!-- Feedback -->
+<div class="alert alert-success">Success message</div>
+<div class="alert alert-error">Error message</div>
+
+<!-- Links -->
+<a href="#" class="link">Gradient link</a>
+```
+
 ## Design Tokens Reference
 
-### Colors
+### Colors (Warm Wellness Theme)
 
 | Token | Description |
 |-------|-------------|
-| `--fn-bg-primary` | Main background (white in light mode) |
-| `--fn-bg-secondary` | Card/section backgrounds |
-| `--fn-bg-tertiary` | Subtle backgrounds, hover states |
-| `--fn-text-primary` | Main text color |
-| `--fn-text-secondary` | Secondary/body text |
+| `--fn-bg-primary` | Main background (warm cream) |
+| `--fn-bg-secondary` | Section backgrounds (warm beige) |
+| `--fn-bg-tertiary` | Hover states, subtle backgrounds |
+| `--fn-card-bg` | Card backgrounds (white) |
+| `--fn-text-primary` | Main text (warm dark) |
+| `--fn-text-secondary` | Body text |
 | `--fn-text-muted` | Placeholder, disabled text |
-| `--fn-accent-primary` | Brand cyan (#06b6d4) |
-| `--fn-accent-secondary` | Brand violet (#8b5cf6) |
-| `--fn-accent-tertiary` | Brand pink (#ec4899) |
+| `--fn-accent-primary` | Emerald (#10b981) |
+| `--fn-accent-secondary` | Teal (#14b8a6) |
+| `--fn-accent-tertiary` | Amber (#f59e0b) |
 | `--fn-border-color` | Default border color |
 | `--fn-success` | Success state green |
 | `--fn-error` | Error state red |
@@ -87,12 +134,10 @@ Use the `fn-*` prefixed utilities:
 | `--fn-font-sans` | Inter, system fonts |
 | `--fn-text-xs` | 0.75rem (12px) |
 | `--fn-text-sm` | 0.875rem (14px) |
-| `--fn-text-base` | 1rem (16px) |
+| `--fn-text-base` | 1.0625rem (17px) |
 | `--fn-text-lg` | 1.125rem (18px) |
 | `--fn-text-xl` | 1.25rem (20px) |
 | `--fn-text-2xl` | 1.5rem (24px) |
-| `--fn-text-3xl` | 1.875rem (30px) |
-| `--fn-text-4xl` | 2.25rem (36px) |
 
 ### Spacing
 
@@ -115,18 +160,33 @@ Use the `fn-*` prefixed utilities:
 | `--fn-radius-lg` | 0.75rem (12px) |
 | `--fn-radius-xl` | 1rem (16px) |
 
-## Design Style
+## Component Classes Reference
 
-FlashNote uses a clean, professional "Gradient Accent" design style featuring:
+| Class | Description |
+|-------|-------------|
+| `.btn-primary` | Gradient button (emerald→teal) |
+| `.btn-secondary` | Outline button with gradient border |
+| `.input-field` | Text input with gradient focus |
+| `.label` | Form label styling |
+| `.card` | Container with border and shadow |
+| `.card-header` | Card header with accent bar |
+| `.link` | Gradient text link |
+| `.alert`, `.alert-success`, `.alert-error`, `.alert-warning` | Alert boxes |
+| `.badge`, `.badge-trial`, `.badge-active`, `.badge-expired` | Status badges |
+| `.loading-spinner` | Animated loading spinner |
 
-- White backgrounds with subtle gradients
-- Cyan (#06b6d4), Violet (#8b5cf6), and Pink (#ec4899) brand accents
-- Modern, accessible styling for healthcare environments
+## Design Decisions
+
+1. **2-color gradients** - Cleaner and more professional than 3-color
+2. **Static animations** - Buttons don't animate by default (less distracting for clinical use)
+3. **Warm backgrounds** - Cream/beige reduces eye strain
+4. **Green primary** - Represents healing/growth (appropriate for PT)
+5. **17px base font** - Slightly larger for clinical readability
 
 ## Adding New Tokens
 
-1. Add the CSS variable to `design-tokens.css` under the appropriate section
-2. Add the Tailwind utility to `tailwind-preset.js` if needed
+1. Add the CSS variable to `design-tokens-warm.css` under the appropriate section
+2. Add the Tailwind utility to `tailwind-preset-warm.js` if needed
 3. Document it in this README
 
 Use the `--fn-` prefix for CSS variables and `fn-` prefix for Tailwind utilities to avoid conflicts with app-specific styles.
