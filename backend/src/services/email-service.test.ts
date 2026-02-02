@@ -20,7 +20,7 @@ vi.mock('../config.js', () => ({
   config: {
     RESEND_API_KEY: 'test_api_key',
     WEB_URL: TEST_CONFIG_DEFAULTS.WEB_URL,
-    EMAIL_FROM_ADDRESS: 'noreply@flashnote.app',
+    EMAIL_FROM_ADDRESS: 'noreply@flashnote.com',
     EMAIL_FROM_NAME: 'FlashNote',
   },
 }));
@@ -53,7 +53,7 @@ describe('EmailService', () => {
       expect(mockResendSend).toHaveBeenCalledWith(
         expect.objectContaining({
           to: 'user@example.com',
-          subject: 'Verify your FlashNote email address',
+          subject: 'Verify your email to start saving hours on documentation',
         })
       );
     });
@@ -198,7 +198,7 @@ describe('EmailService', () => {
       const callArgs = mockResendSend.mock.calls[0]?.[0];
 
       // HTML should include instruction to copy-paste URL
-      expect(callArgs.html).toContain('copy and paste this link');
+      expect(callArgs.html).toContain('copy this link');
     });
 
     it('should include clickable link in text version', async () => {

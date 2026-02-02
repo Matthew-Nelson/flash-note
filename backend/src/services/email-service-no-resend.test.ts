@@ -12,7 +12,7 @@ vi.mock('../config.js', () => ({
   config: {
     RESEND_API_KEY: '', // Empty string - Resend not configured
     WEB_URL: TEST_CONFIG_DEFAULTS.WEB_URL,
-    EMAIL_FROM_ADDRESS: 'noreply@flashnote.app',
+    EMAIL_FROM_ADDRESS: 'noreply@flashnote.com',
     EMAIL_FROM_NAME: 'FlashNote',
   },
 }));
@@ -59,7 +59,7 @@ describe('EmailService (no Resend)', () => {
       const calls = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string);
       expect(calls).toContain('EMAIL SERVICE: Resend not configured, logging email:');
       expect(calls.some((call: string) => call.includes('To: user@example.com'))).toBe(true);
-      expect(calls.some((call: string) => call.includes('Subject: Verify your FlashNote email address'))).toBe(true);
+      expect(calls.some((call: string) => call.includes('Subject: Verify your email to start saving hours on documentation'))).toBe(true);
     });
 
     it('should include verification URL in logged email', async () => {
@@ -120,7 +120,7 @@ describe('EmailService (no Resend)', () => {
       const allLogOutput = consoleLogSpy.mock.calls.map((call: unknown[]) => call[0] as string).join('\n');
       // Plain text content should include the welcome message
       expect(allLogOutput).toContain('Welcome to FlashNote');
-      expect(allLogOutput).toContain('verify your email address');
+      expect(allLogOutput).toContain('Verify your email');
     });
   });
 });
