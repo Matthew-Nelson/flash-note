@@ -291,8 +291,8 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2025-01-28 | Initial document |
-| 1.1 | 2025-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status |
+| 1.0 | 2026-01-28 | Initial document |
+| 1.1 | 2026-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status |
 | 1.2 | 2026-02-01 | Updated OPERATIONS.md references to MONITORING_SETUP.md (moved to planning folder) |
 
 ---

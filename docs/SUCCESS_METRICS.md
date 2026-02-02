@@ -409,9 +409,9 @@ These items must be complete before public launch.
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.2 | 2025-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
-| 1.1 | 2025-01-28 | Added PROD-16 for audit logging workflow completion |
-| 1.0 | 2025-01-22 | Initial document based on audit findings |
+| 1.2 | 2026-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
+| 1.1 | 2026-01-28 | Added PROD-16 for audit logging workflow completion |
+| 1.0 | 2026-01-22 | Initial document based on audit findings |
 
 ---
 
