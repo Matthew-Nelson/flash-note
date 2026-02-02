@@ -12,7 +12,7 @@
    BUTTONS
    ============================================ */
 
-/* Primary Button - Gradient background (static for clinical focus) */
+/* Primary Button - Gradient background with lift effect (no scale to avoid text jitter) */
 .btn-primary {
   color: white;
   border: none;
@@ -24,31 +24,33 @@
     var(--fn-accent-secondary) 100%
   );
   border-radius: var(--fn-radius-md);
-  transition: transform var(--fn-transition-base) var(--fn-ease-default),
-              box-shadow var(--fn-transition-base) var(--fn-ease-default),
-              background var(--fn-transition-base) var(--fn-ease-default);
   font-weight: var(--fn-font-medium);
+  /* Pre-establish GPU layer to prevent jolt on first hover */
+  transform: translateY(0);
+  will-change: transform, box-shadow;
+  box-shadow: 0 2px 8px var(--fn-accent-glow-light);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, filter 0.15s ease-out;
 }
 
 .btn-primary:hover:not(:disabled) {
-  transform: scale(1.02);
-  box-shadow: 0 4px 20px var(--fn-accent-glow);
-  filter: brightness(0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--fn-accent-glow);
+  filter: brightness(1.02);
 }
 
 .btn-primary:active:not(:disabled) {
-  transform: scale(0.97);
-  box-shadow: 0 2px 10px var(--fn-accent-glow);
-  transition: transform 0.1s ease;
+  transform: translateY(0);
+  box-shadow: 0 2px 8px var(--fn-accent-glow-light);
+  filter: brightness(0.98);
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out;
 }
 
 .btn-primary:disabled {
   background: var(--fn-btn-disabled-bg);
   color: var(--fn-text-muted);
-  opacity: 0.5;
   box-shadow: none;
   transform: none;
-  animation: none;
+  opacity: 0.7;
   cursor: not-allowed;
 }
 

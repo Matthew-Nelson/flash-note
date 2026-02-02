@@ -211,7 +211,7 @@ body,
   background-clip: text;
 }
 
-/* Primary Button - 2-color gradient, static */
+/* Primary Button - Gradient with lift effect (no scale to avoid text jitter) */
 .btn-primary {
   color: white;
   border: none;
@@ -219,28 +219,34 @@ body,
   overflow: hidden;
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
   border-radius: var(--border-radius-base);
-  transition: all 0.2s ease;
+  font-weight: 500;
+  /* Pre-establish GPU layer to prevent jolt on first hover */
+  transform: translateY(0);
+  will-change: transform, box-shadow;
+  box-shadow: 0 2px 8px var(--accent-glow-light);
+  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, filter 0.15s ease-out;
 }
 
-.btn-primary:hover {
-  transform: scale(1.02);
-  box-shadow: 0 4px 20px var(--accent-glow);
-  background: linear-gradient(135deg, var(--accent-primary-hover) 0%, var(--accent-secondary-hover) 100%);
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
+  filter: brightness(1.02);
 }
 
-/* Button Press States - tactile feedback */
 .btn-primary:active:not(:disabled) {
-  transform: scale(0.97);
-  box-shadow: 0 2px 10px var(--accent-glow);
-  transition: transform 0.1s ease;
+  transform: translateY(0);
+  box-shadow: 0 2px 8px var(--accent-glow-light);
+  filter: brightness(0.98);
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out;
 }
 
 .btn-primary:disabled {
   background: var(--btn-disabled-bg);
   color: var(--text-muted);
-  opacity: 0.5;
   box-shadow: none;
   transform: none;
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 /* Secondary Button - Green gradient border */
