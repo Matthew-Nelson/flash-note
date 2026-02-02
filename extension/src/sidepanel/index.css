@@ -116,47 +116,55 @@ body {
 }
 
 /* ============================================
-   THEME VARIABLES - Warm Wellness
+   THEME VARIABLES - Local Aliases
+
+   These alias the shared design tokens (--fn-*) for
+   shorter variable names in this file. Values come
+   from design-tokens-warm.css - do not hardcode here.
    ============================================ */
 
 :root {
-  /* Backgrounds - Warm cream */
-  --bg-primary: #fdfcfb;
-  --bg-secondary: #f7f5f3;
-  --bg-tertiary: #f0edeb;
-  --bg-card: #ffffff;
+  /* Backgrounds - Reference shared tokens */
+  --bg-primary: var(--fn-bg-primary);
+  --bg-secondary: var(--fn-bg-secondary);
+  --bg-tertiary: var(--fn-bg-tertiary);
+  --bg-card: var(--fn-bg-card, #ffffff);
 
-  /* Borders - Warm stone */
-  --border-color: #e7e5e4;
-  --border-subtle: #f0edeb;
+  /* Borders */
+  --border-color: var(--fn-border-color);
+  --border-subtle: var(--fn-border-subtle);
 
-  /* Text - Warm grays */
-  --text-primary: #1c1917;
-  --text-secondary: #57534e;
-  --text-muted: #78716c;
+  /* Text */
+  --text-primary: var(--fn-text-primary);
+  --text-secondary: var(--fn-text-secondary);
+  --text-muted: var(--fn-text-muted);
 
-  /* Accents - Green forward */
-  --accent-primary: #10b981;
-  --accent-secondary: #14b8a6;
-  --accent-tertiary: #f59e0b;
+  /* Accents */
+  --accent-primary: var(--fn-accent-primary);
+  --accent-secondary: var(--fn-accent-secondary);
+  --accent-tertiary: var(--fn-accent-tertiary);
 
-  /* Glow - Green based */
-  --accent-glow: rgba(16, 185, 129, 0.35);
-  --accent-glow-light: rgba(16, 185, 129, 0.12);
+  /* Hover states - for button interactions */
+  --accent-primary-hover: var(--fn-accent-primary-hover);
+  --accent-secondary-hover: var(--fn-accent-secondary-hover);
 
-  /* Semantic */
-  --success: #10b981;
-  --error: #ef4444;
-  --error-bg: #fef2f2;
-  --error-text: var(--error);
-  --warning: #f59e0b;
+  /* Glow effects */
+  --accent-glow: var(--fn-accent-glow);
+  --accent-glow-light: var(--fn-accent-glow-light);
+
+  /* Semantic colors */
+  --success: var(--fn-success);
+  --error: var(--fn-error);
+  --error-bg: var(--fn-error-light);
+  --error-text: var(--fn-error);
+  --warning: var(--fn-warning);
 
   /* Components */
-  --btn-disabled-bg: #f5f5f4;
+  --btn-disabled-bg: var(--fn-btn-disabled-bg, #f5f5f4);
   --trial-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(20, 184, 166, 0.04));
   --trial-border: var(--accent-primary);
-  --border-radius-base: 10px;
-  --border-radius-lg: 12px;
+  --border-radius-base: var(--fn-radius-md);
+  --border-radius-lg: var(--fn-radius-lg);
 }
 
 /* ============================================
@@ -217,7 +225,7 @@ body,
 .btn-primary:hover {
   transform: scale(1.02);
   box-shadow: 0 4px 20px var(--accent-glow);
-  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  background: linear-gradient(135deg, var(--accent-primary-hover) 0%, var(--accent-secondary-hover) 100%);
 }
 
 /* Button Press States - tactile feedback */

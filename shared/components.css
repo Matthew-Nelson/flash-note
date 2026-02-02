@@ -57,7 +57,7 @@
   color: var(--fn-text-primary);
   background: var(--fn-card-bg, var(--fn-bg-primary));
   border: 2px solid transparent;
-  background-image: linear-gradient(var(--fn-card-bg, white), var(--fn-card-bg, white)),
+  background-image: linear-gradient(var(--fn-card-bg, #ffffff), var(--fn-card-bg, #ffffff)),
     linear-gradient(
       135deg,
       var(--fn-accent-primary),
@@ -93,7 +93,7 @@
   border-radius: var(--fn-radius-lg);
   overflow: hidden;
   transition: box-shadow var(--fn-transition-slow) var(--fn-ease-default);
-  background: var(--fn-card-bg);
+  background: var(--fn-card-bg, #ffffff);
   border: 1px solid var(--fn-border-color);
 }
 
@@ -139,7 +139,7 @@
 .input-field:focus {
   outline: none;
   border-color: transparent;
-  background-image: linear-gradient(white, white),
+  background-image: linear-gradient(var(--fn-input-bg, #ffffff), var(--fn-input-bg, #ffffff)),
     linear-gradient(
       135deg,
       var(--fn-accent-primary),
