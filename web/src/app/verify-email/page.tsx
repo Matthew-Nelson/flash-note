@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Alert, Button, LoadingSpinner } from '@/components/ui';
+import { useAuth } from '@/lib/auth-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
@@ -15,6 +16,7 @@ interface VerifyEmailResponse {
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
+  const { isAuthenticated, refreshUser } = useAuth();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'verifying' | 'success' | 'already_verified' | 'error'>(
     () => (token ? 'verifying' : 'error')
@@ -33,6 +35,15 @@ function VerifyEmailContent() {
       const result = (await response.json()) as VerifyEmailResponse;
 
       if (response.ok && result.success) {
+        // If user is logged in, refresh their data to get updated emailVerified status
+        if (isAuthenticated) {
+          try {
+            await refreshUser();
+          } catch {
+            // Refresh failed, but verification still succeeded - user can continue
+          }
+        }
+
         if (result.data?.alreadyVerified) {
           setStatus('already_verified');
           setMessage('Your email was already verified.');
@@ -48,7 +59,7 @@ function VerifyEmailContent() {
       setStatus('error');
       setMessage('An error occurred while verifying your email');
     }
-  }, []);
+  }, [isAuthenticated, refreshUser]);
 
   useEffect(() => {
     if (!token || verificationStarted.current) {
@@ -93,9 +104,15 @@ function VerifyEmailContent() {
                 You can now use all features in the FlashNote Chrome extension.
               </p>
               <div className="mt-6">
-                <Link href="/login">
-                  <Button className="w-full">Sign in</Button>
-                </Link>
+                {isAuthenticated ? (
+                  <Link href="/dashboard">
+                    <Button className="w-full">Go to Dashboard</Button>
+                  </Link>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full">Sign in</Button>
+                  </Link>
+                )}
               </div>
             </div>
           )}
@@ -113,9 +130,15 @@ function VerifyEmailContent() {
                 You can use all features in the FlashNote Chrome extension.
               </p>
               <div className="mt-6">
-                <Link href="/login">
-                  <Button className="w-full">Sign in</Button>
-                </Link>
+                {isAuthenticated ? (
+                  <Link href="/dashboard">
+                    <Button className="w-full">Go to Dashboard</Button>
+                  </Link>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full">Sign in</Button>
+                  </Link>
+                )}
               </div>
             </div>
           )}
