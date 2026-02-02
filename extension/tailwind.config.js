@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  presets: [require('../shared/tailwind-preset.js')],
+  presets: [require('../shared/tailwind-preset-warm.js')],
   content: ['./src/**/*.{js,ts,jsx,tsx,html}'],
   theme: {
     extend: {
