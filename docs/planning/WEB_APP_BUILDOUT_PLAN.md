@@ -1,25 +1,24 @@
 # Web App Buildout Plan
 
+> **Status: Phases 1-4 Complete** (February 2, 2026)
+>
+> This plan has been implemented. Remaining work: Phase 5 (Marketing Enhancement) is nice-to-have, and the `/usage/stats` backend endpoint is needed for real usage data on the dashboard.
+
 ## Current State Summary
 
-The web app is a Next.js 14+ application that currently serves as:
-- Marketing landing page (partially complete)
-- Authentication flow entry point (skeleton - not connected to backend)
-- User dashboard (mock data only)
+The web app is a Next.js 14+ application that now includes:
+- ✅ Marketing landing page with FlashNote design system
+- ✅ Authentication flow fully connected to backend
+- ✅ User dashboard with real auth/subscription data (usage still mock)
+- ✅ Stripe checkout and customer portal integration
+- ✅ Legal pages (Privacy Policy, Terms of Service)
+- ✅ Consistent UI component library
+- ✅ Session management and protected routes
+- ✅ Account settings page
 
-**What exists:**
-- Landing page with hero, features, and pricing preview
-- Pricing page with tiers and FAQ
-- Auth page skeletons (login, signup, forgot-password, etc.)
-- Stripe webhook handler
-- Shared design system (already integrated via `shared/tailwind-preset.js`)
-
-**What's missing:**
-- Backend authentication integration
-- Real dashboard with live data
-- Legal pages (Privacy Policy, Terms of Service)
-- Consistent component library
-- Session management and protected routes
+**What's remaining:**
+- Backend `/usage/stats` endpoint (for real usage data on dashboard)
+- Phase 5: Marketing Enhancement (nice-to-have)
 
 ---
 
@@ -58,7 +57,7 @@ The web app's `globals.css` would then:
 
 ## Buildout Phases
 
-### Phase 1: Foundation & Theming Consistency
+### Phase 1: Foundation & Theming Consistency ✅ COMPLETE
 
 **Goal:** Establish consistent theming between extension and web app
 
@@ -80,7 +79,7 @@ The web app's `globals.css` would then:
 
 ---
 
-### Phase 2: Authentication Integration
+### Phase 2: Authentication Integration ✅ COMPLETE
 
 **Goal:** Connect auth pages to backend API
 
@@ -118,9 +117,11 @@ The web app's `globals.css` would then:
 
 ---
 
-### Phase 3: Dashboard Implementation
+### Phase 3: Dashboard Implementation ✅ MOSTLY COMPLETE
 
 **Goal:** Replace mock data with real user data from backend
+
+> **Note:** Auth and subscription data are live. Usage data still uses mock data pending backend `/usage/stats` endpoint.
 
 **Tasks:**
 1. Dashboard data fetching:
@@ -165,7 +166,7 @@ The web app's `globals.css` would then:
 
 ---
 
-### Phase 4: Legal Pages & Compliance
+### Phase 4: Legal Pages & Compliance ✅ COMPLETE
 
 **Goal:** Add required legal pages before launch
 

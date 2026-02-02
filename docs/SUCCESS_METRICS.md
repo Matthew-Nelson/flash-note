@@ -55,7 +55,7 @@ These items must be complete before any user testing.
 | MVP-05 | Database migrations run successfully | Backend | P0 | ✅ Done |
 | MVP-06 | API health endpoint responds | Backend | P0 | ✅ Done |
 | MVP-07 | Extension icon assets exist (all 4 sizes) | Extension | P0 | ⚠️ Placeholders exist, need production icons |
-| MVP-08 | Web app auth connects to backend | Web | P0 | ❌ TODO |
+| MVP-08 | Web app auth connects to backend | Web | P0 | ✅ Done |
 | MVP-09 | Extension auth connects to backend | Extension | P0 | ⚠️ Needs testing |
 | MVP-10 | Note generation returns valid SOAP | Backend | P0 | ⚠️ Needs testing |
 | MVP-11 | Zod validation on all backend inputs | Backend | P0 | ✅ Done |
@@ -76,9 +76,9 @@ These items must be complete before beta testing with real PTs.
 | BETA-04 | Trial expiration enforced | Backend | P0 | ⚠️ Needs testing |
 | BETA-05 | Rate limiting works (verified) | Backend | P0 | ⚠️ Needs testing |
 | BETA-06 | Password validation matches spec | All | P0 | ✅ Done |
-| BETA-07 | Web dashboard shows real data | Web | P0 | ❌ Mock data |
-| BETA-08 | Privacy policy page exists | Web | P0 | ❌ Missing |
-| BETA-09 | Terms of service page exists | Web | P0 | ❌ Missing |
+| BETA-07 | Web dashboard shows real data | Web | P0 | ⚠️ Auth/subscription live, usage mock |
+| BETA-08 | Privacy policy page exists | Web | P0 | ✅ Done |
+| BETA-09 | Terms of service page exists | Web | P0 | ✅ Done |
 | BETA-10 | API request timeout handling | Extension | P1 | ✅ Done |
 | BETA-11 | Retry logic with backoff | Extension | P1 | ✅ Done |
 | BETA-12 | Offline detection | Extension | P2 | ❌ Missing |
@@ -176,18 +176,18 @@ These items must be complete before public launch.
 | **TypeScript** | Strict mode | CLAUDE.md | ✅ Done |
 | **Pages** | Landing page | Handoff §5 | ✅ Done |
 | **Pages** | Pricing page | Handoff §5 | ✅ Done |
-| **Pages** | Login page | Handoff §5 | ⚠️ UI only |
-| **Pages** | Signup page | Handoff §5 | ⚠️ UI only |
-| **Pages** | Dashboard | Handoff §5 | ⚠️ Mock data |
-| **Pages** | Privacy policy | Legal | ❌ Missing |
-| **Pages** | Terms of service | Legal | ❌ Missing |
-| **Auth** | Backend integration | Core | ❌ TODO |
-| **Auth** | Session management | Core | ❌ TODO |
-| **Billing** | Stripe checkout redirect | Handoff §13 | ❌ TODO |
-| **Billing** | Customer portal link | Handoff §13 | ❌ TODO |
-| **Components** | Reusable button | Best practice | ❌ Missing |
-| **Components** | Reusable input | Best practice | ❌ Missing |
-| **Components** | Navigation | Best practice | ❌ Missing |
+| **Pages** | Login page | Handoff §5 | ✅ Done |
+| **Pages** | Signup page | Handoff §5 | ✅ Done |
+| **Pages** | Dashboard | Handoff §5 | ⚠️ Usage data mock |
+| **Pages** | Privacy policy | Legal | ✅ Done |
+| **Pages** | Terms of service | Legal | ✅ Done |
+| **Auth** | Backend integration | Core | ✅ Done |
+| **Auth** | Session management | Core | ✅ Done |
+| **Billing** | Stripe checkout redirect | Handoff §13 | ✅ Done |
+| **Billing** | Customer portal link | Handoff §13 | ✅ Done |
+| **Components** | Reusable button | Best practice | ✅ Done |
+| **Components** | Reusable input | Best practice | ✅ Done |
+| **Components** | Navigation | Best practice | ✅ Done |
 | **Config** | .env.example | Best practice | ✅ Done |
 | **Config** | Security headers | Best practice | ❌ Missing |
 | **Error** | Error boundary | Best practice | ✅ Done |
@@ -356,8 +356,8 @@ These items must be complete before public launch.
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Privacy policy | ❌ | Template in docs/ |
-| Terms of service | ❌ | Template in docs/ |
+| Privacy policy | ✅ | Published at /privacy |
+| Terms of service | ✅ | Published at /terms |
 | BAA template for customers | ⚠️ | Template ready with pass-through model language, needs legal review |
 | HIPAA compliance documentation | ❌ | |
 
@@ -389,7 +389,7 @@ These items must be complete before public launch.
 | Install Zod in extension | - | ✅ Done | - |
 | Add Error Boundary to extension | - | ✅ Done | - |
 | Add Error Boundary to web | - | ✅ Done | - |
-| Implement web auth integration | - | Not started | - |
+| Implement web auth integration | - | ✅ Done | - |
 | Add ESLint configs | - | ✅ Done | - |
 | Test extension auth flow | - | Not started | - |
 | Test note generation end-to-end | - | Not started | - |
@@ -398,10 +398,10 @@ These items must be complete before public launch.
 
 | Phase | Total Items | Completed | Percentage |
 |-------|-------------|-----------|------------|
-| MVP Foundation | 15 | 11 | 73% |
-| Beta Ready | 12 | 4 | 33% |
+| MVP Foundation | 15 | 12 | 80% |
+| Beta Ready | 12 | 6 | 50% |
 | Production Ready | 16 | 4 | 25% |
-| **Overall** | **43** | **19** | **44%** |
+| **Overall** | **43** | **22** | **51%** |
 
 ---
 
@@ -409,6 +409,7 @@ These items must be complete before public launch.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.3 | 2026-02-02 | Web app buildout complete: auth integration, Stripe checkout/portal, privacy/terms pages, UI components, dashboard settings |
 | 1.2 | 2026-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
 | 1.1 | 2026-01-28 | Added PROD-16 for audit logging workflow completion |
 | 1.0 | 2026-01-22 | Initial document based on audit findings |
