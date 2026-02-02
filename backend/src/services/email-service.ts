@@ -26,7 +26,7 @@ class EmailService {
   async sendVerificationEmail(email: string, token: string): Promise<void> {
     const verificationUrl = `${config.WEB_URL}/verify-email?token=${encodeURIComponent(token)}`;
 
-    const subject = 'Verify your FlashNote email address';
+    const subject = 'Verify your email to start saving hours on documentation';
 
     const html = `
 <!DOCTYPE html>
@@ -35,37 +35,58 @@ class EmailService {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
-    <h1 style="color: #1a1a1a; margin-bottom: 24px; font-size: 24px;">Welcome to FlashNote</h1>
+<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1c1917; margin: 0; padding: 0; background-color: #fdfcfb;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header with Logo -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <span style="font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">FlashNote</span>
+    </div>
 
-    <p style="margin-bottom: 16px;">Please verify your email address to complete your registration and start generating SOAP notes.</p>
+    <!-- Main Card -->
+    <div style="background-color: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(28, 25, 23, 0.08), 0 2px 4px -2px rgba(28, 25, 23, 0.06);">
+      <h1 style="color: #1c1917; margin: 0 0 16px 0; font-size: 24px; font-weight: 600;">Welcome to FlashNote!</h1>
 
-    <a href="${verificationUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500; margin: 16px 0;">Verify Email Address</a>
+      <p style="margin: 0 0 24px 0; color: #57534e; font-size: 16px;">You're one click away from transforming how you write PT documentation. Verify your email to start generating complete SOAP notes in seconds.</p>
 
-    <p style="margin-top: 24px; font-size: 14px; color: #666;">This link will expire in 24 hours.</p>
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${verificationUrl}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Verify Email Address</a>
+      </div>
 
-    <p style="font-size: 14px; color: #666;">If you didn't create a FlashNote account, you can safely ignore this email.</p>
+      <p style="margin: 24px 0 0 0; font-size: 14px; color: #78716c;">This link expires in 24 hours for security.</p>
+    </div>
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+    <!-- Footer -->
+    <div style="text-align: center; margin-top: 32px; padding-top: 24px;">
+      <p style="font-size: 13px; color: #a8a29e; margin: 0 0 8px 0;">Didn't create a FlashNote account? You can safely ignore this email.</p>
+      <p style="font-size: 12px; color: #a8a29e; margin: 16px 0 0 0;">If the button doesn't work, copy this link:</p>
+      <p style="font-size: 12px; color: #a8a29e; word-break: break-all; margin: 4px 0 0 0;">${verificationUrl}</p>
+    </div>
 
-    <p style="font-size: 12px; color: #999; margin: 0;">If the button doesn't work, copy and paste this link into your browser:</p>
-    <p style="font-size: 12px; color: #999; word-break: break-all;">${verificationUrl}</p>
+    <!-- Company Footer -->
+    <div style="text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #e7e5e4;">
+      <p style="font-size: 12px; color: #a8a29e; margin: 0;">FlashNote - AI-powered documentation for physical therapists</p>
+    </div>
   </div>
 </body>
 </html>
     `.trim();
 
     const text = `
-Welcome to FlashNote
+Welcome to FlashNote!
 
-Please verify your email address to complete your registration and start generating SOAP notes.
+You're one click away from transforming how you write PT documentation.
 
-Click this link to verify your email: ${verificationUrl}
+Verify your email to start generating complete SOAP notes in seconds:
+${verificationUrl}
 
-This link will expire in 24 hours.
+This link expires in 24 hours for security.
 
-If you didn't create a FlashNote account, you can safely ignore this email.
+---
+
+Didn't create a FlashNote account? You can safely ignore this email.
+
+FlashNote - AI-powered documentation for physical therapists
     `.trim();
 
     await this.sendEmail(email, subject, html, text);
@@ -86,22 +107,42 @@ If you didn't create a FlashNote account, you can safely ignore this email.
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px;">
-    <h1 style="color: #1a1a1a; margin-bottom: 24px; font-size: 24px;">Reset Your Password</h1>
+<body style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #1c1917; margin: 0; padding: 0; background-color: #fdfcfb;">
+  <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <!-- Header with Logo -->
+    <div style="text-align: center; margin-bottom: 32px;">
+      <span style="font-size: 28px; font-weight: 700; background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">FlashNote</span>
+    </div>
 
-    <p style="margin-bottom: 16px;">We received a request to reset your FlashNote password. Click the button below to create a new password.</p>
+    <!-- Main Card -->
+    <div style="background-color: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(28, 25, 23, 0.08), 0 2px 4px -2px rgba(28, 25, 23, 0.06);">
+      <h1 style="color: #1c1917; margin: 0 0 16px 0; font-size: 24px; font-weight: 600;">Reset Your Password</h1>
 
-    <a href="${resetUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500; margin: 16px 0;">Reset Password</a>
+      <p style="margin: 0 0 24px 0; color: #57534e; font-size: 16px;">We received a request to reset your FlashNote password. Click the button below to create a new password and get back to your documentation.</p>
 
-    <p style="margin-top: 24px; font-size: 14px; color: #dc2626; font-weight: 500;">This link will expire in 15 minutes for security reasons.</p>
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%); color: #ffffff; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">Reset Password</a>
+      </div>
 
-    <p style="font-size: 14px; color: #666;">If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.</p>
+      <!-- Security Warning -->
+      <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 24px 0;">
+        <p style="margin: 0; font-size: 14px; color: #92400e; font-weight: 500;">This link expires in 15 minutes for your security.</p>
+      </div>
 
-    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+      <p style="margin: 16px 0 0 0; font-size: 14px; color: #78716c;">If you didn't request this reset, no action is needed. Your password will remain unchanged.</p>
+    </div>
 
-    <p style="font-size: 12px; color: #999; margin: 0;">If the button doesn't work, copy and paste this link into your browser:</p>
-    <p style="font-size: 12px; color: #999; word-break: break-all;">${resetUrl}</p>
+    <!-- Footer -->
+    <div style="text-align: center; margin-top: 32px; padding-top: 24px;">
+      <p style="font-size: 12px; color: #a8a29e; margin: 0;">If the button doesn't work, copy this link:</p>
+      <p style="font-size: 12px; color: #a8a29e; word-break: break-all; margin: 4px 0 0 0;">${resetUrl}</p>
+    </div>
+
+    <!-- Company Footer -->
+    <div style="text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid #e7e5e4;">
+      <p style="font-size: 12px; color: #a8a29e; margin: 0;">FlashNote - AI-powered documentation for physical therapists</p>
+    </div>
   </div>
 </body>
 </html>
@@ -112,11 +153,16 @@ Reset Your Password
 
 We received a request to reset your FlashNote password.
 
-Click this link to reset your password: ${resetUrl}
+Click this link to create a new password:
+${resetUrl}
 
-This link will expire in 15 minutes for security reasons.
+IMPORTANT: This link expires in 15 minutes for your security.
 
-If you didn't request a password reset, you can safely ignore this email. Your password will remain unchanged.
+If you didn't request this reset, no action is needed. Your password will remain unchanged.
+
+---
+
+FlashNote - AI-powered documentation for physical therapists
     `.trim();
 
     await this.sendEmail(email, subject, html, text);
