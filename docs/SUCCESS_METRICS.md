@@ -165,7 +165,7 @@ These items must be complete before public launch.
 | **UI** | Copy functionality | Handoff §9 | ✅ Done |
 | **UI** | Settings/logout | Handoff §9 | ✅ Done |
 | **Error** | Error boundary | Best practice | ✅ Done |
-| **Error** | API timeout handling | Best practice | ⚠️ Has retry, no explicit timeout |
+| **Error** | API timeout handling | Best practice | ✅ Done (backend timeout + retry logic) |
 | **Error** | Offline detection | Nice-to-have | ❌ Missing |
 
 ### Web Requirements
