@@ -70,6 +70,7 @@ These items are **required for production** with real patient data. They should 
 | Task | Source | Status |
 |------|--------|--------|
 | Extension password validation | SUCCESS_METRICS BETA-06 | ✅ Done |
+| Backend `/usage/stats` endpoint | Web buildout dependency | Not started |
 | Web dashboard with real data | SUCCESS_METRICS BETA-07 | Mock data only |
 | Privacy policy page on web | SUCCESS_METRICS BETA-08 | Missing |
 | Terms of service page on web | SUCCESS_METRICS BETA-09 | Missing |
