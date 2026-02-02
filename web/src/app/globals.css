@@ -1,5 +1,6 @@
-/* Import shared design tokens */
+/* Import shared design tokens and components */
 @import '../../../shared/design-tokens.css';
+@import '../../../shared/components.css';
 
 @tailwind base;
 @tailwind components;
