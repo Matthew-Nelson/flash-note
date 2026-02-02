@@ -1,0 +1,530 @@
+/**
+ * FlashNote Component Styles - Warm Wellness Theme
+ *
+ * Component classes using the Warm Wellness palette.
+ * These replace the extension's current component styles.
+ *
+ * Key changes from original:
+ * - 2-color gradients (emerald→teal) instead of 3-color rainbow
+ * - Slower/optional animations for clinical focus
+ * - Warm cream backgrounds
+ * - Green-based glow effects
+ */
+
+/* ============================================
+   THEME VARIABLES (Extension Override)
+
+   Drop-in replacement for extension's :root
+   ============================================ */
+
+:root {
+  /* Backgrounds - Warm cream */
+  --bg-primary: #fdfcfb;
+  --bg-secondary: #f7f5f3;
+  --bg-tertiary: #f0edeb;
+  --bg-card: #ffffff;
+
+  /* Borders - Warm stone */
+  --border-color: #e7e5e4;
+  --border-subtle: #f0edeb;
+
+  /* Text - Warm grays */
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #78716c;
+
+  /* Accents - Green forward */
+  --accent-primary: #10b981;    /* Emerald */
+  --accent-secondary: #14b8a6;  /* Teal */
+  --accent-tertiary: #f59e0b;   /* Amber (for highlights) */
+
+  /* Glow - Green based */
+  --accent-glow: rgba(16, 185, 129, 0.35);
+  --accent-glow-light: rgba(16, 185, 129, 0.12);
+
+  /* Semantic */
+  --success: #10b981;
+  --error: #ef4444;
+  --error-bg: #fef2f2;
+  --error-text: var(--error);
+  --warning: #f59e0b;
+
+  /* Components */
+  --btn-disabled-bg: #f5f5f4;
+  --trial-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(20, 184, 166, 0.04));
+  --trial-border: var(--accent-primary);
+  --border-radius-base: 10px;
+  --border-radius-lg: 12px;
+}
+
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+body,
+#root {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.app-container {
+  min-height: 500px;
+  background: var(--bg-primary);
+}
+
+/* ============================================
+   APP HEADER
+
+   Simplified gradient bar - 2 colors, slower animation
+   ============================================ */
+
+.app-header {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.app-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  background-size: 200% 100%;
+  animation: gradient-shift 8s ease infinite; /* Much slower */
+}
+
+/* ============================================
+   APP TITLE
+
+   2-color gradient, optional animation
+   ============================================ */
+
+.app-title {
+  font-weight: 700;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  /* No animation by default - cleaner for clinical use */
+}
+
+/* Optional: Add class for animated title on marketing pages */
+.app-title.animated {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* ============================================
+   PRIMARY BUTTON
+
+   2-color gradient, refined glow
+   ============================================ */
+
+.btn-primary {
+  color: white;
+  border: none;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
+  border-radius: var(--border-radius-base);
+  transition: all 0.2s ease;
+  /* No animation by default */
+}
+
+/* Optional: animated variant */
+.btn-primary.animated {
+  background-size: 200% 200%;
+  animation: gradient-shift 8s ease infinite;
+}
+
+.btn-primary:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 20px var(--accent-glow);
+  /* Slightly darker on hover */
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: 0 2px 10px var(--accent-glow);
+  transition: transform 0.1s ease;
+}
+
+.btn-primary:disabled {
+  background: var(--btn-disabled-bg);
+  color: var(--text-muted);
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
+}
+
+/* ============================================
+   SECONDARY BUTTON
+
+   Gradient border, warm background
+   ============================================ */
+
+.btn-secondary {
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-card), var(--bg-card)),
+    linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border-radius: var(--border-radius-base);
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  box-shadow: 0 4px 15px var(--accent-glow-light);
+}
+
+.btn-secondary:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* ============================================
+   CARD
+
+   White cards on cream background
+   ============================================ */
+
+.card {
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  transition: all 0.2s ease;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+}
+
+.card:hover {
+  box-shadow: 0 4px 20px rgba(28, 25, 23, 0.06);
+}
+
+.card-header {
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+/* Simplified accent bar - single color or subtle gradient */
+.card-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary));
+}
+
+/* ============================================
+   INPUT FIELD
+
+   White input on cream, green focus state
+   ============================================ */
+
+.input-field {
+  color: var(--text-primary);
+  border-radius: var(--border-radius-base);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: transparent;
+  background-image:
+    linear-gradient(white, white),
+    linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 0 0 3px var(--accent-glow-light);
+}
+
+.input-field::placeholder {
+  color: var(--text-muted);
+}
+
+/* ============================================
+   LOADING SPINNER
+
+   Same structure, new colors - see how it looks!
+   ============================================ */
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  position: relative;
+}
+
+/* Outer ring - green/teal */
+.loading-spinner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--bg-tertiary);
+  border-top-color: var(--accent-primary);
+  border-right-color: var(--accent-secondary);
+  animation: spin-slow 1s linear infinite;
+}
+
+/* Inner core - 2-color gradient */
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  animation: breathe 2s ease-in-out infinite;
+  opacity: 0.8;
+}
+
+/* Orbiting dots - harmonious colors */
+.loading-dots span {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.loading-dots span:nth-child(1) {
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-primary);
+}
+
+.loading-dots span:nth-child(2) {
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-secondary);
+}
+
+.loading-dots span:nth-child(3) {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--accent-tertiary);  /* Amber dot for variety */
+}
+
+.loading-stage {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 500;
+}
+
+/* ============================================
+   LINKS
+
+   Green gradient, simpler hover
+   ============================================ */
+
+.link {
+  transition: opacity 0.2s ease;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 500;
+}
+
+.link:hover {
+  opacity: 0.8;
+}
+
+/* ============================================
+   STATUS INDICATORS
+   ============================================ */
+
+.status-active {
+  color: var(--success);
+}
+
+.status-expired {
+  color: var(--error);
+}
+
+.status-trial {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================
+   TRIAL BANNER
+
+   Warm subtle gradient
+   ============================================ */
+
+.trial-banner {
+  border-radius: var(--border-radius-base);
+  background: var(--trial-bg);
+  position: relative;
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-card), var(--bg-card)),
+    linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* ============================================
+   ICON BUTTON
+
+   Green hover state
+   ============================================ */
+
+.icon-btn {
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(20, 184, 166, 0.1));
+  color: var(--accent-primary);
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+  transition: transform 0.1s ease;
+}
+
+/* ============================================
+   SUCCESS CHECKMARK
+
+   Uses success green (same as accent)
+   ============================================ */
+
+.success-checkmark-circle {
+  stroke: var(--success);
+}
+
+.success-checkmark-check {
+  stroke: var(--success);
+}
+
+.success-checkmark-text {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ============================================
+   ERROR STATE
+
+   Red remains red (universally understood)
+   ============================================ */
+
+.error-message {
+  border-radius: var(--border-radius-base);
+  background: var(--error-bg);
+  border: 1px solid var(--error);
+  color: var(--error);
+}
+
+.error-x-circle {
+  stroke: var(--error);
+}
+
+.error-x-line {
+  stroke: var(--error);
+}
+
+/* ============================================
+   TYPING CURSOR
+
+   Green gradient
+   ============================================ */
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 2px;
+  animation: blink-cursor 1s step-end infinite;
+  background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary));
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.border-gradient {
+  border: 2px solid transparent;
+  background-image:
+    linear-gradient(var(--bg-card), var(--bg-card)),
+    linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+.bg-gradient-subtle {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(20, 184, 166, 0.04));
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+@keyframes blink-cursor {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* ============================================
+   REDUCED MOTION
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
