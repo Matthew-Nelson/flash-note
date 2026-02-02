@@ -92,7 +92,7 @@ function PricingContent() {
         <div className="flex items-center justify-between">
           <Link href="/" className="text-2xl font-bold text-gradient flex items-center gap-2">
             FlashNote
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-200 text-stone-600">BETA</span>
+            <span className="text-[9px] font-medium px-1.5 py-px rounded-full border border-stone-300 text-stone-400">BETA</span>
           </Link>
           <div className="flex items-center space-x-6">
             {isAuthenticated ? (
