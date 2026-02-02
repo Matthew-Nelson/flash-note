@@ -177,7 +177,7 @@ body,
 
 /* App Header */
 .app-header {
-  background: var(--bg-card);
+  background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
   position: relative;
 }
