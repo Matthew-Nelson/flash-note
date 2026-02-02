@@ -15,7 +15,7 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Create extension icons (16, 32, 48, 128px) | SUCCESS_METRICS MVP-07 | ⚠️ Placeholders exist, need production icons |
+| Create extension icons (16, 32, 48, 128px) | SUCCESS_METRICS MVP-07 | ✅ Done |
 | Add Zod validation to extension | SUCCESS_METRICS MVP-12 | ✅ Done |
 | Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | ✅ Done |
 | Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | ✅ Done |

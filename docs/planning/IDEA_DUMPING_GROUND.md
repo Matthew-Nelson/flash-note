@@ -1,0 +1,7 @@
+- Having note generation available in both extensions and web client app (would also allow for safari users)
+- A/B testing LLM models?
+- User feedback quick scoring 1-5 and a textbox
+- need to update copy to clarify extension is chrome only?
+- need to update promo and marketing copy to put big emphasis on hipaa compliance
+- "generic" or "default" note type
+- Extension: render an icon on the page if we know we're on EMR notes entry page? And scrape the info? Way to trigger sidebar opening from a given page? What are the extensions allowed to see and do within the main web page? Is there a way we can scrape the page to learn their identifiers and how to source info and what input fields we can inject into?
