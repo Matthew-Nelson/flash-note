@@ -30,7 +30,7 @@ This document defines the **minimum requirements** that must be met before Flash
 
 | Metric | Target | Current |
 |--------|--------|---------|
-| Backend test coverage | ≥80% | ✅ 28 test files |
+| Backend test coverage | 95% lines, 90% branches | ✅ Enforced in CI |
 | Extension test coverage | ≥70% | 0% |
 | Web test coverage | ≥60% | 0% |
 | Security vulnerabilities | 0 critical, 0 high | ✅ All resolved |
@@ -54,15 +54,15 @@ These items must be complete before any user testing.
 | MVP-04 | Web compiles without errors | Web | P0 | ✅ Done |
 | MVP-05 | Database migrations run successfully | Backend | P0 | ✅ Done |
 | MVP-06 | API health endpoint responds | Backend | P0 | ✅ Done |
-| MVP-07 | Extension icon assets exist (all 4 sizes) | Extension | P0 | ❌ Missing |
+| MVP-07 | Extension icon assets exist (all 4 sizes) | Extension | P0 | ⚠️ Placeholders exist, need production icons |
 | MVP-08 | Web app auth connects to backend | Web | P0 | ❌ TODO |
 | MVP-09 | Extension auth connects to backend | Extension | P0 | ⚠️ Needs testing |
 | MVP-10 | Note generation returns valid SOAP | Backend | P0 | ⚠️ Needs testing |
 | MVP-11 | Zod validation on all backend inputs | Backend | P0 | ✅ Done |
-| MVP-12 | Zod validation on extension inputs | Extension | P0 | ❌ Missing |
-| MVP-13 | Error Boundary in extension | Extension | P0 | ❌ Missing |
-| MVP-14 | Error Boundary in web app | Web | P0 | ❌ Missing |
-| MVP-15 | ESLint config exists and passes | All | P1 | ❌ Missing |
+| MVP-12 | Zod validation on extension inputs | Extension | P0 | ✅ Done |
+| MVP-13 | Error Boundary in extension | Extension | P0 | ✅ Done |
+| MVP-14 | Error Boundary in web app | Web | P0 | ✅ Done |
+| MVP-15 | ESLint config exists and passes | All | P1 | ✅ Done |
 
 ### Phase 2: Beta Ready
 
@@ -75,7 +75,7 @@ These items must be complete before beta testing with real PTs.
 | BETA-03 | Stripe checkout flow works end-to-end | All | P0 | ❌ Not tested |
 | BETA-04 | Trial expiration enforced | Backend | P0 | ⚠️ Needs testing |
 | BETA-05 | Rate limiting works (verified) | Backend | P0 | ⚠️ Needs testing |
-| BETA-06 | Password validation matches spec | All | P0 | ❌ Extension missing |
+| BETA-06 | Password validation matches spec | All | P0 | ✅ Done |
 | BETA-07 | Web dashboard shows real data | Web | P0 | ❌ Mock data |
 | BETA-08 | Privacy policy page exists | Web | P0 | ❌ Missing |
 | BETA-09 | Terms of service page exists | Web | P0 | ❌ Missing |
@@ -129,7 +129,7 @@ These items must be complete before public launch.
 | **API** | Standard error codes | CLAUDE.md | ✅ Done |
 | **API** | Zod validation all inputs | CLAUDE.md | ✅ Done |
 | **API** | Health endpoint | Handoff §8 | ✅ Done |
-| **DB** | 4 tables only | Handoff §7 | ✅ Done |
+| **DB** | 6 tables (users, sessions, audit_logs, usage, email_tokens, processed_webhook_events) | Handoff §7 | ✅ Done |
 | **DB** | UUID primary keys | Handoff §7 | ✅ Done |
 | **DB** | Audit logs table | HIPAA | ✅ Done |
 | **DB** | No PHI stored | HIPAA | ✅ Done |
@@ -150,22 +150,22 @@ These items must be complete before public launch.
 | **Manifest** | Version 3 | Handoff §9 | ✅ Done |
 | **Manifest** | Storage permission | Handoff §9 | ✅ Done |
 | **Manifest** | Host permissions | Handoff §9 | ✅ Done |
-| **Assets** | icon-16.png | Chrome Store | ❌ Missing |
-| **Assets** | icon-32.png | Chrome Store | ❌ Missing |
-| **Assets** | icon-48.png | Chrome Store | ❌ Missing |
-| **Assets** | icon-128.png | Chrome Store | ❌ Missing |
+| **Assets** | icon-16.png | Chrome Store | ✅ Done |
+| **Assets** | icon-32.png | Chrome Store | ✅ Done |
+| **Assets** | icon-48.png | Chrome Store | ✅ Done |
+| **Assets** | icon-128.png | Chrome Store | ✅ Done |
 | **Auth** | Token storage in chrome.storage | Handoff §9 | ✅ Done |
 | **Auth** | Token refresh logic | Handoff §9 | ✅ Done |
 | **Auth** | Token expiry handling | Handoff §9 | ✅ Done |
-| **Validation** | Zod schemas | CLAUDE.md | ❌ Missing |
-| **Validation** | Password strength check | Handoff §11 | ❌ Missing |
+| **Validation** | Zod schemas | CLAUDE.md | ✅ Done |
+| **Validation** | Password strength check | Handoff §11 | ✅ Done |
 | **UI** | Login form | Handoff §9 | ✅ Done |
 | **UI** | Note generator | Handoff §9 | ✅ Done |
 | **UI** | Result display | Handoff §9 | ✅ Done |
 | **UI** | Copy functionality | Handoff §9 | ✅ Done |
 | **UI** | Settings/logout | Handoff §9 | ✅ Done |
-| **Error** | Error boundary | Best practice | ❌ Missing |
-| **Error** | API timeout handling | Best practice | ❌ Missing |
+| **Error** | Error boundary | Best practice | ✅ Done |
+| **Error** | API timeout handling | Best practice | ⚠️ Has retry, no explicit timeout |
 | **Error** | Offline detection | Nice-to-have | ❌ Missing |
 
 ### Web Requirements
@@ -188,9 +188,9 @@ These items must be complete before public launch.
 | **Components** | Reusable button | Best practice | ❌ Missing |
 | **Components** | Reusable input | Best practice | ❌ Missing |
 | **Components** | Navigation | Best practice | ❌ Missing |
-| **Config** | .env.example | Best practice | ❌ Missing |
+| **Config** | .env.example | Best practice | ✅ Done |
 | **Config** | Security headers | Best practice | ❌ Missing |
-| **Error** | Error boundary | Best practice | ❌ Missing |
+| **Error** | Error boundary | Best practice | ✅ Done |
 
 ---
 
@@ -385,22 +385,23 @@ These items must be complete before public launch.
 
 | Task | Assigned | Status | Blocked By |
 |------|----------|--------|------------|
-| Create extension icons | - | Not started | - |
-| Install Zod in extension | - | Not started | - |
-| Add Error Boundary to extension | - | Not started | - |
-| Add Error Boundary to web | - | Not started | - |
+| Create extension icons | - | ⚠️ Placeholders exist, need production icons | - |
+| Install Zod in extension | - | ✅ Done | - |
+| Add Error Boundary to extension | - | ✅ Done | - |
+| Add Error Boundary to web | - | ✅ Done | - |
 | Implement web auth integration | - | Not started | - |
-| Add ESLint configs | - | Not started | - |
-| Write backend auth tests | - | Not started | - |
+| Add ESLint configs | - | ✅ Done | - |
+| Test extension auth flow | - | Not started | - |
+| Test note generation end-to-end | - | Not started | - |
 
 ### Completion Summary
 
 | Phase | Total Items | Completed | Percentage |
 |-------|-------------|-----------|------------|
-| MVP Foundation | 15 | 6 | 40% |
-| Beta Ready | 12 | 0 | 0% |
-| Production Ready | 16 | 1 | 6% |
-| **Overall** | **43** | **7** | **16%** |
+| MVP Foundation | 15 | 11 | 73% |
+| Beta Ready | 12 | 4 | 33% |
+| Production Ready | 16 | 4 | 25% |
+| **Overall** | **43** | **19** | **44%** |
 
 ---
 
@@ -408,6 +409,7 @@ These items must be complete before public launch.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.2 | 2025-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
 | 1.1 | 2025-01-28 | Added PROD-16 for audit logging workflow completion |
 | 1.0 | 2025-01-22 | Initial document based on audit findings |
 

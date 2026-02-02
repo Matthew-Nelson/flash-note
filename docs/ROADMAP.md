@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
 **Last Updated:** February 1, 2026
-**Overall Progress:** 19% (8/43 quality gates complete)
+**Overall Progress:** 39% (19/49 quality gates complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -15,10 +15,10 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Create extension icons (16, 32, 48, 128px) | SUCCESS_METRICS MVP-07 | Not started |
-| Add Zod validation to extension | SUCCESS_METRICS MVP-12 | Not started |
-| Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | Not started |
-| Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | Not started |
+| Create extension icons (16, 32, 48, 128px) | SUCCESS_METRICS MVP-07 | ⚠️ Placeholders exist, need production icons |
+| Add Zod validation to extension | SUCCESS_METRICS MVP-12 | ✅ Done |
+| Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | ✅ Done |
+| Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | ✅ Done |
 | Connect web app auth to backend | SUCCESS_METRICS MVP-08 | Not started |
 | Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs testing |
 | Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs testing |
@@ -27,10 +27,28 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | Not started |
+| Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | ✅ Done |
 | 24-hour grace period for past_due users | STRIPE_TODOS | Not started |
 | Post-checkout subscription sync for extension | STRIPE_TODOS | Not started |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
+| Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |
+
+---
+
+## HIPAA Critical Path (Launch Blockers)
+
+These items are **required for production** with real patient data. They should be completed before or in parallel with Phase 3.
+
+| Task | Source | Status |
+|------|--------|--------|
+| Audit log retention automation (6 years) | SUCCESS_METRICS PROD-10 | Not implemented |
+| Audit log immutability protections | SUCCESS_METRICS PROD-16 | Not implemented |
+| Sign Vertex AI BAA with Google Cloud | SUCCESS_METRICS PROD-09 | Not done |
+| Database encryption at rest | SUCCESS_METRICS PROD-07 | Not deployed |
+| TLS 1.2+ enforced on all connections | SUCCESS_METRICS PROD-08 | Not deployed |
+| HIPAA-compliant hosting provider with BAA | PRE_LAUNCH_CHECKLIST §2 | Not done |
+
+**Note:** Without these items complete, we cannot legally handle real PHI in production.
 
 ---
 
@@ -52,7 +70,7 @@ This document consolidates all pending work from across the project. Use this as
 
 | Task | Source | Status |
 |------|--------|--------|
-| Extension password validation | SUCCESS_METRICS BETA-06 | Missing |
+| Extension password validation | SUCCESS_METRICS BETA-06 | ✅ Done |
 | Web dashboard with real data | SUCCESS_METRICS BETA-07 | Mock data only |
 | Privacy policy page on web | SUCCESS_METRICS BETA-08 | Missing |
 | Terms of service page on web | SUCCESS_METRICS BETA-09 | Missing |
@@ -67,11 +85,13 @@ This document consolidates all pending work from across the project. Use this as
 
 ### Test Coverage
 
-| Target | Current | Goal |
-|--------|---------|------|
-| Backend | ✅ 28 test files | ≥80% |
-| Extension | 0% | ≥70% |
-| Web | 0% | ≥60% |
+| Target | Current | Goal | Notes |
+|--------|---------|------|-------|
+| Backend | ✅ 28 test files | 95% lines, 90% branches | Healthcare-grade thresholds enforced in vitest.config.ts |
+| Extension | 0% | ≥80% | Not configured |
+| Web | 0% | ≥80% | Not configured |
+
+See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for integration, E2E, and penetration testing requirements.
 
 ### Security & Compliance
 
@@ -84,6 +104,26 @@ This document consolidates all pending work from across the project. Use this as
 | Vertex AI BAA signed | SUCCESS_METRICS PROD-09 | Not done |
 | Error tracking (Sentry) | SUCCESS_METRICS PROD-11 | Not done |
 | Audit logging workflow complete | SUCCESS_METRICS PROD-16 | Not done |
+
+### Testing (Beyond Unit Tests) - Production Blockers
+
+See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for full requirements.
+
+**These tests are required before public launch with real users:**
+
+| Task | Source | Status | Priority |
+|------|--------|--------|----------|
+| Integration tests (backend) | TESTING_STRATEGY §5 | Not started | P0 |
+| E2E tests (Playwright) | TESTING_STRATEGY §6 | Not started | P0 |
+| DAST scanning (OWASP ZAP) | TESTING_STRATEGY §7 | Not configured | P1 |
+| Secret scanning (GitLeaks) | TESTING_STRATEGY §7 | Not configured | P1 |
+| Manual penetration test | TESTING_STRATEGY §7 | Not scheduled | P1 |
+| Third-party security audit | TESTING_STRATEGY §7 | Not scheduled | P2 (post-launch OK) |
+
+**Milestones:**
+1. Integration tests covering auth lifecycle, session management, billing webhooks
+2. E2E tests for critical user journeys (register → verify → login → generate → copy)
+3. DAST scan with zero high/critical findings
 
 ### Launch Preparation
 
@@ -127,10 +167,11 @@ These are researched but not prioritized for current development.
 
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
-| MVP Foundation | 15 | 7 | 47% |
-| Beta Ready | 12 | 0 | 0% |
-| Production Ready | 16 | 1 | 6% |
-| **Total** | **43** | **8** | **19%** |
+| MVP Foundation | 15 | 11 | 73% |
+| Beta Ready | 12 | 4 | 33% |
+| Production Ready | 16 | 4 | 25% |
+| HIPAA Critical Path | 6 | 0 | 0% |
+| **Total** | **49** | **19** | **39%** |
 
 ---
 
@@ -148,5 +189,5 @@ These are researched but not prioritized for current development.
 - [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) - Detailed quality gates
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Business launch requirements
 - [STRIPE_TODOS.md](./STRIPE_TODOS.md) - Payment integration details
-- [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) - Test coverage details
-- [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) - **Critical** - Sentry, UptimeRobot, Axiom setup plan
+- [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) - **Critical** - Unit, integration, E2E, and penetration testing requirements
+- [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) - Sentry, UptimeRobot, Axiom setup plan

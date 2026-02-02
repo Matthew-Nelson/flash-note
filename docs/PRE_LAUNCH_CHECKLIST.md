@@ -74,13 +74,13 @@
 
 **All templates exist but need finalization:**
 
-- [~] **Terms of Service** - Draft at `docs/TERMS_OF_SERVICE.md`
+- [~] **Terms of Service** - Draft at `docs/legal/TERMS_OF_SERVICE.md`
   - [ ] Fill in company name, address, state of incorporation
   - [ ] Have attorney review (especially healthcare disclaimers)
   - [ ] Add effective date
   - [ ] Host at flashnote.com/terms
 
-- [~] **Privacy Policy** - Draft at `docs/PRIVACY_POLICY.md`
+- [~] **Privacy Policy** - Draft at `docs/legal/PRIVACY_POLICY.md`
   - [ ] Fill in company details and third-party service names
   - [ ] Ensure HIPAA language is accurate
   - [ ] Have attorney review
@@ -235,11 +235,10 @@
 - [ ] **Enable database encryption**
   - At-rest encryption
   - In-transit encryption (SSL connections)
-- [ ] **Clean up unused environment variables**
-  - Remove `API_URL` (defined but never used in code)
-  - Remove `GCP_PROJECT_ID` (placeholder, not used until Vertex AI migration)
-  - Remove `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` (prices set in Stripe dashboard, not env)
-  - See `backend/src/config.ts` for full schema
+- [x] **Review environment variables** - See `backend/src/config.ts` for full schema
+  - `API_URL` - Currently unused, kept for future inter-service communication
+  - `GCP_PROJECT_ID` - Currently unused, kept for future Vertex AI migration
+  - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` - Used for price ID validation in billing routes
 
 **Estimated Monthly Cost:** ~$15-50/month (basic) to $100-300/month (HIPAA-compliant cloud)
 
@@ -286,8 +285,10 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
   - Final extension name and description
   - Production extension ID
 - [ ] **Create store listing assets**
-  - [ ] Icon: 128x128 PNG
+  - [ ] Icon: 128x128 PNG (placeholder exists, needs professional redesign)
   - [ ] Screenshots: 1280x800 or 640x400 (at least 1, up to 5)
+
+> **Note:** Current extension icons are placeholders. Generate production-quality icons before Chrome Web Store submission.
   - [ ] Promotional images (optional but recommended):
     - Small: 440x280
     - Large: 920x680
