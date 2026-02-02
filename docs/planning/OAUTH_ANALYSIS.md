@@ -4,6 +4,8 @@
 **Last Updated:** 2026-01-28
 **Author:** Engineering Team
 
+> ⚠️ **Implementation Status:** This is a planning document. OAuth authentication has NOT been implemented. The code samples below are proposed implementations, not current code.
+
 ---
 
 ## Executive Summary

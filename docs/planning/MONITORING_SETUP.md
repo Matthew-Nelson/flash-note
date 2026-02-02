@@ -1,4 +1,8 @@
-# FlashNote Operations Guide
+# FlashNote Monitoring Setup Plan
+
+> **Status: NOT YET IMPLEMENTED**
+>
+> This document outlines the recommended monitoring stack for FlashNote. These integrations are planned but not yet added to the codebase. This is a **critical priority** for production readiness.
 
 This document covers monitoring, logging, and maintenance practices for solo operation of FlashNote.
 
@@ -8,24 +12,24 @@ This document covers monitoring, logging, and maintenance practices for solo ope
 
 ### Tier 1: Non-Negotiable (Set Up Before Launch)
 
-| Tool | Purpose | Cost | Setup Time |
-|------|---------|------|------------|
-| **Sentry** | Error tracking | Free (5K errors/mo) | 1 hour |
-| **UptimeRobot** | Uptime monitoring | Free (50 monitors) | 15 min |
+| Tool | Purpose | Cost |
+|------|---------|------|
+| **Sentry** | Error tracking | Free (5K errors/mo) |
+| **UptimeRobot** | Uptime monitoring | Free (50 monitors) |
 
 ### Tier 2: High Value (First Month)
 
-| Tool | Purpose | Cost | Setup Time |
-|------|---------|------|------------|
-| **Axiom** | Log aggregation | Free (500GB/mo) | 2 hours |
-| **GitHub Dependabot** | Security alerts | Free | 30 min |
+| Tool | Purpose | Cost |
+|------|---------|------|
+| **Axiom** | Log aggregation | Free (500GB/mo) |
+| **GitHub Dependabot** | Security alerts | Free |
 
 ### Tier 3: Growth Stage (Paying Customers)
 
-| Tool | Purpose | Cost | Setup Time |
-|------|---------|------|------------|
-| **Sentry Team Plan** | Error tracking + BAA | $26/mo | - |
-| **PagerDuty/Opsgenie** | Escalating alerts | ~$10/mo | 1 hour |
+| Tool | Purpose | Cost |
+|------|---------|------|
+| **Sentry Team Plan** | Error tracking + BAA | $26/mo |
+| **PagerDuty/Opsgenie** | Escalating alerts | ~$10/mo |
 
 ---
 
@@ -38,19 +42,18 @@ cd backend
 pnpm add @sentry/node
 ```
 
+Add to `src/index.ts` at the very top, before other imports:
+
 ```typescript
-// src/index.ts (at the very top)
 import * as Sentry from '@sentry/node';
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   environment: process.env.NODE_ENV,
-  tracesSampleRate: 0.1, // 10% of transactions for performance
+  tracesSampleRate: 0.1,
   beforeSend(event) {
-    // Strip any potential PHI from error reports
-    if (event.request?.data) {
-      delete event.request.data;
-    }
+    // Strip potential PHI from error reports
+    if (event.request?.data) delete event.request.data;
     return event;
   },
 });
@@ -66,12 +69,13 @@ cd extension
 pnpm add @sentry/react
 ```
 
+Add to `src/sidepanel/main.tsx`:
+
 ```typescript
-// src/main.tsx
 import * as Sentry from '@sentry/react';
 
 Sentry.init({
-  dsn: process.env.VITE_SENTRY_DSN,
+  dsn: import.meta.env.VITE_SENTRY_DSN,
   environment: import.meta.env.MODE,
   beforeSend(event) {
     // Never send note content or patient data
@@ -84,50 +88,34 @@ Sentry.init({
 });
 ```
 
-### What Sentry Provides
-
-- Stack traces with source maps
-- Request context (URL, headers, user ID)
-- Release tracking (which deploy caused issues)
-- Issue grouping (see patterns, not noise)
-- Slack/email alerts on new errors
-
 ---
 
 ## UptimeRobot Setup (Uptime Monitoring)
 
 ### Monitors to Create
 
-| Monitor Name | URL | Interval | Alert |
-|--------------|-----|----------|-------|
-| API Health | `https://api.flashnote.app/health` | 5 min | Email |
-| Web App | `https://flashnote.app` | 5 min | Email |
-| Stripe Webhook | `https://api.flashnote.app/billing/webhook` | 5 min | Email |
-
-### What UptimeRobot Provides
-
-- Downtime alerts via email/SMS/Slack
-- Response time graphs
-- Uptime percentage reports
-- Public status page (optional)
+| Monitor Name | URL | Interval |
+|--------------|-----|----------|
+| API Health | `https://api.flashnote.app/health` | 5 min |
+| Web App | `https://flashnote.app` | 5 min |
+| Stripe Webhook | `https://api.flashnote.app/billing/webhook` | 5 min |
 
 ---
 
 ## Axiom Setup (Log Aggregation)
 
-### Backend Integration
-
 ```bash
 cd backend
-pnpm add @axiomhq/winston
+pnpm add winston @axiomhq/winston
 ```
 
+Create `src/utils/logger.ts`:
+
 ```typescript
-// src/utils/logger.ts
 import winston from 'winston';
 import { WinstonTransport as AxiomTransport } from '@axiomhq/winston';
 
-const logger = winston.createLogger({
+export const logger = winston.createLogger({
   level: 'info',
   format: winston.format.json(),
   transports: [
@@ -138,36 +126,17 @@ const logger = winston.createLogger({
     }),
   ],
 });
-
-export { logger };
 ```
 
-### What to Log (HIPAA-Safe)
+### HIPAA-Safe Logging
 
 ```typescript
 // Good: Metadata only
-logger.info('Note generated', {
-  userId: user.id,
-  durationMs: 1234,
-  tokenCount: 500,
-  success: true,
-});
+logger.info('Note generated', { userId: user.id, durationMs: 1234, success: true });
 
-// Bad: Contains PHI
-logger.info('Note generated', {
-  userId: user.id,
-  noteContent: generatedNote, // NEVER DO THIS
-  patientName: context.patient, // NEVER DO THIS
-});
+// Bad: Contains PHI - NEVER DO THIS
+logger.info('Note generated', { noteContent: generatedNote, patientName: context.patient });
 ```
-
-### What Axiom Provides
-
-- Centralized, searchable logs
-- Log retention for HIPAA compliance
-- Query language for debugging
-- Dashboards and alerts
-- Generous free tier (500GB/month)
 
 ---
 
@@ -225,43 +194,33 @@ updates:
     open-pull-requests-limit: 5
 ```
 
-### What Dependabot Provides
-
-- Automated PRs for security vulnerabilities
-- Weekly dependency update PRs
-- CVE alerts in GitHub Security tab
-
 ---
 
 ## Maintenance Schedule
 
-### Weekly (~1-2 hours)
+### Weekly
+- Review Sentry for new error patterns
+- Check UptimeRobot for downtime incidents
+- Merge or close Dependabot PRs
+- Glance at Stripe dashboard for failed payments
 
-- [ ] Review Sentry for new error patterns
-- [ ] Check UptimeRobot for downtime incidents
-- [ ] Merge or close Dependabot PRs
-- [ ] Glance at Stripe dashboard for failed payments
+### Monthly
+- Review audit logs for suspicious patterns
+- Test database backup restoration
+- Update dependencies with breaking changes
+- Review usage metrics and costs
 
-### Monthly (~4-6 hours)
+### Quarterly
+- Full dependency audit (`pnpm audit`)
+- Review and rotate secrets if needed
+- Test disaster recovery process
+- Review error trends and fix recurring issues
 
-- [ ] Review audit logs for suspicious patterns
-- [ ] Test database backup restoration
-- [ ] Update dependencies with breaking changes
-- [ ] Review usage metrics and costs
-
-### Quarterly (~8-10 hours)
-
-- [ ] Full dependency audit (`pnpm audit`)
-- [ ] Review and rotate secrets if needed
-- [ ] Test disaster recovery process
-- [ ] Review error trends and fix recurring issues
-
-### Annually (~16-20 hours)
-
-- [ ] Security audit review
-- [ ] HIPAA compliance documentation update
-- [ ] Architecture review for scale
-- [ ] Update Node.js to latest LTS
+### Annually
+- Security audit review
+- HIPAA compliance documentation update
+- Architecture review for scale
+- Update Node.js to latest LTS
 
 ---
 
@@ -301,9 +260,9 @@ updates:
 
 ---
 
-## Environment Variables Reference
+## Environment Variables to Add
 
-### Required for Monitoring
+### Backend `.env`
 
 ```bash
 # Sentry
@@ -311,10 +270,9 @@ SENTRY_DSN=https://xxx@sentry.io/xxx
 
 # Axiom (optional but recommended)
 AXIOM_TOKEN=xaat-xxx
-AXIOM_DATASET=flashnote-backend
 ```
 
-### Extension (.env)
+### Extension `.env`
 
 ```bash
 VITE_SENTRY_DSN=https://xxx@sentry.io/xxx
@@ -362,22 +320,21 @@ axiom query "['flashnote-backend'] | where level == 'error' | top 10"
 
 | Symptom | Likely Cause | Fix |
 |---------|--------------|-----|
-| 401 on all requests | JWT secret mismatch | Check `JWT_ACCESS_SECRET` |
+| 401 on all requests | JWT secret mismatch | Check `JWT_SECRET` |
 | Webhook failures | Signature mismatch | Verify `STRIPE_WEBHOOK_SECRET` |
 | Slow note generation | Gemini rate limit | Check quota, add retry logic |
 | Extension not loading | CORS issue | Verify allowed origins |
 
 ---
 
-## Summary
+## Implementation Checklist
 
-**Minimum viable monitoring** (launch-ready):
-- Sentry for errors
-- UptimeRobot for uptime
-- 4-5 hours setup, $0/month
-
-**Production monitoring** (paying customers):
-- Add Axiom for logs
-- Upgrade Sentry for BAA
-- Enable Dependabot for security
-- ~$26/month total
+- [ ] Set up Sentry account and get DSN
+- [ ] Add `@sentry/node` to backend
+- [ ] Add `@sentry/react` to extension
+- [ ] Add `SENTRY_DSN` to backend config and `.env.example`
+- [ ] Add `VITE_SENTRY_DSN` to extension config
+- [ ] Set up UptimeRobot monitors
+- [ ] Create `.github/dependabot.yml`
+- [ ] Set up Axiom account (optional for launch)
+- [ ] Add winston + axiom transport to backend (optional for launch)

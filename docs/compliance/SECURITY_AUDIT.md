@@ -48,7 +48,7 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 
 **Original Issue:** The `/auth/refresh` endpoint had no rate limiting, unlike login and register endpoints.
 
-**Resolution:** Added `refreshRateLimit` middleware (30 attempts per 15 minutes) to the `/auth/refresh` endpoint at `backend/src/middleware/rate-limit.ts:59-72`.
+**Resolution:** Added `refreshRateLimit` middleware (30 attempts per 15 minutes) to the `/auth/refresh` endpoint at `backend/src/middleware/rate-limit.ts:62-74`.
 
 ---
 
@@ -244,20 +244,20 @@ All critical vulnerabilities have been remediated. The codebase demonstrates goo
 ---
 
 ### HIGH-006: Refresh Token Not Bound to Device/IP
-**Status:** OPEN
-**File:** `backend/src/services/auth-service.ts`
+**Status:** RESOLVED
+**Files:** `backend/src/services/auth-service.ts`, `backend/src/db/migrations/006_session_device_binding.sql`
 **Severity:** HIGH
 **CVSS:** 6.8
 
-Refresh tokens can be used from any device/IP without validation.
+**Original Issue:** Refresh tokens could be used from any device/IP without validation.
 
-**Risk:** Stolen refresh tokens can be used by attackers from different locations.
+**Risk:** Stolen refresh tokens could be used by attackers from different locations.
 
-**Fix:** Store device fingerprint and/or IP with refresh token, validate on refresh. Add columns to sessions table:
-```sql
-ALTER TABLE sessions ADD COLUMN ip_address INET;
-ALTER TABLE sessions ADD COLUMN user_agent TEXT;
-```
+**Resolution:** Implemented device binding with lenient enforcement (logs but doesn't block):
+- Sessions store `ip_address` (INET) and `user_agent` (TEXT)
+- Device changes logged as `SESSION_DEVICE_CHANGE` audit events
+- Lenient mode chosen because PT staff frequently change networks (hospital WiFi, mobile hotspots)
+- Combined with session limits (MEDIUM-011), provides defense-in-depth against token theft
 
 ---
 
@@ -523,12 +523,12 @@ db.on('error', (err) => {
 **Fix:** Implement connection retry logic with exponential backoff.
 
 **Deferral Rationale (February 1, 2026):**
-This is an operational resilience issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/OPERATIONS.md`, which includes:
+This is an operational resilience issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/planning/MONITORING_SETUP.md`, which includes:
 - Structured logging with pino + Axiom
 - Database connection retry with exponential backoff
 - Request ID tracing across services
 
-**Tracking:** See `docs/OPERATIONS.md` for implementation plan.
+**Tracking:** See `docs/planning/MONITORING_SETUP.md` for implementation plan.
 
 ---
 
@@ -576,12 +576,12 @@ No request ID is generated for log correlation.
 **Fix:** Add `x-request-id` header generation middleware using `uuid` or `nanoid`.
 
 **Deferral Rationale (February 1, 2026):**
-This is an operational observability issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/OPERATIONS.md`, which includes:
+This is an operational observability issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/planning/MONITORING_SETUP.md`, which includes:
 - Request ID middleware with automatic propagation
 - Structured logging with request ID in every log entry
 - Log aggregation with Axiom for cross-request tracing
 
-**Tracking:** See `docs/OPERATIONS.md` for implementation plan.
+**Tracking:** See `docs/planning/MONITORING_SETUP.md` for implementation plan.
 
 ---
 
@@ -882,13 +882,13 @@ Multiple `console.log` and `console.error` statements throughout codebase (25+ i
 - PHI field filtering
 
 **Deferral Rationale (February 1, 2026):**
-This is an operational observability issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/OPERATIONS.md`, which includes:
+This is an operational observability issue, not a security vulnerability. It is being addressed as part of the Observability Track in `docs/planning/MONITORING_SETUP.md`, which includes:
 - Structured logging with pino (chosen for performance)
 - Log aggregation with Axiom
 - PHI field filtering/redaction
 - Environment-aware log levels
 
-**Tracking:** See `docs/OPERATIONS.md` for implementation plan.
+**Tracking:** See `docs/planning/MONITORING_SETUP.md` for implementation plan.
 
 ---
 
@@ -1041,7 +1041,7 @@ app.use(express.json({ limit: '100kb' }));
 | Transmission Security | PASS | TLS enforced |
 | PHI Storage | PASS | No PHI stored; patient context kept in memory only (HIGH-010 resolved) |
 | Unique User IDs | PASS | UUID-based |
-| Automatic Logoff | FAIL | No session timeout warning |
+| Automatic Logoff | PARTIAL | Silent token refresh implemented (60s buffer); verify this approach satisfies HIPAA automatic logoff requirements |
 | Encryption | PARTIAL | Tokens not encrypted at rest |
 | Password Management | PASS | Password reset (HIGH-001) and email verification (HIGH-007) implemented |
 
@@ -1111,13 +1111,13 @@ All three issues required changes to the `sessions` table schema and `auth-servi
 | MEDIUM-006 | No request ID for tracing | ⏸️ DEFERRED to Observability Track |
 
 **Deferral Rationale (February 1, 2026):**
-These are operational observability issues, not security vulnerabilities. They are being addressed as part of a dedicated Observability Track documented in `docs/OPERATIONS.md`, which includes:
+These are operational observability issues, not security vulnerabilities. They are being addressed as part of a dedicated Observability Track documented in `docs/planning/MONITORING_SETUP.md`, which includes:
 - Structured logging with pino + Axiom
 - Request ID middleware with automatic propagation
 - Database connection retry with exponential backoff
 - PHI field filtering/redaction
 
-**Tracking:** See `docs/OPERATIONS.md` for implementation plan and timeline.
+**Tracking:** See `docs/planning/MONITORING_SETUP.md` for implementation plan and timeline.
 
 ---
 
@@ -1215,7 +1215,7 @@ Phase 3: Resilience & UX ✅ COMPLETE
 │   ├── MEDIUM-003: Session timeout warning ✅ ACCEPTED (already mitigated)
 │   └── MEDIUM-008: Token storage separation ✅ ACCEPTED (device binding mitigates)
 └── Group C: Observability Stack ⏸️ DEFERRED
-    └── Tracked in docs/OPERATIONS.md
+    └── Tracked in docs/planning/MONITORING_SETUP.md
 
 Phase 4: Ongoing
 ├── Group F: CI/CD Pipeline ✅ MOSTLY COMPLETE
@@ -1251,7 +1251,7 @@ Phase 4: Ongoing
 | January 30, 2026 | **Resolved Group D - CORS Configuration (MEDIUM-007, MEDIUM-015):** Replaced NODE_ENV-based CORS origin logic with explicit `ALLOWED_ORIGINS` environment variable. (1) Added `ALLOWED_ORIGINS` to Zod config schema - parses comma-separated list with whitespace trimming; (2) CORS middleware now uses `config.ALLOWED_ORIGINS` directly; (3) Supports Chrome extension origins (chrome-extension://); (4) Production must explicitly configure allowed origins. Files: `config.ts`, `index.ts`, `.env.example`, `.env`. |
 | January 30, 2026 | **Resolved Group E - LLM/Prompt Security (MEDIUM-005, MEDIUM-010):** Implemented defense-in-depth prompt injection protection. (1) Created `prompt-sanitization.ts` utility with XML delimiter wrapping (`wrapWithDelimiters`), suspicious pattern detection (`detectSuspiciousPatterns`), and PHI-safe metadata extraction; (2) Updated `pt-prompts.ts` - system prompt includes content handling security rules, user content wrapped in `<clinician_notes>` and `<patient_context>` tags, added security reminder at end of prompt, added PHI protection comment to warning log; (3) Updated `ai-service.ts` - runs detection before prompt building, includes `securityMetadata` in response; (4) Updated `notes.ts` - audit logs include detection metadata (`suspiciousPatternDetected`, `suspiciousPatternCount`); (5) Added `PromptSecurityMetadata` type to `types/index.ts`; (6) Added comprehensive tests (51 total). Detection is monitoring-only (fail-open for usability); XML delimiters provide the actual protection. |
 | January 30, 2026 | **Resolved MEDIUM-013 (Webhook Idempotency):** Implemented database-backed webhook idempotency for Stripe webhooks. (1) Created `007_webhook_idempotency.sql` migration with `processed_webhook_events` table and cleanup index; (2) Added `tryMarkWebhookProcessed()` in `webhooks.ts` using atomic `INSERT ... ON CONFLICT DO NOTHING` with rowCount check - prevents race conditions; (3) Added `cleanupOldWebhookEvents()` for scheduled cleanup (7-day retention recommended); (4) Updated `billing-service.ts` to use database check instead of in-memory Map; (5) Added price ID validation to billing routes using Zod schema with `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` env vars; (6) Added structured JSON logging for missing userId errors with `WEBHOOK_PROCESSING_FAILED` audit action. **Phase 2 now complete.** |
-| February 1, 2026 | **Security Audit Verification & Phase 3 Completion:** Comprehensive codebase audit to verify open issues. **Resolved:** (1) MEDIUM-014 - Implemented `requestWithRetry` in extension API client with exponential backoff (1s, 2s, 4s) for 5xx errors and network failures; (2) LOW-004 - Added CSP to extension manifest (`script-src 'self'; object-src 'self'`); (3) LOW-005 - Verified already implemented (`pnpm audit` in CI). **Accepted (low risk):** (1) MEDIUM-003 - Session timeout warning not needed; silent refresh already implemented with 60s buffer; (2) MEDIUM-008 - Token storage separation provides minimal protection; device binding (HIGH-006) mitigates stolen token risk; (3) LOW-002 - Health check authentication is standard practice for load balancers. **Deferred to Observability Track:** LOW-001, MEDIUM-004, MEDIUM-006 - These are operational issues tracked in `docs/OPERATIONS.md`. **Updated:** LOW-003 status to PARTIALLY RESOLVED (backend has excellent coverage with 28 test files). **Overall:** All security phases complete. Risk assessment upgraded to LOW. |
+| February 1, 2026 | **Security Audit Verification & Phase 3 Completion:** Comprehensive codebase audit to verify open issues. **Resolved:** (1) MEDIUM-014 - Implemented `requestWithRetry` in extension API client with exponential backoff (1s, 2s, 4s) for 5xx errors and network failures; (2) LOW-004 - Added CSP to extension manifest (`script-src 'self'; object-src 'self'`); (3) LOW-005 - Verified already implemented (`pnpm audit` in CI). **Accepted (low risk):** (1) MEDIUM-003 - Session timeout warning not needed; silent refresh already implemented with 60s buffer; (2) MEDIUM-008 - Token storage separation provides minimal protection; device binding (HIGH-006) mitigates stolen token risk; (3) LOW-002 - Health check authentication is standard practice for load balancers. **Deferred to Observability Track:** LOW-001, MEDIUM-004, MEDIUM-006 - These are operational issues tracked in `docs/planning/MONITORING_SETUP.md`. **Updated:** LOW-003 status to PARTIALLY RESOLVED (backend has excellent coverage with 28 test files). **Overall:** All security phases complete. Risk assessment upgraded to LOW. |
 
 ---
 
@@ -1274,7 +1274,7 @@ Phase 4: Ongoing
 - ✅ Phase 1 (Security Foundation) complete
 - ✅ Phase 2 (Security Hardening) complete
 - ✅ Phase 3 (Resilience & UX) complete
-- ⏸️ Observability Stack deferred to dedicated track (`docs/OPERATIONS.md`)
+- ⏸️ Observability Stack deferred to dedicated track (`docs/planning/MONITORING_SETUP.md`)
 
 **Recent Changes (February 1, 2026):**
 - MEDIUM-014 (API retry logic) - RESOLVED: Implemented exponential backoff for transient failures
@@ -1293,7 +1293,7 @@ Phase 4: Ongoing
 
 **Operational Notes:**
 - Webhook idempotency requires cleanup job configuration before production - see `docs/STRIPE_TODOS.md`
-- Observability improvements tracked in `docs/OPERATIONS.md`
+- Observability improvements tracked in `docs/planning/MONITORING_SETUP.md`
 - Account lockout admin unlock currently via direct database access; admin API endpoint planned for future
 
 ---

@@ -1,13 +1,13 @@
 # FlashNote Business Cost Analysis
 
-**Date:** January 2026
+**Date:** February 2026 (Updated)
 **Purpose:** Comprehensive cost breakdown and financial projections for operating FlashNote
 
 ---
 
 ## Executive Summary
 
-FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins** at scale. The dominant cost driver is surprisingly **not** LLM API costs (~$0.0003/note), but rather **Stripe payment processing fees** ($1.14/transaction on $29/mo subscription).
+FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins** at scale. The dominant cost driver is surprisingly **not** LLM API costs (~$0.0006/note), but rather **Stripe payment processing fees** ($1.14/transaction on $29/mo subscription).
 
 | Metric | Value |
 |--------|-------|
@@ -77,7 +77,7 @@ FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins*
 
 | Cost | Per Unit | At 100 Users | At 1,000 Users |
 |------|----------|--------------|----------------|
-| Gemini API | ~$0.0003/note | $0.60/mo* | $6.00/mo* |
+| Gemini API | ~$0.00057/note | $1.14/mo* | $11.40/mo* |
 | Stripe Processing | 2.9% + $0.30/txn | $114/mo | $1,140/mo |
 | Database Growth | Negligible | $0 | $0 |
 | Bandwidth | Included | $0 | $0 |
@@ -88,47 +88,47 @@ FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins*
 
 | Users | Fixed | LLM | Stripe | Total Cost | Revenue | Gross Margin |
 |-------|-------|-----|--------|------------|---------|--------------|
-| 10 | $15 | $0.06 | $11.40 | $26.46 | $290 | 90.9% |
-| 50 | $15 | $0.30 | $57.00 | $72.30 | $1,450 | 95.0% |
-| 100 | $15 | $0.60 | $114.00 | $129.60 | $2,900 | 95.5% |
-| 500 | $15 | $3.00 | $570.00 | $588.00 | $14,500 | 95.9% |
-| 1,000 | $15 | $6.00 | $1,140.00 | $1,161.00 | $29,000 | 96.0% |
+| 10 | $15 | $0.11 | $11.40 | $26.51 | $290 | 90.9% |
+| 50 | $15 | $0.57 | $57.00 | $72.57 | $1,450 | 95.0% |
+| 100 | $15 | $1.14 | $114.00 | $130.14 | $2,900 | 95.5% |
+| 500 | $15 | $5.70 | $570.00 | $590.70 | $14,500 | 95.9% |
+| 1,000 | $15 | $11.40 | $1,140.00 | $1,166.40 | $29,000 | 96.0% |
 
 ---
 
 ## 3. LLM/API Costs Deep Dive
 
-### Gemini 2.5 Flash Pricing (Current)
+### Gemini 2.5 Flash Pricing (Current - February 2026)
 
 | Token Type | Cost per 1M Tokens |
 |------------|-------------------|
-| Input Tokens | $0.10 |
-| Output Tokens | $0.40 |
+| Input Tokens | $0.15 |
+| Output Tokens | $0.60 |
 
 ### Per-Note Cost Calculation
 
 | Component | Tokens | Cost |
 |-----------|--------|------|
-| System Prompt | ~800 | $0.00008 |
-| Note Type Instructions | ~150 | $0.000015 |
-| Patient Context | ~100 | $0.00001 |
-| Clinician Notes | ~150 | $0.000015 |
-| **Total Input** | **~1,200** | **$0.00012** |
-| **Output (SOAP)** | **~650** | **$0.00026** |
-| **Total Per Note** | **~1,850** | **~$0.00038** |
+| System Prompt | ~800 | $0.00012 |
+| Note Type Instructions | ~150 | $0.0000225 |
+| Patient Context | ~100 | $0.000015 |
+| Clinician Notes | ~150 | $0.0000225 |
+| **Total Input** | **~1,200** | **$0.00018** |
+| **Output (SOAP)** | **~650** | **$0.00039** |
+| **Total Per Note** | **~1,850** | **~$0.00057** |
 
 ### Monthly LLM Cost Projections
 
 | Scenario | Notes/User/Mo | Users | Monthly Cost |
 |----------|---------------|-------|--------------|
-| Light Usage | 20 | 100 | $0.76 |
-| Moderate Usage | 50 | 100 | $1.90 |
-| Heavy Usage | 100 | 100 | $3.80 |
-| Power User Risk | 500 | 10 | $1.90 |
+| Light Usage | 20 | 100 | $1.14 |
+| Moderate Usage | 50 | 100 | $2.85 |
+| Heavy Usage | 100 | 100 | $5.70 |
+| Power User Risk | 500 | 10 | $2.85 |
 
 ### Key Insight
 
-**LLM costs are negligible** — even a power user generating 500 notes/month costs only $0.19 in API fees. The risk of LLM cost overrun is minimal compared to Stripe fees.
+**LLM costs are negligible** — even a power user generating 500 notes/month costs only $0.29 in API fees. The risk of LLM cost overrun is minimal compared to Stripe fees.
 
 ---
 
@@ -270,8 +270,8 @@ FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins*
 
 | Cost Category | $/User/Month | % of Total |
 |---------------|--------------|------------|
-| LLM API (20 notes) | $0.008 | 0.6% |
-| Stripe Processing | $1.14 | 87.7% |
+| LLM API (20 notes) | $0.011 | 0.8% |
+| Stripe Processing | $1.14 | 87.3% |
 | Infrastructure (shared) | $0.15 | 11.5% |
 | **Total Marginal Cost** | **$1.30** | 100% |
 
@@ -432,7 +432,7 @@ FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins*
 | Risk | Impact | Likelihood | Mitigation |
 |------|--------|------------|------------|
 | High Churn | Lower LTV | Medium | Focus on quality, gather feedback |
-| Gemini Price Increase | Higher costs | Low | 10x increase still < $0.004/note |
+| Gemini Price Increase | Higher costs | Low | 10x increase still < $0.006/note |
 | Stripe Price Increase | Higher costs | Very Low | Well-established pricing |
 | Competition Undercuts | Price pressure | Medium | Focus on quality & niche |
 
@@ -492,4 +492,4 @@ FlashNote is a highly capital-efficient SaaS business with **95%+ gross margins*
 
 ---
 
-*This analysis is based on current pricing and market conditions as of January 2026. Costs and market dynamics may change. Consult with a CPA for tax advice specific to your situation.*
+*This analysis is based on current pricing and market conditions as of February 2026. Costs and market dynamics may change. Consult with a CPA for tax advice specific to your situation.*

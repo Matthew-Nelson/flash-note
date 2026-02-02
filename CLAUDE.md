@@ -188,12 +188,41 @@ Password requirements are enforced by Zod schemas in the backend:
 
 ## Reference Document
 
-See `FLASHNOTE_HANDOFF.md` for complete project specification including:
+See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification including:
 - Full API documentation
 - Database schema details
 - PT-specific AI prompts
 - HIPAA compliance checklist
 - Deployment strategy
+
+## Documentation Guidelines
+
+**Before starting a task:**
+1. Check `docs/ROADMAP.md` to understand current priorities
+2. Review relevant docs in `docs/` that may inform your approach:
+   - `docs/guides/` - API reference and operational procedures
+   - `docs/planning/` - Future feature designs (don't implement unless asked)
+   - `docs/compliance/` - Security and testing requirements
+   - `docs/reference/` - Project specifications
+
+**After completing a task:**
+1. Update documentation that was affected by your changes
+2. Mark completed items in `docs/ROADMAP.md` or `docs/SUCCESS_METRICS.md`
+3. Move fully-implemented planning docs to `docs/archive/`
+4. Update `docs/guides/API.md` if you added/changed endpoints
+
+**Documentation principles:**
+- Keep docs current - outdated docs are worse than no docs
+- Don't over-document - only document what provides ongoing value
+- Single source of truth - information should live in one place
+- Prefer updating existing docs over creating new ones
+- Archive completed work rather than deleting (for historical reference)
+
+**What NOT to document:**
+- Trivial implementation details obvious from the code
+- Temporary debugging notes
+- Duplicate information already in another doc
+- Speculative features not discussed with the user
 
 ## Additional Rules
 - Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.

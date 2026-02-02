@@ -1,6 +1,6 @@
 # Stripe Integration TODOs
 
-**Last Updated:** January 30, 2026
+**Last Updated:** February 1, 2026
 
 This document tracks all outstanding work for the Stripe payment integration before go-live.
 
@@ -26,15 +26,22 @@ This document tracks all outstanding work for the Stripe payment integration bef
 - [x] Price validation (Zod schema validates against allowed price IDs)
 - [x] Structured logging for webhook processing failures
 - [x] Audit trail for missing userId in webhook metadata
+- [x] Subscription enforcement middleware (`requireActiveSubscription`)
+  - Trial users can access notes during trial period
+  - Expired trial users get 402 `trial_expired` error
+  - Active subscribers can access notes
+  - Canceled/past_due/unpaid users get 402 `subscription_required` error
 
 ### Not Implemented
-- [ ] Subscription enforcement middleware (block expired trials)
 - [ ] Failed payment email notifications
 - [ ] Trial ending soon notifications
 - [ ] Subscription reactivation flow
 - [ ] Customer portal configuration in Stripe Dashboard
 - [ ] Webhook event cleanup job (see Operations section below)
-- [ ] Make sure a user that goes through checkout flow immediately has their subscription status updated within extension and can use the app
+- [ ] Post-checkout subscription sync for extension
+  - Issue: Users completing checkout cannot immediately use /notes/generate
+  - The webhook updates the database, but the extension's cached user state is stale
+  - Potential solutions: poll for status after checkout, WebSocket notification, or force token refresh
 
 ---
 
@@ -57,39 +64,20 @@ This document tracks all outstanding work for the Stripe payment integration bef
 In Stripe Dashboard → Developers → Webhooks, subscribe to:
 
 - `checkout.session.completed`
-- `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 - `invoice.paid`
 - `invoice.payment_failed`
 
+> **Note:** `customer.subscription.created` is not needed - `checkout.session.completed` handles new subscriptions created through our checkout flow.
+
 ---
 
 ## Code TODOs
 
-### HIGH Priority (Before Launch)
-
-#### 1. Subscription Enforcement Middleware
-**Location:** Need to create `backend/src/middleware/subscription.ts`
-
-```typescript
-// Middleware to check if user has active subscription or valid trial
-// Should block access to /notes endpoints when:
-// - subscription_status is 'canceled' or 'unpaid'
-// - subscription_status is 'trialing' AND trial_ends_at < NOW()
-// - subscription_status is 'past_due' (grace period TBD)
-```
-
-**Acceptance Criteria:**
-- Trial users can access notes during trial period
-- Expired trial users get 402 `trial_expired` error
-- Active subscribers can access notes
-- Canceled users get 402 `subscription_required` error
-- Past due users get grace period (configurable)
-
 ### MEDIUM Priority (Before Launch)
 
-#### 2. Failed Payment Email Notification
+#### 1. Failed Payment Email Notification
 **Location:** `backend/src/services/billing-service.ts` (see TODO comment)
 
 ```typescript
@@ -104,18 +92,18 @@ In Stripe Dashboard → Developers → Webhooks, subscribe to:
 
 ### LOW Priority (Post-Launch)
 
-#### 3. Trial Ending Soon Notification
+#### 2. Trial Ending Soon Notification
 Send email 3 days before trial expires to encourage conversion.
 
-#### 4. Subscription Reactivation Flow
+#### 3. Subscription Reactivation Flow
 Allow users to resubscribe after cancellation without creating new checkout session.
 
-#### 5. Add SUBSCRIPTION_RENEWED Audit Action
+#### 4. Add SUBSCRIPTION_RENEWED Audit Action
 **Location:** `backend/src/types/index.ts`
 
 Currently reusing `SUBSCRIPTION_CREATED` for renewals. Consider adding distinct action.
 
-#### 6. Add PAYMENT_FAILED Audit Action
+#### 5. Add PAYMENT_FAILED Audit Action
 **Location:** `backend/src/types/index.ts`
 
 Currently reusing `SUBSCRIPTION_CANCELLED` with FAILURE status. Consider adding distinct action.
@@ -269,6 +257,6 @@ Stripe → webhook endpoint → signature verification → event routing → dat
 ## Related Documentation
 
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Section 3: Financial & Payment Setup
-- [API.md](./API.md) - Billing endpoints documentation
-- [BUSINESS_COST_ANALYSIS.md](./BUSINESS_COST_ANALYSIS.md) - Stripe fee analysis
-- [SECURITY_AUDIT.md](../SECURITY_AUDIT.md) - MEDIUM-013 (webhook idempotency) - ✅ RESOLVED
+- [API.md](./guides/API.md) - Billing endpoints documentation
+- [BUSINESS_COST_ANALYSIS.md](./reference/BUSINESS_COST_ANALYSIS.md) - Stripe fee analysis
+- [SECURITY_AUDIT.md](./compliance/SECURITY_AUDIT.md) - MEDIUM-013 (webhook idempotency) - ✅ RESOLVED

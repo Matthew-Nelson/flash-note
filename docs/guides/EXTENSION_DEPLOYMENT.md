@@ -85,7 +85,9 @@ Our architecture minimizes the impact of slow extension reviews:
 
 ## Mitigation Strategies
 
-### 1. Server-Side Validation
+> **Note**: Strategies 2-5 below (version enforcement, remote configuration, maintenance mode, remote disable) are recommended patterns for production deployments. They are not yet implemented in FlashNote but are documented here as guidance for future development.
+
+### 1. Server-Side Validation ✅ Implemented
 
 Never trust the extension for security decisions:
 
@@ -100,7 +102,7 @@ const response = await api.generateNote(input);
 // Server returns 402 if not subscribed
 ```
 
-### 2. Minimum Version Enforcement
+### 2. Minimum Version Enforcement (Recommended)
 
 The API can reject requests from outdated extensions:
 
@@ -114,7 +116,7 @@ if (clientVersion < minVersion) {
 }
 ```
 
-### 3. Remote Configuration
+### 3. Remote Configuration (Recommended)
 
 Fetch feature flags and settings from the server:
 
@@ -127,7 +129,7 @@ if (config.maintenanceMode) {
 
 This allows behavior changes without extension updates.
 
-### 4. Maintenance Mode
+### 4. Maintenance Mode (Recommended)
 
 The API can tell the extension to show a maintenance message:
 
@@ -138,7 +140,7 @@ The API can tell the extension to show a maintenance message:
 }
 ```
 
-### 5. Remote Disable
+### 5. Remote Disable (Recommended)
 
 If a critical bug is discovered, the API can refuse to serve old versions entirely, forcing users to update.
 

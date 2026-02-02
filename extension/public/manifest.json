@@ -2,6 +2,7 @@
   "manifest_version": 3,
   "name": "FlashNote - AI SOAP Notes for Physical Therapists",
   "version": "0.1.0",
+  "minimum_chrome_version": "116",
   "description": "Generate professional PT documentation in seconds. Type shorthand, get complete SOAP notes.",
 
   "content_security_policy": {

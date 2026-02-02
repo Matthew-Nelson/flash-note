@@ -63,7 +63,9 @@
   - Cloud SQL (GCP), RDS (AWS), or Azure Database all offer BAAs
 
 **BAA You Need to PROVIDE (to customers):**
-- [~] **Customer BAA Template** - Draft exists at `docs/BAA_TEMPLATE.md`
+- [~] **Customer BAA Template** - Template at `docs/legal/BAA_TEMPLATE.md`
+  - [x] Pass-through processing model language added (no PHI storage)
+  - [x] Subcontractor compliance exhibit added (provider-agnostic)
   - [ ] Have healthcare attorney review template
   - [ ] Finalize and host on website
   - [ ] Create signing workflow (DocuSign, HelloSign, or manual)
@@ -72,13 +74,13 @@
 
 **All templates exist but need finalization:**
 
-- [~] **Terms of Service** - Draft at `docs/TERMS_OF_SERVICE.md`
+- [~] **Terms of Service** - Draft at `docs/legal/TERMS_OF_SERVICE.md`
   - [ ] Fill in company name, address, state of incorporation
   - [ ] Have attorney review (especially healthcare disclaimers)
   - [ ] Add effective date
   - [ ] Host at flashnote.com/terms
 
-- [~] **Privacy Policy** - Draft at `docs/PRIVACY_POLICY.md`
+- [~] **Privacy Policy** - Draft at `docs/legal/PRIVACY_POLICY.md`
   - [ ] Fill in company details and third-party service names
   - [ ] Ensure HIPAA language is accurate
   - [ ] Have attorney review
@@ -88,10 +90,10 @@
   - Brief statement about HIPAA compliance for marketing
   - Can be part of Privacy Policy or separate page
 
-- [ ] **Refund Policy**
-  - Define trial period handling
-  - Define subscription refund terms
-  - Can be part of Terms of Service
+- [x] **Refund Policy** - Added inline to Terms of Service
+  - Monthly: No partial refunds
+  - Annual: Pro-rata within 30 days
+  - See `docs/legal/TERMS_OF_SERVICE.md` §4
 
 **Estimated Legal Cost:** $0 (templates only) to $1,500-3,000 (attorney review)
 
@@ -233,11 +235,10 @@
 - [ ] **Enable database encryption**
   - At-rest encryption
   - In-transit encryption (SSL connections)
-- [ ] **Clean up unused environment variables**
-  - Remove `API_URL` (defined but never used in code)
-  - Remove `GCP_PROJECT_ID` (placeholder, not used until Vertex AI migration)
-  - Remove `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` (prices set in Stripe dashboard, not env)
-  - See `backend/src/config.ts` for full schema
+- [x] **Review environment variables** - See `backend/src/config.ts` for full schema
+  - `API_URL` - Currently unused, kept for future inter-service communication
+  - `GCP_PROJECT_ID` - Currently unused, kept for future Vertex AI migration
+  - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` - Used for price ID validation in billing routes
 
 **Estimated Monthly Cost:** ~$15-50/month (basic) to $100-300/month (HIPAA-compliant cloud)
 
@@ -257,16 +258,18 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 - [x] **HIGH-006 + MEDIUM-002 + MEDIUM-011: Session infrastructure** - Device binding, O(1) token validation, session limits
 - [x] **MEDIUM-007 + MEDIUM-015: CORS configuration** - Explicit ALLOWED_ORIGINS env var
 
-### Should Fix Before Launch
-- [ ] **MEDIUM-005: Prompt injection mitigation** - Input sanitization for LLM
-- [ ] **MEDIUM-010: Prompt warnings may leak context** - Audit logging paths
+### Resolved ✅ (continued)
+- [x] **MEDIUM-005: Prompt injection mitigation** - XML delimiters + detection
+- [x] **MEDIUM-010: Prompt warnings may leak context** - Verified PHI-safe
+- [x] **MEDIUM-013: Webhook idempotency** - Database-backed deduplication
+- [x] **MEDIUM-014: Extension retry logic** - Exponential backoff implemented
 
-### Can Address Post-Launch
-- [ ] MEDIUM-003: Session timeout warning (UX improvement)
-- [ ] MEDIUM-008: Extension token storage separation
-- [ ] MEDIUM-013: Webhook idempotency
-- [ ] MEDIUM-014: Extension retry logic
-- [ ] LOW-001: Structured logging (replace console.log)
+### Accepted Risk (Low Priority)
+- [x] MEDIUM-003: Session timeout warning - Silent refresh already implemented
+- [x] MEDIUM-008: Extension token storage separation - Device binding mitigates
+
+### Deferred (Observability Track)
+- [ ] LOW-001: Structured logging - See `docs/planning/MONITORING_SETUP.md`
 
 ---
 
@@ -282,8 +285,10 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
   - Final extension name and description
   - Production extension ID
 - [ ] **Create store listing assets**
-  - [ ] Icon: 128x128 PNG
+  - [ ] Icon: 128x128 PNG (placeholder exists, needs professional redesign)
   - [ ] Screenshots: 1280x800 or 640x400 (at least 1, up to 5)
+
+> **Note:** Current extension icons are placeholders. Generate production-quality icons before Chrome Web Store submission.
   - [ ] Promotional images (optional but recommended):
     - Small: 440x280
     - Large: 920x680
@@ -311,10 +316,16 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 ### Functional Testing (Production Environment)
 - [ ] **Auth flows**
   - [ ] Register new account
+  - [ ] Email verification (click link from email)
+  - [ ] Resend verification email
   - [ ] Login with valid credentials
   - [ ] Login with invalid credentials (rate limiting)
+  - [ ] Login with unverified email (should work but flag `emailVerified: false`)
   - [ ] Token refresh
   - [ ] Logout
+  - [ ] Request password reset
+  - [ ] Complete password reset (click link from email)
+  - [ ] Login with new password after reset
 - [ ] **Note generation**
   - [ ] All 4 note types (daily, initial eval, progress, discharge)
   - [ ] Copy individual sections
@@ -534,5 +545,5 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 
 ---
 
-*Last Updated: January 2026*
+*Last Updated: February 2026*
 *This checklist should be reviewed with legal and financial professionals for your specific situation.*

@@ -1,7 +1,7 @@
 # FlashNote Testing Strategy & Guidelines
 
-> **Document Status:** Planning
-> **Last Updated:** January 2026
+> **Document Status:** Partial Implementation
+> **Last Updated:** February 2026
 > **Owner:** Engineering Team
 
 ## Overview
@@ -34,25 +34,29 @@ This document defines the testing strategy, guidelines, and requirements for Fla
 
 | Project | Testing Framework | Test Coverage | Status |
 |---------|------------------|---------------|--------|
-| Backend | Vitest 1.2.1 | Auth + Lockout services | Partial |
+| Backend | Vitest 4.0.18 | 95%+ (28 test files) | Healthcare-grade |
 | Extension | None | 0% | Not configured |
 | Web | None | 0% | Not configured |
-| CI/CD | None | N/A | Not configured |
+| CI/CD | GitHub Actions | Backend tests, builds, security audit | Configured |
 
 ### Existing Test Files
 
-**Backend:**
-- `backend/src/services/auth-service.test.ts` - Authentication service tests
-- `backend/src/services/lockout-service.test.ts` - Account lockout mechanism tests
-- `backend/src/test/setup.ts` - Test utilities and mocks
+**Backend (28 test files):**
+- **Services:** auth-service, audit-service, ai-service, billing-service, email-service, lockout-service, token-service, usage-service
+- **Middleware:** auth, csrf, email-verification, error-handler, rate-limit, subscription
+- **LLM Providers:** claude-provider, gemini-provider, provider-factory, schemas, errors, index
+- **Database:** users queries, webhooks queries
+- **Utilities:** prompt-sanitization, request-utils
+- **Other:** config, pt-prompts
+- **Test Setup:** `backend/src/test/setup.ts` - Test utilities and mocks
 
 ### Critical Gaps
 
 1. **Extension:** No testing infrastructure - React components handling auth tokens are untested
 2. **Web:** No testing infrastructure - Next.js pages/components untested
-3. **CI/CD:** No automated test execution in pipelines
+3. ~~**CI/CD:** No automated test execution in pipelines~~ ✅ **DONE** - GitHub Actions configured
 4. **E2E:** No end-to-end testing for critical user journeys
-5. **Security:** No automated security scanning or penetration testing
+5. **Security:** DAST (OWASP ZAP) not yet configured; secret scanning (GitLeaks) not implemented
 
 ---
 
@@ -810,18 +814,18 @@ jobs:
 
 All of these must pass before merge:
 
-| Check | Blocking | Threshold |
-|-------|----------|-----------|
-| Linting | Yes | 0 errors |
-| Type checking | Yes | 0 errors |
-| Dependency audit | Yes | No high/critical |
-| Unit tests | Yes | All pass |
-| Coverage (backend) | Yes | 85% minimum |
-| Coverage (extension) | Yes | 80% minimum |
-| Coverage (web) | Yes | 80% minimum |
-| Integration tests | Yes | All pass |
-| E2E tests | Yes | All pass |
-| DAST scan | Yes (main only) | No high/critical |
+| Check | Blocking | Threshold | Status |
+|-------|----------|-----------|--------|
+| Linting | Yes | 0 errors | ✅ Configured |
+| Type checking | Yes | 0 errors | ✅ Via build |
+| Dependency audit | Yes | No high/critical | ✅ Configured (continue-on-error) |
+| Unit tests | Yes | All pass | ✅ Backend only |
+| Coverage (backend) | Yes | 95% minimum | ✅ Enforced |
+| Coverage (extension) | Yes | 80% minimum | Not configured |
+| Coverage (web) | Yes | 80% minimum | Not configured |
+| Integration tests | Yes | All pass | Not configured |
+| E2E tests | Yes | All pass | Not configured |
+| DAST scan | Yes (main only) | No high/critical | Not configured |
 
 ---
 
@@ -829,11 +833,11 @@ All of these must pass before merge:
 
 ### Coverage Thresholds
 
-| Package | Line Coverage | Branch Coverage | Function Coverage |
-|---------|--------------|-----------------|-------------------|
-| Backend | 85% | 80% | 85% |
-| Extension | 80% | 75% | 80% |
-| Web | 80% | 75% | 80% |
+| Package | Line Coverage | Branch Coverage | Function Coverage | Status |
+|---------|--------------|-----------------|-------------------|--------|
+| Backend | 95% | 90% | 95% | ✅ Enforced |
+| Extension | 80% | 75% | 80% | Not configured |
+| Web | 80% | 75% | 80% | Not configured |
 
 ### Critical Path Coverage
 
@@ -849,24 +853,30 @@ These areas require **95%+ coverage**:
 ### Coverage Configuration
 
 ```typescript
-// vitest.config.ts
+// vitest.config.ts (backend - actual configuration)
 export default defineConfig({
   test: {
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html', 'lcov'],
+      reporter: ['text', 'text-summary', 'html', 'lcov', 'json-summary'],
+      reportsDirectory: './coverage',
+      include: ['src/**/*.ts'],
       exclude: [
-        'node_modules/',
-        'dist/',
-        '**/*.test.ts',
-        '**/*.spec.ts',
-        '**/test/**',
+        'src/**/*.test.ts',
+        'src/test/**',
+        'src/types/**',
+        'src/index.ts',
+        'src/db/migrate.ts',
+        'src/config.ts',
+        'src/db/index.ts',
+        'src/routes/**', // Route handlers need integration tests
       ],
+      // Healthcare-grade thresholds - do not lower these
       thresholds: {
-        lines: 85,
-        branches: 80,
-        functions: 85,
-        statements: 85,
+        lines: 95,
+        branches: 90,
+        functions: 95,
+        statements: 95,
       },
     },
   },
@@ -879,33 +889,36 @@ export default defineConfig({
 
 ### Phase 1: Foundation (Weeks 1-2)
 
-- [ ] Set up GitHub Actions CI pipeline with existing backend tests
+- [x] Set up GitHub Actions CI pipeline with existing backend tests
 - [ ] Add Vitest to extension package
 - [ ] Add Vitest to web package
-- [ ] Configure code coverage reporting with Codecov
-- [ ] Add `pnpm audit` to CI pipeline
+- [x] Configure code coverage reporting (artifact upload configured; Codecov integration pending)
+- [x] Add `pnpm audit` to CI pipeline
 - [ ] Add pre-commit hooks for linting
 
 **Success Criteria:** CI runs on every PR, coverage reported
+**Current Status:** ✅ CI pipeline operational, backend tests running on every PR
 
 ### Phase 2: Unit Test Expansion (Weeks 3-4)
 
-- [ ] Achieve 85% coverage on backend
+- [x] Achieve 85% coverage on backend (exceeded: 95%+ with healthcare-grade thresholds)
 - [ ] Add extension component tests (auth, forms, API client)
 - [ ] Add web page/component tests
 - [ ] Add ESLint security plugins
 
 **Success Criteria:** All coverage thresholds met
+**Current Status:** Backend exceeds targets; extension and web testing not yet started
 
 ### Phase 3: Integration & Security (Weeks 5-6)
 
-- [ ] Set up test database for integration tests
+- [ ] Set up test database for integration tests (currently using mocked DB in unit tests)
 - [ ] Write backend integration test suite
 - [ ] Create HIPAA compliance test suite
 - [ ] Configure OWASP ZAP in CI
 - [ ] Add secret scanning (GitLeaks)
 
 **Success Criteria:** Integration tests in CI, DAST scanning active
+**Current Status:** Not started - security audit (pnpm audit) is in CI but DAST/secret scanning not configured
 
 ### Phase 4: E2E Testing (Weeks 7-8)
 
@@ -931,40 +944,39 @@ export default defineConfig({
 
 ### Approved Tools
 
-| Category | Tool | Version | Purpose |
-|----------|------|---------|---------|
-| Unit/Integration | Vitest | 1.x | Fast, TypeScript-native testing |
-| React Testing | @testing-library/react | 14.x | Component testing |
-| E2E | Playwright | 1.x | Browser automation |
-| API Testing | Supertest | 6.x | HTTP assertions |
-| Mocking | vitest (built-in) | - | Mocks and spies |
-| Coverage | v8/c8 | - | Code coverage |
-| Performance | k6 | 0.x | Load testing |
-| SAST | ESLint + plugins | 8.x | Static analysis |
-| DAST | OWASP ZAP | 2.x | Dynamic scanning |
-| Secrets | GitLeaks | 8.x | Secret detection |
+| Category | Tool | Version | Purpose | Status |
+|----------|------|---------|---------|--------|
+| Unit/Integration | Vitest | 4.x | Fast, TypeScript-native testing | ✅ Backend |
+| React Testing | @testing-library/react | 14.x | Component testing | Not installed |
+| E2E | Playwright | 1.x | Browser automation | Not installed |
+| API Testing | Supertest | 6.x | HTTP assertions | Not installed |
+| Mocking | vitest (built-in) | - | Mocks and spies | ✅ Backend |
+| Coverage | @vitest/coverage-v8 | 4.x | Code coverage | ✅ Backend |
+| Performance | k6 | 0.x | Load testing | Not installed |
+| SAST | ESLint + plugins | 9.x | Static analysis | ✅ Partial |
+| DAST | OWASP ZAP | 2.x | Dynamic scanning | Not configured |
+| Secrets | GitLeaks | 8.x | Secret detection | Not configured |
 
 ### Installation Commands
 
 ```bash
-# Backend testing (already configured)
-cd backend
-pnpm add -D vitest @vitest/coverage-v8
+# Backend testing - ✅ ALREADY CONFIGURED
+# vitest 4.0.18 and @vitest/coverage-v8 4.0.18 installed
 
-# Extension testing
+# Extension testing - TODO
 cd extension
 pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom @vitest/coverage-v8
 
-# Web testing
+# Web testing - TODO
 cd web
 pnpm add -D vitest @testing-library/react @testing-library/jest-dom jsdom @vitest/coverage-v8
 
-# E2E testing (new package)
+# E2E testing - TODO (new package)
 mkdir e2e && cd e2e
 pnpm init
 pnpm add -D @playwright/test
 
-# Security linting (all packages)
+# Security linting - TODO (all packages)
 pnpm add -D eslint-plugin-security @microsoft/eslint-plugin-sdl
 ```
 
@@ -1015,3 +1027,4 @@ pnpm --filter e2e test --ui
 | Date | Version | Author | Changes |
 |------|---------|--------|---------|
 | Jan 2026 | 1.0 | Engineering | Initial document |
+| Feb 2026 | 1.1 | Engineering | Updated to reflect current state: CI/CD configured, backend at 95%+ coverage with 28 test files, updated roadmap progress |
