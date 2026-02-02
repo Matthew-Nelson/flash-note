@@ -10,6 +10,13 @@ export const metadata: Metadata = {
   description:
     'Generate professional PT documentation in seconds. Type shorthand, get complete SOAP notes ready for any EMR.',
   keywords: ['physical therapy', 'SOAP notes', 'PT documentation', 'AI', 'healthcare'],
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export default function RootLayout({
