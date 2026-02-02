@@ -28,9 +28,11 @@ This document consolidates all pending work from across the project. Use this as
 | Task | Source | Status |
 |------|--------|--------|
 | Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | ✅ Done |
-| Post-checkout subscription sync for extension | STRIPE_TODOS | Not started |
+| **Fix stale user data bug (extension)** | [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) | ⚠️ P0 - Launch blocker |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
 | Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |
+
+> **Note:** The stale user data bug affects extension users who complete checkout on the web app - their subscription status doesn't sync back to the extension. See [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) for full analysis and recommended fix (focus-based refresh).
 
 ---
 
