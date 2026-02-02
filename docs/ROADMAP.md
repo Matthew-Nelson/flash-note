@@ -20,15 +20,14 @@ This document consolidates all pending work from across the project. Use this as
 | Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | ✅ Done |
 | Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | ✅ Done |
 | Connect web app auth to backend | SUCCESS_METRICS MVP-08 | Not started |
-| Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs testing |
-| Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs testing |
+| Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs automated testing |
+| Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs to change to account for new "trust" paradigm |
 
 ### Medium Priority
 
 | Task | Source | Status |
 |------|--------|--------|
 | Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | ✅ Done |
-| 24-hour grace period for past_due users | STRIPE_TODOS | Not started |
 | Post-checkout subscription sync for extension | STRIPE_TODOS | Not started |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
 | Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |

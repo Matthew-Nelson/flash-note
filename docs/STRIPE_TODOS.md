@@ -33,10 +33,6 @@ This document tracks all outstanding work for the Stripe payment integration bef
   - Canceled/past_due/unpaid users get 402 `subscription_required` error
 
 ### Not Implemented
-- [ ] 24-hour grace period for past_due users
-  - Currently past_due users are blocked immediately
-  - Need to track `subscription_status_changed_at` to calculate grace period
-  - Requires: new migration, update to subscription middleware
 - [ ] Failed payment email notifications
 - [ ] Trial ending soon notifications
 - [ ] Subscription reactivation flow
