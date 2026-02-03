@@ -58,7 +58,7 @@ function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       sanitized[key] = sanitizeObject(value as Record<string, unknown>);
     } else if (Array.isArray(value)) {
-      sanitized[key] = value.map((item) =>
+      sanitized[key] = value.map((item): unknown =>
         item && typeof item === 'object'
           ? sanitizeObject(item as Record<string, unknown>)
           : item
@@ -144,9 +144,10 @@ if (dsn) {
       // Sanitize HTTP breadcrumb data
       if (breadcrumb.category === 'http' && breadcrumb.data) {
         // Remove URL query params and body that might contain PHI
-        if (breadcrumb.data.url) {
+        const urlValue: unknown = breadcrumb.data.url;
+        if (typeof urlValue === 'string') {
           try {
-            const url = new URL(breadcrumb.data.url);
+            const url = new URL(urlValue);
             url.search = '';
             breadcrumb.data.url = url.toString();
           } catch {
@@ -161,6 +162,7 @@ if (dsn) {
     },
   });
 
+  // eslint-disable-next-line no-console
   console.log('Sentry initialized successfully');
 } else if (process.env.NODE_ENV === 'production') {
   console.warn(
