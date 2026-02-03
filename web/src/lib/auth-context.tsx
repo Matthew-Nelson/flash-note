@@ -75,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await api.register(email, password);
     setUser(response.user);
     setSessionEndReason(null);
+    Sentry.setUser({ id: response.user.id });
     return response;
   }, []);
 
