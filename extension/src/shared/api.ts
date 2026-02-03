@@ -1,4 +1,5 @@
 import { storage } from './storage';
+import { captureException } from './sentry';
 import type { AuthResponse, GenerateNoteInput, GeneratedNote } from './schemas';
 
 // API response envelope types
@@ -121,7 +122,11 @@ class ApiClient {
       });
 
       return data.accessToken;
-    } catch {
+    } catch (error) {
+      captureException(error, {
+        operation: 'token_refresh',
+        errorType: 'network_error',
+      });
       await storage.clearAuth();
       return null;
     }
@@ -215,7 +220,12 @@ class ApiClient {
       }
     }
 
-    // All retries exhausted
+    // All retries exhausted - report to Sentry (this indicates a real infrastructure problem)
+    captureException(lastError, {
+      endpoint,
+      retriesAttempted: maxRetries,
+      errorType: lastError instanceof ApiError ? 'server_error' : 'network_error',
+    });
     throw lastError;
   }
 
