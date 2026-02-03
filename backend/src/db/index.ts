@@ -1,4 +1,5 @@
 import pg from 'pg';
+import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
 
 const { Pool } = pg;
@@ -18,6 +19,10 @@ db.on('connect', () => {
 
 db.on('error', (err) => {
   console.error('PostgreSQL pool error:', err);
+  // Capture database errors to Sentry - these are critical infrastructure issues
+  Sentry.captureException(err, {
+    tags: { category: 'database', type: 'pool_error' },
+  });
 });
 
 // Graceful shutdown

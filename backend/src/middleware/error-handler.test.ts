@@ -3,15 +3,20 @@ import { Request, Response, NextFunction } from 'express';
 import { ZodError, z } from 'zod';
 
 // Mock config - use vi.hoisted to define the mock before hoisting
-const { mockConfig } = vi.hoisted(() => ({
+const { mockConfig, mockSentry } = vi.hoisted(() => ({
   mockConfig: {
     NODE_ENV: 'production' as 'production' | 'development' | 'test',
+  },
+  mockSentry: {
+    captureException: vi.fn(),
   },
 }));
 
 vi.mock('../config.js', () => ({
   config: mockConfig,
 }));
+
+vi.mock('@sentry/node', () => mockSentry);
 
 import { AppError, errorHandler } from './error-handler.js';
 
@@ -36,6 +41,7 @@ describe('Error Handler Middleware', () => {
 
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
     mockConfig.NODE_ENV = 'production';
+    mockSentry.captureException.mockClear();
   });
 
   afterEach(() => {
@@ -237,6 +243,37 @@ describe('Error Handler Middleware', () => {
             message: 'Detailed error for debugging',
           },
         });
+      });
+
+      it('should capture unknown errors to Sentry', () => {
+        const error = new Error('Unexpected database failure');
+
+        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockSentry.captureException).toHaveBeenCalledWith(error);
+      });
+
+      it('should NOT capture AppError to Sentry', () => {
+        const error = new AppError(401, 'unauthorized', 'Not authorized');
+
+        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockSentry.captureException).not.toHaveBeenCalled();
+      });
+
+      it('should NOT capture ZodError to Sentry', () => {
+        const schema = z.object({ email: z.string().email() });
+        let zodError: ZodError;
+
+        try {
+          schema.parse({ email: 'invalid' });
+        } catch (e) {
+          zodError = e as ZodError;
+        }
+
+        errorHandler(zodError!, mockReq as Request, mockRes as Response, mockNext);
+
+        expect(mockSentry.captureException).not.toHaveBeenCalled();
       });
     });
 

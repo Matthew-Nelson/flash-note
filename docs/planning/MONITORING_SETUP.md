@@ -1,8 +1,11 @@
 # FlashNote Monitoring Setup Plan
 
-> **Status: NOT YET IMPLEMENTED**
+> **Status: PARTIALLY IMPLEMENTED**
 >
-> This document outlines the recommended monitoring stack for FlashNote. These integrations are planned but not yet added to the codebase. This is a **critical priority** for production readiness.
+> - [x] Backend Sentry integration (error tracking)
+> - [ ] Extension Sentry integration
+> - [ ] UptimeRobot monitors
+> - [ ] Axiom log aggregation (optional)
 
 This document covers monitoring, logging, and maintenance practices for solo operation of FlashNote.
 
@@ -35,31 +38,27 @@ This document covers monitoring, logging, and maintenance practices for solo ope
 
 ## Sentry Setup (Error Tracking)
 
-### Backend Integration
+### Backend Integration (IMPLEMENTED)
 
+The backend Sentry integration is complete with HIPAA-compliant PHI filtering.
+
+**Key files:**
+- `src/instrument.ts` - Sentry initialization with PHI sanitization
+- `src/index.ts` - Imports instrument first, adds Express error handler
+- `src/middleware/error-handler.ts` - Captures unknown errors to Sentry
+- `src/db/index.ts` - Captures database pool errors to Sentry
+
+**HIPAA protections:**
+- Request bodies are NOT sent (may contain patient notes)
+- PHI-sensitive fields automatically redacted (patient, diagnosis, treatment, soap, etc.)
+- Console breadcrumbs disabled (may contain logged PHI)
+- URL query params stripped from HTTP breadcrumbs
+- Only safe headers forwarded (content-type, user-agent, etc.)
+
+**To configure:**
 ```bash
-cd backend
-pnpm add @sentry/node
-```
-
-Add to `src/index.ts` at the very top, before other imports:
-
-```typescript
-import * as Sentry from '@sentry/node';
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  environment: process.env.NODE_ENV,
-  tracesSampleRate: 0.1,
-  beforeSend(event) {
-    // Strip potential PHI from error reports
-    if (event.request?.data) delete event.request.data;
-    return event;
-  },
-});
-
-// Add error handler after all routes
-app.use(Sentry.Handlers.errorHandler());
+# Add to .env
+SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
 ```
 
 ### Extension Integration
@@ -329,10 +328,13 @@ axiom query "['flashnote-backend'] | where level == 'error' | top 10"
 
 ## Implementation Checklist
 
-- [ ] Set up Sentry account and get DSN
-- [ ] Add `@sentry/node` to backend
+- [x] Set up Sentry account and get DSN
+- [x] Add `@sentry/node` to backend
+- [x] Add `SENTRY_DSN` to backend `.env.example`
+- [x] Configure HIPAA-compliant PHI filtering in `src/instrument.ts`
+- [x] Add Sentry error handler to Express middleware
+- [x] Add Sentry capture for database pool errors
 - [ ] Add `@sentry/react` to extension
-- [ ] Add `SENTRY_DSN` to backend config and `.env.example`
 - [ ] Add `VITE_SENTRY_DSN` to extension config
 - [ ] Set up UptimeRobot monitors
 - [ ] Create `.github/dependabot.yml`
