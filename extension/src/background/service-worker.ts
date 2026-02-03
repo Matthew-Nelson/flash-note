@@ -1,6 +1,11 @@
 // FlashNote Background Service Worker
 // Handles extension lifecycle events and side panel
 
+import { initSentry, captureException } from '../shared/sentry';
+
+// Initialize Sentry for the service worker context
+initSentry();
+
 // Message types for runtime messaging
 interface ExtensionMessage {
   type: string;
@@ -62,6 +67,30 @@ chrome.runtime.onConnect.addListener((port) => {
       stopKeepAlive();
     });
   }
+});
+
+// Global error handlers for the service worker context
+// Since we filter out GlobalHandlers integration for extension safety,
+// we manually capture unhandled errors here.
+self.addEventListener('error', (event) => {
+  captureException(event.error ?? new Error(event.message), {
+    source: 'service_worker',
+    errorType: 'unhandled_error',
+    filename: event.filename,
+    lineno: event.lineno,
+  });
+});
+
+self.addEventListener('unhandledrejection', (event) => {
+  captureException(
+    event.reason instanceof Error
+      ? event.reason
+      : new Error(String(event.reason)),
+    {
+      source: 'service_worker',
+      errorType: 'unhandled_rejection',
+    }
+  );
 });
 
 export {};

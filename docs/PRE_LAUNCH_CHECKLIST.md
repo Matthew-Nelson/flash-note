@@ -220,7 +220,7 @@
 
 - [~] **Configure monitoring and alerting**
   - [x] Error tracking (Sentry - free tier) - Backend implemented with HIPAA-compliant PHI filtering
-  - [ ] Error tracking (Sentry) - Extension integration pending
+  - [x] Error tracking (Sentry) - Extension implemented with BrowserClient + HIPAA PHI filtering
   - [ ] Uptime monitoring (UptimeRobot, Better Uptime - free tiers)
   - [ ] Set up alerting for downtime/errors
 

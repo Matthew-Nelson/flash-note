@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/shared/storage';
 import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
+import { setUser as setSentryUser } from '@/shared/sentry';
 
 interface User {
   id: string;
@@ -17,6 +18,11 @@ export function useAuth() {
   useEffect(() => {
     void loadAuth();
   }, []);
+
+  // Keep Sentry user context in sync (only sends user ID, no PHI)
+  useEffect(() => {
+    setSentryUser(user?.id ?? null);
+  }, [user]);
 
   // Listen for forced logout (e.g., password reset invalidated token)
   useEffect(() => {

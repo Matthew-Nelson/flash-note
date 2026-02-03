@@ -3,7 +3,7 @@
 > **Status: PARTIALLY IMPLEMENTED**
 >
 > - [x] Backend Sentry integration (error tracking)
-> - [ ] Extension Sentry integration
+> - [x] Extension Sentry integration (error tracking)
 > - [ ] UptimeRobot monitors
 > - [ ] Axiom log aggregation (optional)
 
@@ -61,30 +61,37 @@ The backend Sentry integration is complete with HIPAA-compliant PHI filtering.
 SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
 ```
 
-### Extension Integration
+### Extension Integration (IMPLEMENTED)
 
+The extension Sentry integration uses `BrowserClient` + `Scope` (not `Sentry.init()`) per Sentry's recommended pattern for browser extensions. This avoids global state pollution that could conflict with websites also using Sentry.
+
+**Key files:**
+- `src/shared/sentry.ts` - BrowserClient setup with HIPAA PHI sanitization
+- `src/shared/sentry-sanitization.ts` - PHI field detection and object sanitization
+- `src/sidepanel/main.tsx` - Initializes Sentry + global error handlers for sidepanel
+- `src/background/service-worker.ts` - Initializes Sentry + global error handlers for service worker
+- `src/sidepanel/components/ErrorBoundary.tsx` - Captures React render errors to Sentry
+- `src/shared/api.ts` - Captures API/network errors after retry exhaustion
+- `src/sidepanel/hooks/useAuth.ts` - Sets Sentry user context (ID only, no PHI)
+
+**Integration points:**
+- React ErrorBoundary captures render errors
+- API client captures 5xx/network errors after all retries exhausted
+- API client captures token refresh failures
+- Global `error` and `unhandledrejection` handlers in both sidepanel and service worker
+- User ID set on Sentry scope when auth state changes
+
+**HIPAA protections (same as backend):**
+- PHI-sensitive fields automatically redacted (patient, diagnosis, treatment, soap, etc.)
+- Console breadcrumbs disabled (may contain logged PHI)
+- URL query params stripped from HTTP breadcrumbs
+- Request bodies removed from events
+- `sendDefaultPii: false`
+
+**To configure:**
 ```bash
-cd extension
-pnpm add @sentry/react
-```
-
-Add to `src/sidepanel/main.tsx`:
-
-```typescript
-import * as Sentry from '@sentry/react';
-
-Sentry.init({
-  dsn: import.meta.env.VITE_SENTRY_DSN,
-  environment: import.meta.env.MODE,
-  beforeSend(event) {
-    // Never send note content or patient data
-    if (event.extra) {
-      delete event.extra.noteContent;
-      delete event.extra.patientContext;
-    }
-    return event;
-  },
-});
+# Add to .env.development or .env.production
+VITE_SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
 ```
 
 ---
@@ -334,8 +341,11 @@ axiom query "['flashnote-backend'] | where level == 'error' | top 10"
 - [x] Configure HIPAA-compliant PHI filtering in `src/instrument.ts`
 - [x] Add Sentry error handler to Express middleware
 - [x] Add Sentry capture for database pool errors
-- [ ] Add `@sentry/react` to extension
-- [ ] Add `VITE_SENTRY_DSN` to extension config
+- [x] Add `@sentry/browser` to extension (BrowserClient pattern for extensions)
+- [x] Add `VITE_SENTRY_DSN` to extension env files
+- [x] Add HIPAA PHI sanitization for extension Sentry events
+- [x] Add Sentry to ErrorBoundary, API client, and service worker
+- [x] Add Sentry ingest domain to manifest.json host_permissions
 - [ ] Set up UptimeRobot monitors
 - [ ] Create `.github/dependabot.yml`
 - [ ] Set up Axiom account (optional for launch)
