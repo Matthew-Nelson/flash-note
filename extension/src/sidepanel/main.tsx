@@ -8,9 +8,12 @@ import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
 import './index.css';
 
-// Global error handlers for the sidepanel context
+// Global error handlers for the sidepanel context.
 // Since we filter out GlobalHandlers integration for extension safety,
 // we manually capture unhandled errors here.
+// Note: React errors caught by ErrorBoundary do NOT propagate here —
+// React handles them internally. These handlers catch non-React errors
+// (async, event handlers, third-party code, etc.).
 window.addEventListener('error', (event) => {
   captureException(event.error ?? new Error(event.message), {
     source: 'sidepanel',

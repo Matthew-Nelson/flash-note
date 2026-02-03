@@ -118,9 +118,6 @@ export function initSentry(): void {
     beforeSend(event) {
       return sanitizeEvent(event);
     },
-
-    // Performance monitoring - lower sample rate for production
-    tracesSampleRate: environment === 'production' ? 0.1 : 1.0,
   });
 
   sentryScope = new Scope();
@@ -130,12 +127,15 @@ export function initSentry(): void {
   // Tag events with extension context
   sentryScope.setTag('runtime', 'extension');
 
-  // eslint-disable-next-line no-console
-  console.log('Sentry initialized for extension');
+  if (import.meta.env.DEV) {
+    // eslint-disable-next-line no-console
+    console.log('Sentry initialized for extension');
+  }
 }
 
 /**
  * Capture an exception and send it to Sentry.
+ * Clones the scope per capture to prevent extras from leaking between events.
  * Safe to call even if Sentry is not initialized (no-ops gracefully).
  */
 export function captureException(
@@ -144,17 +144,16 @@ export function captureException(
 ): void {
   if (!sentryScope) return;
 
+  const scope = sentryScope.clone();
   if (context) {
-    // Sanitize context before attaching
-    const sanitizedContext = sanitizeObject(context);
-    sentryScope.setExtras(sanitizedContext);
+    scope.setExtras(sanitizeObject(context));
   }
-
-  sentryScope.captureException(error);
+  scope.captureException(error);
 }
 
 /**
  * Capture a message and send it to Sentry.
+ * Clones the scope per capture to prevent extras from leaking between events.
  * Safe to call even if Sentry is not initialized (no-ops gracefully).
  */
 export function captureMessage(
@@ -163,12 +162,11 @@ export function captureMessage(
 ): void {
   if (!sentryScope) return;
 
+  const scope = sentryScope.clone();
   if (context) {
-    const sanitizedContext = sanitizeObject(context);
-    sentryScope.setExtras(sanitizedContext);
+    scope.setExtras(sanitizeObject(context));
   }
-
-  sentryScope.captureMessage(message);
+  scope.captureMessage(message);
 }
 
 /**
