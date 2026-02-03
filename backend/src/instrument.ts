@@ -15,61 +15,11 @@ import { config as dotenvConfig } from 'dotenv';
 dotenvConfig();
 
 import * as Sentry from '@sentry/node';
-
-// PHI-sensitive field patterns that should never be sent to Sentry
-const PHI_FIELD_PATTERNS = [
-  /patient/i,
-  /diagnosis/i,
-  /treatment/i,
-  /medical/i,
-  /health/i,
-  /dob|date.?of.?birth/i,
-  /ssn|social.?security/i,
-  /mrn|medical.?record/i,
-  /note/i,
-  /soap/i,
-  /assessment/i,
-  /subjective/i,
-  /objective/i,
-  /plan/i,
-  /shorthand/i,
-  /input/i,
-  /content/i,
-  /body/i,
-  /message/i,
-];
-
-/**
- * Check if a key name potentially contains PHI
- */
-function isPHIField(key: string): boolean {
-  return PHI_FIELD_PATTERNS.some((pattern) => pattern.test(key));
-}
-
-/**
- * Recursively sanitize an object by removing PHI fields
- */
-function sanitizeObject(obj: Record<string, unknown>): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(obj)) {
-    if (isPHIField(key)) {
-      sanitized[key] = '[REDACTED - PHI]';
-    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
-      sanitized[key] = sanitizeObject(value as Record<string, unknown>);
-    } else if (Array.isArray(value)) {
-      sanitized[key] = value.map((item): unknown =>
-        item && typeof item === 'object'
-          ? sanitizeObject(item as Record<string, unknown>)
-          : item
-      );
-    } else {
-      sanitized[key] = value;
-    }
-  }
-
-  return sanitized;
-}
+import {
+  sanitizeObject,
+  filterSafeHeaders,
+  sanitizeUrl,
+} from './utils/sentry-sanitization.js';
 
 // Only initialize if DSN is provided
 const dsn = process.env.SENTRY_DSN;
@@ -112,22 +62,7 @@ if (dsn) {
 
         // Keep only safe headers
         if (event.request.headers) {
-          const safeHeaders: Record<string, string> = {};
-          const allowedHeaders = [
-            'content-type',
-            'content-length',
-            'user-agent',
-            'accept',
-            'accept-encoding',
-            'host',
-          ];
-
-          for (const header of allowedHeaders) {
-            if (event.request.headers[header]) {
-              safeHeaders[header] = event.request.headers[header];
-            }
-          }
-          event.request.headers = safeHeaders;
+          event.request.headers = filterSafeHeaders(event.request.headers);
         }
       }
 
@@ -146,14 +81,7 @@ if (dsn) {
         // Remove URL query params and body that might contain PHI
         const urlValue: unknown = breadcrumb.data.url;
         if (typeof urlValue === 'string') {
-          try {
-            const url = new URL(urlValue);
-            url.search = '';
-            breadcrumb.data.url = url.toString();
-          } catch {
-            // If URL parsing fails, redact entirely
-            breadcrumb.data.url = '[REDACTED]';
-          }
+          breadcrumb.data.url = sanitizeUrl(urlValue);
         }
         delete breadcrumb.data.body;
       }
