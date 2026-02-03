@@ -218,8 +218,9 @@
   - [ ] Configure custom domain
   - [ ] Set environment variables
 
-- [ ] **Configure monitoring and alerting**
-  - [ ] Error tracking (Sentry - free tier)
+- [~] **Configure monitoring and alerting**
+  - [x] Error tracking (Sentry - free tier) - Backend implemented with HIPAA-compliant PHI filtering
+  - [ ] Error tracking (Sentry) - Extension integration pending
   - [ ] Uptime monitoring (UptimeRobot, Better Uptime - free tiers)
   - [ ] Set up alerting for downtime/errors
 

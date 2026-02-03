@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
 
 export class AppError extends Error {
@@ -51,7 +52,9 @@ export function errorHandler(
     return;
   }
 
-  // Unknown errors
+  // Unknown errors - capture to Sentry for monitoring
+  Sentry.captureException(err);
+
   res.status(500).json({
     success: false,
     error: {

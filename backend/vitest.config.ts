@@ -36,6 +36,7 @@ export default defineConfig({
         'src/config.ts', // Environment-dependent - validated through mocking in other tests
         'src/db/index.ts', // Database connection pool - needs real PostgreSQL
         'src/routes/**', // HTTP route handlers - need supertest integration tests
+        'src/instrument.ts', // Sentry initialization - depends on external SDK, sanitization logic tested via sentry-sanitization.ts
       ],
 
       // Minimum coverage thresholds - fail if below these

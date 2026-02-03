@@ -1,3 +1,5 @@
+// IMPORTANT: Sentry must be imported first to ensure proper instrumentation
+import { Sentry } from './instrument.js';
 import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -46,7 +48,8 @@ app.use('/auth', authRouter);
 app.use('/notes', notesRouter);
 app.use('/billing', billingRouter);
 
-// Error handling
+// Error handling - Sentry must be first to capture errors
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 // Start server
