@@ -10,6 +10,7 @@
  * Ported from extension/src/shared/api.ts for consistency.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import { storage } from './storage';
 import type { AuthResponse, ApiResponse, SessionEndReason } from './types';
 
@@ -136,7 +137,13 @@ async function refreshToken(refreshTokenValue: string): Promise<string | null> {
     });
 
     return data.accessToken;
-  } catch {
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: {
+        source: 'token_refresh',
+        errorType: 'refresh_network_failure',
+      },
+    });
     storage.clearAuth();
     return null;
   }
@@ -198,6 +205,14 @@ async function requestWithRetry<T>(
       }
 
       if (attempt === maxRetries) {
+        Sentry.captureException(lastError, {
+          extra: {
+            source: 'request_with_retry',
+            errorType: 'retry_exhausted',
+            endpoint,
+            retriesAttempted: maxRetries,
+          },
+        });
         break;
       }
 
