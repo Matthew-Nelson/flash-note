@@ -81,3 +81,6 @@ Sentry.init({
   // No Session Replay - it captures DOM content which may contain PHI
   // No tracing - not needed for error monitoring MVP
 });
+
+// Required by @sentry/nextjs for route change instrumentation
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;
