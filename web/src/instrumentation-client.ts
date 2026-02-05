@@ -60,6 +60,7 @@ function sanitizeEvent(event: ErrorEvent): ErrorEvent | null {
   if (event.request) {
     delete event.request.data;
     delete event.request.cookies;
+    delete event.request.query_string;
   }
 
   return event;
