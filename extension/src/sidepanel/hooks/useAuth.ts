@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '@/shared/storage';
 import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
-import { setUser as setSentryUser } from '@/shared/sentry';
+import { setUser as setSentryUser, captureException } from '@/shared/sentry';
 
 interface User {
   id: string;
@@ -43,6 +43,8 @@ export function useAuth() {
         setUser(auth.user);
       }
     } catch (error) {
+      // Capture to Sentry - helps diagnose extension storage corruption issues
+      captureException(error, { source: 'extension_storage', errorType: 'read_failed' });
       console.error('Failed to load auth:', error);
     } finally {
       setIsLoading(false);

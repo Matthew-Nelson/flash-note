@@ -1,10 +1,11 @@
 # FlashNote Monitoring Setup Plan
 
-> **Status: PARTIALLY IMPLEMENTED**
+> **Status: SUBSTANTIALLY COMPLETE**
 >
 > - [x] Backend Sentry integration (error tracking)
 > - [x] Extension Sentry integration (error tracking)
 > - [x] Web app Sentry integration (error tracking)
+> - [x] Logging gaps audit and fixes (12 gaps fixed - see `docs/planning/SENTRY_LOGGING_GAPS.md`)
 > - [ ] UptimeRobot monitors
 > - [ ] Axiom log aggregation (optional)
 
@@ -135,6 +136,32 @@ NEXT_PUBLIC_SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
 # For source map uploads in CI (optional)
 SENTRY_AUTH_TOKEN=sntrys_xxx
 ```
+
+---
+
+## Logging Gaps Audit (COMPLETED)
+
+A comprehensive audit identified and fixed 12 locations where errors were being swallowed with only `console.error`. All gaps are now addressed.
+
+**Critical fixes (revenue/compliance):**
+- LLM/AI service errors now visible in Sentry (excluding rate limits)
+- Stripe webhook proxy errors captured with context
+- Missing userId in billing webhooks captured
+- HIPAA audit log write failures captured
+
+**Important fixes (user experience/security):**
+- Verification email failures during registration
+- Account lockout service failures (3 locations)
+- Email service send failures
+- Webhook signature verification failures
+
+**Nice-to-have fixes (diagnostics):**
+- 5xx AppErrors now captured (4xx intentionally excluded)
+- Checkout/billing UI errors (web)
+- SessionStorage write failures (web)
+- Chrome storage read failures (extension)
+
+See [`docs/planning/SENTRY_LOGGING_GAPS.md`](SENTRY_LOGGING_GAPS.md) for the full audit.
 
 ---
 

@@ -42,6 +42,17 @@ export function errorHandler(
 
   // Known application errors
   if (err instanceof AppError) {
+    // Capture 5xx errors to Sentry - these indicate server-side failures
+    // 4xx errors are expected client errors and don't need Sentry alerts
+    if (err.statusCode >= 500) {
+      Sentry.captureException(err, {
+        extra: {
+          source: 'app_error',
+          statusCode: err.statusCode,
+          errorCode: err.code,
+        },
+      });
+    }
     res.status(err.statusCode).json({
       success: false,
       error: {

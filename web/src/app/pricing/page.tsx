@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { useAuth, ApiError } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { Button, Alert } from '@/components/ui';
@@ -65,6 +66,14 @@ function PricingContent() {
       // Redirect to Stripe Checkout
       window.location.href = checkoutUrl;
     } catch (err) {
+      // Capture to Sentry - revenue-impacting checkout failures
+      Sentry.captureException(err, {
+        extra: {
+          source: 'pricing_page',
+          errorType: 'checkout_failed',
+          plan,
+        },
+      });
       if (err instanceof ApiError) {
         if (err.code === 'email_not_verified') {
           setError('Please verify your email before subscribing. Check your inbox for a verification link.');

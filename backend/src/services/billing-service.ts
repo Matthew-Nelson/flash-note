@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
 import { findUserById, updateUserSubscription, updateSubscriptionStatus } from '../db/queries/users.js';
 import { tryMarkWebhookProcessed } from '../db/queries/webhooks.js';
@@ -64,6 +65,13 @@ class BillingService {
         config.STRIPE_WEBHOOK_SECRET
       );
     } catch (err) {
+      // Capture to Sentry - could indicate webhook secret misconfiguration or security probe
+      Sentry.captureException(err, {
+        extra: {
+          source: 'billing_webhook',
+          errorType: 'signature_verification_failed',
+        },
+      });
       // SECURITY: Only log error message, not full error object which may contain sensitive Stripe SDK details
       console.error('Webhook signature verification failed:', err instanceof Error ? err.message : 'Unknown error');
       throw new AppError(400, 'webhook_error', 'Invalid signature');
@@ -265,8 +273,21 @@ class BillingService {
    */
   private async logMissingUserIdError(
     eventType: string,
-    context: Record<string, unknown>
+    context: { subscriptionId?: string; customerId?: unknown; sessionId?: string; invoiceId?: string }
   ): Promise<void> {
+    // Capture to Sentry - revenue-impacting data integrity issue
+    // Explicitly pick safe fields to avoid accidentally leaking sensitive data
+    Sentry.captureException(new Error('Webhook missing userId in metadata'), {
+      extra: {
+        source: 'billing_webhook',
+        eventType,
+        subscriptionId: context.subscriptionId,
+        customerId: context.customerId,
+        sessionId: context.sessionId,
+        invoiceId: context.invoiceId,
+      },
+    });
+
     // Structured logging for alerting systems (can be parsed by log aggregators)
     console.error(JSON.stringify({
       level: 'error',

@@ -7,6 +7,7 @@
  * SECURITY: PHI is never stored - only auth tokens and user metadata.
  */
 
+import * as Sentry from '@sentry/nextjs';
 import type { StoredAuth } from './types';
 
 const AUTH_KEY = 'flashnote:auth';
@@ -49,6 +50,12 @@ export function setAuth(auth: StoredAuth): void {
   try {
     sessionStorage.setItem(AUTH_KEY, JSON.stringify(auth));
   } catch (error) {
+    // Capture to Sentry - helps diagnose "users getting logged out" complaints
+    Sentry.captureException(error, {
+      extra: {
+        source: 'session_storage',
+      },
+    });
     // Storage full or quota exceeded - log but don't crash
     console.error('Failed to store auth:', error);
   }
