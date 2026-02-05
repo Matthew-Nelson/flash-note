@@ -22,15 +22,26 @@ export default function Settings({ user, onLogout }: SettingsProps) {
 
   useEffect(() => {
     // Load the current setting
-    storage.getPreferences().then((prefs) => {
-      setShowFloatingBadge(prefs.showFloatingBadge);
-    });
+    storage
+      .getPreferences()
+      .then((prefs) => {
+        setShowFloatingBadge(prefs.showFloatingBadge);
+      })
+      .catch((error) => {
+        console.error('Failed to load preferences:', error);
+        // Default is already true from initial state
+      });
   }, []);
 
   const handleToggleFloatingBadge = async () => {
     const newValue = !showFloatingBadge;
     setShowFloatingBadge(newValue);
-    await storage.setPreferences({ showFloatingBadge: newValue });
+    try {
+      await storage.setPreferences({ showFloatingBadge: newValue });
+    } catch (error) {
+      console.error('Failed to save preference:', error);
+      setShowFloatingBadge(!newValue); // Revert UI on failure
+    }
   };
 
   const isTrialing = user.subscriptionStatus === 'trialing';

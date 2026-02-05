@@ -22,7 +22,35 @@
 
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": [
+        "https://*.webpt.com/*",
+        "https://*.clinicient.com/*",
+        "https://*.promptemr.com/*",
+        "https://*.theraoffice.com/*",
+        "https://*.rfraintree.com/*",
+        "https://*.nethealth.com/*",
+        "https://*.redocnow.com/*",
+        "https://*.kareo.com/*",
+        "https://*.practiceperfect.com/*",
+        "https://*.betterpt.com/*",
+        "https://*.janeapp.com/*",
+        "https://*.simplepractice.com/*",
+        "https://*.fusionwebclinic.com/*",
+        "https://*.fotoinc.com/*",
+        "https://*.mwtherapy.com/*",
+        "https://*.therago.com/*",
+        "https://*.epic.com/*",
+        "https://*.mychart.com/*",
+        "https://*.cerner.com/*",
+        "https://*.athenahealth.com/*",
+        "https://*.eclinicalworks.com/*",
+        "https://*.allscripts.com/*",
+        "https://*.nextgen.com/*",
+        "https://*.advancedmd.com/*",
+        "https://*.drchrono.com/*",
+        "https://*.modmed.com/*",
+        "http://localhost/*"
+      ],
       "js": ["content/floating-button.js"],
       "css": ["content/floating-button.css"],
       "run_at": "document_idle"

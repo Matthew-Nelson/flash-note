@@ -1,16 +1,14 @@
 /**
  * FlashNote Floating Button Content Script
  *
- * This script is injected into EMR pages to display a floating button
- * that opens the FlashNote sidepanel when clicked.
+ * This script is injected into EMR pages (via manifest matches) to display
+ * a floating button that opens the FlashNote sidepanel when clicked.
  *
  * Security Notes:
  * - This script does NOT read or scrape any data from the page
  * - It only injects a button element and sends a message to open the sidepanel
  * - No PHI is accessed, processed, or transmitted
  */
-
-import { matchesAnyPattern } from './emr-patterns';
 
 const BUTTON_ID = 'flashnote-floating-button';
 const TOOLTIP_ID = 'flashnote-floating-tooltip';
@@ -19,16 +17,23 @@ const PREFERENCES_STORAGE_KEY = 'preferences';
 // Track sidepanel open state
 let isSidepanelOpen = false;
 
+// Cached preference value (updated via storage listener)
+let cachedBadgeEnabled = true;
+
 /**
- * Check if the floating badge is enabled in user preferences
+ * Load the badge preference from storage and cache it
  */
-async function isFloatingBadgeEnabled(): Promise<boolean> {
-  const result = await chrome.storage.local.get(PREFERENCES_STORAGE_KEY);
-  const prefs = result[PREFERENCES_STORAGE_KEY] as
-    | { showFloatingBadge?: boolean }
-    | undefined;
-  // Default to true if not set
-  return prefs?.showFloatingBadge ?? true;
+async function loadBadgePreference(): Promise<void> {
+  try {
+    const result = await chrome.storage.local.get(PREFERENCES_STORAGE_KEY);
+    const prefs = result[PREFERENCES_STORAGE_KEY] as
+      | { showFloatingBadge?: boolean }
+      | undefined;
+    cachedBadgeEnabled = prefs?.showFloatingBadge ?? true;
+  } catch (error) {
+    console.error('FlashNote: Failed to load preferences', error);
+    cachedBadgeEnabled = true; // Default to showing badge
+  }
 }
 
 /**
@@ -134,17 +139,10 @@ function removeFloatingButton(): void {
 }
 
 /**
- * Check if the current page matches EMR patterns and show/hide button accordingly
+ * Update button visibility based on cached preference
  */
-async function checkAndUpdateButton(): Promise<void> {
-  // First check if badge is enabled in settings
-  const badgeEnabled = await isFloatingBadgeEnabled();
-  if (!badgeEnabled) {
-    removeFloatingButton();
-    return;
-  }
-
-  if (matchesAnyPattern(window.location.href)) {
+function updateButtonVisibility(): void {
+  if (cachedBadgeEnabled) {
     createFloatingButton();
   } else {
     removeFloatingButton();
@@ -155,33 +153,36 @@ async function checkAndUpdateButton(): Promise<void> {
  * Initialize the content script
  */
 async function init(): Promise<void> {
-  // Check on initial load
-  await checkAndUpdateButton();
+  // Load preference and show button on initial load
+  await loadBadgePreference();
+  updateButtonVisibility();
 
-  // Listen for URL changes (for SPAs that don't trigger full page reloads)
-  let lastUrl = window.location.href;
+  // Listen for SPA navigation via History API
+  const originalPushState = history.pushState.bind(history);
+  history.pushState = function (...args) {
+    originalPushState(...args);
+    updateButtonVisibility();
+  };
 
-  const observer = new MutationObserver(() => {
-    if (window.location.href !== lastUrl) {
-      lastUrl = window.location.href;
-      void checkAndUpdateButton();
-    }
-  });
+  const originalReplaceState = history.replaceState.bind(history);
+  history.replaceState = function (...args) {
+    originalReplaceState(...args);
+    updateButtonVisibility();
+  };
 
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
-
-  // Also listen for popstate (back/forward navigation)
+  // Listen for back/forward navigation
   window.addEventListener('popstate', () => {
-    void checkAndUpdateButton();
+    updateButtonVisibility();
   });
 
-  // Listen for preference changes (e.g., user toggles badge visibility)
+  // Listen for preference changes and update cache
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local' && changes.preferences) {
-      void checkAndUpdateButton();
+      const newPrefs = changes.preferences.newValue as
+        | { showFloatingBadge?: boolean }
+        | undefined;
+      cachedBadgeEnabled = newPrefs?.showFloatingBadge ?? true;
+      updateButtonVisibility();
     }
   });
 }
