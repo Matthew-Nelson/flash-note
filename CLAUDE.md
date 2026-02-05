@@ -247,7 +247,7 @@ Sentry.captureException(error, {
 import { captureException } from '@/shared/sentry';
 
 // Uses our HIPAA-safe wrapper that sanitizes extras
-captureException(error, { source: 'chrome_storage_read' });
+captureException(error, { source: 'extension_storage', errorType: 'read_failed' });
 ```
 
 ### Safe Extras (Include)
@@ -261,6 +261,20 @@ captureException(error, { source: 'chrome_storage_read' });
 | Status codes | `statusCode: 500` |
 | Durations | `durationMs: 1234` |
 | Counts | `retryCount: 3` |
+
+### Source Naming Convention
+
+Use consistent `snake_case` naming for `source` values:
+
+| Component Type | Pattern | Examples |
+|----------------|---------|----------|
+| Backend services | `{name}_service` | `auth_service`, `billing_service`, `ai_service` |
+| Backend middleware | `{name}_handler` | `error_handler` |
+| Backend webhooks | `{name}_webhook` | `billing_webhook` |
+| Web pages | `{name}_page` | `pricing_page`, `dashboard_page` |
+| Web/Extension libs | `{name}_storage`, `api_client` | `session_storage`, `extension_storage` |
+
+Use `errorType` to specify the specific failure within a source (e.g., `source: 'auth_service', errorType: 'verification_email_failed'`).
 
 ### Unsafe Extras (NEVER Include)
 

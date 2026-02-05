@@ -202,11 +202,14 @@ FlashNote - AI-powered documentation for physical therapists
 
     if (error) {
       // Capture to Sentry - email delivery failures affect password resets and verification
-      const emailError = new Error(`Failed to send email: ${error.message}`);
+      // Note: Resend SDK returns { name, message } object, not an Error instance,
+      // so we wrap it for proper stack trace while preserving original details in extras
+      const emailError = new Error(`Failed to send email: ${error.message}`, { cause: error });
       Sentry.captureException(emailError, {
         extra: {
           source: 'email_service',
-          errorName: error.name,
+          resendErrorName: error.name,
+          resendErrorMessage: error.message,
           // Don't log recipient email to avoid PII in Sentry
         },
       });

@@ -44,7 +44,7 @@ export function useAuth() {
       }
     } catch (error) {
       // Capture to Sentry - helps diagnose extension storage corruption issues
-      captureException(error, { source: 'chrome_storage_read' });
+      captureException(error, { source: 'extension_storage', errorType: 'read_failed' });
       console.error('Failed to load auth:', error);
     } finally {
       setIsLoading(false);

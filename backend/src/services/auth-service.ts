@@ -54,7 +54,7 @@ class AuthService {
       // Capture to Sentry - new users silently blocked without verification email
       Sentry.captureException(error, {
         extra: {
-          source: 'registration',
+          source: 'auth_service',
           errorType: 'verification_email_failed',
           userId: user.id,
         },

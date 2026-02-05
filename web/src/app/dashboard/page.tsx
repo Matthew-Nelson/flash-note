@@ -94,7 +94,8 @@ function DashboardContent() {
       // Capture to Sentry - revenue-impacting billing portal failures
       Sentry.captureException(err, {
         extra: {
-          source: 'billing_portal',
+          source: 'dashboard_page',
+          errorType: 'billing_portal_failed',
         },
       });
       if (err instanceof ApiError) {

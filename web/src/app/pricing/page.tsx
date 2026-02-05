@@ -69,7 +69,8 @@ function PricingContent() {
       // Capture to Sentry - revenue-impacting checkout failures
       Sentry.captureException(err, {
         extra: {
-          source: 'checkout',
+          source: 'pricing_page',
+          errorType: 'checkout_failed',
           plan,
         },
       });
