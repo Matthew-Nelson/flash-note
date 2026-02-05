@@ -1,5 +1,6 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import {
   createContext,
   useContext,
@@ -37,11 +38,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
 
-  // Initialize auth state from storage
+  // Initialize auth state from storage and set Sentry user context
   useEffect(() => {
     const auth = storage.getAuth();
     if (auth?.user) {
       setUser(auth.user);
+      Sentry.setUser({ id: auth.user.id });
     }
     setIsLoading(false);
   }, []);
@@ -65,6 +67,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await api.login(email, password);
     setUser(response.user);
     setSessionEndReason(null);
+    Sentry.setUser({ id: response.user.id });
     return response;
   }, []);
 
@@ -72,6 +75,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await api.register(email, password);
     setUser(response.user);
     setSessionEndReason(null);
+    Sentry.setUser({ id: response.user.id });
     return response;
   }, []);
 
@@ -80,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       await api.logout();
     } finally {
       setUser(null);
+      Sentry.setUser(null);
       router.push('/login');
     }
   }, [router]);

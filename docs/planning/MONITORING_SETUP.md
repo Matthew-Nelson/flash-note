@@ -4,6 +4,7 @@
 >
 > - [x] Backend Sentry integration (error tracking)
 > - [x] Extension Sentry integration (error tracking)
+> - [x] Web app Sentry integration (error tracking)
 > - [ ] UptimeRobot monitors
 > - [ ] Axiom log aggregation (optional)
 
@@ -92,6 +93,47 @@ The extension Sentry integration uses `BrowserClient` + `Scope` (not `Sentry.ini
 ```bash
 # Add to .env.development or .env.production
 VITE_SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
+```
+
+### Web App Integration (IMPLEMENTED)
+
+The web app uses `@sentry/nextjs` with the standard `Sentry.init()` pattern, configured for three Next.js runtimes: client (browser), server (Node.js), and edge (middleware).
+
+**Key files:**
+- `sentry.client.config.ts` - Client-side Sentry init with full HIPAA PHI sanitization
+- `sentry.server.config.ts` - Server-side Sentry init with PHI filtering
+- `sentry.edge.config.ts` - Edge runtime Sentry init with PHI filtering
+- `src/instrumentation.ts` - Next.js instrumentation hook (loads server/edge configs)
+- `src/app/global-error.tsx` - App Router last-resort error boundary
+- `src/lib/sentry-sanitization.ts` - PHI field detection and object sanitization
+- `next.config.ts` - Wrapped with `withSentryConfig` for source map uploads
+- `src/components/ErrorBoundary.tsx` - Captures React render errors to Sentry
+- `src/lib/api.ts` - Captures API/network errors after retry exhaustion
+- `src/lib/auth-context.tsx` - Sets Sentry user context (ID only, no PHI)
+
+**Integration points:**
+- React ErrorBoundary captures render errors
+- `global-error.tsx` captures root layout errors (App Router)
+- `onRequestError` captures Server Component, middleware, and proxy errors
+- API client captures 5xx/network errors after all retries exhausted
+- API client captures token refresh failures
+- User ID set on Sentry when auth state changes
+
+**HIPAA protections (same as backend and extension):**
+- PHI-sensitive fields automatically redacted (patient, diagnosis, treatment, soap, etc.)
+- Console breadcrumbs disabled on client (may contain logged PHI)
+- URL query params stripped from fetch/XHR breadcrumbs
+- Request bodies and cookies removed from events
+- `sendDefaultPii: false`
+- Session Replay intentionally NOT enabled (captures DOM which may contain PHI)
+
+**To configure:**
+```bash
+# Add to .env.local
+NEXT_PUBLIC_SENTRY_DSN=https://your-key@xxx.ingest.us.sentry.io/xxx
+
+# For source map uploads in CI (optional)
+SENTRY_AUTH_TOKEN=sntrys_xxx
 ```
 
 ---
@@ -284,6 +326,14 @@ AXIOM_TOKEN=xaat-xxx
 VITE_SENTRY_DSN=https://xxx@sentry.io/xxx
 ```
 
+### Web `.env.local`
+
+```bash
+NEXT_PUBLIC_SENTRY_DSN=https://xxx@sentry.io/xxx
+# CI only:
+SENTRY_AUTH_TOKEN=sntrys_xxx
+```
+
 ---
 
 ## Cost Summary
@@ -346,6 +396,13 @@ axiom query "['flashnote-backend'] | where level == 'error' | top 10"
 - [x] Add HIPAA PHI sanitization for extension Sentry events
 - [x] Add Sentry to ErrorBoundary, API client, and service worker
 - [x] Add Sentry ingest domain to manifest.json host_permissions
+- [x] Add `@sentry/nextjs` to web app
+- [x] Add `NEXT_PUBLIC_SENTRY_DSN` to web app env files
+- [x] Configure HIPAA-compliant PHI filtering for web app (client, server, edge)
+- [x] Add `withSentryConfig` to `next.config.ts`
+- [x] Add `instrumentation.ts` for server/edge runtime init
+- [x] Add `global-error.tsx` for App Router error capture
+- [x] Add Sentry to web ErrorBoundary, API client, and auth context
 - [ ] Set up UptimeRobot monitors
 - [ ] Create `.github/dependabot.yml`
 - [ ] Set up Axiom account (optional for launch)
