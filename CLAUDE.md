@@ -186,6 +186,108 @@ Password requirements are enforced by Zod schemas in the backend:
 - **Code Review Mindset**: Write code as if it will be audited by a security firm and reviewed by regulators
 - **Fail Secure**: When something goes wrong, fail closed. Deny access by default. Never expose data in error states
 
+## Error Monitoring (Sentry)
+
+**Visibility into production errors is critical.** If an error is caught and handled gracefully, it becomes invisible unless explicitly captured to Sentry. Silent failures in healthcare software are unacceptable.
+
+### When to Add Sentry Monitoring
+
+Add `Sentry.captureException()` when implementing or modifying:
+
+1. **Revenue-critical operations** - Payment processing, checkout, subscription management, billing webhooks
+2. **HIPAA compliance features** - Audit logging, authentication events, authorization failures
+3. **Core product functionality** - LLM/AI service calls, note generation, any feature users pay for
+4. **Security controls** - Account lockout, rate limiting, token validation, webhook signature verification
+5. **External service integrations** - Email delivery, Stripe API, Gemini API
+6. **Graceful error handling** - Any `catch` block that doesn't re-throw (errors that would otherwise be invisible)
+
+**Rule of thumb:** If you write `console.error()` without re-throwing, you probably need `Sentry.captureException()` too.
+
+### What NOT to Capture
+
+- **Expected client errors (4xx)** - Invalid input, missing auth, rate limits hit by users
+- **Transient background operations** - Polling failures, optional refreshes that retry automatically
+- **High-frequency expected conditions** - Rate limiting during normal operation (e.g., `rate_limited` from LLM)
+
+### How to Add Monitoring
+
+**Backend (`@sentry/node`):**
+```typescript
+import * as Sentry from '@sentry/node';
+
+try {
+  await riskyOperation();
+} catch (error) {
+  Sentry.captureException(error, {
+    extra: {
+      source: 'service_name',        // Which service/module
+      errorType: 'descriptive_type', // What kind of failure
+      // Add relevant IDs for debugging (never PHI)
+      userId: user.id,
+      subscriptionId: sub.id,
+    },
+  });
+  console.error('Operation failed:', error);
+  // Handle gracefully or re-throw
+}
+```
+
+**Web App (`@sentry/nextjs`):**
+```typescript
+import * as Sentry from '@sentry/nextjs';
+
+// Same pattern as backend
+Sentry.captureException(error, {
+  extra: { source: 'checkout', plan: 'monthly' },
+});
+```
+
+**Extension (custom wrapper):**
+```typescript
+import { captureException } from '@/shared/sentry';
+
+// Uses our HIPAA-safe wrapper that sanitizes extras
+captureException(error, { source: 'chrome_storage_read' });
+```
+
+### Safe Extras (Include)
+
+| Safe to Include | Examples |
+|-----------------|----------|
+| Source identifier | `source: 'billing_service'` |
+| Error type/code | `errorType: 'webhook_failed'` |
+| User ID | `userId: user.id` |
+| Resource IDs | `subscriptionId`, `sessionId` |
+| Status codes | `statusCode: 500` |
+| Durations | `durationMs: 1234` |
+| Counts | `retryCount: 3` |
+
+### Unsafe Extras (NEVER Include)
+
+| Never Include | Why |
+|---------------|-----|
+| Patient names | PHI |
+| Note content | PHI |
+| Diagnosis/treatment | PHI |
+| Email addresses | PII (use userId instead) |
+| Request/response bodies | May contain PHI |
+| Full error messages from user input | May contain PHI |
+
+### Existing Sentry Configuration
+
+- **Backend**: `src/instrument.ts` with PHI sanitization in `beforeSend`
+- **Extension**: `src/shared/sentry.ts` using BrowserClient (not `Sentry.init()` - required for extensions)
+- **Web**: `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
+
+All components have `beforeSend` hooks that strip PHI-sensitive fields. See `docs/planning/MONITORING_SETUP.md` for full configuration details.
+
+### Logging Gaps Audit
+
+A comprehensive audit identified all catch blocks in the codebase. See `docs/planning/SENTRY_LOGGING_GAPS.md` for:
+- The full list of what's monitored
+- Decisions on what should remain silent
+- The rationale for each monitoring decision
+
 ## Reference Document
 
 See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification including:
