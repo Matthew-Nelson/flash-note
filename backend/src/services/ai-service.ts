@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import { config, isProduction } from '../config.js';
 import { buildSOAPPrompt } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
@@ -140,6 +141,19 @@ class AIService {
   private mapLLMErrorToAppError(error: LLMError): AppError {
     // SECURITY: Log only safe error details (no PHI)
     console.error('LLM error:', error.toSafeLogObject());
+
+    // Capture to Sentry for visibility into LLM failures (core product feature)
+    // Rate limited errors are excluded as they occur during normal operation
+    if (error.code !== 'rate_limited') {
+      Sentry.captureException(error, {
+        extra: {
+          source: 'ai_service',
+          errorCode: error.code,
+          provider: config.LLM_PROVIDER,
+          model: this.provider.model,
+        },
+      });
+    }
 
     switch (error.code) {
       case 'rate_limited':

@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import * as Sentry from '@sentry/node';
 import { config, BCRYPT_ROUNDS } from '../config.js';
 import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUser } from '../db/queries/users.js';
@@ -50,6 +51,14 @@ class AuthService {
       const verificationToken = await tokenService.createToken(user.id, 'email_verification');
       await emailService.sendVerificationEmail(email, verificationToken);
     } catch (error) {
+      // Capture to Sentry - new users silently blocked without verification email
+      Sentry.captureException(error, {
+        extra: {
+          source: 'registration',
+          errorType: 'verification_email_failed',
+          userId: user.id,
+        },
+      });
       // Log error but don't fail registration - user can resend verification
       console.error('Failed to send verification email:', error);
     }
@@ -87,6 +96,14 @@ class AuthService {
         try {
           await lockoutService.recordFailedAttempt(user.id, context);
         } catch (error) {
+          // Capture to Sentry - security control failure visibility
+          Sentry.captureException(error, {
+            extra: {
+              source: 'lockout_service',
+              errorType: 'failed_attempt_recording',
+              userId: user.id,
+            },
+          });
           // Log error for investigation but continue with login rejection
           // This prevents lockout service failures from blocking the auth flow
           console.error('Lockout service error during failed attempt recording:', error);
@@ -102,6 +119,14 @@ class AuthService {
     try {
       lockoutStatus = await lockoutService.getAccountLockoutStatus(user.id);
     } catch (error) {
+      // Capture to Sentry - security control failure visibility
+      Sentry.captureException(error, {
+        extra: {
+          source: 'lockout_service',
+          errorType: 'status_check_failed',
+          userId: user.id,
+        },
+      });
       // SECURITY: Fail-secure - if we can't check lockout status, deny access
       // Log error for investigation
       console.error('Lockout service error during status check:', error);
@@ -120,6 +145,14 @@ class AuthService {
     try {
       await lockoutService.resetFailedAttempts(user.id);
     } catch (error) {
+      // Capture to Sentry - security control failure visibility
+      Sentry.captureException(error, {
+        extra: {
+          source: 'lockout_service',
+          errorType: 'reset_failed_attempts',
+          userId: user.id,
+        },
+      });
       // Log error but don't block successful login
       console.error('Lockout service error during failed attempts reset:', error);
     }

@@ -1,7 +1,8 @@
 # Sentry Logging Gaps - Coverage Audit
 
 **Created:** February 3, 2026
-**Status:** Documented - Fix Before Launch
+**Completed:** February 5, 2026
+**Status:** All gaps fixed
 **Priority:** P1
 **Affected Components:** Backend, Web App, Extension
 
@@ -21,7 +22,7 @@ These represent blind spots in core product functionality or compliance requirem
 
 ### 1. LLM/AI Service Errors Invisible to Sentry
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/ai-service.ts:142`
 - **Current behavior:** `console.error('LLM error:', error.toSafeLogObject())` then maps to `AppError`. Since `AppError` is treated as an expected error, the global handler skips Sentry.
 - **Impact:** Core product feature. If Gemini has an outage, rate-limits, or auth failure, the backend produces zero Sentry events. The client captures the 500 response, but the root cause is lost.
@@ -29,7 +30,7 @@ These represent blind spots in core product functionality or compliance requirem
 
 ### 2. Stripe Webhook Proxy Errors Silent
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `web/src/app/api/webhooks/stripe/route.ts:41,50`
 - **Current behavior:** `console.error('Backend webhook error:', errorBody)` and `console.error('Webhook error:', error)` — no Sentry capture.
 - **Impact:** If the backend is unreachable, all Stripe payment events (subscriptions, cancellations, renewals) are silently lost. This is critical payment infrastructure.
@@ -37,7 +38,7 @@ These represent blind spots in core product functionality or compliance requirem
 
 ### 3. Missing userId in Billing Webhook Events
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/billing-service.ts:266-290` (called from lines 116-121, 144-148, 156-160, 184-189, 219-224)
 - **Current behavior:** `console.error(JSON.stringify({...}))` + audit log — no Sentry capture.
 - **Impact:** Webhook events without userId in metadata can't be linked to a user. Payment failures, subscription cancellations, and renewals are silently unprocessable. Revenue-impacting data integrity issue.
@@ -45,7 +46,7 @@ These represent blind spots in core product functionality or compliance requirem
 
 ### 4. HIPAA Audit Log Write Failures
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/audit-service.ts:20-23`
 - **Current behavior:** `console.error('Audit log failed:', error)` — no Sentry capture.
 - **Impact:** HIPAA requires reliable audit logging. If the database has transient issues causing audit writes to fail, there is no visibility. This is a compliance gap.
@@ -59,7 +60,7 @@ These affect user experience or security visibility but are not immediately reve
 
 ### 5. Verification Email Failure During Registration
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/auth-service.ts:49-54`
 - **Current behavior:** `console.error('Failed to send verification email:', error)` — swallowed, no Sentry.
 - **Impact:** New users silently don't receive verification emails, blocking their entire workflow (email verification is required for note generation and billing).
@@ -67,7 +68,7 @@ These affect user experience or security visibility but are not immediately reve
 
 ### 6. Account Lockout Service Failures
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/auth-service.ts:89-92, 104-107, 122-124`
 - **Current behavior:** Three separate `console.error(...)` blocks — no Sentry capture.
 - **Impact:** The brute-force protection mechanism is silently degraded. The fail-secure behavior is correct (login is rejected or proceeds safely), but operational visibility into security control failures is lost.
@@ -75,7 +76,7 @@ These affect user experience or security visibility but are not immediately reve
 
 ### 7. Email Service Send Failures
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/email-service.ts:202-205`
 - **Current behavior:** `console.error('Email send error:', error)` then throws a new Error. The thrown error reaches the global handler in most paths, but verification email failures during registration (Gap #5) are caught and swallowed upstream.
 - **Impact:** Email delivery failures affect password resets and verification.
@@ -83,7 +84,7 @@ These affect user experience or security visibility but are not immediately reve
 
 ### 8. Webhook Signature Verification Failures
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/services/billing-service.ts:66-69`
 - **Current behavior:** `console.error(...)` then throws `AppError(400, ...)`. Because it's an `AppError`, the global handler skips Sentry.
 - **Impact:** Repeated signature failures could indicate webhook secret misconfiguration or a security probe. Individual occurrences are expected (Stripe retries), but a pattern indicates a real problem.
@@ -97,7 +98,7 @@ Lower priority improvements that would add diagnostic value.
 
 ### 9. 5xx AppErrors Skip Sentry
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `backend/src/middleware/error-handler.ts:44-52`
 - **Current behavior:** All `AppError` instances are logged to console only. Only unknown errors go to Sentry.
 - **Impact:** Server-side failures (5xx) thrown as `AppError` are invisible to Sentry.
@@ -105,7 +106,7 @@ Lower priority improvements that would add diagnostic value.
 
 ### 10. Checkout/Billing UI Errors (Web)
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **Files:** `web/src/app/pricing/page.tsx:67`, `web/src/app/dashboard/page.tsx:92`
 - **Current behavior:** Checkout and billing API failures caught in page components, displayed to user — no Sentry capture.
 - **Impact:** Revenue-impacting failures visible only if the user reports them.
@@ -113,7 +114,7 @@ Lower priority improvements that would add diagnostic value.
 
 ### 11. SessionStorage Write Failures (Web)
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `web/src/lib/storage.ts:51-53`
 - **Current behavior:** `console.error('Failed to store auth:', error)` — no Sentry.
 - **Impact:** Rare edge case (storage quota exceeded). Could help diagnose "users getting logged out" complaints.
@@ -121,7 +122,7 @@ Lower priority improvements that would add diagnostic value.
 
 ### 12. Chrome Storage Read Failure (Extension)
 
-- [ ] **Fix applied**
+- [x] **Fix applied**
 - **File:** `extension/src/sidepanel/hooks/useAuth.ts:45-46`
 - **Current behavior:** `console.error('Failed to load auth:', error)` — no Sentry.
 - **Impact:** Could help diagnose extension storage corruption issues.

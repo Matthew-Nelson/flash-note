@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useCallback, Suspense } from 'react';
+import * as Sentry from '@sentry/nextjs';
 import { useAuth, ApiError } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { ProtectedRoute } from '@/components/auth';
@@ -90,6 +91,12 @@ function DashboardContent() {
       const { portalUrl } = await api.createPortalSession();
       window.location.href = portalUrl;
     } catch (err) {
+      // Capture to Sentry - revenue-impacting billing portal failures
+      Sentry.captureException(err, {
+        extra: {
+          source: 'billing_portal',
+        },
+      });
       if (err instanceof ApiError) {
         setError(err.message || 'Failed to open billing portal. Please try again.');
       } else {

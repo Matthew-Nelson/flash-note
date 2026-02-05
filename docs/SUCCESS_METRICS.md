@@ -99,7 +99,7 @@ These items must be complete before public launch.
 | PROD-08 | TLS 1.2+ enforced | Infra | P0 | ❌ Not deployed |
 | PROD-09 | Vertex AI BAA signed (HIPAA) | Infra | P0 | ❌ Not done |
 | PROD-10 | Audit logs retained 6 years | Backend | P0 | ❌ Not implemented |
-| PROD-11 | Error tracking (Sentry) configured | All | P1 | ❌ Not done |
+| PROD-11 | Error tracking (Sentry) configured | All | P1 | ✅ Done (all components + logging gaps fixed) |
 | PROD-12 | Chrome Web Store listing complete | Extension | P0 | ❌ Not done |
 | PROD-13 | BAA template available for customers | Docs | P0 | ⚠️ Template ready, needs legal review |
 | PROD-14 | Incident response plan documented | Docs | P1 | ❌ Not done |
@@ -400,8 +400,8 @@ These items must be complete before public launch.
 |-------|-------------|-----------|------------|
 | MVP Foundation | 15 | 12 | 80% |
 | Beta Ready | 12 | 6 | 50% |
-| Production Ready | 16 | 4 | 25% |
-| **Overall** | **43** | **22** | **51%** |
+| Production Ready | 16 | 5 | 31% |
+| **Overall** | **43** | **23** | **53%** |
 
 ---
 
@@ -409,6 +409,7 @@ These items must be complete before public launch.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.4 | 2026-02-05 | PROD-11 Sentry error tracking complete: fixed all 12 logging gaps across backend, web, and extension |
 | 1.3 | 2026-02-02 | Web app buildout complete: auth integration, Stripe checkout/portal, privacy/terms pages, UI components, dashboard settings |
 | 1.2 | 2026-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
 | 1.1 | 2026-01-28 | Added PROD-16 for audit logging workflow completion |

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 
 // Stripe webhook handler
 // This endpoint receives events from Stripe when subscription events occur
@@ -38,6 +39,14 @@ export async function POST(request: NextRequest) {
       } catch {
         errorBody = await response.text();
       }
+      // Capture to Sentry - critical payment infrastructure failure
+      Sentry.captureException(new Error('Backend webhook error'), {
+        extra: {
+          source: 'stripe_webhook_proxy',
+          statusCode: response.status,
+          errorBody,
+        },
+      });
       console.error('Backend webhook error:', errorBody);
       return NextResponse.json(
         { error: 'Webhook processing failed' },
@@ -47,6 +56,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
+    // Capture to Sentry - critical payment infrastructure failure
+    Sentry.captureException(error, {
+      extra: {
+        source: 'stripe_webhook_proxy',
+      },
+    });
     console.error('Webhook error:', error);
     return NextResponse.json(
       { error: 'Webhook processing failed' },

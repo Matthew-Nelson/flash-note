@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
 
 /**
@@ -200,8 +201,17 @@ FlashNote - AI-powered documentation for physical therapists
     });
 
     if (error) {
+      // Capture to Sentry - email delivery failures affect password resets and verification
+      const emailError = new Error(`Failed to send email: ${error.message}`);
+      Sentry.captureException(emailError, {
+        extra: {
+          source: 'email_service',
+          errorName: error.name,
+          // Don't log recipient email to avoid PII in Sentry
+        },
+      });
       console.error('Email send error:', error);
-      throw new Error(`Failed to send email: ${error.message}`);
+      throw emailError;
     }
   }
 }
