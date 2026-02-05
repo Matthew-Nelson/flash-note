@@ -10,13 +10,26 @@
  * - No PHI is accessed, processed, or transmitted
  */
 
-import { getActivePatterns, matchesAnyPattern } from './emr-patterns';
+import { matchesAnyPattern } from './emr-patterns';
 
 const BUTTON_ID = 'flashnote-floating-button';
 const TOOLTIP_ID = 'flashnote-floating-tooltip';
+const PREFERENCES_STORAGE_KEY = 'preferences';
 
 // Track sidepanel open state
 let isSidepanelOpen = false;
+
+/**
+ * Check if the floating badge is enabled in user preferences
+ */
+async function isFloatingBadgeEnabled(): Promise<boolean> {
+  const result = await chrome.storage.local.get(PREFERENCES_STORAGE_KEY);
+  const prefs = result[PREFERENCES_STORAGE_KEY] as
+    | { showFloatingBadge?: boolean }
+    | undefined;
+  // Default to true if not set
+  return prefs?.showFloatingBadge ?? true;
+}
 
 /**
  * Create and inject the floating button into the page
@@ -124,10 +137,14 @@ function removeFloatingButton(): void {
  * Check if the current page matches EMR patterns and show/hide button accordingly
  */
 async function checkAndUpdateButton(): Promise<void> {
-  const patterns = await getActivePatterns();
-  const matchedPattern = matchesAnyPattern(window.location.href, patterns);
+  // First check if badge is enabled in settings
+  const badgeEnabled = await isFloatingBadgeEnabled();
+  if (!badgeEnabled) {
+    removeFloatingButton();
+    return;
+  }
 
-  if (matchedPattern) {
+  if (matchesAnyPattern(window.location.href)) {
     createFloatingButton();
   } else {
     removeFloatingButton();
@@ -161,15 +178,10 @@ async function init(): Promise<void> {
     void checkAndUpdateButton();
   });
 
-  // Listen for storage changes (user updated patterns in settings)
+  // Listen for preference changes (e.g., user toggles badge visibility)
   chrome.storage.onChanged.addListener((changes, areaName) => {
-    if (areaName === 'local') {
-      if (
-        changes.flashnote_custom_emr_patterns ||
-        changes.flashnote_disabled_emr_patterns
-      ) {
-        void checkAndUpdateButton();
-      }
+    if (areaName === 'local' && changes.preferences) {
+      void checkAndUpdateButton();
     }
   });
 }

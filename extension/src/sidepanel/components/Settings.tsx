@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { storage } from '../../shared/storage';
 
 interface User {
   id: string;
@@ -15,6 +16,22 @@ interface SettingsProps {
 export default function Settings({ user, onLogout }: SettingsProps) {
   // Use lazy initializer to capture time once at mount (pure during re-renders)
   const [mountTime] = useState(() => Date.now());
+
+  // Floating badge setting
+  const [showFloatingBadge, setShowFloatingBadge] = useState(true);
+
+  useEffect(() => {
+    // Load the current setting
+    storage.getPreferences().then((prefs) => {
+      setShowFloatingBadge(prefs.showFloatingBadge);
+    });
+  }, []);
+
+  const handleToggleFloatingBadge = async () => {
+    const newValue = !showFloatingBadge;
+    setShowFloatingBadge(newValue);
+    await storage.setPreferences({ showFloatingBadge: newValue });
+  };
 
   const isTrialing = user.subscriptionStatus === 'trialing';
   const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
@@ -51,9 +68,40 @@ export default function Settings({ user, onLogout }: SettingsProps) {
         </div>
       </div>
 
+      {/* Preferences */}
+      <div className="animate-fade-in-up stagger-2">
+        <h2 className="text-sm font-semibold mb-3">Preferences</h2>
+        <div className="card p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Show floating badge</p>
+              <p className="text-xs opacity-60 mt-0.5">
+                Display FlashNote button on EMR pages
+              </p>
+            </div>
+            <button
+              onClick={handleToggleFloatingBadge}
+              className={`relative w-11 h-6 rounded-full transition-colors ${
+                showFloatingBadge
+                  ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+                  : 'bg-stone-300'
+              }`}
+              role="switch"
+              aria-checked={showFloatingBadge}
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                  showFloatingBadge ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Subscription */}
       {isTrialing && (
-        <div className="animate-fade-in-up stagger-2">
+        <div className="animate-fade-in-up stagger-3">
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="trial-banner rounded-lg p-4">
             <p className="text-sm mb-3">
@@ -74,7 +122,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {user.subscriptionStatus === 'active' && (
-        <div className="animate-fade-in-up stagger-2">
+        <div className="animate-fade-in-up stagger-3">
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="card p-4">
             <a
@@ -90,7 +138,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       )}
 
       {/* Support */}
-      <div className="animate-fade-in-up stagger-3">
+      <div className="animate-fade-in-up stagger-4">
         <h2 className="text-sm font-semibold mb-3">Support</h2>
         <div className="space-y-2">
           <a
@@ -111,7 +159,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       </div>
 
       {/* Logout */}
-      <div className="pt-4 border-t animate-fade-in-up stagger-4">
+      <div className="pt-4 border-t animate-fade-in-up stagger-5">
         <button
           onClick={onLogout}
           className="w-full py-2 px-4 text-sm font-medium text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
@@ -121,7 +169,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
       </div>
 
       {/* Version */}
-      <div className="text-center text-xs opacity-40 animate-fade-in stagger-5">
+      <div className="text-center text-xs opacity-40 animate-fade-in">
         FlashNote v0.1.0
       </div>
     </div>
