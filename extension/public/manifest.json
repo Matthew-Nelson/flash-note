@@ -20,6 +20,15 @@
     "https://*.ingest.us.sentry.io/*"
   ],
 
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/floating-button.js"],
+      "css": ["content/floating-button.css"],
+      "run_at": "document_idle"
+    }
+  ],
+
   "action": {
     "default_icon": {
       "16": "icons/icon-16.png",

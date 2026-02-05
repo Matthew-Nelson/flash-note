@@ -3,12 +3,18 @@
 
 import { initSentry, captureException } from '../shared/sentry';
 
+// Type for sidePanel.close() which exists in Chrome 116+ but not in @types/chrome
+type SidePanelWithClose = typeof chrome.sidePanel & {
+  close: (options: { windowId: number }) => Promise<void>;
+};
+const sidePanelApi = chrome.sidePanel as SidePanelWithClose;
+
 // Initialize Sentry for the service worker context
 initSentry();
 
 // Message types for runtime messaging
 interface ExtensionMessage {
-  type: string;
+  type: 'PING' | 'OPEN_SIDEPANEL' | 'CLOSE_SIDEPANEL';
 }
 
 // Log when the extension is installed or updated
@@ -28,13 +34,52 @@ chrome.action.onClicked.addListener((tab) => {
 });
 
 // Handle messages from side panel or content scripts
-chrome.runtime.onMessage.addListener((message: ExtensionMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
   if (message.type === 'PING') {
     sendResponse({ type: 'PONG' });
     return true;
   }
 
-  // Add more message handlers as needed
+  if (message.type === 'OPEN_SIDEPANEL') {
+    // Open the side panel for the tab that sent the message
+    const tabId = sender.tab?.id;
+    if (tabId) {
+      chrome.sidePanel
+        .open({ tabId })
+        .then(() => {
+          sendResponse({ success: true });
+        })
+        .catch((error) => {
+          console.error('Failed to open side panel:', error);
+          sendResponse({ success: false, error: String(error) });
+        });
+      return true; // Will respond asynchronously
+    } else {
+      sendResponse({ success: false, error: 'No tab ID available' });
+      return true;
+    }
+  }
+
+  if (message.type === 'CLOSE_SIDEPANEL') {
+    // Close the side panel for the window that sent the message
+    const windowId = sender.tab?.windowId;
+    if (windowId) {
+      sidePanelApi
+        .close({ windowId })
+        .then(() => {
+          sendResponse({ success: true });
+        })
+        .catch((error: unknown) => {
+          console.error('Failed to close side panel:', error);
+          sendResponse({ success: false, error: String(error) });
+        });
+      return true; // Will respond asynchronously
+    } else {
+      sendResponse({ success: false, error: 'No window ID available' });
+      return true;
+    }
+  }
+
   return false;
 });
 
