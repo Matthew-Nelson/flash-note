@@ -13,9 +13,14 @@
  *   - NODE_ENV=test  -> loads .env.test
  *   - Otherwise      -> loads .env
  *
+ * CI behavior:
+ *   - When CI=true is set, we skip loading .env files entirely
+ *   - CI environments (GitHub Actions) set env vars directly in workflows
+ *   - This avoids conflicts between .env.test (local) and CI env vars
+ *
  * Load priority (highest wins):
  *   1. Shell/command-line env vars (e.g., DATABASE_URL=... pnpm dev)
- *   2. .env file selected above
+ *   2. .env file selected above (skipped in CI)
  *   3. Code defaults (in config.ts Zod schema)
  *
  * Production note: In production, env vars are set directly by the platform
@@ -25,14 +30,22 @@
 import { config as dotenvConfig } from 'dotenv';
 import path from 'path';
 
+const isCI = process.env.CI === 'true';
 const envFile = process.env.NODE_ENV === 'test' ? '.env.test' : '.env';
 
-// Only log in non-production to avoid log noise
-if (process.env.NODE_ENV !== 'production') {
-  console.log(`[env-loader] Loading from: ${envFile} (NODE_ENV=${process.env.NODE_ENV || 'undefined'})`);
-}
+// In CI, env vars are set by the workflow - don't load from files
+if (isCI) {
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[env-loader] CI detected - using workflow environment variables');
+  }
+} else {
+  // Only log in non-production to avoid log noise
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`[env-loader] Loading from: ${envFile} (NODE_ENV=${process.env.NODE_ENV || 'undefined'})`);
+  }
 
-dotenvConfig({ path: path.resolve(process.cwd(), envFile) });
+  dotenvConfig({ path: path.resolve(process.cwd(), envFile) });
+}
 
 // Debug: confirm critical env vars loaded (redact secrets)
 if (process.env.NODE_ENV !== 'production') {
