@@ -11,6 +11,10 @@
  * The target database is determined by NODE_ENV:
  *   - NODE_ENV=test  -> loads .env.test
  *   - Otherwise      -> loads .env
+ *
+ * Note: This script creates its own database connection to avoid
+ * importing config.ts, which would require ALL env vars to be set.
+ * Migrations only need DATABASE_URL.
  */
 
 // Load environment variables first (standalone script)
@@ -19,7 +23,21 @@ import '../env-loader.js';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { db } from './index.js';
+import pg from 'pg';
+
+const { Pool } = pg;
+
+// Create standalone database connection - only needs DATABASE_URL
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error('DATABASE_URL environment variable is required');
+  process.exit(1);
+}
+
+const db = new Pool({
+  connectionString: databaseUrl,
+  max: 1, // Only need one connection for migrations
+});
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
