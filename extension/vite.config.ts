@@ -1,7 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
-import { mkdirSync, existsSync, readFileSync, writeFileSync, rmSync } from 'fs';
+import {
+  mkdirSync,
+  existsSync,
+  readFileSync,
+  writeFileSync,
+  rmSync,
+  copyFileSync,
+} from 'fs';
 
 // Plugin to fix output paths for Chrome extension
 function chromeExtensionPlugin() {
@@ -27,6 +34,22 @@ function chromeExtensionPlugin() {
         // Clean up the src directory in dist
         rmSync(resolve(__dirname, 'dist/src'), { recursive: true, force: true });
       }
+
+      // Copy content script CSS to dist/content
+      const contentCssSrc = resolve(
+        __dirname,
+        'src/content/floating-button.css'
+      );
+      const contentCssDest = resolve(__dirname, 'dist/content');
+      if (existsSync(contentCssSrc)) {
+        if (!existsSync(contentCssDest)) {
+          mkdirSync(contentCssDest, { recursive: true });
+        }
+        copyFileSync(
+          contentCssSrc,
+          resolve(contentCssDest, 'floating-button.css')
+        );
+      }
     },
   };
 }
@@ -46,11 +69,15 @@ export default defineConfig({
       input: {
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
         background: resolve(__dirname, 'src/background/service-worker.ts'),
+        'floating-button': resolve(__dirname, 'src/content/floating-button.ts'),
       },
       output: {
         entryFileNames: (chunk) => {
           if (chunk.name === 'background') {
             return 'background/service-worker.js';
+          }
+          if (chunk.name === 'floating-button') {
+            return 'content/floating-button.js';
           }
           return 'sidepanel/[name].js';
         },

@@ -16,6 +16,8 @@ export interface StoredAuth {
 
 export interface StoredPreferences {
   defaultNoteType: string;
+  /** Whether to show the floating badge on EMR pages (default: true) */
+  showFloatingBadge: boolean;
 }
 
 export const storage = {
@@ -36,6 +38,7 @@ export const storage = {
     const result = await chrome.storage.local.get('preferences');
     return (result.preferences as StoredPreferences | undefined) ?? {
       defaultNoteType: 'daily_note',
+      showFloatingBadge: true,
     };
   },
 

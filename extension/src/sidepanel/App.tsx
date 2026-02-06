@@ -16,6 +16,45 @@ const VERIFICATION_POLL_INTERVAL = 10 * 1000;
 function AppContent() {
   const { user, isLoading, login, register, logout, refreshUser } = useAuth();
 
+  // Track sidepanel open/close state for the floating button
+  // Also establish port connection for keep-alive
+  useEffect(() => {
+    let windowId: number | undefined;
+    let port: chrome.runtime.Port | undefined;
+
+    const setup = async () => {
+      try {
+        // Create port connection for keep-alive
+        port = chrome.runtime.connect({ name: 'sidepanel' });
+
+        // Get window ID and notify background
+        const win = await chrome.windows.getCurrent();
+        windowId = win.id;
+        if (windowId) {
+          void chrome.runtime.sendMessage({ type: 'SIDEPANEL_OPENED', windowId });
+        }
+      } catch (error) {
+        console.error('Failed to setup sidepanel:', error);
+      }
+    };
+
+    const notifyClosed = () => {
+      if (windowId) {
+        // Use sendMessage (not async) since we're in beforeunload
+        void chrome.runtime.sendMessage({ type: 'SIDEPANEL_CLOSED', windowId });
+      }
+    };
+
+    void setup();
+    window.addEventListener('beforeunload', notifyClosed);
+
+    return () => {
+      window.removeEventListener('beforeunload', notifyClosed);
+      port?.disconnect();
+      notifyClosed();
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="app-container flex items-center justify-center flex-1">
