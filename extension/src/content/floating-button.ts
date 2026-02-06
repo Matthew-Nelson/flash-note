@@ -14,8 +14,24 @@ const BUTTON_ID = 'flashnote-floating-button';
 const TOOLTIP_ID = 'flashnote-floating-tooltip';
 const PREFERENCES_STORAGE_KEY = 'preferences';
 
-// Track sidepanel open state
+// Track sidepanel open state (queried from background on init)
 let isSidepanelOpen = false;
+
+/**
+ * Query the background service worker for the current sidepanel state
+ */
+async function querySidepanelState(): Promise<boolean> {
+  try {
+    const response: { isOpen?: boolean } | undefined =
+      await chrome.runtime.sendMessage({
+        type: 'GET_SIDEPANEL_STATE',
+      });
+    return response?.isOpen ?? false;
+  } catch (error) {
+    console.error('FlashNote: Failed to query sidepanel state', error);
+    return false;
+  }
+}
 
 // Cached preference value (updated via storage listener)
 let cachedBadgeEnabled = true;
@@ -82,6 +98,11 @@ function createFloatingButton(): void {
     tooltip.classList.remove('visible');
     tooltip.classList.remove('lifted');
   });
+
+  // Set active state if sidepanel is already open
+  if (isSidepanelOpen) {
+    button.classList.add('active');
+  }
 
   // Inject into page
   document.body.appendChild(button);
@@ -153,6 +174,9 @@ function updateButtonVisibility(): void {
  * Initialize the content script
  */
 async function init(): Promise<void> {
+  // Query sidepanel state from background (handles page refresh case)
+  isSidepanelOpen = await querySidepanelState();
+
   // Load preference and show button on initial load
   await loadBadgePreference();
   updateButtonVisibility();
