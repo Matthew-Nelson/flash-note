@@ -1,0 +1,148 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'extension/**'
+      - 'backend/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'extension/**'
+      - 'backend/**'
+      - '.github/workflows/e2e.yml'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10'
+
+jobs:
+  extension-e2e:
+    name: Extension E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: flashnote_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install root dependencies
+        run: pnpm install
+
+      - name: Install backend dependencies
+        run: pnpm install
+        working-directory: ./backend
+
+      - name: Install extension dependencies
+        run: pnpm install
+        working-directory: ./extension
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+
+      - name: Seed test data
+        run: pnpm db:seed:test
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+
+      - name: Build extension
+        run: pnpm build
+        working-directory: ./extension
+
+      - name: Start backend server
+        run: |
+          pnpm dev &
+          echo $! > /tmp/backend.pid
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
+          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
+          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
+          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
+          NODE_ENV: test
+          PORT: 4000
+
+      - name: Wait for backend to be ready
+        run: |
+          echo "Waiting for backend..."
+          for i in {1..30}; do
+            if curl -s http://localhost:4000/health > /dev/null; then
+              echo "Backend is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30..."
+            sleep 2
+          done
+          echo "Backend failed to start"
+          exit 1
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: ./extension
+
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        working-directory: ./extension
+        env:
+          CI: true
+          API_URL: http://localhost:4000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: extension/playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: test-results
+          path: extension/test-results/
+          retention-days: 7
+
+      - name: Stop backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            kill $(cat /tmp/backend.pid) || true
+          fi

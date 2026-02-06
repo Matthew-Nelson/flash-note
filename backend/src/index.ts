@@ -1,4 +1,8 @@
-// IMPORTANT: Sentry must be imported first to ensure proper instrumentation
+// IMPORTANT: env-loader must be imported FIRST to ensure environment variables
+// are available before any other modules (including Sentry) initialize.
+import './env-loader.js';
+
+// Sentry must be imported before other application modules for proper instrumentation
 import { Sentry } from './instrument.js';
 import express, { type Express } from 'express';
 import cors from 'cors';
@@ -29,7 +33,11 @@ app.use(
   })
 );
 app.use(cors({
-  origin: config.ALLOWED_ORIGINS,
+  // In development/test, allow any origin (needed for E2E tests with dynamic extension IDs)
+  // In production, use the strict allowlist
+  origin: config.NODE_ENV === 'production'
+    ? config.ALLOWED_ORIGINS
+    : true,
   credentials: true,
 }));
 

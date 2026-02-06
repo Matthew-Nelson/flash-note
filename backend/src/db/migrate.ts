@@ -1,3 +1,21 @@
+/**
+ * Database Migration Script
+ *
+ * Applies SQL migrations from src/db/migrations/ in order.
+ * Tracks applied migrations in a `migrations` table to avoid re-running.
+ *
+ * Usage:
+ *   pnpm db:migrate        # Run against development database (.env)
+ *   pnpm db:migrate:test   # Run against test database (.env.test)
+ *
+ * The target database is determined by NODE_ENV:
+ *   - NODE_ENV=test  -> loads .env.test
+ *   - Otherwise      -> loads .env
+ */
+
+// Load environment variables first (standalone script)
+import '../env-loader.js';
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

@@ -116,7 +116,7 @@ See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for full requirement
 | Task | Source | Status | Priority |
 |------|--------|--------|----------|
 | Integration tests (backend) | TESTING_STRATEGY §5 | Not started | P0 |
-| E2E tests (Playwright) | TESTING_STRATEGY §6 | Not started | P0 |
+| E2E tests (Playwright) | TESTING_STRATEGY §6 | ✅ Foundation complete (37 tests) | P0 |
 | DAST scanning (OWASP ZAP) | TESTING_STRATEGY §7 | Not configured | P1 |
 | Secret scanning (GitLeaks) | TESTING_STRATEGY §7 | Not configured | P1 |
 | Manual penetration test | TESTING_STRATEGY §7 | Not scheduled | P1 |
@@ -124,8 +124,15 @@ See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for full requirement
 
 **Milestones:**
 1. Integration tests covering auth lifecycle, session management, billing webhooks
-2. E2E tests for critical user journeys (register → verify → login → generate → copy)
+2. ✅ E2E tests for critical user journeys (register → verify → login → generate → copy)
 3. DAST scan with zero high/critical findings
+
+**E2E Test Coverage Gaps (to address before launch):**
+- API error handling tests (network failures, 500 errors)
+- Token refresh flow tests
+- Floating button on EMR pages tests
+- Copy functionality tests
+- Rate limiting UX tests
 
 ### Launch Preparation
 
@@ -161,6 +168,13 @@ These are researched but not prioritized for current development.
 | OAuth/Social Login | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | Google OAuth recommended |
 | Conversational Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI asks clarifying questions |
 | Review Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI reviews therapist's draft |
+
+## Technical Debt / UX Improvements
+
+| Issue | Description | Priority |
+|-------|-------------|----------|
+| Auth UI consistency | Extension and web app have different validation UX. Extension uses HTML5 native validation (browser tooltips) while web app uses React/Zod. Should unify to React/Zod validation with styled error messages for consistent UX. Remove `type="email"` and `minLength` HTML5 validation; use `noValidate` on forms. | Medium |
+| Form validation pattern | Establish consistent pattern: validate on blur/change with Zod, show styled `.error-message` divs, not browser tooltips. Document in CLAUDE.md. | Medium |
 
 ## Recently Completed
 
