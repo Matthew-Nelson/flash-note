@@ -1,5 +1,4 @@
 import { defineConfig } from '@playwright/test';
-import path from 'path';
 
 /**
  * Playwright configuration for FlashNote Chrome Extension E2E tests.
@@ -8,6 +7,9 @@ import path from 'path';
  * - Extensions require persistent context (handled in fixtures)
  * - Single worker to avoid conflicts with extension state
  * - Chromium channel required for headless extension support
+ *
+ * Note: The backend server is started separately in CI (see .github/workflows/e2e.yml)
+ * and should be started manually for local development.
  */
 export default defineConfig({
   testDir: './tests/e2e',
@@ -61,24 +63,7 @@ export default defineConfig({
     },
   ],
 
-  // Web server configuration for CI
-  // In CI, we start the backend before running tests
-  // Locally, you should start the backend manually
-  webServer: process.env.CI
-    ? {
-        command: 'pnpm --filter backend dev',
-        port: 4000,
-        reuseExistingServer: false,
-        cwd: path.join(__dirname, '..'),
-        env: {
-          DATABASE_URL:
-            process.env.DATABASE_URL ||
-            'postgres://test:test@localhost:5432/flashnote_test',
-          JWT_SECRET: process.env.JWT_SECRET || 'test-secret-for-ci',
-          NODE_ENV: 'test',
-          PORT: '4000',
-        },
-        timeout: 120000,
-      }
-    : undefined,
+  // Note: Backend server is started separately
+  // - CI: Started by .github/workflows/e2e.yml before tests run
+  // - Local: Start manually with `cd backend && pnpm dev`
 });
