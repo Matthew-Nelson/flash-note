@@ -222,16 +222,14 @@ test.describe('Note Generation', () => {
         .catch(() => false);
 
       if (successVisible) {
-        // Wait for transition to result view
-        await extensionPage.waitForTimeout(2000);
-
-        // Should show result display with SOAP sections or back button
+        // Wait for result view to appear (replaces fixed timeout)
+        // The success message transitions to result view automatically
         await expect(
           extensionPage
             .locator('text=Subjective')
             .or(extensionPage.locator('button:has-text("Back")'))
             .or(extensionPage.locator('button:has-text("Copy")')),
-        ).toBeVisible({ timeout: 5000 });
+        ).toBeVisible({ timeout: 10000 });
       }
     });
 
@@ -257,11 +255,11 @@ test.describe('Note Generation', () => {
         .catch(() => false);
 
       if (successVisible) {
-        // Wait for transition
-        await extensionPage.waitForTimeout(2000);
-
-        // Click back button if visible
+        // Wait for result view to appear (replaces fixed timeout)
         const backButton = extensionPage.locator('button:has-text("Back")');
+        await expect(backButton).toBeVisible({ timeout: 10000 });
+
+        // Click back button
         if (await backButton.isVisible()) {
           await backButton.click();
 

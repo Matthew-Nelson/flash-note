@@ -139,11 +139,7 @@ test.describe('Authentication', () => {
       await expect(extensionPage.locator('header')).toBeVisible();
     });
 
-    test('persists login state on page reload', async ({
-      extensionPage,
-      extensionId,
-      context,
-    }) => {
+    test('persists login state on page reload', async ({ extensionPage }) => {
       await loginUser(extensionPage);
 
       // Verify we're logged in

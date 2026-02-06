@@ -81,11 +81,7 @@ test.describe('Settings', () => {
       ).toBeVisible({ timeout: 5000 });
     });
 
-    test('sign out clears authentication state', async ({
-      extensionPage,
-      extensionId,
-      context,
-    }) => {
+    test('sign out clears authentication state', async ({ extensionPage }) => {
       // Sign out
       await extensionPage.click('button[title="Settings"]');
       await extensionPage.click('button:has-text("Sign Out")');

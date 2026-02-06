@@ -33,11 +33,11 @@ app.use(
   })
 );
 app.use(cors({
-  // In development/test, allow any origin (needed for E2E tests with dynamic extension IDs)
-  // In production, use the strict allowlist
+  // In production, use the strict allowlist from ALLOWED_ORIGINS
+  // In dev/test, allow localhost origins and any Chrome extension
   origin: config.NODE_ENV === 'production'
     ? config.ALLOWED_ORIGINS
-    : true,
+    : ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000', /^chrome-extension:\/\/.+$/],
   credentials: true,
 }));
 

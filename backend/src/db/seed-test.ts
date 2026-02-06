@@ -33,13 +33,16 @@ async function seedTestData() {
     process.exit(1);
   }
 
-  // Safety check - don't run in production
-  if (
-    databaseUrl.includes('render.com') ||
-    databaseUrl.includes('production') ||
-    process.env.NODE_ENV === 'production'
-  ) {
-    console.error('ERROR: This script should not run in production!');
+  // Safety check - only run against known test databases
+  // Use positive matching (allowlist) rather than negative matching (blocklist)
+  const isTestDatabase =
+    databaseUrl.includes('flashnote_test') ||
+    databaseUrl.includes('localhost') ||
+    databaseUrl.includes('127.0.0.1');
+
+  if (!isTestDatabase || process.env.NODE_ENV === 'production') {
+    console.error('ERROR: This script only runs against local test databases');
+    console.error('Database URL must contain "flashnote_test", "localhost", or "127.0.0.1"');
     process.exit(1);
   }
 
@@ -97,9 +100,7 @@ async function seedTestData() {
     }
 
     console.log('\nTest data seeding complete!');
-    console.log('\nTest credentials:');
-    console.log(`  Email: ${TEST_USER.email}`);
-    console.log(`  Password: ${TEST_USER.password}`);
+    console.log(`Test user ready: ${TEST_USER.email}`);
   } catch (error) {
     console.error('Seeding failed:', error);
     process.exit(1);
