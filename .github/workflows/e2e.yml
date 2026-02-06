@@ -68,16 +68,30 @@ jobs:
         working-directory: ./extension
 
       - name: Run database migrations
-        run: pnpm db:migrate
+        run: pnpm db:migrate:test
         working-directory: ./backend
         env:
+          NODE_ENV: test
           DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+          # Required by config.ts validation (not used by migrations)
+          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
+          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
+          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
+          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
+          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
 
       - name: Seed test data
         run: pnpm db:seed:test
         working-directory: ./backend
         env:
+          NODE_ENV: test
           DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+          # Required by config.ts validation (not used by seeding)
+          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
+          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
+          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
+          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
+          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
 
       - name: Build extension
         run: pnpm build
@@ -93,7 +107,9 @@ jobs:
           JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
           JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
           CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Use mock AI for E2E tests (faster, deterministic, no API costs)
+          USE_MOCK_AI: 'true'
+          GEMINI_API_KEY: fake-key-not-used-with-mock-ai
           STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
           STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
           NODE_ENV: test

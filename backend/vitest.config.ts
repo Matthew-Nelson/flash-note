@@ -31,7 +31,9 @@ export default defineConfig({
         'src/test/**',
         'src/types/**',
         'src/index.ts', // Entry point
+        'src/env-loader.ts', // Environment loading infrastructure
         'src/db/migrate.ts', // Migration script
+        'src/db/seed-test.ts', // Test data seeding script
         // Exclude files that require external dependencies (not unit-testable)
         'src/config.ts', // Environment-dependent - validated through mocking in other tests
         'src/db/index.ts', // Database connection pool - needs real PostgreSQL
