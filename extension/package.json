@@ -13,7 +13,7 @@
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "package": "pnpm build && cd dist && zip -r ../flashnote-extension.zip .",
     "clean": "rm -rf dist",
-    "pretest:e2e": "pnpm build:dev",
+    "pretest:e2e": "pnpm --filter @flashnote/backend test:setup && pnpm build:dev",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

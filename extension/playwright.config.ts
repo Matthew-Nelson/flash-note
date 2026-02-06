@@ -1,4 +1,10 @@
 import { defineConfig } from '@playwright/test';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// ES module equivalent of __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Playwright configuration for FlashNote Chrome Extension E2E tests.
@@ -8,8 +14,9 @@ import { defineConfig } from '@playwright/test';
  * - Single worker to avoid conflicts with extension state
  * - Chromium channel required for headless extension support
  *
- * Note: The backend server is started separately in CI (see .github/workflows/e2e.yml)
- * and should be started manually for local development.
+ * Running tests:
+ * - Local: `pnpm test:e2e` (automatically starts backend, runs tests, cleans up)
+ * - CI: Backend is started separately by .github/workflows/e2e.yml
  */
 export default defineConfig({
   testDir: './tests/e2e',
@@ -63,7 +70,21 @@ export default defineConfig({
     },
   ],
 
-  // Note: Backend server is started separately
-  // - CI: Started by .github/workflows/e2e.yml before tests run
-  // - Local: Start manually with `cd backend && pnpm dev`
+  // Backend server lifecycle (local development only)
+  // In CI, the backend is started separately by e2e.yml workflow
+  webServer: process.env.CI
+    ? undefined
+    : {
+        // Start backend with test environment
+        command: 'NODE_ENV=test pnpm dev',
+        cwd: path.join(__dirname, '../backend'),
+        port: 4000,
+        // Reuse existing server if already running (useful during development)
+        reuseExistingServer: true,
+        // Wait up to 2 minutes for server to start
+        timeout: 120000,
+        // Show server output for debugging
+        stdout: 'pipe',
+        stderr: 'pipe',
+      },
 });
