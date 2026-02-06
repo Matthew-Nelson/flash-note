@@ -1,18 +1,14 @@
 /**
  * Sentry Instrumentation
  *
- * IMPORTANT: This file must be imported BEFORE any other modules.
- * It initializes Sentry error monitoring and performance tracing.
+ * IMPORTANT: This file must be imported AFTER env-loader.js but BEFORE other
+ * application modules. The env-loader ensures environment variables are available.
  *
  * HIPAA COMPLIANCE:
  * - beforeSend filters out potential PHI from error payloads
  * - Request bodies are NOT captured (may contain patient data)
  * - Sensitive headers are excluded
  */
-
-// Load environment variables FIRST (before Sentry init)
-import { config as dotenvConfig } from 'dotenv';
-dotenvConfig();
 
 import * as Sentry from '@sentry/node';
 import {

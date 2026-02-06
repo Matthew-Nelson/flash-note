@@ -1,8 +1,7 @@
-import { config as dotenvConfig } from 'dotenv';
 import { z } from 'zod';
 
-// Load .env file, override any existing env vars to ensure local .env takes precedence
-dotenvConfig({ override: true });
+// Environment variables are loaded by env-loader.ts (imported first in index.ts)
+// This file only validates and exports the typed config object.
 
 const envSchema = z.object({
   // Server

@@ -12,7 +12,14 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "package": "pnpm build && cd dist && zip -r ../flashnote-extension.zip .",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "pretest:e2e": "pnpm --filter @flashnote/backend test:setup && pnpm build:dev",
+    "test:e2e": "playwright test",
+    "test:e2e:ci": "pnpm build:dev && playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:codegen": "playwright codegen"
   },
   "dependencies": {
     "@sentry/browser": "^10.38.0",
@@ -22,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.58.1",
     "@types/chrome": "^0.0.260",
     "@types/react": "^19.2.10",
     "@types/react-dom": "^19.2.3",
