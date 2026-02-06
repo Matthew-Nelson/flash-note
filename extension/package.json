@@ -15,6 +15,7 @@
     "clean": "rm -rf dist",
     "pretest:e2e": "pnpm --filter @flashnote/backend test:setup && pnpm build:dev",
     "test:e2e": "playwright test",
+    "test:e2e:ci": "pnpm build:dev && playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:debug": "playwright test --debug",

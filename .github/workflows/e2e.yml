@@ -134,7 +134,7 @@ jobs:
         working-directory: ./extension
 
       - name: Run E2E tests
-        run: pnpm test:e2e
+        run: pnpm test:e2e:ci
         working-directory: ./extension
         env:
           CI: true
