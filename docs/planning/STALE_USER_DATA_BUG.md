@@ -254,26 +254,50 @@ if (typeof chrome !== 'undefined' && chrome.runtime) {
    - Call `refreshUser()` after successful verification
    - Committed in `3b5b01b`
 
-2. **Extension - Focus-Based Refresh**
-   - Implement Option B in extension
-   - Refresh user data when extension panel becomes visible
-   - Debounce to prevent excessive API calls
-   - **Files to modify:** `extension/src/sidepanel/App.tsx` or `useAuth.ts`
+2. **New `GET /user/me` Endpoint** ✅ DONE
+   - Lightweight read-only endpoint that returns fresh user data
+   - Uses existing `requireAuth` middleware (validates access token)
+   - No token rotation, no session creation — decouples "get fresh data" from "rotate tokens"
+   - **Files added:** `backend/src/routes/user.ts`, registered in `backend/src/index.ts`
 
-3. **Extension - Post-Checkout Awareness**
-   - Add a "Refresh Status" button in Settings as fallback
-   - Users can manually trigger refresh if focus-based doesn't catch it
+3. **Extension - Focus-Based Refresh** ✅ DONE
+   - Implemented Option B via `visibilitychange` listener in `useAuth` hook
+   - Calls `GET /user/me` (via `fetchUser()`) when extension panel becomes visible
+   - 30-second debounce prevents excessive API calls
+   - **Files modified:** `extension/src/sidepanel/hooks/useAuth.ts`
 
-### Phase 2: Safety Net (Pre-Launch)
+4. **Background Refresh (Both Clients)** ✅ DONE
+   - 5-minute interval refresh as safety net in both extension and web
+   - Uses `GET /user/me` — no token rotation or session churn
+   - Catches subscription cancellation, trial expiration
+   - **Files modified:** `extension/src/sidepanel/hooks/useAuth.ts`, `web/src/lib/auth-context.tsx`
 
-4. **Periodic Background Refresh**
-   - Add 5-minute interval refresh as safety net
-   - Only if user has been active (not on idle tabs)
-   - Catches edge cases like subscription cancellation
+5. **Web App - Focus-Based Refresh** ✅ DONE
+   - Same `visibilitychange` pattern as extension
+   - Handles returning from Stripe portal (cancellation, payment update)
+   - **Files modified:** `web/src/lib/auth-context.tsx`
 
-### Phase 3: Polish (Post-Launch)
+6. **Fix Double-Refresh in Dashboard Polling** ✅ DONE
+   - Dashboard post-checkout polling now uses `GET /user/me` instead of `POST /auth/refresh`
+   - Eliminates double token rotation per poll iteration (was 2x per poll, now 0x)
+   - **Files modified:** `web/src/app/dashboard/page.tsx`
 
-5. **Cross-App Communication**
+7. **Extension StoredUser Type Fix** ✅ DONE
+   - Added missing `emailVerified` field to `StoredUser` interface
+   - **Files modified:** `extension/src/shared/storage.ts`
+
+8. **Extension Email Verification Polling** ✅ DONE
+   - Switched from `refreshUser()` to `fetchUser()` for 10s polling
+   - Eliminates token rotation during verification wait
+   - **Files modified:** `extension/src/sidepanel/App.tsx`
+
+9. **Web Verify-Email Page** ✅ DONE
+   - Switched from `refreshUser()` to `fetchUser()` post-verification
+   - **Files modified:** `web/src/app/verify-email/page.tsx`
+
+### Phase 2: Polish (Post-Launch)
+
+10. **Cross-App Communication**
    - If metrics show users still hitting stale data issues
    - Implement web → extension messaging for immediate sync
 
@@ -287,12 +311,19 @@ Before marking this resolved, verify these scenarios work correctly:
 - [ ] Register → Verify email → Navigate to pricing → Can checkout (no error)
 - [ ] Complete checkout → Redirected to dashboard → Shows "active" immediately
 - [ ] Active subscription → Cancel in Stripe portal → Status updates within 5 min
+- [ ] Switch to another tab → Wait 30s → Return → User data refreshed
 
 ### Extension
 - [ ] Register → Verify email → Extension shows "Verified" status
 - [ ] Trial user → Complete checkout on web → Return to extension → Shows "Active"
 - [ ] Close extension → Wait 1 min → Reopen → Status is current
-- [ ] "Refresh Status" button updates subscription status immediately
+- [ ] Background refresh updates status within 5 min without user interaction
+
+### Backend
+- [ ] `GET /user/me` returns current user data with valid access token
+- [ ] `GET /user/me` returns 401 with expired/invalid token
+- [ ] `GET /user/me` does NOT rotate tokens or create sessions
+- [ ] Rate limiting applies (100 req/min via apiRateLimit)
 
 ---
 
@@ -300,13 +331,16 @@ Before marking this resolved, verify these scenarios work correctly:
 
 | File | Purpose |
 |------|---------|
-| `web/src/lib/auth-context.tsx` | Web app auth state management |
-| `web/src/app/verify-email/page.tsx` | Email verification (fixed) |
-| `web/src/app/dashboard/page.tsx` | Post-checkout polling (working) |
-| `extension/src/sidepanel/hooks/useAuth.ts` | Extension auth state |
+| `backend/src/routes/user.ts` | **NEW** - GET /user/me endpoint |
+| `backend/src/index.ts` | Route registration |
+| `web/src/lib/auth-context.tsx` | Web auth state + focus/background refresh |
+| `web/src/lib/api.ts` | Web API client with `fetchUser()` |
+| `web/src/app/verify-email/page.tsx` | Email verification (uses fetchUser) |
+| `web/src/app/dashboard/page.tsx` | Post-checkout polling (uses fetchUser) |
+| `extension/src/sidepanel/hooks/useAuth.ts` | Extension auth state + focus/background refresh |
 | `extension/src/sidepanel/App.tsx` | Extension main component, email polling |
-| `extension/src/shared/api.ts` | API client with `refreshUser()` |
-| `extension/src/shared/storage.ts` | Chrome storage wrapper |
+| `extension/src/shared/api.ts` | Extension API client with `fetchUser()` |
+| `extension/src/shared/storage.ts` | Chrome storage wrapper (StoredUser type fix) |
 
 ---
 
@@ -314,9 +348,9 @@ Before marking this resolved, verify these scenarios work correctly:
 
 - PR #24: Web App Buildout (includes email verification fix)
 - `docs/ROADMAP.md`: BETA-03 (Stripe checkout e2e test)
-- Rate limiting: 30 refreshes per 15 minutes per user
+- Rate limiting: 100 requests/min via apiRateLimit on GET /user/me
 
 ---
 
 **Document Owner:** Engineering
-**Last Updated:** February 2, 2026
+**Last Updated:** February 7, 2026

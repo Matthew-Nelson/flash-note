@@ -11,7 +11,7 @@ import { Card, CardContent, SubscriptionBadge, Button } from '@/components/ui';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
-  const { user, logout, refreshUser } = useAuth();
+  const { user, logout, fetchUser } = useAuth();
 
   const [showSuccessAlert, setShowSuccessAlert] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -25,6 +25,8 @@ function DashboardContent() {
   };
 
   // Poll for subscription status update after checkout
+  // Uses GET /user/me (via fetchUser) instead of POST /auth/refresh
+  // to avoid token rotation and session churn during polling
   const pollForSubscription = useCallback(async () => {
     setIsPolling(true);
     let attempts = 0;
@@ -34,11 +36,9 @@ function DashboardContent() {
     const poll = async (): Promise<boolean> => {
       attempts++;
 
-      // Refresh user data from server (single call per poll)
-      const refreshedData = await api.refreshUser();
-      if (refreshedData?.user.subscriptionStatus === 'active') {
-        // Update the auth context with fresh data
-        await refreshUser();
+      // Single lightweight call via GET /user/me (no token rotation)
+      const freshUser = await fetchUser();
+      if (freshUser?.subscriptionStatus === 'active') {
         return true;
       }
 
@@ -61,7 +61,7 @@ function DashboardContent() {
     } finally {
       setIsPolling(false);
     }
-  }, [refreshUser]);
+  }, [fetchUser]);
 
   // Handle checkout success
   useEffect(() => {
@@ -74,7 +74,7 @@ function DashboardContent() {
         setShowSuccessAlert(true);
       } else {
         // Otherwise poll for webhook to process
-        pollForSubscription();
+        void pollForSubscription();
       }
     }
   }, [searchParams, user?.subscriptionStatus, pollForSubscription]);

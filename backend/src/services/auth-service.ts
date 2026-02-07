@@ -456,14 +456,22 @@ class AuthService {
   }
 
   private sanitizeUser(user: User) {
-    return {
-      id: user.id,
-      email: user.email,
-      subscriptionStatus: user.subscriptionStatus,
-      trialEndsAt: user.trialEndsAt,
-      emailVerified: user.emailVerified,
-    };
+    return sanitizeUser(user);
   }
+}
+
+/**
+ * Strip sensitive fields from a User object for API responses.
+ * Single source of truth for user data serialization — used by auth service and user routes.
+ */
+export function sanitizeUser(user: User) {
+  return {
+    id: user.id,
+    email: user.email,
+    subscriptionStatus: user.subscriptionStatus,
+    trialEndsAt: user.trialEndsAt,
+    emailVerified: user.emailVerified,
+  };
 }
 
 export const authService = new AuthService();

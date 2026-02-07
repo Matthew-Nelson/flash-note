@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { storage } from '@/shared/storage';
 import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
 import { setUser as setSentryUser, captureException } from '@/shared/sentry';
@@ -11,9 +11,16 @@ interface User {
   emailVerified?: boolean;
 }
 
+// Minimum time between focus-triggered refreshes (30 seconds)
+const FOCUS_REFRESH_DEBOUNCE_MS = 30 * 1000;
+
+// Background refresh interval (5 minutes)
+const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const lastFetchTime = useRef(0);
 
   useEffect(() => {
     void loadAuth();
@@ -36,6 +43,51 @@ export function useAuth() {
     };
   }, []);
 
+  // Fetch fresh user data via GET /user/me (no token rotation)
+  const fetchUser = useCallback(async () => {
+    try {
+      const response = await api.fetchUser();
+      if (response?.user) {
+        setUser(response.user);
+        lastFetchTime.current = Date.now();
+        return response.user;
+      }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
+    }
+    return null;
+  }, []);
+
+  // Refresh user data on visibility change (e.g., returning from checkout tab)
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
+      if (timeSinceLastFetch > FOCUS_REFRESH_DEBOUNCE_MS) {
+        void fetchUser();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, fetchUser]);
+
+  // Background refresh every 5 minutes as a safety net
+  useEffect(() => {
+    if (!user) return;
+
+    const intervalId = setInterval(() => {
+      void fetchUser();
+    }, BACKGROUND_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [user, fetchUser]);
+
   const loadAuth = async () => {
     try {
       const auth = await storage.getAuth();
@@ -54,12 +106,14 @@ export function useAuth() {
   const login = useCallback(async (email: string, password: string) => {
     const response = await api.login(email, password);
     setUser(response.user);
+    lastFetchTime.current = Date.now();
     return response;
   }, []);
 
   const register = useCallback(async (email: string, password: string) => {
     const response = await api.register(email, password);
     setUser(response.user);
+    lastFetchTime.current = Date.now();
     return response;
   }, []);
 
@@ -79,6 +133,7 @@ export function useAuth() {
       const response = await api.refreshUser();
       if (response?.user) {
         setUser(response.user);
+        lastFetchTime.current = Date.now();
         return response.user;
       }
     } catch (error) {
@@ -94,5 +149,6 @@ export function useAuth() {
     register,
     logout,
     refreshUser,
+    fetchUser,
   };
 }

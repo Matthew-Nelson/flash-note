@@ -48,8 +48,8 @@ export const test = base.extend<{
 
     const { accessToken, refreshToken, csrfToken, user } = body.data;
 
-    // Calculate expiry (1 hour from now)
-    const expiresAt = Date.now() + 60 * 60 * 1000;
+    // Calculate expiry (55 minutes - matches ACCESS_TOKEN_EXPIRY_MS in web/src/lib/api.ts)
+    const expiresAt = Date.now() + 55 * 60 * 1000;
 
     // Navigate to the app first (required before setting sessionStorage)
     const baseURL = process.env.WEB_URL || 'http://localhost:3000';

@@ -291,8 +291,33 @@ class ApiClient {
   }
 
   /**
+   * Fetch fresh user data from GET /user/me without rotating tokens.
+   * Lightweight alternative to refreshUser() for polling state changes
+   * (subscription status, email verification) without session churn.
+   */
+  async fetchUser(): Promise<{ user: AuthResponse['user'] } | null> {
+    try {
+      const data = await this.request<{ user: AuthResponse['user'] }>('/user/me');
+
+      // Update stored user data without touching tokens
+      const auth = await storage.getAuth();
+      if (auth) {
+        await storage.setAuth({
+          ...auth,
+          user: data.user,
+        });
+      }
+
+      return data;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Force refresh the access token and get updated user data.
-   * Used to poll for email verification status changes.
+   * Rotates tokens and creates a new session - use fetchUser() for
+   * lightweight status checks that don't need token rotation.
    */
   async refreshUser(): Promise<AuthResponse | null> {
     const auth = await storage.getAuth();
