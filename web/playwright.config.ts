@@ -1,9 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Playwright configuration for FlashNote Web App E2E tests.
@@ -53,6 +49,11 @@ export default defineConfig({
 
     // Video on first retry
     video: 'on-first-retry',
+
+    // Required for CI environments running as root
+    launchOptions: {
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    },
   },
 
   // Output directory for test artifacts
@@ -82,7 +83,7 @@ export default defineConfig({
         // Start the backend API
         {
           command: 'NODE_ENV=test pnpm dev',
-          cwd: path.join(__dirname, '../backend'),
+          cwd: path.resolve(__dirname, '../backend'),
           port: 4000,
           reuseExistingServer: true,
           timeout: 120000,

@@ -116,9 +116,8 @@ baseTest.describe('Pricing Page (Unauthenticated)', () => {
       const alert = page.getByText(/checkout was canceled/i);
       await baseExpect(alert).toBeVisible();
 
-      // Find and click the dismiss button on the alert
-      const alertContainer = alert.locator('..');
-      await alertContainer.getByRole('button').click();
+      // The Alert component renders a dismiss button with aria-label="Dismiss"
+      await page.getByRole('button', { name: 'Dismiss' }).click();
 
       await baseExpect(alert).not.toBeVisible();
     });

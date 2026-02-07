@@ -57,7 +57,8 @@ test.describe('Forgot Password Page', () => {
       await page.getByRole('button', { name: 'Send reset link' }).click();
 
       await expect(page.getByText('Check your email')).toBeVisible({ timeout: 10000 });
-      await expect(page.getByRole('link', { name: 'Return to login' })).toBeVisible();
+      // "Return to login" is a <Button> inside a <Link>, so the button role takes precedence
+      await expect(page.getByRole('button', { name: 'Return to login' })).toBeVisible();
     });
 
     test('shows security note about expiry', async ({ page }) => {
@@ -92,18 +93,19 @@ test.describe('Reset Password Page', () => {
       await expect(page.getByText('Invalid or Expired Link')).toBeVisible({ timeout: 10000 });
     });
 
-    test('shows link to request new reset', async ({ page }) => {
+    test('shows button to request new reset', async ({ page }) => {
       await page.goto('/reset-password?token=invalid-token-abc123');
 
+      // "Request a new reset link" is a <Button> inside a <Link>, so the button role takes precedence
       await expect(
-        page.getByRole('link', { name: 'Request a new reset link' })
+        page.getByRole('button', { name: 'Request a new reset link' })
       ).toBeVisible({ timeout: 10000 });
     });
 
     test('request new reset link navigates to forgot-password', async ({ page }) => {
       await page.goto('/reset-password?token=invalid-token-abc123');
 
-      await page.getByRole('link', { name: 'Request a new reset link' }).click({ timeout: 10000 });
+      await page.getByRole('button', { name: 'Request a new reset link' }).click({ timeout: 10000 });
       await expect(page).toHaveURL('/forgot-password');
     });
   });
