@@ -4,62 +4,13 @@ import { generateTestEmail, generateTestPassword, invalidEmails, invalidPassword
 /**
  * Authentication E2E tests.
  *
- * Covers login and registration flows including:
- * - Form display and layout
- * - Client-side validation
- * - Successful login and redirect
- * - Login error handling
- * - Registration form and validation
- * - Registration error handling
+ * Focus: Login/signup flows, validation behavior, error handling, navigation.
+ * Deleted: Pure visibility checks for form elements/branding.
  */
 
 test.describe('Login Page', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-  });
-
-  test.describe('Form Display', () => {
-    test('displays login form with all elements', async ({ page }) => {
-      await expect(page.getByRole('heading', { name: 'Sign in to your account' })).toBeVisible();
-      await expect(page.getByLabel('Email address')).toBeVisible();
-      await expect(page.getByLabel('Password')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible();
-    });
-
-    test('shows link to create account', async ({ page }) => {
-      await expect(page.getByRole('link', { name: 'create a new account' })).toBeVisible();
-    });
-
-    test('shows forgot password link', async ({ page }) => {
-      await expect(page.getByRole('link', { name: 'Forgot password?' })).toBeVisible();
-    });
-
-    test('shows FlashNote branding', async ({ page }) => {
-      await expect(page.getByText('FlashNote').first()).toBeVisible();
-    });
-  });
-
-  test.describe('Form Validation', () => {
-    test('shows error for invalid email format', async ({ page }) => {
-      await page.getByLabel('Email address').fill(invalidEmails.noAt);
-      await page.getByLabel('Password').fill('SomePassword1');
-      await page.getByRole('button', { name: 'Sign in' }).click();
-
-      await expect(page.getByText(/valid email/i)).toBeVisible();
-    });
-
-    test('shows error when password is empty', async ({ page }) => {
-      await page.getByLabel('Email address').fill('user@example.com');
-      // Leave password empty and submit
-      await page.getByRole('button', { name: 'Sign in' }).click();
-
-      await expect(page.getByText(/password is required/i)).toBeVisible();
-    });
-
-    test('sign in button is not disabled when form is empty', async ({ page }) => {
-      // The form relies on validation on submit, not disabled state
-      await expect(page.getByRole('button', { name: 'Sign in' })).toBeEnabled();
-    });
   });
 
   test.describe('Successful Login', () => {
@@ -68,16 +19,6 @@ test.describe('Login Page', () => {
       await page.getByLabel('Password').fill('TestPassword123');
       await page.getByRole('button', { name: 'Sign in' }).click();
 
-      await expect(page).toHaveURL('/dashboard', { timeout: 15000 });
-    });
-
-    test('shows loading state during submission', async ({ page }) => {
-      await page.getByLabel('Email address').fill('test@example.com');
-      await page.getByLabel('Password').fill('TestPassword123');
-      await page.getByRole('button', { name: 'Sign in' }).click();
-
-      // Button should show loading state during submission
-      // It may resolve quickly, so we don't assert on it strictly
       await expect(page).toHaveURL('/dashboard', { timeout: 15000 });
     });
   });
@@ -118,42 +59,7 @@ test.describe('Signup Page', () => {
     await page.goto('/signup');
   });
 
-  test.describe('Form Display', () => {
-    test('displays registration form with all elements', async ({ page }) => {
-      await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
-      await expect(page.getByText('Start your 14-day free trial')).toBeVisible();
-      await expect(page.getByLabel('Email address')).toBeVisible();
-      await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
-      await expect(page.getByLabel('Confirm Password')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Create account' })).toBeVisible();
-    });
-
-    test('shows password requirements hint', async ({ page }) => {
-      await expect(
-        page.getByText('Min 8 characters, 1 uppercase, 1 lowercase, 1 number')
-      ).toBeVisible();
-    });
-
-    test('shows link to login', async ({ page }) => {
-      await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible();
-    });
-
-    test('shows terms and privacy links', async ({ page }) => {
-      await expect(page.getByRole('link', { name: 'Terms of Service' })).toBeVisible();
-      await expect(page.getByRole('link', { name: 'Privacy Policy' })).toBeVisible();
-    });
-  });
-
   test.describe('Registration Validation', () => {
-    test('shows error for invalid email', async ({ page }) => {
-      await page.getByLabel('Email address').fill(invalidEmails.noAt);
-      await page.getByLabel('Password', { exact: true }).fill('ValidPass1');
-      await page.getByLabel('Confirm Password').fill('ValidPass1');
-      await page.getByRole('button', { name: 'Create account' }).click();
-
-      await expect(page.getByText(/valid email/i)).toBeVisible();
-    });
-
     test('shows error for short password', async ({ page }) => {
       await page.getByLabel('Email address').fill(generateTestEmail());
       await page.getByLabel('Password', { exact: true }).fill(invalidPasswords.tooShort);

@@ -59,19 +59,12 @@ export default defineConfig({
   // Output directory for test artifacts
   outputDir: './test-results',
 
-  // Multi-browser test matrix
+  // Single browser - Chrome covers 95%+ of PT users
+  // Add Firefox/Webkit later if cross-browser issues arise
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
     },
   ],
 

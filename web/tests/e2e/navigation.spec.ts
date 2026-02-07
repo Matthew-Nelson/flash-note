@@ -4,11 +4,8 @@ import { test as authTest, expect as authExpect } from './fixtures/web';
 /**
  * Navigation and routing E2E tests.
  *
- * Covers:
- * - Protected route redirects (unauthenticated access)
- * - Authenticated route redirects (already logged in)
- * - Page titles and basic accessibility
- * - Cross-page navigation flows
+ * Focus: Protected route redirects, auth-aware routing, cross-page flows.
+ * These are security-critical tests for route protection.
  */
 
 baseTest.describe('Protected Routes (Unauthenticated)', () => {
@@ -20,45 +17,6 @@ baseTest.describe('Protected Routes (Unauthenticated)', () => {
   baseTest('redirects /dashboard/settings to /login when not authenticated', async ({ page }) => {
     await page.goto('/dashboard/settings');
     await baseExpect(page).toHaveURL('/login', { timeout: 10000 });
-  });
-});
-
-baseTest.describe('Public Routes (Unauthenticated)', () => {
-  baseTest('landing page loads', async ({ page }) => {
-    await page.goto('/');
-    await baseExpect(page.getByText('FlashNote').first()).toBeVisible();
-  });
-
-  baseTest('login page loads', async ({ page }) => {
-    await page.goto('/login');
-    await baseExpect(page.getByRole('heading', { name: 'Sign in to your account' })).toBeVisible();
-  });
-
-  baseTest('signup page loads', async ({ page }) => {
-    await page.goto('/signup');
-    await baseExpect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();
-  });
-
-  baseTest('pricing page loads', async ({ page }) => {
-    await page.goto('/pricing');
-    await baseExpect(
-      page.getByRole('heading', { name: /Simple, Transparent Pricing/i })
-    ).toBeVisible();
-  });
-
-  baseTest('forgot-password page loads', async ({ page }) => {
-    await page.goto('/forgot-password');
-    await baseExpect(page.getByRole('heading', { name: 'Reset your password' })).toBeVisible();
-  });
-
-  baseTest('privacy page loads', async ({ page }) => {
-    await page.goto('/privacy');
-    await baseExpect(page.getByRole('heading', { name: /Privacy Policy/i })).toBeVisible();
-  });
-
-  baseTest('terms page loads', async ({ page }) => {
-    await page.goto('/terms');
-    await baseExpect(page.getByRole('heading', { name: /Terms of Service/i })).toBeVisible();
   });
 });
 
@@ -116,11 +74,5 @@ baseTest.describe('Cross-Page Navigation Flows', () => {
     // Navigate to signup from login
     await page.getByRole('link', { name: 'create a new account' }).click();
     await baseExpect(page).toHaveURL('/signup');
-  });
-
-  baseTest('landing page to pricing navigation', async ({ page }) => {
-    await page.goto('/');
-    await page.getByRole('link', { name: 'Pricing' }).first().click();
-    await baseExpect(page).toHaveURL('/pricing');
   });
 });
