@@ -14,7 +14,7 @@ type ResendStatus = 'idle' | 'sending' | 'sent' | 'error';
 const VERIFICATION_POLL_INTERVAL = 10 * 1000;
 
 function AppContent() {
-  const { user, isLoading, login, register, logout, refreshUser } = useAuth();
+  const { user, isLoading, login, register, logout, refreshUser, fetchUser } = useAuth();
 
   // Track sidepanel open/close state for the floating button
   // Also establish port connection for keep-alive
@@ -77,6 +77,7 @@ function AppContent() {
       user={user}
       logout={logout}
       refreshUser={refreshUser}
+      fetchUser={fetchUser}
     />
   );
 }
@@ -85,24 +86,27 @@ function AuthenticatedApp({
   user,
   logout,
   refreshUser,
+  fetchUser,
 }: {
   user: NonNullable<ReturnType<typeof useAuth>['user']>;
   logout: () => void;
   refreshUser: () => Promise<ReturnType<typeof useAuth>['user']>;
+  fetchUser: () => Promise<ReturnType<typeof useAuth>['user']>;
 }) {
   const [view, setView] = useState<View>('generator');
   const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
   const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
 
   // Poll for email verification status when user hasn't verified
+  // Uses fetchUser (GET /user/me) instead of refreshUser to avoid token rotation churn
   useEffect(() => {
     if (user.emailVerified !== false) {
       return;
     }
 
     const pollVerification = async () => {
-      const refreshedUser = await refreshUser();
-      if (refreshedUser?.emailVerified) {
+      const fetchedUser = await fetchUser();
+      if (fetchedUser?.emailVerified) {
         // User verified - polling will stop automatically since condition no longer met
         setResendStatus('idle');
       }
@@ -111,7 +115,7 @@ function AuthenticatedApp({
     const intervalId = setInterval(pollVerification, VERIFICATION_POLL_INTERVAL);
 
     return () => clearInterval(intervalId);
-  }, [user.emailVerified, refreshUser]);
+  }, [user.emailVerified, fetchUser]);
 
   const handleResendVerification = async () => {
     if (resendStatus === 'sending') return;

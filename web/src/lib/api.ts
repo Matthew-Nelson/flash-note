@@ -12,7 +12,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { storage } from './storage';
-import type { AuthResponse, ApiResponse, SessionEndReason } from './types';
+import type { User, AuthResponse, ApiResponse, SessionEndReason } from './types';
 
 // API URL from environment or default to localhost
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -282,7 +282,32 @@ export const api = {
   },
 
   /**
-   * Force refresh user data
+   * Fetch fresh user data from GET /user/me without rotating tokens.
+   * Lightweight alternative to refreshUser() for polling state changes
+   * (subscription status, email verification) without session churn.
+   */
+  async fetchUser(): Promise<{ user: User } | null> {
+    try {
+      const data = await request<{ user: User }>('/user/me');
+
+      // Update stored user data without touching tokens
+      const auth = storage.getAuth();
+      if (auth) {
+        storage.setAuth({
+          ...auth,
+          user: data.user,
+        });
+      }
+
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Force refresh user data by rotating tokens.
+   * Creates a new session - use fetchUser() for lightweight status checks.
    */
   async refreshUser(): Promise<AuthResponse | null> {
     const auth = storage.getAuth();

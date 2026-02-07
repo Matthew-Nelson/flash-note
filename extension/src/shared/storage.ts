@@ -1,9 +1,10 @@
-// User type with optional trialEndsAt to match backend response
+// User type matching backend sanitizeUser() response
 export interface StoredUser {
   id: string;
   email: string;
   subscriptionStatus: string;
   trialEndsAt?: string | null;
+  emailVerified?: boolean;
 }
 
 export interface StoredAuth {

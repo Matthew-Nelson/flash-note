@@ -7,12 +7,19 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { storage } from './storage';
 import { api, ApiError, AUTH_INVALIDATED_EVENT } from './api';
 import type { User, AuthResponse, SessionEndReason } from './types';
+
+// Minimum time between focus-triggered refreshes (30 seconds)
+const FOCUS_REFRESH_DEBOUNCE_MS = 30 * 1000;
+
+// Background refresh interval (5 minutes)
+const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
 
 interface AuthContextValue {
   user: User | null;
@@ -23,6 +30,7 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  fetchUser: () => Promise<void>;
   clearSessionEndReason: () => void;
 }
 
@@ -37,6 +45,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
+  const lastFetchTime = useRef(0);
 
   // Initialize auth state from storage and set Sentry user context
   useEffect(() => {
@@ -63,10 +72,50 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
   }, [router]);
 
+  // Fetch fresh user data via GET /user/me (no token rotation)
+  const fetchUser = useCallback(async () => {
+    const response = await api.fetchUser();
+    if (response?.user) {
+      setUser(response.user);
+      lastFetchTime.current = Date.now();
+    }
+  }, []);
+
+  // Refresh user data on tab focus (e.g., returning from Stripe checkout/portal)
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const timeSinceLastFetch = Date.now() - lastFetchTime.current;
+      if (timeSinceLastFetch > FOCUS_REFRESH_DEBOUNCE_MS) {
+        void fetchUser();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, fetchUser]);
+
+  // Background refresh every 5 minutes as a safety net
+  useEffect(() => {
+    if (!user) return;
+
+    const intervalId = setInterval(() => {
+      void fetchUser();
+    }, BACKGROUND_REFRESH_INTERVAL_MS);
+
+    return () => clearInterval(intervalId);
+  }, [user, fetchUser]);
+
   const login = useCallback(async (email: string, password: string) => {
     const response = await api.login(email, password);
     setUser(response.user);
     setSessionEndReason(null);
+    lastFetchTime.current = Date.now();
     Sentry.setUser({ id: response.user.id });
     return response;
   }, []);
@@ -75,6 +124,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await api.register(email, password);
     setUser(response.user);
     setSessionEndReason(null);
+    lastFetchTime.current = Date.now();
     Sentry.setUser({ id: response.user.id });
     return response;
   }, []);
@@ -93,6 +143,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await api.refreshUser();
     if (response?.user) {
       setUser(response.user);
+      lastFetchTime.current = Date.now();
     }
   }, []);
 
@@ -109,6 +160,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     refreshUser,
+    fetchUser,
     clearSessionEndReason,
   };
 

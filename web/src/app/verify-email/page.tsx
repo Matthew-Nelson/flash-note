@@ -16,7 +16,7 @@ interface VerifyEmailResponse {
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const { isAuthenticated, refreshUser } = useAuth();
+  const { isAuthenticated, fetchUser } = useAuth();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'verifying' | 'success' | 'already_verified' | 'error'>(
     () => (token ? 'verifying' : 'error')
@@ -35,12 +35,12 @@ function VerifyEmailContent() {
       const result = (await response.json()) as VerifyEmailResponse;
 
       if (response.ok && result.success) {
-        // If user is logged in, refresh their data to get updated emailVerified status
+        // If user is logged in, fetch fresh data to get updated emailVerified status
         if (isAuthenticated) {
           try {
-            await refreshUser();
+            await fetchUser();
           } catch {
-            // Refresh failed, but verification still succeeded - user can continue
+            // Fetch failed, but verification still succeeded - user can continue
           }
         }
 
@@ -59,7 +59,7 @@ function VerifyEmailContent() {
       setStatus('error');
       setMessage('An error occurred while verifying your email');
     }
-  }, [isAuthenticated, refreshUser]);
+  }, [isAuthenticated, fetchUser]);
 
   useEffect(() => {
     if (!token || verificationStarted.current) {

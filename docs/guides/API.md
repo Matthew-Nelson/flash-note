@@ -286,6 +286,40 @@ POST /auth/reset-password
 
 ---
 
+### User
+
+#### Get Current User
+
+```
+GET /user/me
+Authorization: Bearer <token>
+```
+
+Returns the authenticated user's current profile data. This is a lightweight read-only endpoint that does **not** rotate tokens or create sessions, making it suitable for polling state changes (subscription status, email verification).
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "therapist@clinic.com",
+      "subscriptionStatus": "active",
+      "trialEndsAt": "2025-02-03T12:00:00Z",
+      "emailVerified": true
+    }
+  }
+}
+```
+
+**Errors:**
+- `401` - Not authenticated (missing or invalid token)
+- `404` - User not found
+- `429` - Rate limit exceeded
+
+---
+
 ### Notes
 
 #### Generate SOAP Note
@@ -450,4 +484,5 @@ All errors follow this format:
 | `POST /auth/request-password-reset` | 3 requests | 1 hour |
 | `POST /auth/reset-password` | 5 requests | 15 minutes |
 | `POST /notes/generate` | 30 requests | 1 minute |
+| `GET /user/me` | 100 requests | 1 minute |
 | All other endpoints | 100 requests | 1 minute |
