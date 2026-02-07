@@ -74,7 +74,7 @@ function DashboardContent() {
         setShowSuccessAlert(true);
       } else {
         // Otherwise poll for webhook to process
-        pollForSubscription();
+        void pollForSubscription();
       }
     }
   }, [searchParams, user?.subscriptionStatus, pollForSubscription]);

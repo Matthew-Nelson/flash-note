@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { Alert, Button, LoadingSpinner } from '@/components/ui';
+import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
