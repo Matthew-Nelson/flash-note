@@ -14,12 +14,12 @@ import { test, expect } from './fixtures/web';
 
 test.describe('Checkout Flow', () => {
   test.describe('Checkout Initiation', () => {
-    test('subscribe button initiates checkout redirect', async ({ authenticatedPage: page }) => {
+    test('subscribe button calls checkout API', async ({ authenticatedPage: page }) => {
       await page.goto('/pricing');
 
       // Set up request listener to capture the checkout API call
-      const checkoutRequest = page.waitForRequest((req) =>
-        req.url().includes('/billing/checkout') && req.method() === 'POST'
+      const checkoutRequestPromise = page.waitForRequest(
+        (req) => req.url().includes('/billing/checkout') && req.method() === 'POST'
       );
 
       // Click subscribe button
@@ -27,35 +27,20 @@ test.describe('Checkout Flow', () => {
       await subscribeButton.first().click();
 
       // Verify checkout API was called
-      const request = await checkoutRequest;
+      const request = await checkoutRequestPromise;
       expect(request.method()).toBe('POST');
-
-      // The response should redirect to Stripe (or show error if email not verified)
-      // We check for either the redirect or a verification error
-      await expect(
-        page.getByText(/verify your email/i)
-          .or(page.locator('body'))
-      ).toBeVisible({ timeout: 10000 });
     });
   });
 
   test.describe('Checkout Success Redirect', () => {
-    test('shows activating message when returning from Stripe checkout', async ({
+    test('dashboard loads when returning from Stripe with success param', async ({
       authenticatedPage: page,
     }) => {
       // Simulate returning from successful Stripe checkout
-      // The test user is on trial, so it will show the "activating" spinner
       await page.goto('/dashboard?success=true&session_id=cs_test_mock123');
 
-      // Dashboard should load, and may show activating spinner
+      // Dashboard should load successfully
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
-
-      // Check if the activating message appears (it will for trial users)
-      const activating = page.getByText(/activating your subscription/i);
-      const isActivating = await activating.isVisible().catch(() => false);
-
-      // Either way, the dashboard should be visible and functional
-      expect(isActivating || true).toBe(true); // Test passes either way
     });
 
     test('clears success param from URL after processing', async ({
@@ -63,12 +48,13 @@ test.describe('Checkout Flow', () => {
     }) => {
       await page.goto('/dashboard?success=true&session_id=cs_test_mock123');
 
-      // Wait for page to process the param
+      // Wait for dashboard to load and process the param
       await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 15000 });
 
-      // URL should be cleaned up (no query params)
-      await page.waitForTimeout(500);
-      expect(page.url()).not.toContain('success=true');
+      // Wait for URL to be cleaned up (dashboard replaces state after processing)
+      await expect(async () => {
+        expect(page.url()).not.toContain('success=true');
+      }).toPass({ timeout: 5000 });
     });
   });
 
@@ -95,23 +81,22 @@ test.describe('Checkout Flow', () => {
   });
 
   test.describe('Email Verification Requirement', () => {
-    test('checkout requires email verification', async ({ authenticatedPage: page }) => {
-      // This test verifies that unverified users can't checkout
-      // The test user may or may not be verified, so we check for appropriate response
+    test('checkout attempt triggers API call', async ({ authenticatedPage: page }) => {
+      // This test verifies the checkout flow is initiated
+      // The test user is verified, so checkout should proceed
       await page.goto('/pricing');
+
+      // Set up listeners for both possible outcomes
+      const checkoutRequestPromise = page.waitForRequest(
+        (req) => req.url().includes('/billing/checkout') && req.method() === 'POST'
+      );
 
       const subscribeButton = page.getByRole('button', { name: /Subscribe Now|Start Free Trial/i });
       await subscribeButton.first().click();
 
-      // Should either redirect to Stripe (if verified) or show verification error
-      await page.waitForTimeout(2000);
-
-      // Check current state - either redirected, got error, or still on pricing
-      const url = page.url();
-      const hasVerificationError = await page.getByText(/verify your email/i).isVisible().catch(() => false);
-
-      // Test passes if we either got verification error or proceeded to checkout
-      expect(url.includes('/pricing') || url.includes('stripe.com') || hasVerificationError).toBe(true);
+      // Checkout API should be called
+      const request = await checkoutRequestPromise;
+      expect(request.method()).toBe('POST');
     });
   });
 });
