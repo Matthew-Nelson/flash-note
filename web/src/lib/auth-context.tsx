@@ -30,7 +30,7 @@ interface AuthContextValue {
   register: (email: string, password: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
-  fetchUser: () => Promise<void>;
+  fetchUser: () => Promise<User | null>;
   clearSessionEndReason: () => void;
 }
 
@@ -73,12 +73,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [router]);
 
   // Fetch fresh user data via GET /user/me (no token rotation)
-  const fetchUser = useCallback(async () => {
-    const response = await api.fetchUser();
-    if (response?.user) {
-      setUser(response.user);
-      lastFetchTime.current = Date.now();
+  const fetchUser = useCallback(async (): Promise<User | null> => {
+    try {
+      const response = await api.fetchUser();
+      if (response?.user) {
+        setUser(response.user);
+        lastFetchTime.current = Date.now();
+        return response.user;
+      }
+    } catch (error) {
+      console.error('Failed to fetch user:', error);
     }
+    return null;
   }, []);
 
   // Refresh user data on tab focus (e.g., returning from Stripe checkout/portal)

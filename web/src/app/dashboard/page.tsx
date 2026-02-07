@@ -36,11 +36,9 @@ function DashboardContent() {
     const poll = async (): Promise<boolean> => {
       attempts++;
 
-      // Fetch fresh user data without rotating tokens (single lightweight call)
-      const response = await api.fetchUser();
-      if (response?.user.subscriptionStatus === 'active') {
-        // Update the auth context with the fresh data already in storage
-        await fetchUser();
+      // Single lightweight call via GET /user/me (no token rotation)
+      const freshUser = await fetchUser();
+      if (freshUser?.subscriptionStatus === 'active') {
         return true;
       }
 

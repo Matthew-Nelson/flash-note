@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { requireAuth } from '../middleware/auth.js';
 import { apiRateLimit } from '../middleware/rate-limit.js';
 import { findUserById } from '../db/queries/users.js';
+import { sanitizeUser } from '../services/auth-service.js';
 import { AppError } from '../middleware/error-handler.js';
 import type { AuthenticatedRequest } from '../types/index.js';
 
@@ -16,7 +17,7 @@ export const userRouter: Router = Router();
  *
  * Requires: valid access token (Bearer auth)
  */
-userRouter.get('/me', apiRateLimit, requireAuth, async (req, res, next) => {
+userRouter.get('/me', requireAuth, apiRateLimit, async (req, res, next) => {
   try {
     const { userId } = (req as AuthenticatedRequest).user;
 
@@ -28,13 +29,7 @@ userRouter.get('/me', apiRateLimit, requireAuth, async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          subscriptionStatus: user.subscriptionStatus,
-          trialEndsAt: user.trialEndsAt,
-          emailVerified: user.emailVerified,
-        },
+        user: sanitizeUser(user),
       },
     });
   } catch (error) {

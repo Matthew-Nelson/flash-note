@@ -14,7 +14,7 @@ type ResendStatus = 'idle' | 'sending' | 'sent' | 'error';
 const VERIFICATION_POLL_INTERVAL = 10 * 1000;
 
 function AppContent() {
-  const { user, isLoading, login, register, logout, refreshUser, fetchUser } = useAuth();
+  const { user, isLoading, login, register, logout, fetchUser } = useAuth();
 
   // Track sidepanel open/close state for the floating button
   // Also establish port connection for keep-alive
@@ -76,7 +76,6 @@ function AppContent() {
       key={user.id}
       user={user}
       logout={logout}
-      refreshUser={refreshUser}
       fetchUser={fetchUser}
     />
   );
@@ -85,12 +84,10 @@ function AppContent() {
 function AuthenticatedApp({
   user,
   logout,
-  refreshUser,
   fetchUser,
 }: {
   user: NonNullable<ReturnType<typeof useAuth>['user']>;
   logout: () => void;
-  refreshUser: () => Promise<ReturnType<typeof useAuth>['user']>;
   fetchUser: () => Promise<ReturnType<typeof useAuth>['user']>;
 }) {
   const [view, setView] = useState<View>('generator');
