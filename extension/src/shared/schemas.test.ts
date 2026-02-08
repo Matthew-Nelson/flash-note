@@ -46,6 +46,8 @@ describe('Extension Validation Schemas', () => {
     const validData = {
       email: 'test@example.com',
       password: 'Password1',
+      confirmPassword: 'Password1',
+      acceptedLegalTerms: true as const,
     };
 
     it('should accept valid registration data', () => {
@@ -54,25 +56,25 @@ describe('Extension Validation Schemas', () => {
 
     it('should reject password shorter than 8 characters', () => {
       expect(
-        registerSchema.safeParse({ ...validData, password: 'Pass1' }).success
+        registerSchema.safeParse({ ...validData, password: 'Pass1', confirmPassword: 'Pass1' }).success
       ).toBe(false);
     });
 
     it('should reject password without uppercase letter', () => {
       expect(
-        registerSchema.safeParse({ ...validData, password: 'password1' }).success
+        registerSchema.safeParse({ ...validData, password: 'password1', confirmPassword: 'password1' }).success
       ).toBe(false);
     });
 
     it('should reject password without lowercase letter', () => {
       expect(
-        registerSchema.safeParse({ ...validData, password: 'PASSWORD1' }).success
+        registerSchema.safeParse({ ...validData, password: 'PASSWORD1', confirmPassword: 'PASSWORD1' }).success
       ).toBe(false);
     });
 
     it('should reject password without number', () => {
       expect(
-        registerSchema.safeParse({ ...validData, password: 'Password' }).success
+        registerSchema.safeParse({ ...validData, password: 'Password', confirmPassword: 'Password' }).success
       ).toBe(false);
     });
 
@@ -80,6 +82,34 @@ describe('Extension Validation Schemas', () => {
       expect(
         registerSchema.safeParse({ ...validData, email: 'bad' }).success
       ).toBe(false);
+    });
+
+    it('should reject mismatched passwords', () => {
+      const result = registerSchema.safeParse({
+        ...validData,
+        confirmPassword: 'Different1',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const paths = result.error.errors.map((e) => e.path.join('.'));
+        expect(paths).toContain('confirmPassword');
+      }
+    });
+
+    it('should reject when confirmPassword is missing', () => {
+      const { confirmPassword: _, ...noConfirm } = validData;
+      expect(registerSchema.safeParse(noConfirm).success).toBe(false);
+    });
+
+    it('should reject when acceptedLegalTerms is false', () => {
+      expect(
+        registerSchema.safeParse({ ...validData, acceptedLegalTerms: false }).success
+      ).toBe(false);
+    });
+
+    it('should reject when acceptedLegalTerms is missing', () => {
+      const { acceptedLegalTerms: _, ...noConsent } = validData;
+      expect(registerSchema.safeParse(noConsent).success).toBe(false);
     });
   });
 
@@ -274,6 +304,8 @@ describe('Extension Validation Schemas', () => {
       const result = validateRegister({
         email: 'test@example.com',
         password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: true,
       });
       expect(result.success).toBe(true);
     });

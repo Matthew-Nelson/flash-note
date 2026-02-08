@@ -53,6 +53,7 @@ describe('Web Validation Schemas', () => {
       email: 'test@example.com',
       password: 'Password1',
       confirmPassword: 'Password1',
+      acceptedLegalTerms: true as const,
     };
 
     it('should accept valid registration data', () => {
@@ -115,6 +116,20 @@ describe('Web Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
     });
+
+    it('should reject when acceptedLegalTerms is false', () => {
+      const result = registerSchema.safeParse({
+        ...validData,
+        acceptedLegalTerms: false,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject when acceptedLegalTerms is missing', () => {
+      const { acceptedLegalTerms: _, ...noConsent } = validData;
+      const result = registerSchema.safeParse(noConsent);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('validateLogin', () => {
@@ -145,6 +160,7 @@ describe('Web Validation Schemas', () => {
         email: 'test@example.com',
         password: 'Password1',
         confirmPassword: 'Password1',
+        acceptedLegalTerms: true,
       });
       expect(result.success).toBe(true);
       if (result.success) {

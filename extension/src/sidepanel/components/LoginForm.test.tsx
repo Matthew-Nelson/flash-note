@@ -122,10 +122,12 @@ describe('LoginForm', () => {
       await user.click(screen.getByText(/sign up/i));
       await user.type(screen.getByLabelText('Email'), 'new@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      await user.click(screen.getByRole('checkbox'));
       await user.click(screen.getByText('Create Account'));
 
       await waitFor(() => {
-        expect(onRegister).toHaveBeenCalledWith('new@example.com', 'Password1');
+        expect(onRegister).toHaveBeenCalledWith('new@example.com', 'Password1', true);
       });
     });
 
@@ -136,11 +138,36 @@ describe('LoginForm', () => {
       await user.click(screen.getByText(/sign up/i));
       await user.type(screen.getByLabelText('Email'), 'new@example.com');
       await user.type(screen.getByLabelText('Password'), 'short');
+      await user.type(screen.getByLabelText('Confirm Password'), 'short');
+      await user.click(screen.getByRole('checkbox'));
       await user.click(screen.getByText('Create Account'));
 
       await waitFor(() => {
         expect(onRegister).not.toHaveBeenCalled();
       });
+    });
+
+    it('should show validation error when checkbox is unchecked', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Email'), 'new@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      // Do NOT check the checkbox
+      await user.click(screen.getByText('Create Account'));
+
+      await waitFor(() => {
+        expect(onRegister).not.toHaveBeenCalled();
+        expect(screen.getByText('You must accept the legal terms to create an account')).toBeInTheDocument();
+      });
+    });
+
+    it('should not show confirm password or checkbox in login mode', () => {
+      renderForm();
+      expect(screen.queryByLabelText('Confirm Password')).not.toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     });
 
     it('should toggle back to login', async () => {

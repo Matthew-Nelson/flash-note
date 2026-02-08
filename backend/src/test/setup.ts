@@ -24,10 +24,21 @@ type MockDbQueryFn = (...args: unknown[]) => Promise<{ rows: unknown[]; rowCount
 // Mock the database module
 export const mockDbQuery = vi.fn<MockDbQueryFn>();
 
+// Mock PoolClient returned by db.connect() - delegates to mockDbQuery for test assertions
+export const mockClientQuery = vi.fn<MockDbQueryFn>();
+export const mockClientRelease = vi.fn();
+
+const mockClient = {
+  query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>
+    mockClientQuery(...args),
+  release: (): void => mockClientRelease(),
+};
+
 vi.mock('../db/index.js', () => ({
   db: {
     query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>
       mockDbQuery(...args),
+    connect: (): Promise<typeof mockClient> => Promise.resolve(mockClient),
   },
 }));
 
@@ -61,6 +72,8 @@ export const TEST_CONFIG_DEFAULTS = {
  */
 export function resetMocks() {
   mockDbQuery.mockReset();
+  mockClientQuery.mockReset();
+  mockClientRelease.mockReset();
   mockAuditLog.mockReset();
   // Restore default Promise return value for auditLog
   mockAuditLog.mockResolvedValue(undefined);

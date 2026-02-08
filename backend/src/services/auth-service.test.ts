@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, mockAuditLog, resetMocks, createMockUserRow } from '../test/setup.js';
+import { mockDbQuery, mockClientQuery, mockAuditLog, resetMocks, createMockUserRow } from '../test/setup.js';
 import bcrypt from 'bcryptjs';
 
 // Mock config before any imports that use it
@@ -16,6 +16,11 @@ const { mockConfig } = vi.hoisted(() => ({
 vi.mock('../config.js', () => ({
   config: mockConfig,
   BCRYPT_ROUNDS: 10,
+  LEGAL_DOCUMENT_VERSIONS: {
+    baa: '1.0',
+    terms_of_service: '1.0',
+    privacy_policy: '1.0',
+  },
 }));
 
 // We need to mock lockoutService separately since it's imported by auth-service
@@ -744,18 +749,28 @@ describe('AuthService', () => {
     });
 
     it('should still succeed if verification email fails', async () => {
-      // User not found (email doesn't exist)
+      // User not found (email doesn't exist) - via pool query
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      // Create user
+      // Transaction via client:
       const newUser = createMockUserRow({
         id: 'new-user-id',
         email: 'new@example.com',
         token_version: 1,
       });
-      mockDbQuery.mockResolvedValueOnce({ rows: [newUser] });
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // createUserWithClient
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
+      // recordLegalAcceptances (3 document types)
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
+      // COMMIT
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
-      // Token creation for email verification
+      // Token creation for email verification (via pool query)
       mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
       mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
 

@@ -1,3 +1,4 @@
+import type pg from 'pg';
 import { db } from '../index.js';
 import type { User } from '../../types/index.js';
 import type { UserRow, UserTokenVersionRow } from '../../types/database.js';
@@ -58,6 +59,25 @@ export async function createUser(
   passwordHash: string
 ): Promise<User> {
   const result = await db.query<UserRow>(
+    `INSERT INTO users (email, password_hash)
+     VALUES ($1, $2)
+     RETURNING ${USER_COLUMNS}`,
+    [email, passwordHash]
+  );
+
+  return rowToUser(result.rows[0]!);
+}
+
+/**
+ * Create a user using a PoolClient (for use within a transaction).
+ * Same as createUser() but accepts a client instead of using the pool.
+ */
+export async function createUserWithClient(
+  client: pg.PoolClient,
+  email: string,
+  passwordHash: string
+): Promise<User> {
+  const result = await client.query<UserRow>(
     `INSERT INTO users (email, password_hash)
      VALUES ($1, $2)
      RETURNING ${USER_COLUMNS}`,

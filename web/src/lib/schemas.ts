@@ -33,6 +33,9 @@ export const registerSchema = z.object({
     .regex(/[a-z]/, 'Password must contain at least one lowercase letter')
     .regex(/[0-9]/, 'Password must contain at least one number'),
   confirmPassword: z.string(),
+  acceptedLegalTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
+  }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],

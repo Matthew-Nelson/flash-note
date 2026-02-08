@@ -246,10 +246,10 @@ class ApiClient {
     return data;
   }
 
-  async register(email: string, password: string): Promise<AuthResponse> {
+  async register(email: string, password: string, acceptedLegalTerms: boolean): Promise<AuthResponse> {
     const data = await this.request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, acceptedLegalTerms }),
     });
 
     await storage.setAuth({

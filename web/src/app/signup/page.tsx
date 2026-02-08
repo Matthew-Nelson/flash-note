@@ -14,11 +14,13 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<{
     email?: string;
     password?: string;
     confirmPassword?: string;
+    acceptedLegalTerms?: string;
   }>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -35,11 +37,11 @@ export default function SignupPage() {
     setFieldErrors({});
 
     // Validate input
-    const result = registerSchema.safeParse({ email, password, confirmPassword });
+    const result = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms });
     if (!result.success) {
-      const errors: { email?: string; password?: string; confirmPassword?: string } = {};
+      const errors: { email?: string; password?: string; confirmPassword?: string; acceptedLegalTerms?: string } = {};
       result.error.errors.forEach((err) => {
-        const field = err.path[0] as 'email' | 'password' | 'confirmPassword';
+        const field = err.path[0] as 'email' | 'password' | 'confirmPassword' | 'acceptedLegalTerms';
         errors[field] = err.message;
       });
       setFieldErrors(errors);
@@ -49,7 +51,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await register(email, password);
+      const response = await register(email, password, acceptedLegalTerms);
 
       // Check if email verification is required
       if (response.emailVerificationRequired) {
@@ -140,6 +142,34 @@ export default function SignupPage() {
               error={fieldErrors.confirmPassword}
             />
 
+            <div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={acceptedLegalTerms}
+                  onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
+                  className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus:ring-fn-accent"
+                />
+                <span className="text-sm text-fn-text-secondary">
+                  I agree to the{' '}
+                  <Link href="/baa" target="_blank" className="link">
+                    Business Associate Agreement
+                  </Link>
+                  ,{' '}
+                  <Link href="/terms" target="_blank" className="link">
+                    Terms of Service
+                  </Link>
+                  , and{' '}
+                  <Link href="/privacy" target="_blank" className="link">
+                    Privacy Policy
+                  </Link>
+                </span>
+              </label>
+              {fieldErrors.acceptedLegalTerms && (
+                <p className="mt-1 text-sm text-fn-error">{fieldErrors.acceptedLegalTerms}</p>
+              )}
+            </div>
+
             {error && (
               <Alert variant="error">{error}</Alert>
             )}
@@ -158,19 +188,6 @@ export default function SignupPage() {
               Already have an account?{' '}
               <Link href="/login" className="link">
                 Sign in
-              </Link>
-            </p>
-          </div>
-
-          <div className="mt-4">
-            <p className="text-center text-xs text-fn-text-muted">
-              By creating an account, you agree to our{' '}
-              <Link href="/terms" className="link">
-                Terms of Service
-              </Link>{' '}
-              and{' '}
-              <Link href="/privacy" className="link">
-                Privacy Policy
               </Link>
             </p>
           </div>

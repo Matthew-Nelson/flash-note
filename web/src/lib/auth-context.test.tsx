@@ -154,10 +154,10 @@ describe('AuthContext', () => {
       await waitFor(() => expect(captured.isLoading).toBe(false));
 
       await act(async () => {
-        await captured.register('new@example.com', 'Password1');
+        await captured.register('new@example.com', 'Password1', true);
       });
 
-      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1');
+      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true);
       expect(screen.getByTestId('authenticated').textContent).toBe('true');
     });
   });

@@ -20,6 +20,13 @@ const passwordSchema = z
 export const registerSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
   password: passwordSchema,
+  confirmPassword: z.string(),
+  acceptedLegalTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 /**

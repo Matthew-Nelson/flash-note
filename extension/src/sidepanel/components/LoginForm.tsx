@@ -5,7 +5,7 @@ import SessionAlert from './SessionAlert';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<unknown>;
-  onRegister: (email: string, password: string) => Promise<unknown>;
+  onRegister: (email: string, password: string, acceptedLegalTerms: boolean) => Promise<unknown>;
 }
 
 type ViewMode = 'login' | 'signup' | 'forgotPassword';
@@ -14,6 +14,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -24,7 +26,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     // Validate input with Zod
     const validation = viewMode === 'signup'
-      ? validateRegister({ email, password })
+      ? validateRegister({ email, password, confirmPassword, acceptedLegalTerms })
       : validateLogin({ email, password });
 
     if (!validation.success) {
@@ -36,7 +38,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     try {
       if (viewMode === 'signup') {
-        await onRegister(email, password);
+        await onRegister(email, password, acceptedLegalTerms);
       } else {
         await onLogin(email, password);
       }
@@ -217,7 +219,6 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            minLength={8}
             className="input-field w-full px-3 py-2"
             placeholder={viewMode === 'signup' ? 'Min 8 chars, 1 uppercase, 1 number' : '********'}
           />
@@ -236,6 +237,49 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             </div>
           )}
         </div>
+
+        {viewMode === 'signup' && (
+          <div>
+            <label htmlFor="confirmPassword" className="label block text-sm mb-1">
+              Confirm Password
+            </label>
+            <input
+              id="confirmPassword"
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="input-field w-full px-3 py-2"
+              placeholder="Re-enter your password"
+            />
+          </div>
+        )}
+
+        {viewMode === 'signup' && (
+          <div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={acceptedLegalTerms}
+                onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
+                className="mt-1 h-4 w-4"
+              />
+              <span className="text-xs opacity-80">
+                I agree to the{' '}
+                <a href="https://flashnote.co/baa" target="_blank" rel="noopener noreferrer" className="link">
+                  Business Associate Agreement
+                </a>
+                ,{' '}
+                <a href="https://flashnote.co/terms" target="_blank" rel="noopener noreferrer" className="link">
+                  Terms of Service
+                </a>
+                , and{' '}
+                <a href="https://flashnote.co/privacy" target="_blank" rel="noopener noreferrer" className="link">
+                  Privacy Policy
+                </a>
+              </span>
+            </label>
+          </div>
+        )}
 
         {errors.length > 0 && (
           <div className="error-message text-sm px-3 py-2 animate-fade-in">
@@ -277,6 +321,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
           type="button"
           onClick={() => {
             setViewMode(viewMode === 'signup' ? 'login' : 'signup');
+            setConfirmPassword('');
+            setAcceptedLegalTerms(false);
             setErrors([]);
           }}
           className="link text-sm"

@@ -109,10 +109,10 @@ describe('useAuth', () => {
       await waitFor(() => expect(result.current.isLoading).toBe(false));
 
       await act(async () => {
-        await result.current.register('new@example.com', 'Password1');
+        await result.current.register('new@example.com', 'Password1', true);
       });
 
-      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1');
+      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true);
       expect(result.current.user).not.toBeNull();
     });
   });
