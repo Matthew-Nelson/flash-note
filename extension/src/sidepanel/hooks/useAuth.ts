@@ -58,22 +58,32 @@ export function useAuth() {
     return null;
   }, []);
 
-  // Refresh user data on visibility change (e.g., returning from checkout tab)
+  // Refresh user data on visibility change or focus (e.g., returning from checkout tab)
+  // Note: visibilitychange alone doesn't work for sidepanels during tab navigation
+  // because the sidepanel stays "visible" while docked. The focus event fires when
+  // the user clicks inside the sidepanel after interacting with the main browser area.
   useEffect(() => {
     if (!user) return;
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-
+    const handleRefresh = () => {
       const timeSinceLastFetch = Date.now() - lastFetchTime.current;
       if (timeSinceLastFetch > FOCUS_REFRESH_DEBOUNCE_MS) {
         void fetchUser();
       }
     };
 
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleRefresh();
+      }
+    };
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleRefresh);
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleRefresh);
     };
   }, [user, fetchUser]);
 
