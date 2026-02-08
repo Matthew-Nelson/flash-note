@@ -20,7 +20,7 @@ type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 // API URL is set via environment variables at build time
 // Development: VITE_API_URL=http://localhost:4000 (from .env.development)
-// Production: VITE_API_URL=https://api.flashnote.com (from .env.production)
+// Production: VITE_API_URL=https://api.flashnote.co (from .env.production)
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
 const ACCESS_TOKEN_EXPIRY_MS = 55 * 60 * 1000; // 55 minutes

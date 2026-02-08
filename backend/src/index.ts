@@ -1,8 +1,11 @@
+/* eslint-disable no-console -- Server startup logging is intentional */
 // IMPORTANT: env-loader must be imported FIRST to ensure environment variables
 // are available before any other modules (including Sentry) initialize.
 import './env-loader.js';
 
-// Sentry must be imported before other application modules for proper instrumentation
+// Sentry must be imported before other application modules for proper instrumentation.
+// ESM hook registration is handled by @sentry/node/preload via --import flag in
+// package.json scripts; this import calls Sentry.init() to activate instrumentation.
 import { Sentry } from './instrument.js';
 import express, { type Express } from 'express';
 import cors from 'cors';

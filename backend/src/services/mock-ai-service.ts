@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Mock AI logging is intentional for dev mode */
 import type { GeneratedNote, NoteType, BillingSummary, GoalsTracking } from '../types/index.js';
 
 /**

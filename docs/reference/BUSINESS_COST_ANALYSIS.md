@@ -28,7 +28,7 @@ FlashNote is a highly capital-efficient SaaS business with **93-94% gross margin
 
 | Item | Cost | Notes |
 |------|------|-------|
-| Domain Registration | $12-15/year | flashnote.com or similar |
+| Domain Registration | $12-15/year | flashnote.co |
 | Chrome Web Store Developer | $5 (one-time) | Required to publish extension |
 | Stripe Account | $0 | Free to create, pay-as-you-go |
 | Google Cloud Account | $0 | Free tier + pay-as-you-go |

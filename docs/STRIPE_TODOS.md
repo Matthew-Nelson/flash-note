@@ -55,7 +55,7 @@ This document tracks all outstanding work for the Stripe payment integration bef
 | Complete identity verification | TODO | Required for live mode |
 | Create products and prices | Done | Monthly $29, Annual $290 |
 | Configure Customer Portal | TODO | Enable cancel, update payment, view invoices |
-| Add production webhook endpoint | TODO | `https://api.flashnote.app/billing/webhook` |
+| Add production webhook endpoint | TODO | `https://api.flashnote.co/billing/webhook` |
 | Configure webhook events | TODO | See events list below |
 | Switch to live mode | TODO | After all testing complete |
 
@@ -132,7 +132,7 @@ $$);
 **Option B: External cron job**
 ```bash
 # Add to crontab or use a scheduler like AWS EventBridge
-0 3 * * * curl -X POST https://api.flashnote.app/admin/cleanup-webhook-events
+0 3 * * * curl -X POST https://api.flashnote.co/admin/cleanup-webhook-events
 ```
 
 **Option C: Application-level scheduled task**

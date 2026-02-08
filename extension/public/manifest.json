@@ -16,7 +16,7 @@
 
   "host_permissions": [
     "http://localhost:4000/*",
-    "https://api.flashnote.com/*",
+    "https://api.flashnote.co/*",
     "https://*.ingest.us.sentry.io/*"
   ],
 

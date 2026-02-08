@@ -131,6 +131,10 @@ jobs:
         run: pnpm install
         working-directory: ./extension
 
+      - name: Run linter
+        run: pnpm lint
+        working-directory: ./extension
+
       - name: Build
         run: pnpm build
         working-directory: ./extension
@@ -157,6 +161,10 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+        working-directory: ./web
+
+      - name: Run linter
+        run: pnpm lint
         working-directory: ./web
 
       - name: Build

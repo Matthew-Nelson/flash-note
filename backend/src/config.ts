@@ -71,7 +71,7 @@ const envSchema = z.object({
 
   // Email (Resend)
   RESEND_API_KEY: z.string().min(1).optional(),
-  EMAIL_FROM_ADDRESS: z.string().email().default('noreply@flashnote.app'),
+  EMAIL_FROM_ADDRESS: z.string().email().default('noreply@flashnote.co'),
   EMAIL_FROM_NAME: z.string().default('FlashNote'),
   EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS: z.string().transform(Number).default('24'),
   PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: z.string().transform(Number).default('15'),

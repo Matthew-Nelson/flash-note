@@ -856,12 +856,12 @@ private async requestWithRetry<T>(
 **Risk:** Chrome extensions make requests from `chrome-extension://<extension-id>` origins. If the extension makes direct API calls in production, they may be blocked by CORS.
 
 **Resolution:** Implemented alongside MEDIUM-007. The `ALLOWED_ORIGINS` environment variable now supports:
-- Standard web URLs (https://flashnote.com)
+- Standard web URLs (https://flashnote.co)
 - Chrome extension origins (chrome-extension://abcdefghijklmnop)
 
 **Production Configuration Example:**
 ```bash
-ALLOWED_ORIGINS=https://flashnote.com,chrome-extension://YOUR_EXTENSION_ID
+ALLOWED_ORIGINS=https://flashnote.co,chrome-extension://YOUR_EXTENSION_ID
 ```
 
 **Note:** The Chrome extension ID is assigned when published to the Chrome Web Store. Update this value after publishing.
@@ -1467,7 +1467,7 @@ New audit actions needed:
 
 **Configuration:**
 - `RESEND_API_KEY` - API key from Resend dashboard
-- `EMAIL_FROM_ADDRESS` - Sender email (default: noreply@flashnote.app)
+- `EMAIL_FROM_ADDRESS` - Sender email (default: noreply@flashnote.co)
 - `EMAIL_FROM_NAME` - Sender name (default: FlashNote)
 - `EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS` - Token expiry (default: 24)
 - `PASSWORD_RESET_TOKEN_EXPIRY_MINUTES` - Token expiry (default: 15)

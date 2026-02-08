@@ -124,15 +124,8 @@ export default function LoginPage() {
             />
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label htmlFor="password" className="label text-sm">
-                  Password
-                </label>
-                <Link href="/forgot-password" className="text-sm link">
-                  Forgot password?
-                </Link>
-              </div>
               <Input
+                label="Password"
                 name="password"
                 type="password"
                 autoComplete="current-password"
@@ -141,6 +134,11 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 error={fieldErrors.password}
               />
+              <div className="mt-1 text-right">
+                <Link href="/forgot-password" className="text-sm link">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
             {error && (

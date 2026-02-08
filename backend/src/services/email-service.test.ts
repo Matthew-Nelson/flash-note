@@ -20,7 +20,7 @@ vi.mock('../config.js', () => ({
   config: {
     RESEND_API_KEY: 'test_api_key',
     WEB_URL: TEST_CONFIG_DEFAULTS.WEB_URL,
-    EMAIL_FROM_ADDRESS: 'noreply@flashnote.com',
+    EMAIL_FROM_ADDRESS: 'noreply@flashnote.co',
     EMAIL_FROM_NAME: 'FlashNote',
   },
 }));

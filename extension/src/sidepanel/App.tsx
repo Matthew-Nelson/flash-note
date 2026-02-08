@@ -94,6 +94,13 @@ function AuthenticatedApp({
   const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
   const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
 
+  // Fetch fresh user data when navigating to Settings so subscription status is current
+  useEffect(() => {
+    if (view === 'settings') {
+      void fetchUser();
+    }
+  }, [view, fetchUser]);
+
   // Poll for email verification status when user hasn't verified
   // Uses fetchUser (GET /user/me) instead of refreshUser to avoid token rotation churn
   useEffect(() => {

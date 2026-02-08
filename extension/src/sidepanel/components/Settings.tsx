@@ -121,7 +121,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
                 : 'Subscribe to continue using FlashNote.'}
             </p>
             <a
-              href="https://flashnote.com/pricing"
+              href="https://flashnote.co/pricing"
               target="_blank"
               rel="noopener noreferrer"
               className="btn-primary inline-block w-full text-center py-2 px-4 text-sm font-medium rounded-lg"
@@ -137,7 +137,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="card p-4">
             <a
-              href="https://flashnote.com/dashboard"
+              href="https://flashnote.co/dashboard"
               target="_blank"
               rel="noopener noreferrer"
               className="link text-sm"
@@ -153,7 +153,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
         <h2 className="text-sm font-semibold mb-3">Support</h2>
         <div className="space-y-2">
           <a
-            href="https://flashnote.com/help"
+            href="https://flashnote.co/help"
             target="_blank"
             rel="noopener noreferrer"
             className="link block text-sm"
@@ -161,7 +161,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
             Help Center
           </a>
           <a
-            href="mailto:support@flashnote.com"
+            href="mailto:support@flashnote.co"
             className="link block text-sm"
           >
             Contact Support

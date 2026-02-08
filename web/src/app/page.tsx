@@ -194,7 +194,7 @@ export default function Home() {
                   </Link>
                 </li>
                 <li>
-                  <a href="mailto:support@flashnote.com" className="hover:text-white transition-colors">
+                  <a href="mailto:support@flashnote.co" className="hover:text-white transition-colors">
                     Contact
                   </a>
                 </li>

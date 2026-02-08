@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- DB connection lifecycle logging is intentional */
 import pg from 'pg';
 import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
