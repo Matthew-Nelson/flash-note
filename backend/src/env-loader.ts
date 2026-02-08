@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Startup diagnostic logging is intentional */
 /**
  * Centralized Environment Loader
  *

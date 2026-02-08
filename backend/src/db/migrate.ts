@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- CLI script with intentional stdout output */
 /**
  * Database Migration Script
  *

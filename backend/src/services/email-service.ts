@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Dev mode email logging (when Resend not configured) is intentional */
 import { Resend } from 'resend';
 import * as Sentry from '@sentry/node';
 import { config } from '../config.js';

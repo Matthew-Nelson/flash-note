@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Server startup logging is intentional */
 // IMPORTANT: env-loader must be imported FIRST to ensure environment variables
 // are available before any other modules (including Sentry) initialize.
 import './env-loader.js';
