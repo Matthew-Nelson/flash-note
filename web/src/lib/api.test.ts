@@ -132,7 +132,7 @@ describe('Web API Client', () => {
 
       // Verify refresh was called
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      const firstCall = mockFetch.mock.calls[0]!;
+      const firstCall = mockFetch.mock.calls[0];
       expect(firstCall[0]).toContain('/auth/refresh');
     });
 
@@ -203,9 +203,11 @@ describe('Web API Client', () => {
 
       await api.fetchUser();
 
-      const fetchCall = mockFetch.mock.calls[0]!;
-      const headers = fetchCall[1]?.headers as Record<string, string>;
-      expect(headers['X-CSRF-Token']).toBe('my-csrf-token');
+      const fetchCall = mockFetch.mock.calls[0];
+      const headers = (fetchCall[1] as RequestInit | undefined)?.headers as
+        | Record<string, string>
+        | undefined;
+      expect(headers?.['X-CSRF-Token']).toBe('my-csrf-token');
     });
   });
 

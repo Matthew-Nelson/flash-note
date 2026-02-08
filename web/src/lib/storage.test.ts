@@ -70,7 +70,7 @@ describe('Web Storage', () => {
       setAuth(mockAuth);
       const stored = sessionStorage.getItem('flashnote:auth');
       expect(stored).not.toBeNull();
-      const parsed = JSON.parse(stored!);
+      const parsed = JSON.parse(stored!) as Record<string, unknown>;
       expect(parsed.accessToken).toBe(mockAuth.accessToken);
     });
 
