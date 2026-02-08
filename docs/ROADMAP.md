@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 5, 2026
-**Overall Progress:** 47% (23/49 quality gates complete)
+**Last Updated:** February 6, 2026
+**Overall Progress:** 43% (23/53 quality gates complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -33,6 +33,67 @@ This document consolidates all pending work from across the project. Use this as
 | Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |
 
 > **Note:** The stale user data bug affects extension users who complete checkout on the web app - their subscription status doesn't sync back to the extension. See [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) for full analysis and recommended fix (focus-based refresh).
+
+---
+
+## P0: UI Quality Improvements
+
+**Goal:** Fix patient-safety and accessibility compliance issues identified in the [UI Audit](./compliance/UI_AUDIT.md).
+
+> Full audit details, affected files, and implementation notes are in [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md).
+
+### P0 -- Patient Safety & Legal (Fix Now)
+
+| Task | Audit Ref | Status |
+|------|-----------|--------|
+| Fix silent clipboard copy failure in ResultDisplay | [2.1] | Not started |
+| Fix color contrast failures across brand gradient colors (WCAG AA) | [1.1] | Not started |
+
+### P1 -- Accessibility Compliance (Fix Soon)
+
+| Task | Audit Ref | Status |
+|------|-----------|--------|
+| Add `role="alert"` / `aria-live` to all dynamic content | [1.2] | Not started |
+| Add `aria-hidden="true"` to all decorative SVGs | [1.3] | Not started |
+| Fix nested `<Link><Button>` invalid HTML (12 instances) | [1.4] | Not started |
+| Add skip-to-content link | [1.5] | Not started |
+| Add `<main>` landmark to 8 web pages | [1.6] | Not started |
+| Fix focus management (outline, button focus, view transitions) | [1.8] | Not started |
+| Route web auth pages through API client for retry logic | [2.2] | Not started |
+| Add responsive mobile navigation | [4.1] | Not started |
+
+### P2 -- UX Quality & Consistency
+
+| Task | Audit Ref | Status |
+|------|-----------|--------|
+| Fix heading hierarchy violations | [1.7] | Not started |
+| Fix miscellaneous a11y issues (toggle labels, hints, aria-busy) | [1.9] | Not started |
+| Clear form errors on input change | [2.3] | Not started |
+| Use Alert component consistently on dashboard | [2.4] | Not started |
+| Show actual error message during NoteGenerator error animation | [2.5] | Not started |
+| Add offline detection with user-facing banner | [2.6] | Not started |
+| Add request timeouts to API clients | [2.7] | Not started |
+| Add nested ErrorBoundaries for view-level isolation | [2.11] | Not started |
+| Deduplicate extension CSS -- import shared styles | [3.1] | Not started |
+| Fix dashboard off-brand alert colors | [3.2] | Not started |
+| Extract shared Nav/Footer/BetaBadge components | [3.4] | Not started |
+| Add responsive text sizing for hero/pricing headings | [4.2] | Not started |
+| Fix CTA button overflow on small screens | [4.3] | Not started |
+| Increase touch targets to 44x44px minimum | [4.4] | Not started |
+
+### P3 -- Polish & Tech Debt
+
+| Task | Audit Ref | Status |
+|------|-----------|--------|
+| Fix terminal resend verification error state | [2.8] | Not started |
+| Remove or adopt dead `useApi` hook | [2.9] | Not started |
+| Fix dashboard polling unmount cleanup | [2.10] | Not started |
+| Extract BETA badge into shared component | [3.3] | Not started |
+| Fix ErrorBoundary hardcoded colors | [3.5] | Not started |
+| Fix Settings toggle flash on load | [5.1] | Not started |
+| Fix placeholder Chrome Web Store link | [5.2] | Not started |
+| Add dark mode support | [5.3] | Not started |
+| Add print styles | [5.4] | Not started |
 
 ---
 
@@ -189,10 +250,11 @@ These are researched but not prioritized for current development.
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
 | MVP Foundation | 15 | 12 | 80% |
+| UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
 | Beta Ready | 12 | 6 | 50% |
 | Production Ready | 16 | 5 | 31% |
 | HIPAA Critical Path | 6 | 0 | 0% |
-| **Total** | **49** | **23** | **47%** |
+| **Total** | **82** | **23** | **28%** |
 
 ---
 
@@ -211,4 +273,5 @@ These are researched but not prioritized for current development.
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Business launch requirements
 - [STRIPE_TODOS.md](./STRIPE_TODOS.md) - Payment integration details
 - [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) - **Critical** - Unit, integration, E2E, and penetration testing requirements
+- [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md) - **Critical** - UI quality audit: accessibility, error handling, responsiveness, styling
 - [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) - Sentry, UptimeRobot, Axiom setup plan
