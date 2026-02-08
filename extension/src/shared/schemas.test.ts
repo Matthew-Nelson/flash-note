@@ -359,6 +359,15 @@ describe('Extension Validation Schemas', () => {
         expect(result.invalidFields).toContain('password');
       }
     });
+
+    it('should return empty invalidFields for non-object input', () => {
+      const result = validateLogin('not-an-object');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.invalidFields).toEqual([]);
+        expect(result.errors.length).toBeGreaterThan(0);
+      }
+    });
   });
 
   describe('validateRegister', () => {
@@ -390,6 +399,15 @@ describe('Extension Validation Schemas', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.invalidFields).toContain('confirmPassword');
+      }
+    });
+
+    it('should return empty invalidFields for non-object input', () => {
+      const result = validateRegister('not-an-object');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.invalidFields).toEqual([]);
+        expect(result.errors.length).toBeGreaterThan(0);
       }
     });
 
