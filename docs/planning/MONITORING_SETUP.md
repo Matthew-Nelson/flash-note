@@ -171,9 +171,9 @@ See [`docs/planning/SENTRY_LOGGING_GAPS.md`](SENTRY_LOGGING_GAPS.md) for the ful
 
 | Monitor Name | URL | Interval |
 |--------------|-----|----------|
-| API Health | `https://api.flashnote.app/health` | 5 min |
-| Web App | `https://flashnote.app` | 5 min |
-| Stripe Webhook | `https://api.flashnote.app/billing/webhook` | 5 min |
+| API Health | `https://api.flashnote.co/health` | 5 min |
+| Web App | `https://flashnote.co` | 5 min |
+| Stripe Webhook | `https://api.flashnote.co/billing/webhook` | 5 min |
 
 ---
 
@@ -393,7 +393,7 @@ SENTRY_AUTH_TOKEN=sntrys_xxx
 
 ```bash
 # Backend health
-curl https://api.flashnote.app/health
+curl https://api.flashnote.co/health
 
 # Check recent errors (if using Axiom CLI)
 axiom query "['flashnote-backend'] | where level == 'error' | top 10"

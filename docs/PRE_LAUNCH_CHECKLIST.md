@@ -145,7 +145,7 @@
 **For Production:**
 - [ ] **Set up Webhook endpoint in Stripe Dashboard**
   - Go to Developers → Webhooks → Add endpoint
-  - Endpoint URL: `https://api.flashnote.app/billing/webhook`
+  - Endpoint URL: `https://api.flashnote.co/billing/webhook`
   - Subscribe to required events:
     - `checkout.session.completed`
     - `customer.subscription.updated`

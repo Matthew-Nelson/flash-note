@@ -459,7 +459,7 @@ security-scan:
     - name: OWASP ZAP Scan
       uses: zaproxy/action-full-scan@v0.4.0
       with:
-        target: 'https://staging-api.flashnote.app'
+        target: 'https://staging-api.flashnote.co'
         rules_file_name: '.zap/rules.tsv'
         fail_action: true
 ```
@@ -669,7 +669,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.post('https://api.flashnote.app/auth/login', {
+  const res = http.post('https://api.flashnote.co/auth/login', {
     email: 'loadtest@example.com',
     password: 'testpassword123',
   });
