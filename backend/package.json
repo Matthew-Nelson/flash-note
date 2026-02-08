@@ -6,10 +6,10 @@
   "description": "FlashNote Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "dev:test": "NODE_ENV=test tsx watch src/index.ts",
+    "dev": "tsx watch --import @sentry/node/preload src/index.ts",
+    "dev:test": "NODE_ENV=test tsx watch --import @sentry/node/preload src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --import @sentry/node/preload dist/index.js",
     "test": "NODE_ENV=production vitest --run",
     "test:watch": "NODE_ENV=production vitest",
     "test:coverage": "NODE_ENV=production vitest --run --coverage",

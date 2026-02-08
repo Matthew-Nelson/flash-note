@@ -208,23 +208,9 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label htmlFor="password" className="label text-sm">
-              Password
-            </label>
-            {viewMode === 'login' && (
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMode('forgotPassword');
-                  setErrors([]);
-                }}
-                className="link text-xs"
-              >
-                Forgot password?
-              </button>
-            )}
-          </div>
+          <label htmlFor="password" className="label block text-sm mb-1">
+            Password
+          </label>
           <input
             id="password"
             type="password"
@@ -235,6 +221,20 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             className="input-field w-full px-3 py-2"
             placeholder={viewMode === 'signup' ? 'Min 8 chars, 1 uppercase, 1 number' : '********'}
           />
+          {viewMode === 'login' && (
+            <div className="mt-1 text-right">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('forgotPassword');
+                  setErrors([]);
+                }}
+                className="link text-xs"
+              >
+                Forgot password?
+              </button>
+            </div>
+          )}
         </div>
 
         {errors.length > 0 && (
