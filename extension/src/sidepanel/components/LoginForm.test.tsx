@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginForm from './LoginForm';
 import { api } from '@/shared/api';
@@ -70,6 +70,20 @@ describe('LoginForm', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
+      });
+    });
+
+    it('should show generic error for non-Error throws', async () => {
+      onLogin.mockRejectedValue('string error');
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.click(screen.getByText('Sign In'));
+
+      await waitFor(() => {
+        expect(screen.getByText('An unexpected error occurred')).toBeInTheDocument();
       });
     });
 
@@ -192,6 +206,37 @@ describe('LoginForm', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Too many attempts/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should show validation error for empty email on forgot password', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText('Forgot password?'));
+
+      // Submit form directly to bypass native HTML validation on type="email" + required
+      const form = screen.getByText('Send reset link').closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
+      });
+    });
+
+    it('should show validation error for email without @ on forgot password', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText('Forgot password?'));
+      await user.type(screen.getByLabelText('Email'), 'notanemail');
+
+      // Submit form directly to bypass native HTML validation
+      const form = screen.getByText('Send reset link').closest('form')!;
+      fireEvent.submit(form);
+
+      await waitFor(() => {
+        expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
       });
     });
 

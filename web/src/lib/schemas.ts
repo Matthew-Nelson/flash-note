@@ -50,6 +50,7 @@ export type RegisterInput = z.infer<typeof registerSchema>;
 export function getValidationError<T>(schema: z.ZodSchema<T>, data: unknown): string | null {
   const result = schema.safeParse(data);
   if (result.success) return null;
+  /* v8 ignore next -- Zod always provides error messages; defensive fallback only */
   return result.error.errors[0]?.message ?? 'Validation failed';
 }
 

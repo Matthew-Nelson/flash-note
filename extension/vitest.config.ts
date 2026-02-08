@@ -35,10 +35,10 @@ export default defineConfig({
         'src/shared/sentry.ts',      // BrowserClient init requires integration testing; public API tested via no-op tests
       ],
       thresholds: {
-        lines: 80,
-        functions: 80,
-        branches: 80,
-        statements: 80,
+        lines: 95,
+        functions: 95,
+        branches: 95,
+        statements: 95,
       },
     },
 

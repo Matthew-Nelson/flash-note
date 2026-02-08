@@ -24,6 +24,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // Send to Sentry for production error tracking
     captureException(error, {
+      /* v8 ignore next -- React always provides componentStack; defensive fallback only */
       componentStack: errorInfo.componentStack ?? 'unknown',
     });
   }

@@ -24,6 +24,7 @@ export default function ResultDisplay({ note, onBack }: ResultDisplayProps) {
       setCopiedSection(section);
       setTimeout(() => setCopiedSection(null), 2000);
     } catch (err) {
+      /* v8 ignore next -- clipboard failure is a UX fallback; requires real browser clipboard API */
       console.error('Failed to copy:', err);
     }
   };

@@ -91,6 +91,17 @@ describe('Web Storage', () => {
       });
       expect(() => setAuth(createMockStoredAuth())).not.toThrow();
     });
+
+    it('should no-op in SSR (no window)', () => {
+      const originalWindow = globalThis.window;
+      // @ts-expect-error - simulating SSR
+      delete globalThis.window;
+      try {
+        expect(() => setAuth(createMockStoredAuth())).not.toThrow();
+      } finally {
+        globalThis.window = originalWindow;
+      }
+    });
   });
 
   describe('clearAuth', () => {
@@ -109,6 +120,17 @@ describe('Web Storage', () => {
         throw new Error('Storage error');
       });
       expect(() => clearAuth()).not.toThrow();
+    });
+
+    it('should no-op in SSR (no window)', () => {
+      const originalWindow = globalThis.window;
+      // @ts-expect-error - simulating SSR
+      delete globalThis.window;
+      try {
+        expect(() => clearAuth()).not.toThrow();
+      } finally {
+        globalThis.window = originalWindow;
+      }
     });
   });
 });

@@ -68,6 +68,30 @@ describe('Extension SessionAlert', () => {
     expect(screen.getByText(/security reasons/i)).toBeInTheDocument();
   });
 
+  it('should fall back to session_expired for missing reason', () => {
+    render(<SessionAlert />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(AUTH_INVALIDATED_EVENT, {
+          detail: {},
+        })
+      );
+    });
+    expect(screen.getByText('Session Expired')).toBeInTheDocument();
+  });
+
+  it('should fall back to session_expired for unknown reason', () => {
+    render(<SessionAlert />);
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(AUTH_INVALIDATED_EVENT, {
+          detail: { reason: 'unknown_reason' },
+        })
+      );
+    });
+    expect(screen.getByText('Session Expired')).toBeInTheDocument();
+  });
+
   it('should dismiss and call onDismiss when dismiss button is clicked', async () => {
     const user = userEvent.setup();
     const onDismiss = vi.fn();

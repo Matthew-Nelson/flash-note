@@ -227,6 +227,21 @@ describe('AuthContext', () => {
         await captured.refreshUser();
       });
     });
+
+    it('should not update user when api.refreshUser returns null', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.refreshUser).mockResolvedValue(null);
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      await act(async () => {
+        await captured.refreshUser();
+      });
+
+      // User should still be the original user from storage
+      expect(screen.getByTestId('user').textContent).toBe('test@example.com');
+    });
   });
 
   describe('auth invalidation event', () => {
@@ -267,6 +282,201 @@ describe('AuthContext', () => {
       await waitFor(() => {
         expect(captured.sessionEndReason).toBe('session_expired');
       });
+    });
+  });
+
+  describe('fetchUser error handling', () => {
+    it('should return null when api.fetchUser throws', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockRejectedValue(new Error('Network error'));
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      let result: unknown;
+      await act(async () => {
+        result = await captured.fetchUser();
+      });
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when api.fetchUser returns null', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue(null);
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      let result: unknown;
+      await act(async () => {
+        result = await captured.fetchUser();
+      });
+
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('visibility change refresh', () => {
+    it('should fetch user when tab becomes visible after debounce period', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      // Switch to fake timers after initial render settles
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+
+      // Advance past debounce period (30s)
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      // Simulate tab becoming visible
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true,
+        configurable: true,
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(api.fetchUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('should NOT fetch user when tab becomes hidden', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'hidden',
+        writable: true,
+        configurable: true,
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(api.fetchUser).not.toHaveBeenCalled();
+    });
+
+    it('should debounce rapid visibility changes', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true,
+        configurable: true,
+      });
+
+      // Fire multiple visibility changes rapidly (within 30s debounce)
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+      await vi.advanceTimersByTimeAsync(100);
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      // Should only fetch once because debounce blocks subsequent calls
+      // (lastFetchTime is updated on first call)
+      expect(api.fetchUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not set up visibility listener when no user', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(null);
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(false));
+
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+
+      await vi.advanceTimersByTimeAsync(31_000);
+
+      Object.defineProperty(document, 'visibilityState', {
+        value: 'visible',
+        writable: true,
+        configurable: true,
+      });
+
+      act(() => {
+        document.dispatchEvent(new Event('visibilitychange'));
+      });
+
+      expect(api.fetchUser).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('background refresh interval', () => {
+    it('should fetch user every 5 minutes when authenticated', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      vi.mocked(api.fetchUser).mockClear();
+
+      // Advance 5 minutes
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(api.fetchUser).toHaveBeenCalledTimes(1);
+
+      // Advance another 5 minutes
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
+      expect(api.fetchUser).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not set up interval when no user', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(null);
+
+      renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(false));
+
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      expect(api.fetchUser).not.toHaveBeenCalled();
+    });
+
+    it('should clean up interval on unmount', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
+      vi.mocked(api.fetchUser).mockResolvedValue({ user: createMockUser() });
+
+      const { unmount } = renderWithProvider();
+      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
+
+      vi.useFakeTimers();
+      vi.mocked(api.fetchUser).mockClear();
+      unmount();
+
+      await vi.advanceTimersByTimeAsync(10 * 60 * 1000);
+      expect(api.fetchUser).not.toHaveBeenCalled();
     });
   });
 

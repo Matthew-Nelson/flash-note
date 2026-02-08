@@ -147,6 +147,34 @@ describe('Web API Client', () => {
       expect(storage.clearAuth).toHaveBeenCalled();
       expect(Sentry.captureException).toHaveBeenCalled();
     });
+
+    it('should clear auth when refresh response is not ok', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(
+        createMockStoredAuth({ expiresAt: Date.now() - 1000 })
+      );
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+      const result = await api.fetchUser();
+      expect(result).toBeNull();
+      expect(storage.clearAuth).toHaveBeenCalled();
+    });
+
+    it('should clear auth when refresh response is not successful', async () => {
+      vi.mocked(storage.getAuth).mockReturnValue(
+        createMockStoredAuth({ expiresAt: Date.now() - 1000 })
+      );
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Refresh token expired')
+          ),
+      });
+
+      const result = await api.fetchUser();
+      expect(result).toBeNull();
+      expect(storage.clearAuth).toHaveBeenCalled();
+    });
   });
 
   describe('auth invalidation', () => {
@@ -255,6 +283,16 @@ describe('Web API Client', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
+    it('should NOT retry on non-retryable errors (e.g. JSON parse error)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      });
+
+      await expect(api.createCheckoutSession('price_123')).rejects.toThrow(SyntaxError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('should retry on network errors', async () => {
       vi.useFakeTimers();
 
@@ -345,6 +383,85 @@ describe('Web API Client', () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       const result = await api.refreshUser();
       expect(result).toBeNull();
+    });
+  });
+
+  describe('refreshUser', () => {
+    it('should return null when response is not successful', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token expired')
+          ),
+      });
+
+      const result = await api.refreshUser();
+      expect(result).toBeNull();
+    });
+
+    it('should return null on network error', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
+      const result = await api.refreshUser();
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    it('should send password reset request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      await api.requestPasswordReset('user@example.com');
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/request-password-reset');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.email).toBe('user@example.com');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_request', 'Invalid email')
+          ),
+      });
+
+      await expect(api.requestPasswordReset('bad')).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('resendVerificationEmail', () => {
+    it('should send verification email request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      await api.resendVerificationEmail('user@example.com');
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/resend-verification');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.email).toBe('user@example.com');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('rate_limit_exceeded', 'Too many requests')
+          ),
+      });
+
+      await expect(api.resendVerificationEmail('user@example.com')).rejects.toThrow(ApiError);
     });
   });
 

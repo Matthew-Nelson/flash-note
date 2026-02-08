@@ -81,6 +81,32 @@ describe('Settings', () => {
     });
   });
 
+  it('should handle preferences load failure gracefully', async () => {
+    vi.mocked(storage.getPreferences).mockRejectedValue(new Error('Storage error'));
+    renderSettings();
+
+    // Should still render with default values (badge = true)
+    const toggle = await screen.findByRole('switch');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('should display expired status for non-active non-trialing user', () => {
+    renderSettings({ subscriptionStatus: 'canceled' });
+    expect(screen.getByText('canceled')).toBeInTheDocument();
+    // Should not show View Plans or Manage subscription
+    expect(screen.queryByText('View Plans')).not.toBeInTheDocument();
+    expect(screen.queryByText('Manage subscription')).not.toBeInTheDocument();
+  });
+
+  it('should display trialing without trialEndsAt', () => {
+    renderSettings({
+      subscriptionStatus: 'trialing',
+      trialEndsAt: null,
+    });
+    expect(screen.getByText('Trial (0 days left)')).toBeInTheDocument();
+    expect(screen.getByText('Subscribe to continue using FlashNote.')).toBeInTheDocument();
+  });
+
   it('should call onLogout when Sign Out is clicked', async () => {
     const user = userEvent.setup();
     renderSettings();

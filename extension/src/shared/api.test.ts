@@ -295,6 +295,30 @@ describe('Extension API Client', () => {
       expect(caughtError).toBeInstanceOf(ApiError);
       expect(captureException).toHaveBeenCalled();
     });
+
+    it('should report network_error on retry exhaustion from network failures', async () => {
+      vi.useFakeTimers();
+
+      for (let i = 0; i < 4; i++) {
+        mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      }
+
+      let caughtError: unknown;
+      const promise = api.generateNote(input).catch((e) => {
+        caughtError = e;
+      });
+
+      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+
+      await promise;
+      expect(caughtError).toBeInstanceOf(TypeError);
+      expect(captureException).toHaveBeenCalledWith(
+        expect.any(TypeError),
+        expect.objectContaining({ errorType: 'network_error' })
+      );
+    });
   });
 
   describe('fetchUser', () => {
@@ -315,6 +339,159 @@ describe('Extension API Client', () => {
       mockFetch.mockRejectedValueOnce(new Error('Network'));
       const result = await api.fetchUser();
       expect(result).toBeNull();
+    });
+
+    it('should skip storage update when getAuth returns null after fetch', async () => {
+      const user = { id: 'u1', email: 'a@b.com', subscriptionStatus: 'active', trialEndsAt: null };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({ user })),
+      });
+
+      vi.mocked(storage.getAuth)
+        .mockResolvedValueOnce(createMockStoredAuth()) // for getToken()
+        .mockResolvedValueOnce(createMockStoredAuth()) // for getCsrfToken()
+        .mockResolvedValueOnce(null);                   // for fetchUser() storage check
+
+      const result = await api.fetchUser();
+      expect(result).not.toBeNull();
+      expect(storage.setAuth).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('token refresh edge cases', () => {
+    it('should clear auth when refresh response is not ok', async () => {
+      vi.mocked(storage.getAuth).mockResolvedValue(
+        createMockStoredAuth({ expiresAt: Date.now() - 1000 })
+      );
+      mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
+
+      const result = await api.fetchUser();
+      expect(result).toBeNull();
+      expect(storage.clearAuth).toHaveBeenCalled();
+    });
+
+    it('should clear auth when refresh response is not successful', async () => {
+      vi.mocked(storage.getAuth).mockResolvedValue(
+        createMockStoredAuth({ expiresAt: Date.now() - 1000 })
+      );
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Refresh token expired')
+          ),
+      });
+
+      const result = await api.fetchUser();
+      expect(result).toBeNull();
+      expect(storage.clearAuth).toHaveBeenCalled();
+    });
+  });
+
+  describe('auth invalidation storage error', () => {
+    it('should still throw ApiError even if clearAuth fails', async () => {
+      vi.mocked(storage.clearAuth).mockRejectedValueOnce(new Error('Storage error'));
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token invalidated')
+          ),
+      });
+
+      const result = await api.fetchUser();
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    it('should send password reset request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      await api.requestPasswordReset('user@example.com');
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/request-password-reset');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.email).toBe('user@example.com');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_request', 'Invalid email')
+          ),
+      });
+
+      await expect(api.requestPasswordReset('bad')).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('resendVerificationEmail', () => {
+    it('should send verification email request', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      await api.resendVerificationEmail('user@example.com');
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/resend-verification');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.email).toBe('user@example.com');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('rate_limit_exceeded', 'Too many requests')
+          ),
+      });
+
+      await expect(api.resendVerificationEmail('user@example.com')).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('isRetryableError', () => {
+    it('should NOT retry on non-retryable errors (e.g. JSON parse error)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.reject(new SyntaxError('Unexpected token')),
+      });
+
+      await expect(api.generateNote({
+        noteType: 'daily_note',
+        quickNotes: 'Patient reports improved mobility',
+      })).rejects.toThrow(SyntaxError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('unknown error response format', () => {
+    it('should use unknown_error code for malformed error response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: () => Promise.resolve({}), // No success field
+      });
+
+      await expect(api.logout()).rejects.toMatchObject({
+        code: 'unknown_error',
+        message: 'An error occurred',
+      });
     });
   });
 
@@ -340,6 +517,25 @@ describe('Extension API Client', () => {
 
     it('should return null on server error', async () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+      const result = await api.refreshUser();
+      expect(result).toBeNull();
+    });
+
+    it('should return null when response is not successful', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token expired')
+          ),
+      });
+
+      const result = await api.refreshUser();
+      expect(result).toBeNull();
+    });
+
+    it('should return null on network error', async () => {
+      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
       const result = await api.refreshUser();
       expect(result).toBeNull();
     });

@@ -88,6 +88,25 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Child content')).toBeInTheDocument();
   });
 
+  it('should call window.location.reload when Refresh Page is clicked', async () => {
+    const user = userEvent.setup();
+    const reloadMock = vi.fn();
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, reload: reloadMock },
+      writable: true,
+      configurable: true,
+    });
+
+    render(
+      <ErrorBoundary>
+        <ThrowOnRender shouldThrow={true} />
+      </ErrorBoundary>
+    );
+
+    await user.click(screen.getByText('Refresh Page'));
+    expect(reloadMock).toHaveBeenCalledTimes(1);
+  });
+
   it('should show error details in development', () => {
     const originalEnv = process.env.NODE_ENV;
     process.env.NODE_ENV = 'development';
