@@ -127,10 +127,10 @@ describe('Sentry PHI Sanitization', () => {
       };
       const result = sanitizeObject(input);
       const items = result.items as Array<Record<string, unknown>>;
-      expect(items[0]!.id).toBe(1);
-      expect(items[0]!.treatment).toBe('[REDACTED - PHI]');
-      expect(items[1]!.id).toBe(2);
-      expect(items[1]!.treatment).toBe('[REDACTED - PHI]');
+      expect(items[0].id).toBe(1);
+      expect(items[0].treatment).toBe('[REDACTED - PHI]');
+      expect(items[1].id).toBe(2);
+      expect(items[1].treatment).toBe('[REDACTED - PHI]');
     });
 
     it('should preserve primitive values in arrays', () => {

@@ -23,7 +23,7 @@ const chromeStore = new Map<string, unknown>();
 const chromeMock = {
   storage: {
     local: {
-      get: vi.fn(async (keys: string | string[]) => {
+      get: vi.fn((keys: string | string[]) => {
         const keyArr = typeof keys === 'string' ? [keys] : keys;
         const result: Record<string, unknown> = {};
         for (const key of keyArr) {
@@ -32,12 +32,12 @@ const chromeMock = {
         }
         return result;
       }),
-      set: vi.fn(async (items: Record<string, unknown>) => {
+      set: vi.fn((items: Record<string, unknown>) => {
         for (const [key, value] of Object.entries(items)) {
           chromeStore.set(key, value);
         }
       }),
-      remove: vi.fn(async (keys: string | string[]) => {
+      remove: vi.fn((keys: string | string[]) => {
         const keyArr = typeof keys === 'string' ? [keys] : keys;
         for (const key of keyArr) {
           chromeStore.delete(key);
