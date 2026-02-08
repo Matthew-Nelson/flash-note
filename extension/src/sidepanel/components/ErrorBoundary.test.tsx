@@ -36,6 +36,39 @@ describe('Extension ErrorBoundary', () => {
     expect(screen.getByText('Try Again')).toBeInTheDocument();
   });
 
+  it('should NOT show error details in production mode (HIPAA)', () => {
+    const originalMode = import.meta.env.MODE;
+    import.meta.env.MODE = 'production';
+
+    render(
+      <ErrorBoundary>
+        <ThrowOnRender shouldThrow={true} />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    expect(screen.queryByText('Error details')).not.toBeInTheDocument();
+    expect(screen.queryByText('Test error')).not.toBeInTheDocument();
+
+    import.meta.env.MODE = originalMode;
+  });
+
+  it('should show error details in development mode', () => {
+    const originalMode = import.meta.env.MODE;
+    import.meta.env.MODE = 'development';
+
+    render(
+      <ErrorBoundary>
+        <ThrowOnRender shouldThrow={true} />
+      </ErrorBoundary>
+    );
+
+    expect(screen.getByText('Error details')).toBeInTheDocument();
+    expect(screen.getByText('Test error')).toBeInTheDocument();
+
+    import.meta.env.MODE = originalMode;
+  });
+
   it('should capture exception with Sentry', () => {
     render(
       <ErrorBoundary>

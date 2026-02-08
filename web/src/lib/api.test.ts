@@ -109,20 +109,18 @@ describe('Web API Client', () => {
   });
 
   describe('token refresh', () => {
-    it('should refresh token when expired', async () => {
-      // First call: token is expired
+    it('should refresh token when expired and use new token for subsequent request', async () => {
       vi.mocked(storage.getAuth).mockReturnValue(
         createMockStoredAuth({ expiresAt: Date.now() - 1000 })
       );
 
-      // Mock refresh endpoint
+      // Mock refresh endpoint with new token
       const refreshResponse = createMockAuthResponse({ accessToken: 'new-token' });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(createMockApiResponse(refreshResponse)),
         })
-        // Mock the actual request after refresh
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(createMockApiResponse({ user: refreshResponse.user })),
@@ -130,10 +128,16 @@ describe('Web API Client', () => {
 
       await api.fetchUser();
 
-      // Verify refresh was called
+      // Verify refresh was called first
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      const firstCall = mockFetch.mock.calls[0];
-      expect(firstCall[0]).toContain('/auth/refresh');
+      expect(mockFetch.mock.calls[0][0]).toContain('/auth/refresh');
+
+      // Verify the subsequent request used the refreshed token
+      const secondCall = mockFetch.mock.calls[1];
+      const headers = (secondCall[1] as RequestInit | undefined)?.headers as
+        | Record<string, string>
+        | undefined;
+      expect(headers?.Authorization).toBe('Bearer new-token');
     });
 
     it('should clear auth and capture Sentry on refresh network failure', async () => {
@@ -384,9 +388,7 @@ describe('Web API Client', () => {
       const result = await api.refreshUser();
       expect(result).toBeNull();
     });
-  });
 
-  describe('refreshUser', () => {
     it('should return null when response is not successful', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

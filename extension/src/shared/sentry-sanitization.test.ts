@@ -237,8 +237,8 @@ describe('Sentry PHI Sanitization', () => {
       const extra = {
         userId: 'user-123',
         requestPath: '/api/notes/generate',
-        patientContext: 'John Doe, 45yo male, knee pain',
-        shorthandInput: 'pt c/o knee pain x2wks',
+        patientContext: 'TEST_PATIENT_A context data',
+        shorthandInput: 'TEST shorthand input data',
         documentType: 'daily_note',
         timestamp: '2024-01-15T10:30:00Z',
       };
@@ -256,8 +256,8 @@ describe('Sentry PHI Sanitization', () => {
         url: 'https://api.flashnote.co/notes?patientId=123',
         method: 'POST',
         status_code: 200,
-        body: '{"shorthand": "pt reports pain..."}',
-        requestBody: '{"diagnosis": "..."}',
+        body: '{"shorthand": "TEST_INPUT_DATA"}',
+        requestBody: '{"diagnosis": "TEST_DIAGNOSIS_DATA"}',
       };
       const result = sanitizeObject(breadcrumbData);
       expect(result.method).toBe('POST');

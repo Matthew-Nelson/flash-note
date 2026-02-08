@@ -60,7 +60,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             FlashNote encountered an unexpected error. Please try again.
           </p>
 
-          {this.state.error && (
+          {import.meta.env.MODE === 'development' && this.state.error && (
             <details className="text-left w-full mb-4">
               <summary className="text-xs text-gray-500 cursor-pointer hover:text-gray-700">
                 Error details

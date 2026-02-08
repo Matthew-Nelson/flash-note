@@ -69,6 +69,12 @@ describe('AuthContext', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // Restore visibilityState to default to prevent leaking between tests
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      writable: true,
+      configurable: true,
+    });
   });
 
   function renderWithProvider() {
@@ -180,7 +186,7 @@ describe('AuthContext', () => {
       renderWithProvider();
       await waitFor(() => expect(captured.isAuthenticated).toBe(true));
 
-      // The error propagates from try/finally, but finally still executes
+      // The error propagates from try/catch/finally, but finally still executes
       await act(async () => {
         try {
           await captured.logout();
@@ -191,6 +197,12 @@ describe('AuthContext', () => {
 
       expect(screen.getByTestId('user').textContent).toBe('none');
       expect(mockPush).toHaveBeenCalledWith('/login');
+      expect(Sentry.captureException).toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({
+          extra: { source: 'auth_context', errorType: 'logout_failed' },
+        })
+      );
     });
   });
 

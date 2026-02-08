@@ -34,6 +34,12 @@ describe('useAuth', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    // Restore visibilityState to default to prevent leaking between tests
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      writable: true,
+      configurable: true,
+    });
   });
 
   describe('initial state', () => {

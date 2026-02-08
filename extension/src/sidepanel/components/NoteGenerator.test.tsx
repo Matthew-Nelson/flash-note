@@ -188,12 +188,25 @@ describe('NoteGenerator', () => {
     expect(select).toHaveValue('initial_eval');
   });
 
-  it('should allow entering patient context', async () => {
-    const user = userEvent.setup();
+  it('should send patientContext to API when provided', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(api.generateNote).mockResolvedValue(createMockGeneratedNote());
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderGenerator();
-    const textarea = screen.getByLabelText(/patient context/i);
-    await user.type(textarea, 'John 52M chronic LBP');
-    expect(textarea).toHaveValue('John 52M chronic LBP');
+    await user.type(screen.getByLabelText(/patient context/i), 'TEST_PATIENT_A 52M');
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+    await user.click(screen.getByText('Generate Note'));
+
+    await waitFor(() => {
+      expect(api.generateNote).toHaveBeenCalledWith(
+        expect.objectContaining({
+          patientContext: 'TEST_PATIENT_A 52M',
+          noteType: 'daily_note',
+          quickNotes: 'Patient reports improved mobility and decreased pain levels today.',
+        })
+      );
+    });
   });
 
   it('should render multiple errors as a list', async () => {

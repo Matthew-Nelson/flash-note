@@ -107,12 +107,15 @@ describe('Extension API Client', () => {
   });
 
   describe('token refresh', () => {
-    it('should refresh token when expired', async () => {
+    it('should refresh token when expired and store updated CSRF token', async () => {
       vi.mocked(storage.getAuth).mockResolvedValue(
         createMockStoredAuth({ expiresAt: Date.now() - 1000 })
       );
 
-      const refreshResponse = createMockAuthResponse({ accessToken: 'new-token' });
+      const refreshResponse = createMockAuthResponse({
+        accessToken: 'new-token',
+        csrfToken: 'new-csrf-token',
+      });
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -128,6 +131,14 @@ describe('Extension API Client', () => {
       expect(mockFetch).toHaveBeenCalledTimes(2);
       const firstCall = mockFetch.mock.calls[0];
       expect(firstCall[0]).toContain('/auth/refresh');
+
+      // Verify the new CSRF token was stored alongside the new access token
+      expect(storage.setAuth).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accessToken: 'new-token',
+          csrfToken: 'new-csrf-token',
+        })
+      );
     });
 
     it('should clear auth and capture Sentry on refresh network failure', async () => {
