@@ -43,10 +43,10 @@ describe('ALLOWED_ORIGINS config parsing', () => {
 
     it('parses chrome-extension origins with valid 32-char ID', () => {
       const result = allowedOriginsSchema.parse(
-        'https://flashnote.com,chrome-extension://abcdefghijklmnopabcdefghijklmnop'
+        'https://flashnote.co,chrome-extension://abcdefghijklmnopabcdefghijklmnop'
       );
       expect(result).toEqual([
-        'https://flashnote.com',
+        'https://flashnote.co',
         'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
       ]);
     });
@@ -150,11 +150,11 @@ describe('ALLOWED_ORIGINS config parsing', () => {
   describe('production-like configurations', () => {
     it('parses typical production config', () => {
       const result = allowedOriginsSchema.parse(
-        'https://flashnote.com,https://www.flashnote.com,chrome-extension://abcdefghijklmnopabcdefghijklmnop'
+        'https://flashnote.co,https://www.flashnote.co,chrome-extension://abcdefghijklmnopabcdefghijklmnop'
       );
       expect(result).toEqual([
-        'https://flashnote.com',
-        'https://www.flashnote.com',
+        'https://flashnote.co',
+        'https://www.flashnote.co',
         'chrome-extension://abcdefghijklmnopabcdefghijklmnop',
       ]);
     });

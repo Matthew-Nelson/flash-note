@@ -299,7 +299,7 @@ function DashboardContent() {
             <p className="text-fn-text-secondary mb-4">
               Our support team is here to help you get the most out of FlashNote.
             </p>
-            <a href="mailto:support@flashnote.com" className="link">
+            <a href="mailto:support@flashnote.co" className="link">
               Contact Support
             </a>
           </CardContent>

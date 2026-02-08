@@ -353,7 +353,7 @@ describe('Sentry PHI Sanitization', () => {
 
     it('should sanitize realistic breadcrumb data', () => {
       const breadcrumbData = {
-        url: 'https://api.flashnote.com/notes?patientId=123',
+        url: 'https://api.flashnote.co/notes?patientId=123',
         method: 'POST',
         status_code: 200,
         body: '{"shorthand": "pt reports pain..."}',
@@ -363,7 +363,7 @@ describe('Sentry PHI Sanitization', () => {
       const result = sanitizeObject(breadcrumbData);
 
       // URL should be preserved (sanitizeUrl handles query params separately)
-      expect(result.url).toBe('https://api.flashnote.com/notes?patientId=123');
+      expect(result.url).toBe('https://api.flashnote.co/notes?patientId=123');
       expect(result.method).toBe('POST');
       expect(result.status_code).toBe(200);
       expect(result.body).toBe('[REDACTED - PHI]');

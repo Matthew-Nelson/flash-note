@@ -747,7 +747,7 @@ The base schema has been extended with additional migrations:
 ### Base URL
 
 - Development: `http://localhost:4000`
-- Production: `https://api.flashnote.com`
+- Production: `https://api.flashnote.co`
 
 ### Authentication
 
@@ -1124,7 +1124,7 @@ The extension uses a **sidepanel** architecture (not popup) for a better persist
 
   "host_permissions": [
     "http://localhost:4000/*",
-    "https://api.flashnote.com/*"
+    "https://api.flashnote.co/*"
   ],
 
   "action": {
@@ -1211,7 +1211,7 @@ export const storage = {
 ```typescript
 // src/shared/api.ts
 const API_BASE = process.env.NODE_ENV === 'production'
-  ? 'https://api.flashnote.com'
+  ? 'https://api.flashnote.co'
   : 'http://localhost:4000';
 
 class ApiClient {
@@ -2216,8 +2216,8 @@ STRIPE_SECRET_KEY=sk_live_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
 
 # URLs
-WEB_URL=https://flashnote.com
-API_URL=https://api.flashnote.com
+WEB_URL=https://flashnote.co
+API_URL=https://api.flashnote.co
 
 # For production HIPAA compliance
 GCP_PROJECT_ID=your-project-id
@@ -2248,8 +2248,8 @@ Vercel Setup:
 ☐ Deploy
 
 DNS Setup:
-☐ Purchase domain (flashnote.com)
-☐ Configure A record for api.flashnote.com → Render
+☐ Purchase domain (flashnote.co)
+☐ Configure A record for api.flashnote.co → Render
 ☐ Configure CNAME for www → Vercel
 ☐ Wait for SSL certificate provisioning
 

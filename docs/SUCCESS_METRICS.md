@@ -365,7 +365,7 @@ These items must be complete before public launch.
 
 | Requirement | Status | Notes |
 |-------------|--------|-------|
-| Domain purchased | ❌ | flashnote.com |
+| Domain purchased | ❌ | flashnote.co |
 | DNS configured | ❌ | |
 | Backend deployed (Render) | ❌ | |
 | Database provisioned | ❌ | |

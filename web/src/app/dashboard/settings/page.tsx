@@ -170,8 +170,8 @@ function SettingsContent() {
                   <p className="text-fn-text-secondary text-sm mb-4">
                     This action cannot be undone. All your data will be permanently deleted.
                     To delete your account, please contact us at{' '}
-                    <a href="mailto:support@flashnote.com" className="link">
-                      support@flashnote.com
+                    <a href="mailto:support@flashnote.co" className="link">
+                      support@flashnote.co
                     </a>
                   </p>
                   <div className="flex gap-3">
@@ -183,7 +183,7 @@ function SettingsContent() {
                       Cancel
                     </Button>
                     <a
-                      href="mailto:support@flashnote.com?subject=Account%20Deletion%20Request"
+                      href="mailto:support@flashnote.co?subject=Account%20Deletion%20Request"
                       className="btn-primary px-3 py-1.5 text-sm inline-flex items-center"
                     >
                       Contact Support

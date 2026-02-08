@@ -67,7 +67,7 @@ When the backend updates user state (via email verification endpoint or Stripe w
 ### Scenario: Extension User Subscribes
 
 1. User is on trial in extension, clicks "View Plans"
-2. Opens `flashnote.com/pricing` in new browser tab
+2. Opens `flashnote.co/pricing` in new browser tab
 3. Completes Stripe checkout successfully
 4. Returns to extension
 5. **Extension still shows "Trial - 14 days left"**

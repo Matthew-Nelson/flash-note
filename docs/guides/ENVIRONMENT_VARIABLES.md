@@ -198,7 +198,7 @@ The Chrome extension uses Vite's environment variable system (separate from back
 | File | Build Mode | API URL |
 |------|------------|---------|
 | `extension/.env.development` | `pnpm build:dev` | `http://localhost:4000` |
-| `extension/.env.production` | `pnpm build` | `https://api.flashnote.com` |
+| `extension/.env.production` | `pnpm build` | `https://api.flashnote.co` |
 
 Variables must be prefixed with `VITE_` to be accessible in code:
 ```typescript
@@ -242,7 +242,7 @@ pnpm dev:test
 
 ### Extension hitting wrong API URL
 
-**Symptom:** Extension calls `https://api.flashnote.com` during local testing.
+**Symptom:** Extension calls `https://api.flashnote.co` during local testing.
 
 **Cause:** Extension was built in production mode.
 

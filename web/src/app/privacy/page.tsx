@@ -144,7 +144,7 @@ export default function PrivacyPolicyPage() {
             <Section title="Contact Us">
               <p className="text-fn-text-secondary">
                 If you have questions about this Privacy Policy, please contact us at:{' '}
-                <a href="mailto:privacy@flashnote.com" className="link">privacy@flashnote.com</a>
+                <a href="mailto:privacy@flashnote.co" className="link">privacy@flashnote.co</a>
               </p>
             </Section>
           </div>
@@ -191,7 +191,7 @@ function Footer() {
             <h4 className="font-semibold text-white mb-4">Support</h4>
             <ul className="space-y-2 text-sm text-fn-text-inverse/70">
               <li>
-                <a href="mailto:support@flashnote.com" className="hover:text-white transition-colors">
+                <a href="mailto:support@flashnote.co" className="hover:text-white transition-colors">
                   Contact
                 </a>
               </li>

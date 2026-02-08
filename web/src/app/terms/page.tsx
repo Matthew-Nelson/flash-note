@@ -117,7 +117,7 @@ export default function TermsOfServicePage() {
                 <li><strong>Monthly subscriptions:</strong> No refunds for partial billing periods. You retain access until the end of your current billing cycle.</li>
                 <li><strong>Annual subscriptions:</strong> You may request a pro-rata refund within the first 30 days of your subscription or renewal. After 30 days, no refunds are provided, but you retain access for the remainder of your annual term.</li>
                 <li><strong>Exceptions:</strong> Refunds are not available for accounts terminated due to Terms of Service violations.</li>
-                <li><strong>How to request a refund:</strong> Contact us at <a href="mailto:support@flashnote.com" className="link">support@flashnote.com</a> with your account email and reason for the request. Approved refunds are processed within 5-10 business days.</li>
+                <li><strong>How to request a refund:</strong> Contact us at <a href="mailto:support@flashnote.co" className="link">support@flashnote.co</a> with your account email and reason for the request. Approved refunds are processed within 5-10 business days.</li>
               </ul>
             </Section>
 
@@ -199,7 +199,7 @@ export default function TermsOfServicePage() {
             <Section title="13. Contact Information">
               <p className="text-fn-text-secondary">
                 For questions about these Terms, please contact us at:{' '}
-                <a href="mailto:legal@flashnote.com" className="link">legal@flashnote.com</a>
+                <a href="mailto:legal@flashnote.co" className="link">legal@flashnote.co</a>
               </p>
             </Section>
           </div>
@@ -246,7 +246,7 @@ function Footer() {
             <h4 className="font-semibold text-white mb-4">Support</h4>
             <ul className="space-y-2 text-sm text-fn-text-inverse/70">
               <li>
-                <a href="mailto:support@flashnote.com" className="hover:text-white transition-colors">
+                <a href="mailto:support@flashnote.co" className="hover:text-white transition-colors">
                   Contact
                 </a>
               </li>

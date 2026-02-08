@@ -78,13 +78,13 @@
   - [ ] Fill in company name, address, state of incorporation
   - [ ] Have attorney review (especially healthcare disclaimers)
   - [ ] Add effective date
-  - [ ] Host at flashnote.com/terms
+  - [ ] Host at flashnote.co/terms
 
 - [~] **Privacy Policy** - Draft at `docs/legal/PRIVACY_POLICY.md`
   - [ ] Fill in company details and third-party service names
   - [ ] Ensure HIPAA language is accurate
   - [ ] Have attorney review
-  - [ ] Host at flashnote.com/privacy
+  - [ ] Host at flashnote.co/privacy
 
 - [ ] **HIPAA Notice** (optional but recommended)
   - Brief statement about HIPAA compliance for marketing
@@ -185,17 +185,17 @@
 ## 4. Domain & Infrastructure
 
 ### Domain Setup
-- [ ] **Purchase primary domain** (flashnote.com or similar)
+- [ ] **Purchase primary domain** (flashnote.co or similar)
   - Namecheap, Google Domains, Cloudflare Registrar
   - Consider purchasing variations for protection
 - [ ] **Configure DNS records**
-  - A record for api.flashnote.com → Backend host
+  - A record for api.flashnote.co → Backend host
   - CNAME for www → Web host (Vercel)
   - MX records for email (if using custom email)
 - [ ] **Enable DNSSEC** (recommended)
 - [ ] **Set up email**
-  - support@flashnote.com
-  - legal@flashnote.com (for BAA/legal inquiries)
+  - support@flashnote.co
+  - legal@flashnote.co (for BAA/legal inquiries)
   - Consider Google Workspace, Zoho, or Fastmail
 
 ### Production Infrastructure
@@ -203,7 +203,7 @@
   - [ ] Choose HIPAA-compliant hosting (see BAA requirements above)
   - [ ] Configure environment variables
   - [ ] Set up SSL/TLS (automatic with most providers)
-  - [ ] Configure custom domain (api.flashnote.com)
+  - [ ] Configure custom domain (api.flashnote.co)
   - [ ] Set up auto-scaling if needed
 
 - [ ] **Deploy Production Database**
@@ -385,7 +385,7 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 ## 9. Customer Support Readiness
 
 ### Support Infrastructure
-- [ ] **Set up support email** (support@flashnote.com)
+- [ ] **Set up support email** (support@flashnote.co)
 - [ ] **Create help documentation / FAQ**
   - How to install the extension
   - How to generate notes

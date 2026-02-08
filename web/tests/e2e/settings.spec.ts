@@ -42,7 +42,7 @@ test.describe('Settings Page', () => {
       await page.getByRole('button', { name: 'Delete Account' }).click();
 
       await expect(page.getByText(/are you sure/i)).toBeVisible();
-      await expect(page.getByText('support@flashnote.com')).toBeVisible();
+      await expect(page.getByText('support@flashnote.co')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Cancel' })).toBeVisible();
     });
 

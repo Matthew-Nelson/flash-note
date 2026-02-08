@@ -3,7 +3,7 @@
 ## Base URL
 
 - **Development:** `http://localhost:4000`
-- **Production:** `https://api.flashnote.com`
+- **Production:** `https://api.flashnote.co`
 
 ## Authentication
 
