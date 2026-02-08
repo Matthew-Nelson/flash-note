@@ -10,6 +10,7 @@ import {
   updatePassword,
   getTokenVersion,
   incrementTokenVersion,
+  resetLockout,
 } from './users.js';
 
 describe('User Queries', () => {
@@ -285,6 +286,45 @@ describe('User Queries', () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [{ token_version: 1 }] });
 
       await incrementTokenVersion('user-123');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('updated_at = NOW()'),
+        expect.any(Array)
+      );
+    });
+  });
+
+  describe('resetLockout', () => {
+    it('should reset failed_login_attempts to 0', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await resetLockout('user-123');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('failed_login_attempts = 0'),
+        ['user-123']
+      );
+    });
+
+    it('should clear locked_until and last_failed_login_at', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await resetLockout('user-123');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('locked_until = NULL'),
+        expect.any(Array)
+      );
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('last_failed_login_at = NULL'),
+        expect.any(Array)
+      );
+    });
+
+    it('should update updated_at timestamp', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await resetLockout('user-123');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
         expect.stringContaining('updated_at = NOW()'),
