@@ -49,6 +49,7 @@ function ResetPasswordContent() {
     if (!token) {
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- API call on mount (external system sync)
     void validateToken(token);
   }, [token, validateToken]);
 

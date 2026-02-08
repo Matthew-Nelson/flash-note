@@ -29,9 +29,10 @@ function PricingContent() {
   const [error, setError] = useState<string | null>(null);
   const [showCanceledAlert, setShowCanceledAlert] = useState(false);
 
-  // Check for canceled checkout
+  // Check for canceled checkout — reads URL param and clears it (external system sync)
   useEffect(() => {
     if (searchParams.get('canceled') === 'true') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing state from URL params + side effect (replaceState)
       setShowCanceledAlert(true);
       // Clear the query param from URL without navigation
       window.history.replaceState({}, '', '/pricing');
