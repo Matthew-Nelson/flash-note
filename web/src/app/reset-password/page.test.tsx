@@ -44,7 +44,6 @@ describe('ResetPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('FlashNote')).toBeInTheDocument();
       expect(screen.getByText('BETA')).toBeInTheDocument();
-      expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
     });
   });
 
@@ -65,7 +64,6 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByText('FlashNote')).toBeInTheDocument();
     });
     expect(screen.getByText('BETA')).toBeInTheDocument();
-    expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
     expect(screen.getByText('Create a new password')).toBeInTheDocument();
   });
 

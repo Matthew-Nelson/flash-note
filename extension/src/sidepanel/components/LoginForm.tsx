@@ -102,9 +102,6 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             <span className="app-title text-2xl font-bold">FlashNote</span>
             <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
           </h1>
-          <p className="text-sm opacity-70 mt-2">
-            AI-powered SOAP notes for PTs
-          </p>
           <h2 className="mt-3 text-center text-lg font-bold text-fn-text-primary">
             Reset your password
           </h2>
@@ -193,9 +190,6 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
           <span className="app-title text-2xl font-bold">FlashNote</span>
           <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
         </h1>
-        <p className="text-sm opacity-70 mt-2">
-          AI-powered SOAP notes for PTs
-        </p>
         {viewMode === 'login' && (
           <h2 className="mt-3 text-center text-lg font-bold text-fn-text-primary">
             Sign in to your account

@@ -15,7 +15,6 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
     expect(screen.getByText('FlashNote')).toBeInTheDocument();
     expect(screen.getByText('BETA')).toBeInTheDocument();
-    expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
     expect(screen.getByText('Resend verification email')).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
     expect(screen.getByText('Send verification email')).toBeInTheDocument();

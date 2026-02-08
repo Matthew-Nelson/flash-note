@@ -16,9 +16,6 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           <span className="text-3xl font-bold text-gradient">FlashNote</span>
           <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
         </Link>
-        <p className="mt-2 text-center text-sm text-fn-text-muted">
-          AI-powered SOAP notes for PTs
-        </p>
         {title && (
           <h2 className="mt-4 text-center text-2xl font-bold text-fn-text-primary">
             {title}

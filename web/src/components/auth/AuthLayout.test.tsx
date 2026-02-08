@@ -16,11 +16,6 @@ describe('AuthLayout', () => {
     expect(screen.getByText('BETA')).toBeInTheDocument();
   });
 
-  it('should render tagline', () => {
-    render(<AuthLayout>content</AuthLayout>);
-    expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
-  });
-
   it('should render title when provided', () => {
     render(<AuthLayout title="Create your account">content</AuthLayout>);
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Create your account');

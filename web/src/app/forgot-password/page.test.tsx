@@ -15,7 +15,6 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
     expect(screen.getByText('FlashNote')).toBeInTheDocument();
     expect(screen.getByText('BETA')).toBeInTheDocument();
-    expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
     expect(screen.getByText('Reset your password')).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
     expect(screen.getByText('Send reset link')).toBeInTheDocument();

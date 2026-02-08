@@ -256,14 +256,6 @@ describe('LoginForm', () => {
       expect(screen.getByText('Send reset link')).toBeInTheDocument();
     });
 
-    it('should render tagline in forgot password view', async () => {
-      const user = userEvent.setup();
-      renderForm();
-
-      await user.click(screen.getByText('Forgot password?'));
-      expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
-    });
-
     it('should add error border to email field on validation failure', async () => {
       const user = userEvent.setup();
       renderForm();
