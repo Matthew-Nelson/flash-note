@@ -2,29 +2,40 @@ name: E2E Tests
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'extension/**'
       - 'web/**'
       - 'backend/**'
       - '.github/workflows/e2e.yml'
   pull_request:
-    branches: [main]
+    branches: [main, develop]
     paths:
       - 'extension/**'
       - 'web/**'
       - 'backend/**'
       - '.github/workflows/e2e.yml'
-  # Allow manual trigger for testing
   workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10'
+  # Shared backend env for all E2E jobs (migrations, seeding, server start)
+  DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+  JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
+  JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
+  CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
+  STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
+  STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
+  GEMINI_API_KEY: fake-key-not-used-with-mock-ai
 
 jobs:
   extension-e2e:
-    name: Extension E2E Tests
+    name: Extension E2E
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -44,92 +55,45 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install root dependencies
-        run: pnpm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install backend dependencies
-        run: pnpm install
-        working-directory: ./backend
-
-      - name: Install extension dependencies
-        run: pnpm install
-        working-directory: ./extension
-
-      - name: Run database migrations
-        run: pnpm db:migrate:test
+      - name: Setup database
+        run: pnpm db:migrate:test && pnpm db:seed:test
         working-directory: ./backend
         env:
-          CI: 'true'
           NODE_ENV: test
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
-
-      - name: Seed test data
-        run: pnpm db:seed:test
-        working-directory: ./backend
-        env:
-          CI: 'true'
-          NODE_ENV: test
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
 
       - name: Build extension
         run: pnpm build
         working-directory: ./extension
 
-      - name: Start backend server
+      - name: Start backend
         run: |
-          pnpm dev &
+          pnpm dev:test &
           echo $! > /tmp/backend.pid
         working-directory: ./backend
         env:
-          CI: 'true'
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          USE_MOCK_AI: 'true'
-          GEMINI_API_KEY: fake-key-not-used-with-mock-ai
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
           NODE_ENV: test
+          USE_MOCK_AI: 'true'
           PORT: 4000
 
-      - name: Wait for backend to be ready
+      - name: Wait for backend
         run: |
-          echo "Waiting for backend..."
           for i in {1..30}; do
-            if curl -s http://localhost:4000/health > /dev/null; then
-              echo "Backend is ready!"
-              exit 0
-            fi
-            echo "Attempt $i/30..."
+            curl -sf http://localhost:4000/health > /dev/null && echo "Backend ready" && exit 0
             sleep 2
           done
-          echo "Backend failed to start"
-          exit 1
+          echo "Backend failed to start" && exit 1
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
@@ -146,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: playwright-report
+          name: extension-playwright-report
           path: extension/playwright-report/
           retention-days: 7
 
@@ -154,19 +118,16 @@ jobs:
         uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
         with:
-          name: test-results
+          name: extension-test-results
           path: extension/test-results/
           retention-days: 7
 
       - name: Stop backend
         if: always()
-        run: |
-          if [ -f /tmp/backend.pid ]; then
-            kill $(cat /tmp/backend.pid) || true
-          fi
+        run: kill $(cat /tmp/backend.pid) 2>/dev/null || true
 
   web-e2e:
-    name: Web E2E Tests
+    name: Web E2E
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -186,90 +147,43 @@ jobs:
           --health-retries 5
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install root dependencies
-        run: pnpm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Install backend dependencies
-        run: pnpm install
-        working-directory: ./backend
-
-      - name: Install web dependencies
-        run: pnpm install
-        working-directory: ./web
-
-      - name: Run database migrations
-        run: pnpm db:migrate:test
+      - name: Setup database
+        run: pnpm db:migrate:test && pnpm db:seed:test
         working-directory: ./backend
         env:
-          CI: 'true'
           NODE_ENV: test
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
 
-      - name: Seed test data
-        run: pnpm db:seed:test
-        working-directory: ./backend
-        env:
-          CI: 'true'
-          NODE_ENV: test
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
-
-      - name: Start backend server
+      - name: Start backend
         run: |
-          pnpm dev &
+          pnpm dev:test &
           echo $! > /tmp/backend.pid
         working-directory: ./backend
         env:
-          CI: 'true'
-          DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          USE_MOCK_AI: 'true'
-          GEMINI_API_KEY: fake-key-not-used-with-mock-ai
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
           NODE_ENV: test
+          USE_MOCK_AI: 'true'
           PORT: 4000
 
-      - name: Wait for backend to be ready
+      - name: Wait for backend
         run: |
-          echo "Waiting for backend..."
           for i in {1..30}; do
-            if curl -s http://localhost:4000/health > /dev/null; then
-              echo "Backend is ready!"
-              exit 0
-            fi
-            echo "Attempt $i/30..."
+            curl -sf http://localhost:4000/health > /dev/null && echo "Backend ready" && exit 0
             sleep 2
           done
-          echo "Backend failed to start"
-          exit 1
+          echo "Backend failed to start" && exit 1
 
-      - name: Start web dev server
+      - name: Start web server
         run: |
           pnpm dev &
           echo $! > /tmp/web.pid
@@ -281,25 +195,19 @@ jobs:
           NEXT_PUBLIC_STRIPE_PRICE_MONTHLY: price_test_monthly
           NEXT_PUBLIC_STRIPE_PRICE_ANNUAL: price_test_annual
 
-      - name: Wait for web server to be ready
+      - name: Wait for web server
         run: |
-          echo "Waiting for web server..."
           for i in {1..30}; do
-            if curl -s http://localhost:3000 > /dev/null; then
-              echo "Web server is ready!"
-              exit 0
-            fi
-            echo "Attempt $i/30..."
+            curl -sf http://localhost:3000 > /dev/null && echo "Web server ready" && exit 0
             sleep 2
           done
-          echo "Web server failed to start"
-          exit 1
+          echo "Web server failed to start" && exit 1
 
       - name: Install Playwright browsers
         run: pnpm exec playwright install --with-deps chromium
         working-directory: ./web
 
-      - name: Run Web E2E tests
+      - name: Run E2E tests
         run: pnpm test:e2e:ci --project=chromium
         working-directory: ./web
         env:
@@ -326,9 +234,5 @@ jobs:
       - name: Stop servers
         if: always()
         run: |
-          if [ -f /tmp/web.pid ]; then
-            kill $(cat /tmp/web.pid) || true
-          fi
-          if [ -f /tmp/backend.pid ]; then
-            kill $(cat /tmp/backend.pid) || true
-          fi
+          kill $(cat /tmp/web.pid) 2>/dev/null || true
+          kill $(cat /tmp/backend.pid) 2>/dev/null || true

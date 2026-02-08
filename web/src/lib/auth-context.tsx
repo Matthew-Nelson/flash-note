@@ -138,6 +138,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(async () => {
     try {
       await api.logout();
+    } catch (error) {
+      Sentry.captureException(error, {
+        extra: { source: 'auth_context', errorType: 'logout_failed' },
+      });
+      throw error;
     } finally {
       setUser(null);
       Sentry.setUser(null);

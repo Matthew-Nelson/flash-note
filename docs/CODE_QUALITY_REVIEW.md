@@ -283,6 +283,107 @@ The BETA badge markup is copy-pasted in 8+ locations across both extension and w
 
 ---
 
+## Findings from Unit Testing (2026-02-07)
+
+The following issues were discovered while writing comprehensive unit tests across both packages (418 tests total). They are not covered in the sections above.
+
+### 18. Extension ErrorBoundary Always Shows Error Details (HIPAA Concern)
+
+**Files:**
+- `extension/src/sidepanel/components/ErrorBoundary.tsx:62-70`
+- `web/src/components/ErrorBoundary.tsx:65-76` (correctly gated)
+
+The web ErrorBoundary gates error details behind `process.env.NODE_ENV === 'development'`. The extension version has **no such guard** — it always renders a `<details>` block with `this.state.error.message`. If an error message contains PHI (e.g., a validation error echoing patient context back), it's exposed in the production extension UI.
+
+**Recommendation:** Add the same `NODE_ENV` or `import.meta.env.MODE` guard as the web version. Alternatively, never render raw error messages in production — show only the generic "Something went wrong" text.
+
+---
+
+### 19. Web `setAuth()` Silently Swallows Storage Write Failures
+
+**File:** `web/src/lib/storage.ts:45-61`
+
+When `sessionStorage.setItem()` fails (quota exceeded, private browsing restrictions), `setAuth()` logs to Sentry and console but **returns void without signaling failure to the caller**. The auth context calls `storage.setAuth(authData)` after login and assumes it succeeded. If it didn't, the user appears logged in (state is in memory) but a page refresh will log them out (nothing persisted).
+
+**Recommendation:** Either return a boolean success indicator or throw so callers can handle the failure (e.g., show a warning: "Your session may not persist across page refreshes").
+
+---
+
+### 20. `useApi` Hook Has Unstable `options` in `useCallback` Dependencies
+
+**File:** `extension/src/sidepanel/hooks/useApi.ts:35`
+
+The `execute` callback depends on `[apiFunction, options]`, but `options` is an object parameter with default value `{}`. If callers pass inline objects like `useApi(api.login, { onSuccess: () => {} })`, the `options` reference changes every render, causing `execute` to get a new identity every render. Any `useEffect` depending on `execute` would loop infinitely.
+
+Note: This hook is currently unused (covered in finding #15), but if it's ever adopted, this bug will surface immediately.
+
+**Recommendation:** If keeping the hook, destructure `onSuccess`/`onError` from options and use them individually in the dependency array, or use `useRef` to store the latest callbacks.
+
+---
+
+### 21. `loadAuth` Not Wrapped in `useCallback` in Extension `useAuth`
+
+**File:** `extension/src/sidepanel/hooks/useAuth.ts:101-114`
+
+`loadAuth` is defined as a plain `async` function inside the hook body but is called via `void loadAuth()` in a `useEffect` with an empty dependency array (`[]`). Unlike `login`, `register`, `logout`, and `fetchUser` — which are all wrapped in `useCallback` — `loadAuth` is recreated every render. This currently works because the effect only runs once (mount), but it triggers the `react-hooks/exhaustive-deps` lint warning and breaks the pattern consistency that other hooks in this file follow.
+
+**Recommendation:** Either wrap in `useCallback` for consistency, or move the logic inline into the `useEffect` callback since it's only called once.
+
+---
+
+### 22. `NoteGenerator` Uses `useRef` for Inter-Phase State Transfer
+
+**File:** `extension/src/sidepanel/components/NoteGenerator.tsx:36-39`
+
+```typescript
+const generatedNoteRef = useRef<GeneratedNote | null>(null);
+const errorMessageRef = useRef<string | null>(null);
+```
+
+These refs store the generated note and error message from `handleSubmit`, which are then read 1.5 seconds later by `useEffect` timeout callbacks during the success/error animation phases. This works but is fragile — the data flow is non-obvious (write in event handler, read in effect), and if the component unmounts and remounts during the animation, the refs are gone. The pattern is essentially a manual message queue between two disconnected pieces of React lifecycle.
+
+**Recommendation:** Use a reducer or combined state object (e.g., `{ phase, note, error }`) so the data and the phase transition are set atomically. This makes the data flow explicit and testable.
+
+---
+
+### 23. Extension `SessionAlert` Dismiss Button Always Renders
+
+**File:** `extension/src/sidepanel/components/SessionAlert.tsx:74-82`
+
+The dismiss button always renders regardless of whether `onDismiss` is provided. When `onDismiss` is `undefined`, clicking dismiss sets `alert` to `null` (hiding the alert) but the parent never learns the alert was dismissed. Compare to the web `SessionAlert` which conditionally renders the dismiss button.
+
+This isn't a bug per se (the alert hides either way), but it's a behavioral divergence from the web version and could confuse future developers who expect dismiss to propagate to the parent.
+
+**Recommendation:** Conditionally render the dismiss button only when `onDismiss` is provided, matching the web version's behavior.
+
+---
+
+### 24. `void fetchUser()` Calls Lack Error Propagation
+
+**Files:**
+- `extension/src/sidepanel/hooks/useAuth.ts:71,95`
+- `web/src/lib/auth-context.tsx` (similar pattern)
+
+Background refresh calls use `void fetchUser()` (fire-and-forget). The `fetchUser` function catches its own errors and logs to console, so unhandled rejections are avoided. However, there's no mechanism to surface persistent failures to the user. If `fetchUser` fails repeatedly (e.g., backend down, token expired but refresh also failing), the user sees stale data with no indication that refreshes are failing.
+
+**Recommendation:** Add a failure counter. After N consecutive failures, set an error state that the UI can display (e.g., "Unable to connect — your data may be outdated"). This is especially important in a healthcare context where stale subscription status could allow usage beyond trial expiry.
+
+---
+
+### 25. Hardcoded Version String in Settings
+
+**File:** `extension/src/sidepanel/components/Settings.tsx:184`
+
+```tsx
+FlashNote v0.1.0
+```
+
+This is a hardcoded string that will drift from the actual version in `package.json`. It's already stale if the version has been bumped.
+
+**Recommendation:** Import the version from `package.json` or use a Vite define/env variable (e.g., `import.meta.env.VITE_APP_VERSION`) populated at build time.
+
+---
+
 ## What's Actually Good
 
 To be fair, this review focuses on problems. Here's what's working well:
@@ -299,13 +400,31 @@ To be fair, this review focuses on problems. Here's what's working well:
 
 ## Prioritized Action Items
 
-1. **Consolidate extension types** — Delete `types.ts`, use `schemas.ts` as source of truth (30 minutes)
-2. **Add missing audit actions** — `SUBSCRIPTION_RENEWED`, `PAYMENT_FAILED` (5 minutes)
-3. **Fix dashboard mock data** — Either wire up usage API or remove fake numbers (1 hour)
-4. **Extract `db/queries/sessions.ts`** — Move session SQL out of auth service (1 hour)
-5. **Create `getAuthUser(req)` helper** — Eliminate scattered type casts (30 minutes)
-6. **Split extension LoginForm** — Separate login/signup/forgot-password (1 hour)
-7. **Rate limiter factory** — Reduce middleware boilerplate (30 minutes)
-8. **Sentry sanitization sync check** — Add CI or test to prevent drift (1 hour)
-9. **API client divergence tracking** — Document shared behavior contract (1 hour)
-10. **Delete dead `useApi` hook** — Zero effort, zero risk (1 minute)
+### Critical (HIPAA / Security)
+
+1. **Fix extension ErrorBoundary** (#18) — Add `import.meta.env.MODE` guard to hide error details in production (5 minutes)
+2. **Sentry sanitization sync check** (#3) — Add CI or test to prevent drift (1 hour)
+
+### High (Correctness / Data Integrity)
+
+3. **Fix `setAuth` silent failure** (#19) — Return success indicator or throw so callers can warn users (15 minutes)
+4. **Consolidate extension types** (#2, #9) — Delete `types.ts`, use `schemas.ts` as source of truth (30 minutes)
+5. **Add missing audit actions** (#13) — `SUBSCRIPTION_RENEWED`, `PAYMENT_FAILED` (5 minutes)
+6. **Fix dashboard mock data** (#8) — Either wire up usage API or remove fake numbers (1 hour)
+7. **Add background refresh failure indicator** (#24) — Surface persistent `fetchUser` failures to UI (30 minutes)
+
+### Medium (Architecture / Maintainability)
+
+8. **Extract `db/queries/sessions.ts`** (#7) — Move session SQL out of auth service (1 hour)
+9. **Create `getAuthUser(req)` helper** (#6) — Eliminate scattered type casts (30 minutes)
+10. **Split extension LoginForm** (#14) — Separate login/signup/forgot-password (1 hour)
+11. **NoteGenerator state management** (#22) — Replace useRef message-passing with reducer or combined state (30 minutes)
+12. **Use build-time version** (#25) — Replace hardcoded `v0.1.0` with `import.meta.env` variable (10 minutes)
+13. **API client divergence tracking** (#1) — Document shared behavior contract (1 hour)
+
+### Low (Cleanup)
+
+14. **Rate limiter factory** (#12) — Reduce middleware boilerplate (30 minutes)
+15. **Fix `useApi` hook deps** (#15, #20) — Fix or delete dead hook with unstable deps (5 minutes)
+16. **Wrap `loadAuth` in useCallback** (#21) — Consistency with other hooks in useAuth (5 minutes)
+17. **Extension SessionAlert dismiss guard** (#23) — Conditionally render dismiss button (5 minutes)

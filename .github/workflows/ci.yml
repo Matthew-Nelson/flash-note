@@ -6,45 +6,42 @@ on:
   pull_request:
     branches: [main, develop]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10'
 
 jobs:
-  # Backend tests with coverage
-  backend-tests:
-    name: Backend Tests & Coverage
+  backend:
+    name: Backend
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
         working-directory: ./backend
 
-      - name: Run linter
+      - name: Lint
         run: pnpm lint
         working-directory: ./backend
 
-      - name: Run tests with coverage
+      - name: Test
         run: pnpm test:ci
         working-directory: ./backend
         env:
-          # Test environment variables (non-sensitive)
-          NODE_ENV: production
+          NODE_ENV: test
           DATABASE_URL: postgresql://test:test@localhost:5432/test
           JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
           JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
@@ -53,171 +50,193 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
           STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
 
-      - name: Upload coverage reports
+      - name: Build
+        run: pnpm build
+        working-directory: ./backend
+
+      - name: Upload coverage
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: coverage-report
+          name: backend-coverage
           path: ./backend/coverage/
           retention-days: 30
 
       - name: Coverage summary
+        if: always()
         run: |
-          echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f ./backend/coverage/coverage-summary.json ]; then
+          summary_file="./backend/coverage/coverage-summary.json"
+          echo "## Backend Coverage" >> $GITHUB_STEP_SUMMARY
+          if [ -f "$summary_file" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
             echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
             echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
-            lines=$(cat ./backend/coverage/coverage-summary.json | jq -r '.total.lines.pct')
-            branches=$(cat ./backend/coverage/coverage-summary.json | jq -r '.total.branches.pct')
-            functions=$(cat ./backend/coverage/coverage-summary.json | jq -r '.total.functions.pct')
-            statements=$(cat ./backend/coverage/coverage-summary.json | jq -r '.total.statements.pct')
-            echo "| Lines | ${lines}% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Branches | ${branches}% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Functions | ${functions}% |" >> $GITHUB_STEP_SUMMARY
-            echo "| Statements | ${statements}% |" >> $GITHUB_STEP_SUMMARY
+            for metric in lines branches functions statements; do
+              pct=$(jq -r ".total.${metric}.pct" "$summary_file")
+              echo "| ${metric^} | ${pct}% |" >> $GITHUB_STEP_SUMMARY
+            done
           else
             echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
           fi
 
-  # Backend build verification
-  backend-build:
-    name: Backend Build
+  extension:
+    name: Extension
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
-        working-directory: ./backend
-
-      - name: Build
-        run: pnpm build
-        working-directory: ./backend
-
-  # Extension build verification
-  extension-build:
-    name: Extension Build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
         working-directory: ./extension
 
-      - name: Run linter
+      - name: Lint
         run: pnpm lint
         working-directory: ./extension
 
+      - name: Test
+        run: pnpm test:ci
+        working-directory: ./extension
+
       - name: Build
         run: pnpm build
         working-directory: ./extension
 
-  # Web app build verification
-  web-build:
-    name: Web Build
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: extension-coverage
+          path: ./extension/coverage/
+          retention-days: 30
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          summary_file="./extension/coverage/coverage-summary.json"
+          echo "## Extension Coverage" >> $GITHUB_STEP_SUMMARY
+          if [ -f "$summary_file" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
+            for metric in lines branches functions statements; do
+              pct=$(jq -r ".total.${metric}.pct" "$summary_file")
+              echo "| ${metric^} | ${pct}% |" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  web:
+    name: Web
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
         working-directory: ./web
 
-      - name: Run linter
+      - name: Lint
         run: pnpm lint
+        working-directory: ./web
+
+      - name: Test
+        run: pnpm test:ci
         working-directory: ./web
 
       - name: Build
         run: pnpm build
         working-directory: ./web
         env:
-          # Next.js build requires some env vars
           NEXT_PUBLIC_API_URL: https://api.example.com
 
-  # Security audit
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-coverage
+          path: ./web/coverage/
+          retention-days: 30
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          summary_file="./web/coverage/coverage-summary.json"
+          echo "## Web Coverage" >> $GITHUB_STEP_SUMMARY
+          if [ -f "$summary_file" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
+            for metric in lines branches functions statements; do
+              pct=$(jq -r ".total.${metric}.pct" "$summary_file")
+              echo "| ${metric^} | ${pct}% |" >> $GITHUB_STEP_SUMMARY
+            done
+          else
+            echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
+          fi
+
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
         with:
           version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'pnpm'
 
-      - name: Install dependencies (backend)
-        run: pnpm install
-        working-directory: ./backend
+      - name: Install all dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Run security audit
+      - name: Audit backend
         run: pnpm audit --audit-level=high
         working-directory: ./backend
-        continue-on-error: true  # Don't fail on audit warnings
+        continue-on-error: true
 
-  # All checks must pass
+      - name: Audit extension
+        run: pnpm audit --audit-level=high
+        working-directory: ./extension
+        continue-on-error: true
+
+      - name: Audit web
+        run: pnpm audit --audit-level=high
+        working-directory: ./web
+        continue-on-error: true
+
   ci-success:
     name: CI Success
-    needs: [backend-tests, backend-build, extension-build, web-build, security-audit]
+    needs: [backend, extension, web, security-audit]
     runs-on: ubuntu-latest
     if: always()
 
     steps:
-      - name: Check all jobs passed
+      - name: Check required jobs
         run: |
-          if [[ "${{ needs.backend-tests.result }}" != "success" ]] || \
-             [[ "${{ needs.backend-build.result }}" != "success" ]] || \
-             [[ "${{ needs.extension-build.result }}" != "success" ]] || \
-             [[ "${{ needs.web-build.result }}" != "success" ]]; then
-            echo "One or more required jobs failed"
-            exit 1
-          fi
+          results=("${{ needs.backend.result }}" "${{ needs.extension.result }}" "${{ needs.web.result }}" "${{ needs.security-audit.result }}")
+          for result in "${results[@]}"; do
+            if [[ "$result" != "success" ]]; then
+              echo "One or more required jobs failed"
+              exit 1
+            fi
+          done
           echo "All required checks passed!"
