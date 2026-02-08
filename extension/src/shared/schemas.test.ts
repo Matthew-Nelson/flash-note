@@ -1,17 +1,58 @@
 import { describe, it, expect } from 'vitest';
 import {
+  emailSchema,
   loginSchema,
   registerSchema,
   noteTypeSchema,
   generateNoteSchema,
   storedAuthSchema,
   generatedNoteSchema,
+  validateEmail,
   validateLogin,
   validateRegister,
   validateGenerateNote,
 } from './schemas';
 
 describe('Extension Validation Schemas', () => {
+  describe('emailSchema', () => {
+    it('should accept valid email', () => {
+      expect(emailSchema.safeParse('test@example.com').success).toBe(true);
+    });
+
+    it('should reject empty string', () => {
+      expect(emailSchema.safeParse('').success).toBe(false);
+    });
+
+    it('should reject invalid email', () => {
+      expect(emailSchema.safeParse('not-an-email').success).toBe(false);
+      expect(emailSchema.safeParse('@').success).toBe(false);
+    });
+  });
+
+  describe('validateEmail', () => {
+    it('should return success for valid email', () => {
+      const result = validateEmail('test@example.com');
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data).toBe('test@example.com');
+      }
+    });
+
+    it('should return errors for invalid email', () => {
+      const result = validateEmail('bad');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.errors.length).toBeGreaterThan(0);
+        expect(result.invalidFields).toContain('email');
+      }
+    });
+
+    it('should return errors for empty string', () => {
+      const result = validateEmail('');
+      expect(result.success).toBe(false);
+    });
+  });
+
   describe('loginSchema', () => {
     it('should accept valid credentials', () => {
       const result = loginSchema.safeParse({
@@ -82,6 +123,18 @@ describe('Extension Validation Schemas', () => {
       expect(
         registerSchema.safeParse({ ...validData, email: 'bad' }).success
       ).toBe(false);
+    });
+
+    it('should reject empty confirmPassword', () => {
+      const result = registerSchema.safeParse({
+        ...validData,
+        confirmPassword: '',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.errors.map((e) => e.message);
+        expect(messages).toContain('Please confirm your password');
+      }
     });
 
     it('should reject mismatched passwords', () => {
@@ -297,6 +350,15 @@ describe('Extension Validation Schemas', () => {
         expect(result.errors.length).toBeGreaterThan(0);
       }
     });
+
+    it('should return invalidFields for invalid input', () => {
+      const result = validateLogin({ email: 'bad', password: '' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.invalidFields).toContain('email');
+        expect(result.invalidFields).toContain('password');
+      }
+    });
   });
 
   describe('validateRegister', () => {
@@ -315,6 +377,32 @@ describe('Extension Validation Schemas', () => {
       expect(result.success).toBe(false);
       if (!result.success) {
         expect(result.errors.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('should return invalidFields for mismatched passwords', () => {
+      const result = validateRegister({
+        email: 'test@example.com',
+        password: 'Password1',
+        confirmPassword: 'Different1',
+        acceptedLegalTerms: true,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.invalidFields).toContain('confirmPassword');
+      }
+    });
+
+    it('should return invalidFields for unchecked legal terms', () => {
+      const result = validateRegister({
+        email: 'test@example.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: false,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.invalidFields).toContain('acceptedLegalTerms');
       }
     });
   });

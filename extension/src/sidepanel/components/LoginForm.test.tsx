@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginForm from './LoginForm';
 import { api } from '@/shared/api';
@@ -28,18 +28,23 @@ describe('LoginForm', () => {
   describe('login view', () => {
     it('should render login form by default', () => {
       renderForm();
-      expect(screen.getByText('Sign In')).toBeInTheDocument();
-      expect(screen.getByLabelText('Email')).toBeInTheDocument();
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
+      expect(screen.getByLabelText('Email address')).toBeInTheDocument();
       expect(screen.getByLabelText('Password')).toBeInTheDocument();
+    });
+
+    it('should render login heading', () => {
+      renderForm();
+      expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
     });
 
     it('should call onLogin with email and password', async () => {
       const user = userEvent.setup();
       renderForm();
 
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
-      await user.click(screen.getByText('Sign In'));
+      await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
         expect(onLogin).toHaveBeenCalledWith('test@example.com', 'Password1');
@@ -51,11 +56,48 @@ describe('LoginForm', () => {
       renderForm();
 
       // Type an invalid email and leave password empty (just click submit)
-      await user.type(screen.getByLabelText('Email'), 'bad-email');
-      await user.click(screen.getByText('Sign In'));
+      await user.type(screen.getByLabelText('Email address'), 'bad-email');
+      await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
         expect(onLogin).not.toHaveBeenCalled();
+      });
+    });
+
+    it('should add error border to invalid fields on validation failure', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.type(screen.getByLabelText('Email address'), 'bad-email');
+      await user.click(screen.getByText('Sign in'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Email address').className).toContain('input-field-error');
+        expect(screen.getByLabelText('Password').className).toContain('input-field-error');
+      });
+    });
+
+    it('should clear error borders when resubmitting', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      // Trigger validation errors
+      await user.type(screen.getByLabelText('Email address'), 'bad');
+      await user.click(screen.getByText('Sign in'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Email address').className).toContain('input-field-error');
+      });
+
+      // Clear and type valid data
+      await user.clear(screen.getByLabelText('Email address'));
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.click(screen.getByText('Sign in'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Email address').className).not.toContain('input-field-error');
+        expect(screen.getByLabelText('Password').className).not.toContain('input-field-error');
       });
     });
 
@@ -64,9 +106,9 @@ describe('LoginForm', () => {
       const user = userEvent.setup();
       renderForm();
 
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.type(screen.getByLabelText('Password'), 'wrong');
-      await user.click(screen.getByText('Sign In'));
+      await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
         expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
@@ -78,9 +120,9 @@ describe('LoginForm', () => {
       const user = userEvent.setup();
       renderForm();
 
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
-      await user.click(screen.getByText('Sign In'));
+      await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
         expect(screen.getByText('An unexpected error occurred')).toBeInTheDocument();
@@ -94,9 +136,9 @@ describe('LoginForm', () => {
       const user = userEvent.setup();
       renderForm();
 
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
-      await user.click(screen.getByText('Sign In'));
+      await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
         expect(screen.getByText('Loading...')).toBeInTheDocument();
@@ -112,7 +154,16 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText(/sign up/i));
-      expect(screen.getByText('Create Account')).toBeInTheDocument();
+      expect(screen.getByText('Create account')).toBeInTheDocument();
+    });
+
+    it('should render signup heading and subtitle', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      expect(screen.getByText('Create your account')).toBeInTheDocument();
+      expect(screen.getByText('Start your 14-day free trial')).toBeInTheDocument();
     });
 
     it('should call onRegister on signup', async () => {
@@ -120,11 +171,11 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText(/sign up/i));
-      await user.type(screen.getByLabelText('Email'), 'new@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
       await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
       await user.click(screen.getByRole('checkbox'));
-      await user.click(screen.getByText('Create Account'));
+      await user.click(screen.getByText('Create account'));
 
       await waitFor(() => {
         expect(onRegister).toHaveBeenCalledWith('new@example.com', 'Password1', true);
@@ -136,11 +187,11 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText(/sign up/i));
-      await user.type(screen.getByLabelText('Email'), 'new@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
       await user.type(screen.getByLabelText('Password'), 'short');
       await user.type(screen.getByLabelText('Confirm Password'), 'short');
       await user.click(screen.getByRole('checkbox'));
-      await user.click(screen.getByText('Create Account'));
+      await user.click(screen.getByText('Create account'));
 
       await waitFor(() => {
         expect(onRegister).not.toHaveBeenCalled();
@@ -152,16 +203,29 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText(/sign up/i));
-      await user.type(screen.getByLabelText('Email'), 'new@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
       await user.type(screen.getByLabelText('Password'), 'Password1');
       await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
       // Do NOT check the checkbox
-      await user.click(screen.getByText('Create Account'));
+      await user.click(screen.getByText('Create account'));
 
       await waitFor(() => {
         expect(onRegister).not.toHaveBeenCalled();
         expect(screen.getByText('You must accept the legal terms to create an account')).toBeInTheDocument();
       });
+    });
+
+    it('should show password hint in signup mode', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      expect(screen.getByText('Min 8 characters, 1 uppercase, 1 lowercase, 1 number')).toBeInTheDocument();
+    });
+
+    it('should not show password hint in login mode', () => {
+      renderForm();
+      expect(screen.queryByText('Min 8 characters, 1 uppercase, 1 lowercase, 1 number')).not.toBeInTheDocument();
     });
 
     it('should not show confirm password or checkbox in login mode', () => {
@@ -175,10 +239,10 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText(/sign up/i));
-      expect(screen.getByText('Create Account')).toBeInTheDocument();
+      expect(screen.getByText('Create account')).toBeInTheDocument();
 
       await user.click(screen.getByText(/sign in/i));
-      expect(screen.getByText('Sign In')).toBeInTheDocument();
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
     });
   });
 
@@ -192,13 +256,33 @@ describe('LoginForm', () => {
       expect(screen.getByText('Send reset link')).toBeInTheDocument();
     });
 
+    it('should render tagline in forgot password view', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText('Forgot password?'));
+      expect(screen.getByText('AI-powered SOAP notes for PTs')).toBeInTheDocument();
+    });
+
+    it('should add error border to email field on validation failure', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText('Forgot password?'));
+      await user.click(screen.getByText('Send reset link'));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Email address').className).toContain('input-field-error');
+      });
+    });
+
     it('should show success message on password reset', async () => {
       vi.mocked(api.requestPasswordReset).mockResolvedValue(undefined);
       const user = userEvent.setup();
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
@@ -212,7 +296,7 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-      await user.type(screen.getByLabelText('Email'), 'nonexistent@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'nonexistent@example.com');
       await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
@@ -228,7 +312,7 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-      await user.type(screen.getByLabelText('Email'), 'test@example.com');
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
       await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
@@ -241,10 +325,7 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-
-      // Submit form directly to bypass native HTML validation on type="email" + required
-      const form = screen.getByText('Send reset link').closest('form')!;
-      fireEvent.submit(form);
+      await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
         expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -256,11 +337,8 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-      await user.type(screen.getByLabelText('Email'), 'notanemail');
-
-      // Submit form directly to bypass native HTML validation
-      const form = screen.getByText('Send reset link').closest('form')!;
-      fireEvent.submit(form);
+      await user.type(screen.getByLabelText('Email address'), 'notanemail');
+      await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
         expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -272,8 +350,8 @@ describe('LoginForm', () => {
       renderForm();
 
       await user.click(screen.getByText('Forgot password?'));
-      await user.click(screen.getByText('Back to sign in'));
-      expect(screen.getByText('Sign In')).toBeInTheDocument();
+      await user.click(screen.getByText('Back to login'));
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
     });
   });
 });

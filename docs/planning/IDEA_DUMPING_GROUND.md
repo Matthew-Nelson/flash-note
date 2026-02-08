@@ -5,3 +5,10 @@
 - need to update promo and marketing copy to put big emphasis on hipaa compliance
 - "generic" or "default" note type
 - Max width to extension, its currently super fing wide and just full widths itself
+- SimplePractice Legal docs to reference:
+    - https://support.simplepractice.com/hc/en-us/articles/360018696052-SimplePractice-BAA-Terms-of-Service-and-Trust-Security-information
+    - https://www.simplepractice.com/terms-of-service-ai-addendum/
+    - https://www.simplepractice.com/baa/
+    - https://www.simplepractice.com/terms/
+    - https://www.simplepractice.com/privacy/
+- Go through all account management and everything on the web app? What would make sense? There are some complicated interactions and what if I need to rapidly update a doc? Should we consider server side providing any of this crap seeing as we might need to rapidy change some docs or something and extension approval and deployment can take some time? WHat is best here?

@@ -71,4 +71,31 @@ describe('Input', () => {
     render(<Input name="test" ref={ref} />);
     expect(ref).toHaveBeenCalledWith(expect.any(HTMLInputElement));
   });
+
+  describe('invalid prop', () => {
+    it('should set aria-invalid when invalid is true', () => {
+      render(<Input name="email" invalid />);
+      expect(screen.getByRole('textbox')).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    it('should add error class when invalid is true', () => {
+      render(<Input name="email" invalid />);
+      expect(screen.getByRole('textbox').className).toContain('input-field-error');
+    });
+
+    it('should NOT show inline error text when only invalid is set', () => {
+      render(<Input name="email" invalid />);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('should show hint when invalid is true and no error', () => {
+      render(<Input name="email" invalid hint="Some hint" />);
+      expect(screen.getByText('Some hint')).toBeInTheDocument();
+    });
+
+    it('should NOT set aria-describedby when only invalid is true', () => {
+      render(<Input name="email" invalid />);
+      expect(screen.getByRole('textbox')).not.toHaveAttribute('aria-describedby');
+    });
+  });
 });

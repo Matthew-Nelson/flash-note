@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useAuth, ApiError } from '@/lib/auth-context';
 import { registerSchema } from '@/lib/schemas';
 import { Button, Input, Alert } from '@/components/ui';
+import { AuthLayout } from '@/components/auth';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -15,13 +16,8 @@ export default function SignupPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
-  const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{
-    email?: string;
-    password?: string;
-    confirmPassword?: string;
-    acceptedLegalTerms?: string;
-  }>({});
+  const [errors, setErrors] = useState<string[]>([]);
+  const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Redirect if already authenticated
@@ -33,18 +29,20 @@ export default function SignupPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setFieldErrors({});
+    setErrors([]);
+    setInvalidFields(new Set());
 
     // Validate input
     const result = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms });
     if (!result.success) {
-      const errors: { email?: string; password?: string; confirmPassword?: string; acceptedLegalTerms?: string } = {};
+      const messages: string[] = [];
+      const invalid = new Set<string>();
       result.error.errors.forEach((err) => {
-        const field = err.path[0] as 'email' | 'password' | 'confirmPassword' | 'acceptedLegalTerms';
-        errors[field] = err.message;
+        messages.push(err.message);
+        if (err.path[0]) invalid.add(String(err.path[0]));
       });
-      setFieldErrors(errors);
+      setErrors(messages);
+      setInvalidFields(invalid);
       return;
     }
 
@@ -65,16 +63,18 @@ export default function SignupPage() {
         // Handle specific error codes
         switch (err.code) {
           case 'email_exists':
-            setFieldErrors({ email: 'An account with this email already exists' });
+            setErrors(['An account with this email already exists']);
+            setInvalidFields(new Set(['email']));
             break;
           case 'weak_password':
-            setFieldErrors({ password: 'Password does not meet requirements' });
+            setErrors(['Password does not meet requirements']);
+            setInvalidFields(new Set(['password']));
             break;
           default:
-            setError(err.message || 'Failed to create account');
+            setErrors([err.message || 'Failed to create account']);
         }
       } else {
-        setError('An unexpected error occurred. Please try again.');
+        setErrors(['An unexpected error occurred. Please try again.']);
       }
     } finally {
       setIsSubmitting(false);
@@ -91,108 +91,96 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <Link href="/" className="flex justify-center items-center gap-2">
-          <span className="text-3xl font-bold text-gradient">FlashNote</span>
-          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
-        </Link>
-        <h2 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
-          Create your account
-        </h2>
-        <p className="mt-2 text-center text-sm text-fn-text-secondary">
-          Start your 14-day free trial
+    <AuthLayout
+      title="Create your account"
+      subtitle="Start your 14-day free trial"
+      footer={
+        <p className="text-center text-sm">
+          <Link href="/login" className="link">
+            Already have an account? Sign in
+          </Link>
         </p>
-      </div>
+      }
+    >
+      <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+        <Input
+          label="Email address"
+          name="email"
+          type="email"
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          invalid={invalidFields.has('email')}
+        />
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card py-8 px-4 sm:px-10">
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <Input
-              label="Email address"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              error={fieldErrors.email}
+        <Input
+          label="Password"
+          name="password"
+          type="password"
+          autoComplete="new-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          invalid={invalidFields.has('password')}
+          hint="Min 8 characters, 1 uppercase, 1 lowercase, 1 number"
+        />
+
+        <Input
+          label="Confirm Password"
+          name="confirmPassword"
+          type="password"
+          autoComplete="new-password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          invalid={invalidFields.has('confirmPassword')}
+        />
+
+        <div>
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptedLegalTerms}
+              onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
+              className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus:ring-fn-accent"
             />
-
-            <Input
-              label="Password"
-              name="password"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              error={fieldErrors.password}
-              hint="Min 8 characters, 1 uppercase, 1 lowercase, 1 number"
-            />
-
-            <Input
-              label="Confirm Password"
-              name="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              required
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              error={fieldErrors.confirmPassword}
-            />
-
-            <div>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={acceptedLegalTerms}
-                  onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
-                  className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus:ring-fn-accent"
-                />
-                <span className="text-sm text-fn-text-secondary">
-                  I agree to the{' '}
-                  <Link href="/baa" target="_blank" className="link">
-                    Business Associate Agreement
-                  </Link>
-                  ,{' '}
-                  <Link href="/terms" target="_blank" className="link">
-                    Terms of Service
-                  </Link>
-                  , and{' '}
-                  <Link href="/privacy" target="_blank" className="link">
-                    Privacy Policy
-                  </Link>
-                </span>
-              </label>
-              {fieldErrors.acceptedLegalTerms && (
-                <p className="mt-1 text-sm text-fn-error">{fieldErrors.acceptedLegalTerms}</p>
-              )}
-            </div>
-
-            {error && (
-              <Alert variant="error">{error}</Alert>
-            )}
-
-            <Button
-              type="submit"
-              loading={isSubmitting}
-              className="w-full"
-            >
-              Create account
-            </Button>
-          </form>
-
-          <div className="mt-6">
-            <p className="text-center text-sm text-fn-text-secondary">
-              Already have an account?{' '}
-              <Link href="/login" className="link">
-                Sign in
+            <span className="text-sm text-fn-text-secondary">
+              I agree to the{' '}
+              <Link href="/baa" target="_blank" className="link">
+                Business Associate Agreement
               </Link>
-            </p>
-          </div>
+              ,{' '}
+              <Link href="/terms" target="_blank" className="link">
+                Terms of Service
+              </Link>
+              , and{' '}
+              <Link href="/privacy" target="_blank" className="link">
+                Privacy Policy
+              </Link>
+            </span>
+          </label>
         </div>
-      </div>
-    </div>
+
+        {errors.length > 0 && (
+          <Alert variant="error">
+            {errors.length === 1 ? (
+              errors[0]
+            ) : (
+              <ul className="list-disc list-inside space-y-1">
+                {errors.map((error, i) => (
+                  <li key={i}>{error}</li>
+                ))}
+              </ul>
+            )}
+          </Alert>
+        )}
+
+        <Button
+          type="submit"
+          loading={isSubmitting}
+          className="w-full"
+        >
+          Create account
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }

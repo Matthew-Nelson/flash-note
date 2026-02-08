@@ -324,6 +324,14 @@ body,
   color: var(--text-muted);
 }
 
+.input-field-error {
+  border-color: var(--fn-error);
+}
+
+.input-field-error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
 /* Label */
 .label {
   color: var(--text-secondary);

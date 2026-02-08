@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { validateLogin, validateRegister } from '@/shared/schemas';
+import { validateLogin, validateRegister, validateEmail } from '@/shared/schemas';
 import { api } from '@/shared/api';
 import SessionAlert from './SessionAlert';
 
@@ -17,12 +17,14 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
+  const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [resetEmailSent, setResetEmailSent] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
+    setInvalidFields(new Set());
 
     // Validate input with Zod
     const validation = viewMode === 'signup'
@@ -31,6 +33,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     if (!validation.success) {
       setErrors(validation.errors);
+      setInvalidFields(new Set(validation.invalidFields));
       return;
     }
 
@@ -56,9 +59,12 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
+    setInvalidFields(new Set());
 
-    if (!email || !email.includes('@')) {
-      setErrors(['Please enter a valid email address']);
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.success) {
+      setErrors(emailValidation.errors);
+      setInvalidFields(new Set(emailValidation.invalidFields));
       return;
     }
 
@@ -84,6 +90,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     setViewMode('login');
     setResetEmailSent(false);
     setErrors([]);
+    setInvalidFields(new Set());
   };
 
   // Forgot Password View
@@ -96,8 +103,11 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
           </h1>
           <p className="text-sm opacity-70 mt-2">
-            Reset your password
+            AI-powered SOAP notes for PTs
           </p>
+          <h2 className="mt-3 text-center text-lg font-bold text-fn-text-primary">
+            Reset your password
+          </h2>
         </div>
 
         {resetEmailSent ? (
@@ -109,31 +119,29 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               </p>
             </div>
             <p className="text-xs opacity-70 text-center mb-6">
-              The link will expire in 15 minutes.
+              The link will expire in 15 minutes for security.
             </p>
             <button
               type="button"
               onClick={handleBackToLogin}
               className="link text-sm w-full text-center"
             >
-              Back to sign in
+              Back to login
             </button>
           </div>
         ) : (
           <>
-            <form onSubmit={handleForgotPassword} className="space-y-4 animate-fade-in-up stagger-2">
+            <form onSubmit={handleForgotPassword} className="space-y-4 animate-fade-in-up stagger-2" noValidate>
               <div>
                 <label htmlFor="reset-email" className="label block text-sm mb-1">
-                  Email
+                  Email address
                 </label>
                 <input
                   id="reset-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
-                  className="input-field w-full px-3 py-2"
-                  placeholder="you@clinic.com"
+                  className={`input-field w-full px-3 py-2${invalidFields.has('email') ? ' input-field-error' : ''}`}
                 />
               </div>
 
@@ -168,7 +176,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
                 onClick={handleBackToLogin}
                 className="link text-sm"
               >
-                Back to sign in
+                Back to login
               </button>
             </div>
           </>
@@ -188,24 +196,37 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         <p className="text-sm opacity-70 mt-2">
           AI-powered SOAP notes for PTs
         </p>
+        {viewMode === 'login' && (
+          <h2 className="mt-3 text-center text-lg font-bold text-fn-text-primary">
+            Sign in to your account
+          </h2>
+        )}
+        {viewMode === 'signup' && (
+          <>
+            <h2 className="mt-3 text-center text-lg font-bold text-fn-text-primary">
+              Create your account
+            </h2>
+            <p className="mt-1 text-center text-sm text-fn-text-secondary">
+              Start your 14-day free trial
+            </p>
+          </>
+        )}
       </div>
 
       {/* Session alert for forced logout scenarios */}
       <SessionAlert />
 
-      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up stagger-2">
+      <form onSubmit={handleSubmit} className="space-y-4 animate-fade-in-up stagger-2" noValidate>
         <div>
           <label htmlFor="email" className="label block text-sm mb-1">
-            Email
+            Email address
           </label>
           <input
             id="email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            required
-            className="input-field w-full px-3 py-2"
-            placeholder="you@clinic.com"
+            className={`input-field w-full px-3 py-2${invalidFields.has('email') ? ' input-field-error' : ''}`}
           />
         </div>
 
@@ -218,10 +239,13 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            required
-            className="input-field w-full px-3 py-2"
-            placeholder={viewMode === 'signup' ? 'Min 8 chars, 1 uppercase, 1 number' : '********'}
+            className={`input-field w-full px-3 py-2${invalidFields.has('password') ? ' input-field-error' : ''}`}
           />
+          {viewMode === 'signup' && (
+            <p className="mt-1.5 text-sm text-fn-text-muted">
+              Min 8 characters, 1 uppercase, 1 lowercase, 1 number
+            </p>
+          )}
           {viewMode === 'login' && (
             <div className="mt-1 text-right">
               <button
@@ -230,7 +254,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
                   setViewMode('forgotPassword');
                   setErrors([]);
                 }}
-                className="link text-xs"
+                className="link text-sm"
               >
                 Forgot password?
               </button>
@@ -248,8 +272,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="input-field w-full px-3 py-2"
-              placeholder="Re-enter your password"
+              className={`input-field w-full px-3 py-2${invalidFields.has('confirmPassword') ? ' input-field-error' : ''}`}
             />
           </div>
         )}
@@ -263,7 +286,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
                 onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
                 className="mt-1 h-4 w-4"
               />
-              <span className="text-xs opacity-80">
+              <span className="text-sm text-fn-text-secondary">
                 I agree to the{' '}
                 <a href="https://flashnote.co/baa" target="_blank" rel="noopener noreferrer" className="link">
                   Business Associate Agreement
@@ -309,9 +332,9 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               Loading...
             </span>
           ) : viewMode === 'signup' ? (
-            'Create Account'
+            'Create account'
           ) : (
-            'Sign In'
+            'Sign in'
           )}
         </button>
       </form>
@@ -324,6 +347,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             setConfirmPassword('');
             setAcceptedLegalTerms(false);
             setErrors([]);
+            setInvalidFields(new Set());
           }}
           className="link text-sm"
         >

@@ -1,13 +1,58 @@
 import { describe, it, expect } from 'vitest';
 import {
+  emailSchema,
+  passwordSchema,
   loginSchema,
   registerSchema,
+  resetPasswordSchema,
   validateLogin,
   validateRegister,
   getValidationError,
 } from './schemas';
 
 describe('Web Validation Schemas', () => {
+  describe('emailSchema', () => {
+    it('should accept valid email', () => {
+      expect(emailSchema.safeParse('test@example.com').success).toBe(true);
+    });
+
+    it('should reject empty string', () => {
+      const result = emailSchema.safeParse('');
+      expect(result.success).toBe(false);
+    });
+
+    it('should reject invalid email', () => {
+      expect(emailSchema.safeParse('not-an-email').success).toBe(false);
+      expect(emailSchema.safeParse('@').success).toBe(false);
+    });
+  });
+
+  describe('passwordSchema', () => {
+    it('should accept valid password', () => {
+      expect(passwordSchema.safeParse('Password1').success).toBe(true);
+    });
+
+    it('should reject empty string', () => {
+      expect(passwordSchema.safeParse('').success).toBe(false);
+    });
+
+    it('should reject password shorter than 8 characters', () => {
+      expect(passwordSchema.safeParse('Pass1').success).toBe(false);
+    });
+
+    it('should reject password without uppercase', () => {
+      expect(passwordSchema.safeParse('password1').success).toBe(false);
+    });
+
+    it('should reject password without lowercase', () => {
+      expect(passwordSchema.safeParse('PASSWORD1').success).toBe(false);
+    });
+
+    it('should reject password without number', () => {
+      expect(passwordSchema.safeParse('Password').success).toBe(false);
+    });
+  });
+
   describe('loginSchema', () => {
     it('should accept valid credentials', () => {
       const result = loginSchema.safeParse({
@@ -97,6 +142,18 @@ describe('Web Validation Schemas', () => {
       expect(result.success).toBe(false);
     });
 
+    it('should reject empty confirmPassword', () => {
+      const result = registerSchema.safeParse({
+        ...validData,
+        confirmPassword: '',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.errors.map((e) => e.message);
+        expect(messages).toContain('Please confirm your password');
+      }
+    });
+
     it('should reject mismatched passwords', () => {
       const result = registerSchema.safeParse({
         ...validData,
@@ -129,6 +186,48 @@ describe('Web Validation Schemas', () => {
       const { acceptedLegalTerms: _, ...noConsent } = validData;
       const result = registerSchema.safeParse(noConsent);
       expect(result.success).toBe(false);
+    });
+  });
+
+  describe('resetPasswordSchema', () => {
+    const validData = {
+      password: 'Password1',
+      confirmPassword: 'Password1',
+    };
+
+    it('should accept valid reset password data', () => {
+      expect(resetPasswordSchema.safeParse(validData).success).toBe(true);
+    });
+
+    it('should reject empty password', () => {
+      expect(resetPasswordSchema.safeParse({ ...validData, password: '' }).success).toBe(false);
+    });
+
+    it('should reject weak password', () => {
+      expect(
+        resetPasswordSchema.safeParse({ ...validData, password: 'short', confirmPassword: 'short' }).success
+      ).toBe(false);
+    });
+
+    it('should reject empty confirmPassword', () => {
+      const result = resetPasswordSchema.safeParse({ ...validData, confirmPassword: '' });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const messages = result.error.errors.map((e) => e.message);
+        expect(messages).toContain('Please confirm your password');
+      }
+    });
+
+    it('should reject mismatched passwords', () => {
+      const result = resetPasswordSchema.safeParse({
+        ...validData,
+        confirmPassword: 'Different1',
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        const paths = result.error.errors.map((e) => e.path.join('.'));
+        expect(paths).toContain('confirmPassword');
+      }
     });
   });
 
