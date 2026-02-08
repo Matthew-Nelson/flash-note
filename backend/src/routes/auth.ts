@@ -18,21 +18,25 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCsrf } from '../middleware/csrf.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
-import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion } from '../db/queries/users.js';
-import { db } from '../db/index.js';
+import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion, resetLockout } from '../db/queries/users.js';
+import { deleteSessionsByUserId } from '../db/queries/sessions.js';
 import { BCRYPT_ROUNDS } from '../config.js';
 
 export const authRouter: Router = Router();
 
+// PASSWORD POLICY - SOURCE OF TRUTH
+// When updating, sync to: extension/src/shared/schemas.ts, web/src/app/reset-password/page.tsx
+const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .regex(/[A-Z]/, 'Password must contain an uppercase letter')
+  .regex(/[a-z]/, 'Password must contain a lowercase letter')
+  .regex(/[0-9]/, 'Password must contain a number');
+
 // Validation schemas
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
-    .regex(/[a-z]/, 'Password must contain a lowercase letter')
-    .regex(/[0-9]/, 'Password must contain a number'),
+  password: passwordSchema,
 });
 
 const loginSchema = z.object({
@@ -58,12 +62,7 @@ const requestPasswordResetSchema = z.object({
 
 const resetPasswordSchema = z.object({
   token: z.string().min(1, 'Token is required'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(/[A-Z]/, 'Password must contain an uppercase letter')
-    .regex(/[a-z]/, 'Password must contain a lowercase letter')
-    .regex(/[0-9]/, 'Password must contain a number'),
+  password: passwordSchema,
 });
 
 const validateResetTokenSchema = z.object({
@@ -368,18 +367,10 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
     await incrementTokenVersion(userId);
 
     // SECURITY: Also delete all sessions (refresh tokens) to force re-login
-    await db.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+    await deleteSessionsByUserId(userId);
 
     // SECURITY: Reset lockout counter on password reset
-    await db.query(
-      `UPDATE users
-       SET failed_login_attempts = 0,
-           locked_until = NULL,
-           last_failed_login_at = NULL,
-           updated_at = NOW()
-       WHERE id = $1`,
-      [userId]
-    );
+    await resetLockout(userId);
 
     await auditService.log({
       userId,
