@@ -29,6 +29,7 @@
 - [Audit Logging](#audit-logging)
 - [Security Considerations](#security-considerations)
 - [Rollout Phases](#rollout-phases)
+- [Known Edge Cases & Implementation Notes](#known-edge-cases--implementation-notes)
 - [What NOT to Build Yet](#what-not-to-build-yet)
 - [Implementation Order](#implementation-order)
 
@@ -79,8 +80,10 @@ This is a single knob. No code deploys needed to transition between phases.
 | Phase | Chrome Web Store Setting |
 |-------|------------------------|
 | Closed | Developer mode only (not published) |
-| Beta | **Unlisted** (direct link only, not discoverable in store) |
+| Beta | **Unlisted** or **Trusted Testers** (see note below) |
 | Public | **Public** (discoverable in store search) |
+
+> **Note:** Google has been restricting the "unlisted" visibility option for new Chrome Web Store submissions. If unlisted is unavailable, use the **Trusted Testers** feature instead — you add beta users' Google accounts to a tester group, and only they can install the extension. This achieves the same gating effect. Verify current CWS policies before publishing.
 
 ---
 
@@ -121,8 +124,8 @@ The registration form has one invite code field regardless of code type. The bac
 
 ```
 Format: XXXX-XXXX (e.g., "AB3K-M7RN")
-Alphabet: A-Z, 2-9 (no 0/O, 1/I/L confusion)
-Effective alphabet: 30 chars → 30^8 = ~656 billion combinations
+Alphabet: A-Z minus O/I/L = 23 letters, plus 2-9 = 8 digits
+Effective alphabet: 31 chars → 31^8 = ~852 billion combinations
 ```
 
 ---
@@ -159,12 +162,15 @@ CREATE TABLE organization_members (
   role TEXT NOT NULL DEFAULT 'member'
     CHECK (role IN ('owner', 'admin', 'member')),
   joined_at TIMESTAMPTZ DEFAULT NOW(),
-  removed_at TIMESTAMPTZ,
-
-  -- Prevent duplicate active memberships
-  -- (a user CAN be re-added after removal, creating a new row)
-  UNIQUE(organization_id, user_id)
+  removed_at TIMESTAMPTZ
 );
+
+-- Partial unique index: prevents duplicate ACTIVE memberships
+-- while allowing re-addition after removal (new row with removed_at = NULL).
+-- A plain UNIQUE(organization_id, user_id) would block re-adds.
+CREATE UNIQUE INDEX idx_org_members_active_unique
+  ON organization_members(organization_id, user_id)
+  WHERE removed_at IS NULL;
 
 CREATE INDEX idx_org_members_user ON organization_members(user_id)
   WHERE removed_at IS NULL;
@@ -359,7 +365,23 @@ available = max_seats - active_seats
 -- code fails at redemption time ("no seats available").
 ```
 
-**Design decision: pending invites don't reserve seats.** This avoids "phantom seat" problems where an admin generates codes that never get used, blocking the org from reaching capacity. The tradeoff is that two simultaneous redemptions could race for the last seat. The backend handles this with a check at registration time. The loser gets a clear error: "This clinic has no available seats. Contact your clinic administrator."
+**Design decision: pending invites don't reserve seats.** This avoids "phantom seat" problems where an admin generates codes that never get used, blocking the org from reaching capacity. The tradeoff is that two simultaneous redemptions could race for the last seat. The loser gets a clear error: "This clinic has no available seats. Contact your clinic administrator."
+
+**Concurrency control for seat allocation:** The registration transaction must use `SELECT ... FOR UPDATE` on the `organizations` row to serialize concurrent seat claims. Without this, two simultaneous registrations could both read `active_seats = 4, max_seats = 5`, both proceed, and end up with 6 active seats. The implementation:
+
+```sql
+BEGIN;
+  -- Lock the org row to prevent concurrent over-allocation
+  SELECT max_seats FROM organizations WHERE id = $1 FOR UPDATE;
+
+  -- Count active seats (safe because org row is locked)
+  SELECT COUNT(*) AS active_seats FROM organization_members
+  WHERE organization_id = $1 AND removed_at IS NULL;
+
+  -- If active_seats < max_seats → proceed with INSERT into organization_members
+  -- Otherwise → ROLLBACK and return "no seats available"
+COMMIT;
+```
 
 ### What Happens to Removed Members
 
@@ -506,22 +528,24 @@ In addition to individual PT acceptance, the **clinic itself** (as a Covered Ent
 Admins can view which team members have accepted current document versions:
 
 ```sql
--- For each org member, get their latest acceptance per document type
+-- For each org member, get their latest acceptance per document type.
+-- Uses DISTINCT ON to pick the most recent acceptance per (user, document_type).
 SELECT
   u.id, u.email,
   la.document_type, la.document_version, la.accepted_at
 FROM organization_members om
 JOIN users u ON u.id = om.user_id
 LEFT JOIN LATERAL (
-  SELECT document_type, document_version, accepted_at
+  SELECT DISTINCT ON (document_type)
+    document_type, document_version, accepted_at
   FROM legal_acceptances
   WHERE user_id = u.id
-  ORDER BY accepted_at DESC
+  ORDER BY document_type, accepted_at DESC
 ) la ON true
 WHERE om.organization_id = $1 AND om.removed_at IS NULL;
 ```
 
-This surfaces: "Mike Chen accepted BAA v1.0 on Feb 3, but we're now on v1.1" - useful when we update terms and need re-acceptance.
+This surfaces: "Mike Chen accepted BAA v1.0 on Feb 3, but we're now on v1.1" — useful when we update terms and need re-acceptance.
 
 ---
 
@@ -553,10 +577,16 @@ This surfaces: "Mike Chen accepted BAA v1.0 on Feb 3, but we're now on v1.1" - u
 ```
 
 ```typescript
-// Step 3 pseudocode - only runs if user has org_id but no individual sub
+// Step 3 pseudocode - only runs if user has org_id but no individual sub.
+// IMPORTANT: Verify active membership, not just the presence of organization_id.
+// If the removal transaction partially failed (set removed_at but didn't clear
+// organization_id), this JOIN prevents the user from retaining access.
 const orgResult = await db.query<OrgSubscriptionRow>(
-  `SELECT subscription_status, trial_ends_at FROM organizations WHERE id = $1`,
-  [user.organization_id]
+  `SELECT o.subscription_status, o.trial_ends_at
+   FROM organizations o
+   JOIN organization_members om ON om.organization_id = o.id
+   WHERE o.id = $1 AND om.user_id = $2 AND om.removed_at IS NULL`,
+  [user.organization_id, user.userId]
 );
 
 if (orgResult.rows.length > 0) {
@@ -568,7 +598,7 @@ if (orgResult.rows.length > 0) {
 }
 ```
 
-**Performance note:** The denormalized `users.organization_id` means we already have the org ID from the first query. The second query is a primary key lookup on `organizations` - effectively free.
+**Performance note:** The denormalized `users.organization_id` means we already have the org ID from the first query. The second query joins `organizations` (PK lookup) with `organization_members` (covered by `idx_org_members_active_unique`) — effectively free. The JOIN on `organization_members` is the defense-in-depth check that `organization_id` wasn't left stale.
 
 ---
 
@@ -729,6 +759,25 @@ POST /billing/checkout
 ```
 
 The webhook handler for `checkout.session.completed` checks whether the price is a clinic plan and, if so, creates the organization.
+
+**Webhook disambiguation:** The current webhook handler correlates events via `metadata.userId` on the subscription. Clinic subscriptions must use a different correlation path. During clinic checkout, set `subscription_data.metadata.organizationId` (or `userId` + `planType: 'clinic'`). The webhook handler then branches:
+
+```typescript
+// In checkout.session.completed handler:
+const sub = await stripe.subscriptions.retrieve(session.subscription);
+if (sub.metadata.planType === 'clinic') {
+  // Create org, assign owner — correlate via sub.metadata.userId
+} else {
+  // Existing individual flow — update users table
+}
+
+// In customer.subscription.updated handler:
+if (sub.metadata.organizationId) {
+  // Update organizations.subscription_status + sync max_seats from sub.items.data[0].quantity
+} else {
+  // Existing individual flow — update users.subscription_status
+}
+```
 
 ### Webhook Event Handling
 
@@ -1116,31 +1165,6 @@ The entire flow becomes self-serve:
 
 For now, manual is fine. The individual per-user legal acceptance (already built) covers the HIPAA requirement for individual users. The entity-level BAA is a business agreement, not a per-click obligation.
 
-### Is a "God Mode" User Bad Practice?
-
-**Yes, an in-app god mode is bad practice.** Here's why specifically for healthcare software:
-
-1. **Audit trail ambiguity**: If a super-admin modifies a user's subscription or generates notes "on behalf of" a user, the audit trail becomes murky. HIPAA auditors want to know exactly who did what.
-
-2. **PHI exposure risk**: A god-mode user who can view "any user's data" is seeing data they have no clinical need for. HIPAA's minimum necessary standard says you should only access PHI you need for your specific role.
-
-3. **Single account compromise**: One compromised password exposes everything. With the external tools approach, an attacker would need to compromise Stripe + Sentry + your database separately.
-
-4. **You don't need it**: Everything a god-mode account would do, you can already do through existing tools:
-
-| "I want to..." | How |
-|----------------|-----|
-| See all users | `psql` query |
-| Check a user's subscription | Stripe Dashboard → Customers |
-| Reset a user's password | `psql` → update password_hash, or tell them to use forgot-password |
-| Disable a user | `psql` → set subscription_status = 'canceled', increment token_version |
-| Generate invite codes | CLI script → inserts into invite_codes table |
-| View usage stats | `psql` query or Axiom dashboard |
-| Debug an error | Sentry → search by userId |
-| Monitor uptime | UptimeRobot |
-
-**The principle: Use the right tool for each job, not one tool for all jobs.**
-
 ### What You Should Build (and When)
 
 | Tool | When | Why |
@@ -1172,6 +1196,67 @@ When onboarding a new clinic:
   2. Generate invite code → share with clinic admin
   3. Monitor their first week in Axiom → proactive support
 ```
+
+---
+
+## Known Edge Cases & Implementation Notes
+
+Issues identified during planning review that must be addressed during implementation.
+
+### 1. Removed Member Usage Disappears from Org Dashboard
+
+The org usage query (in [Usage Endpoint Design](#usage-endpoint-design)) filters `WHERE om.removed_at IS NULL`. This means if a PT generated 50 notes before being removed mid-month, those notes vanish from the org's usage totals — misleading for billing reconciliation.
+
+**Resolution:** The org usage query should include members who were active during the queried month, not just currently active members. Either:
+- **Option A (recommended):** Always include removed members in the usage response with a `removedAt` field, so the dashboard can display them separately (e.g., "Former members: 50 notes"). This preserves billing accuracy.
+- **Option B:** Use `WHERE om.removed_at IS NULL OR (om.removed_at >= date_trunc('month', NOW()))` to include members removed during the current month.
+
+### 2. Org Subscription Canceled — Member State Limbo
+
+When an org's Stripe subscription is canceled, the webhook sets `organizations.subscription_status = 'canceled'`, and the subscription middleware blocks all members. But `users.organization_id` stays set. This creates an awkward state:
+
+- Members still "belong" to the org in the data model but can't use the product.
+- If a member tries to subscribe individually, the middleware would check their org first (which is canceled), then fall through to individual check. **This path works correctly** — but the UI needs to handle it cleanly. The member should see "Your clinic's subscription has ended" with a clear CTA to subscribe individually, not a generic 402.
+- The clinic admin should see a "Reactivate" prompt, not just a dead dashboard.
+
+**Resolution:** No schema change needed. The frontend must handle the `clinic_subscription_expired` error code distinctly from `subscription_required` or `trial_expired`. Add this to the extension error handling as well (currently the extension has no concept of org-level errors).
+
+### 3. Owner's Dual Subscription Ambiguity
+
+Flow 2 step 7 says the owner's individual subscription "remains for billing continuity." This creates confusion:
+
+- The owner could have both an active $30/mo individual sub AND be on the org's $25/seat/mo plan — double-paying.
+- If the individual sub lapses but the org sub is active, the owner still has access. Fine. But the Stripe dashboard shows a "canceled" individual subscription, which looks like a problem.
+- If the org sub lapses but the individual sub is still active, the owner retains access but their PTs don't.
+
+**Resolution:** When an org is created and the owner is assigned, the checkout flow should prompt the owner to cancel their individual subscription (or we cancel it automatically as part of the org creation webhook). Document this in the checkout UX spec. The middleware already handles the fallback correctly (check individual first, then org), so no backend change needed — this is purely a billing hygiene concern.
+
+### 4. `/invite-codes/validate` Response Must Be Minimal
+
+This is a public endpoint (pre-registration). If it returns the code type (`beta` vs `clinic`) and organization name, an attacker can:
+- Enumerate valid codes to identify customer organizations
+- Learn which clinics are FlashNote customers (competitive intelligence, or social engineering)
+
+**Resolution:** The response should return only `{ valid: true/false }`. If the code is valid and of type `clinic`, the organization name is revealed *after* the user enters their registration details (email + password) but *before* the final submit — so they can confirm they're joining the right clinic. This keeps the enumeration cost high (must attempt full registration) while still giving the PT confirmation.
+
+### 5. Rate Limiting on Invite Code Generation
+
+A compromised admin account could generate thousands of invite codes. The doc specifies rate limits for `/invite-codes/validate` (10/min per IP) and registration (3/hour), but not for `POST /organization/invites`.
+
+**Resolution:** Add a rate limit of 10 invite codes per hour per organization. This is generous for legitimate use (no clinic onboards 10 PTs per hour) but prevents abuse. Use the `organization_id` as the rate limit key, not the user ID or IP.
+
+### 6. Existing User Migration
+
+When `REGISTRATION_MODE` is deployed, existing users (internal test accounts, early signups) need a clear path:
+- Users created before invite codes exist are grandfathered — they already have accounts and don't need codes.
+- The `REGISTRATION_MODE` check only gates *new* registrations, not existing logins.
+- The `ALTER TABLE users ADD COLUMN organization_id` migration defaults to `NULL`, which is correct — existing users are individual users.
+
+No migration script needed, but this should be verified in staging before the `REGISTRATION_MODE=invite` switch.
+
+### 7. Webhook Idempotency for Org Creation
+
+The existing `processed_webhook_events` table handles individual subscription webhooks. The same idempotency pattern must apply to org-creating webhooks (`checkout.session.completed` for clinic plans). If the webhook fires twice, we must not create two organizations. The existing pattern (check `processed_webhook_events` before processing) handles this, but the org creation code must be inside the idempotency guard.
 
 ---
 
