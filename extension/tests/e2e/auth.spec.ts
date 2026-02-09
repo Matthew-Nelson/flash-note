@@ -87,13 +87,13 @@ test.describe('Authentication', () => {
       await expect(extensionPage.locator('input[type="email"].input-field-error')).toBeVisible();
     });
 
-    test('shows error for short password', async ({ extensionPage }) => {
+    test('shows error for incorrect password', async ({ extensionPage }) => {
       await extensionPage.fill('input[type="email"]', 'test@example.com');
       await extensionPage.fill('input[type="password"]', 'short');
       await extensionPage.click('button:has-text("Sign In")');
 
-      // Zod validation rejects short password — but login schema only requires min 1 char,
-      // so this actually submits to the API which returns invalid credentials
+      // Login schema only requires min 1 char, so this submits to the API
+      // which returns invalid_credentials
       await expect(extensionPage.locator('.error-message')).toBeVisible();
     });
 

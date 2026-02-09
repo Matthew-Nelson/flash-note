@@ -796,6 +796,22 @@ describe('AuthService', () => {
       expect(result.user.email).toBe('new@example.com');
       expect(result.emailVerificationRequired).toBe(true);
 
+      // LEGAL_CONSENT_ACCEPTED audit log should have been called (coupled to consent recording)
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'new-user-id',
+          action: AuditAction.LEGAL_CONSENT_ACCEPTED,
+          status: 'SUCCESS',
+          metadata: expect.objectContaining({
+            documentVersions: {
+              baa: '1.0',
+              terms_of_service: '1.0',
+              privacy_policy: '1.0',
+            },
+          }),
+        })
+      );
+
       // Error should be logged
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         'Failed to send verification email:',

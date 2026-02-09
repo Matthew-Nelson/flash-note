@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
-import { config, BCRYPT_ROUNDS } from '../config.js';
+import { config, BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '../config.js';
 import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUserWithClient } from '../db/queries/users.js';
 import { recordLegalAcceptances } from '../db/queries/legal-acceptances.js';
@@ -30,11 +30,14 @@ const DUMMY_HASH = '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYq1IpHBBUGK
 interface LoginContext {
   ipAddress?: string;
   userAgent?: string;
-  acceptedLegalTerms?: true;
+}
+
+interface RegisterContext extends LoginContext {
+  acceptedLegalTerms: true;
 }
 
 class AuthService {
-  async register(email: string, password: string, context: LoginContext = {}) {
+  async register(email: string, password: string, context: RegisterContext) {
     // Check if user exists
     const existing = await findUserByEmail(email);
     if (existing) {
@@ -51,24 +54,22 @@ class AuthService {
       await client.query('BEGIN');
       user = await createUserWithClient(client, email, passwordHash);
 
-      if (context.acceptedLegalTerms) {
-        try {
-          await recordLegalAcceptances(
-            client,
-            user.id,
-            context.ipAddress ?? null,
-            context.userAgent ?? null
-          );
-        } catch (error) {
-          Sentry.captureException(error, {
-            extra: {
-              source: 'auth_service',
-              errorType: 'legal_acceptance_recording_failed',
-              userId: user.id,
-            },
-          });
-          throw error;
-        }
+      try {
+        await recordLegalAcceptances(
+          client,
+          user.id,
+          context.ipAddress ?? null,
+          context.userAgent ?? null
+        );
+      } catch (error) {
+        Sentry.captureException(error, {
+          extra: {
+            source: 'auth_service',
+            errorType: 'legal_acceptance_recording_failed',
+            userId: user.id,
+          },
+        });
+        throw error;
       }
 
       await client.query('COMMIT');
@@ -78,6 +79,16 @@ class AuthService {
     } finally {
       client.release();
     }
+
+    // HIPAA: Audit legal consent acceptance (coupled to DB recording above)
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.LEGAL_CONSENT_ACCEPTED,
+      status: 'SUCCESS',
+      metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
 
     // Generate and send verification email
     // SECURITY: Do this after user creation to ensure audit trail

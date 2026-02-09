@@ -20,7 +20,7 @@ import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion, resetLockout } from '../db/queries/users.js';
 import { deleteSessionsByUserId } from '../db/queries/sessions.js';
-import { BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '../config.js';
+import { BCRYPT_ROUNDS } from '../config.js';
 
 export const authRouter: Router = Router();
 
@@ -86,15 +86,6 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
       userId: result.user.id,
       action: AuditAction.REGISTER,
       status: 'SUCCESS',
-      ipAddress,
-      userAgent,
-    });
-
-    await auditService.log({
-      userId: result.user.id,
-      action: AuditAction.LEGAL_CONSENT_ACCEPTED,
-      status: 'SUCCESS',
-      metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
       ipAddress,
       userAgent,
     });
