@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 6, 2026
-**Overall Progress:** 43% (23/53 quality gates complete)
+**Last Updated:** February 8, 2026
+**Overall Progress:** 31% (26/84 quality gates complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -20,19 +20,18 @@ This document consolidates all pending work from across the project. Use this as
 | Add Error Boundary to extension | SUCCESS_METRICS MVP-13 | ✅ Done |
 | Add Error Boundary to web app | SUCCESS_METRICS MVP-14 | ✅ Done |
 | Connect web app auth to backend | SUCCESS_METRICS MVP-08 | ✅ Done |
-| Test extension auth with backend | SUCCESS_METRICS MVP-09 | Needs automated testing |
-| Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | Needs to change to account for new "trust" paradigm |
+| Test extension auth with backend | SUCCESS_METRICS MVP-09 | ✅ Done |
+| Test note generation returns valid SOAP | SUCCESS_METRICS MVP-10 | ✅ Done |
 
 ### Medium Priority
 
 | Task | Source | Status |
 |------|--------|--------|
 | Add ESLint config to all projects | SUCCESS_METRICS MVP-15 | ✅ Done |
-| **Fix stale user data bug (extension)** | [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) | ⚠️ P0 - Launch blocker |
+| **Fix stale user data bug (extension)** | [STALE_USER_DATA_BUG.md](./archive/STALE_USER_DATA_BUG.md) | ✅ Done (fixed in #41, #44) |
 | Failed payment email notifications | STRIPE_TODOS | Not started |
 | Webhook event cleanup job (production required) | STRIPE_TODOS §Operations | Not configured |
 
-> **Note:** The stale user data bug affects extension users who complete checkout on the web app - their subscription status doesn't sync back to the extension. See [STALE_USER_DATA_BUG.md](./planning/STALE_USER_DATA_BUG.md) for full analysis and recommended fix (focus-based refresh).
 
 ---
 
@@ -71,7 +70,7 @@ This document consolidates all pending work from across the project. Use this as
 | Clear form errors on input change | [2.3] | Not started |
 | Use Alert component consistently on dashboard | [2.4] | Not started |
 | Show actual error message during NoteGenerator error animation | [2.5] | Not started |
-| Add offline detection with user-facing banner | [2.6] | Not started |
+| ~~Add offline detection with user-facing banner~~ | [2.6] | Dropped — deferred to post-launch polish |
 | Add request timeouts to API clients | [2.7] | Not started |
 | Add nested ErrorBoundaries for view-level isolation | [2.11] | Not started |
 | Deduplicate extension CSS -- import shared styles | [3.1] | Not started |
@@ -97,9 +96,11 @@ This document consolidates all pending work from across the project. Use this as
 
 ---
 
-## HIPAA Critical Path (Launch Blockers)
+## HIPAA/HITECH Critical Path (Launch Blockers)
 
 These items are **required for production** with real patient data. They should be completed before or in parallel with Phase 3.
+
+> **Regulatory Context:** The HITECH Act of 2009 makes FlashNote directly liable for HIPAA violations as a Business Associate, subject to direct OCR audits, with penalties up to $2.1M/year per violation category. These items address both HIPAA and HITECH requirements.
 
 | Task | Source | Status |
 |------|--------|--------|
@@ -109,8 +110,10 @@ These items are **required for production** with real patient data. They should 
 | Database encryption at rest | SUCCESS_METRICS PROD-07 | Not deployed |
 | TLS 1.2+ enforced on all connections | SUCCESS_METRICS PROD-08 | Not deployed |
 | HIPAA-compliant hosting provider with BAA | PRE_LAUNCH_CHECKLIST §2 | Not done |
+| Breach notification / incident response procedure | HITECH Act requirement | Not documented |
+| BAA acceptance in signup flow | PRE_LAUNCH_LEGAL_COMPLIANCE | Not implemented |
 
-**Note:** Without these items complete, we cannot legally handle real PHI in production.
+**Note:** Without these items complete, we cannot legally handle real PHI in production. Under the HITECH Act, FlashNote is directly liable for compliance failures — independent of covered entities.
 
 ---
 
@@ -122,11 +125,11 @@ These items are **required for production** with real patient data. They should 
 
 | Task | Source | Status |
 |------|--------|--------|
-| Backend unit tests ≥60% coverage | SUCCESS_METRICS BETA-01 | ✅ 28 test files |
-| Manual auth flow testing (all apps) | SUCCESS_METRICS BETA-02 | Not done |
-| Stripe checkout end-to-end test | SUCCESS_METRICS BETA-03 | Not tested |
-| Verify trial expiration enforcement | SUCCESS_METRICS BETA-04 | Needs testing |
-| Verify rate limiting works | SUCCESS_METRICS BETA-05 | Needs testing |
+| Backend unit tests ≥60% coverage | SUCCESS_METRICS BETA-01 | ✅ 31 test files, ~683 tests |
+| Manual auth flow testing (all apps) | SUCCESS_METRICS BETA-02 | ✅ Done |
+| Stripe checkout end-to-end test | SUCCESS_METRICS BETA-03 | ✅ Done (local override interception; live Stripe deferred to post-beta) |
+| Verify trial expiration enforcement | SUCCESS_METRICS BETA-04 | ✅ Done |
+| Verify rate limiting works | SUCCESS_METRICS BETA-05 | ❌ Failed manual test — needs investigation |
 
 ### Feature Completion
 
@@ -139,6 +142,7 @@ These items are **required for production** with real patient data. They should 
 | Terms of service page on web | SUCCESS_METRICS BETA-09 | ✅ Done |
 | API request timeout handling | SUCCESS_METRICS BETA-10 | ✅ Done |
 | Retry logic with backoff | SUCCESS_METRICS BETA-11 | ✅ Done |
+| **Create `/baa` web page** | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
 
 ---
 
@@ -150,9 +154,9 @@ These items are **required for production** with real patient data. They should 
 
 | Target | Current | Goal | Notes |
 |--------|---------|------|-------|
-| Backend | ✅ 28 test files | 95% lines, 90% branches | Healthcare-grade thresholds enforced in vitest.config.ts |
-| Extension | 0% | ≥80% | Not configured |
-| Web | 0% | ≥80% | Not configured |
+| Backend | ✅ 31 test files, ~683 tests | 95% lines, 90% branches | Healthcare-grade thresholds enforced in vitest.config.ts |
+| Extension | ✅ 14 test files, ~233 tests (~93%) | ≥80% | Configured with 80% thresholds |
+| Web | ✅ 19 test files, ~224 tests (~92%) | ≥80% | Configured with 80% thresholds |
 
 See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for integration, E2E, and penetration testing requirements.
 
@@ -245,14 +249,16 @@ These are researched but not prioritized for current development.
 
 ## Progress Summary
 
+> **Note:** This table tracks all work items across the project (84 total), including UI audit findings and HIPAA compliance tasks. For quality gates only (43 items), see [SUCCESS_METRICS.md](./SUCCESS_METRICS.md).
+
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
-| MVP Foundation | 15 | 12 | 80% |
+| MVP Foundation | 15 | 15 | 100% |
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
-| Beta Ready | 12 | 6 | 50% |
+| Beta Ready | 12 | 9 | 75% |
 | Production Ready | 16 | 5 | 31% |
-| HIPAA Critical Path | 6 | 0 | 0% |
-| **Total** | **82** | **23** | **28%** |
+| HIPAA/HITECH Critical Path | 8 | 0 | 0% |
+| **Total** | **84** | **29** | **35%** |
 
 ---
 

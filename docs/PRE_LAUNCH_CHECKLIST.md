@@ -42,7 +42,9 @@
 
 ---
 
-## 2. HIPAA Compliance & Legal Documents
+## 2. HIPAA/HITECH Compliance & Legal Documents
+
+> **Regulatory Context:** The HITECH Act of 2009 made business associates (like FlashNote) **directly liable** for HIPAA violations, subject to direct OCR audits, and introduced tiered penalties up to $2.1M/year per violation category. All compliance items below address both HIPAA and HITECH requirements.
 
 ### Business Associate Agreements (BAAs)
 
@@ -86,14 +88,30 @@
   - [ ] Have attorney review
   - [ ] Host at flashnote.co/privacy
 
-- [ ] **HIPAA Notice** (optional but recommended)
-  - Brief statement about HIPAA compliance for marketing
+- [ ] **HIPAA/HITECH Notice** (optional but recommended)
+  - Brief statement about HIPAA and HITECH Act compliance for marketing
   - Can be part of Privacy Policy or separate page
 
 - [x] **Refund Policy** - Added inline to Terms of Service
   - Monthly: No partial refunds
   - Annual: Pro-rata within 30 days
   - See `docs/legal/TERMS_OF_SERVICE.md` §4
+
+### HITECH Breach Notification & Incident Response
+
+- [ ] **Document breach notification procedure** (required by HITECH Act)
+  - 72-hour notification to covered entities upon breach discovery
+  - Breach investigation and documentation process
+  - Cooperation with covered entity's notification to individuals and HHS
+  - Template breach notification letter
+- [ ] **Document incident response plan**
+  - Who is responsible for breach assessment
+  - Escalation path and decision tree
+  - Evidence preservation procedures
+  - Communication templates for covered entities
+- [ ] **Verify Google Cloud/Vertex AI BAA is signed**
+  - Required before any PHI flows through Gemini/Vertex AI
+  - Must use Vertex AI endpoint (consumer Gemini API is NOT covered)
 
 **Estimated Legal Cost:** $0 (templates only) to $1,500-3,000 (attorney review)
 
@@ -446,9 +464,11 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 - [ ] Update documentation as needed
 
 ### Annual Tasks
-- [ ] HIPAA security risk assessment
-- [ ] Legal document review and update
+- [ ] HIPAA/HITECH security risk assessment
+- [ ] Legal document review and update (BAA, ToS, Privacy Policy)
 - [ ] Insurance policy review
+- [ ] Review HITECH Safe Harbor alignment (consider NIST CSF, SOC 2)
+- [ ] Verify all subprocessor BAAs remain current (Google Cloud, hosting, etc.)
 - [ ] Consider penetration testing ($3,000-15,000)
 
 ---
@@ -532,9 +552,12 @@ Based on `SECURITY_AUDIT.md`, these should be addressed before handling real pat
 - [IRS EIN Application](https://www.irs.gov/businesses/small-businesses-self-employed/apply-for-an-employer-identification-number-ein-online)
 - [Registered Agent Services](https://www.northwestregisteredagent.com/)
 
-### HIPAA Compliance
+### HIPAA/HITECH Compliance
 - [Google Cloud BAA](https://cloud.google.com/security/compliance/hipaa)
 - [HHS HIPAA Resources](https://www.hhs.gov/hipaa/)
+- [HITECH Act Text](https://www.congress.gov/bill/111th-congress/house-bill/1/text)
+- [HITECH Breach Notification Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-D)
+- [HITECH Safe Harbor (2021)](https://www.congress.gov/bill/116th-congress/house-bill/7898)
 
 ### Chrome Web Store
 - [Developer Dashboard](https://chrome.google.com/webstore/devconsole/)

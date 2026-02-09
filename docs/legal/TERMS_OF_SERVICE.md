@@ -84,10 +84,13 @@ TO THE MAXIMUM EXTENT PERMITTED BY LAW:
 - We are not liable for indirect, incidental, or consequential damages
 - Our total liability is limited to the amount paid for the service
 
-## 9. HIPAA and Data Security
+## 9. HIPAA, HITECH Act, and Data Security
 
-- We maintain appropriate safeguards for protected health information
-- We offer Business Associate Agreements to covered entities
+- FlashNote operates as a Business Associate under HIPAA and the HITECH Act of 2009
+- We maintain administrative, physical, and technical safeguards for Protected Health Information as required by the HIPAA Security Rule, as strengthened by the HITECH Act
+- We provide Business Associate Agreements (BAA) to covered entities as required by HIPAA and the HITECH Act — acceptance of a BAA is required to use FlashNote
+- We comply with the HITECH Act Breach Notification Rule and will notify covered entities of any breach of unsecured PHI within 72 hours of discovery
+- We maintain BAAs with all subprocessors who handle PHI on our behalf
 - See our Privacy Policy for details on data handling
 
 ## 10. Modifications to Service
@@ -107,7 +110,7 @@ We may terminate or suspend your account for:
 
 ## 12. Governing Law
 
-These Terms are governed by the laws of [State/Country], without regard to conflict of law provisions.
+These Terms are governed by the laws of the State of California, United States, without regard to conflict of law provisions.
 
 ## 13. Contact Information
 

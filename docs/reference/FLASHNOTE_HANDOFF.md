@@ -645,7 +645,7 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 
 ## 7. Database Schema
 
-### Complete Schema (6 tables)
+### Complete Schema (7 tables)
 
 ```sql
 -- migrations/001_initial_schema.sql
@@ -720,7 +720,7 @@ CREATE INDEX idx_usage_user_month ON usage(user_id, month);
 
 ### Notes on Schema Design
 
-1. **Minimal tables:** 6 tables total (4 core + email_tokens + processed_webhook_events)
+1. **Minimal tables:** 7 tables total (4 core + email_tokens + processed_webhook_events + legal_acceptances)
 2. **No PHI storage:** We don't store patient notes, only audit metadata
 3. **HIPAA audit logs:** Track all significant actions
 4. **Usage tracking:** For billing limits and analytics
@@ -739,6 +739,7 @@ The base schema has been extended with additional migrations:
 | 005_token_hash_index | Index optimization for token lookups |
 | 006_session_device_binding | IP/user-agent on sessions for audit trail |
 | 007_webhook_idempotency | Stripe webhook deduplication table |
+| 008_legal_acceptances | BAA/ToS/Privacy acceptance tracking for signup |
 
 ---
 

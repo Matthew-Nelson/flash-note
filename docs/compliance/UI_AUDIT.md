@@ -252,13 +252,11 @@ All forms in both apps keep error messages visible until the next form submissio
 
 ---
 
-### 2.6 No Offline Detection
+### 2.6 ~~No Offline Detection~~ (Deferred)
 
-**Severity: P2**
+**Severity: P2 — Deferred to post-launch polish**
 
-Neither app checks `navigator.onLine` or listens for `online`/`offline` events. Clinical environments often have unstable WiFi. Users get generic API errors instead of "You appear to be offline."
-
-**Fix:** Add a shared `useOnlineStatus()` hook. Display a persistent banner when offline. Prevent form submissions while offline with a clear message.
+Neither app checks `navigator.onLine` or listens for `online`/`offline` events. Existing API error handling and retry logic provides adequate coverage for beta.
 
 ---
 
@@ -498,7 +496,7 @@ No `@media print` rules exist. For a healthcare documentation tool, PTs or compl
 | 13 | [2.3] Errors don't clear on input change | Error Handling | Confusing stale errors |
 | 14 | [2.4] Inconsistent error display patterns | Error Handling | Dashboard diverges from rest of app |
 | 15 | [2.5] NoteGenerator hides errors behind animation | Error Handling | Delayed actionable information |
-| 16 | [2.6] No offline detection | Error Handling | Generic errors in unstable WiFi |
+| ~~16~~ | ~~[2.6] No offline detection~~ | ~~Error Handling~~ | Deferred to post-launch |
 | 17 | [2.7] No request timeout | Error Handling | Infinite spinner on hanging requests |
 | 18 | [2.11] No nested ErrorBoundaries | Error Handling | Single crash takes down entire UI |
 | 19 | [3.1] Extension CSS forks shared styles | Styling | Drift between extension and web |

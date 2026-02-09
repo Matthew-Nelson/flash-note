@@ -34,7 +34,7 @@ A **Limited Liability Company (LLC)** is a legal business structure that:
 
 ### Why FlashNote Needs an LLC
 
-1. **Liability Protection:** If someone sues FlashNote for HIPAA violations, your personal assets (house, car, savings) are protected
+1. **Liability Protection:** If someone sues FlashNote for HIPAA/HITECH violations (fines up to $2.1M/year per violation category), your personal assets (house, car, savings) are protected
 2. **Professionalism:** Customers trust "FlashNote LLC" more than "Matthew Nelson DBA FlashNote"
 3. **Tax Benefits:** Deduct business expenses, structure for tax optimization
 4. **Banking:** Separate business bank account keeps finances clean
@@ -776,10 +776,12 @@ Date: __________                 Date: __________
 
 **What LLC protects (The "Corporate Veil"):**
 
-**Scenario 1: Customer sues for HIPAA violation**
-- ✅ They can sue FlashNote LLC
+**Scenario 1: HIPAA/HITECH violation (e.g., PHI breach)**
+- ✅ HHS OCR can audit and fine FlashNote LLC directly (HITECH Act)
+- ✅ Customers can sue FlashNote LLC
 - ✅ LLC assets at risk (bank account, equipment)
 - ✅ Your personal assets protected (house, car, savings)
+- ⚠️ HITECH penalties: $141–$2,134,831 per violation category/year depending on culpability
 
 **Scenario 2: Business debt**
 - ✅ Vendor sues for unpaid bill
@@ -1015,7 +1017,7 @@ Date: __________                 Date: __________
 5. ❌ **Not filing Statement of Information** → $250 penalty
 6. ❌ **Operating without EIN** → Can't open bank account
 7. ❌ **Using personal credit card for business** → Hard to track, no separation
-8. ❌ **Not getting BAA signed by customers** → HIPAA violation
+8. ❌ **Not getting BAA signed by customers** → HIPAA/HITECH violation (direct liability as business associate)
 9. ❌ **Forgetting $800 CA franchise tax** → Penalties add up
 10. ❌ **Not documenting IP ownership** → Issues when selling company
 

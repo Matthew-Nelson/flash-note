@@ -5,7 +5,7 @@
 > - [x] Backend Sentry integration (error tracking)
 > - [x] Extension Sentry integration (error tracking)
 > - [x] Web app Sentry integration (error tracking)
-> - [x] Logging gaps audit and fixes (12 gaps fixed - see `docs/planning/SENTRY_LOGGING_GAPS.md`)
+> - [x] Logging gaps audit and fixes (12 gaps fixed - see `docs/archive/SENTRY_LOGGING_GAPS.md`)
 > - [ ] UptimeRobot monitors
 > - [ ] Axiom log aggregation (optional)
 
@@ -161,7 +161,7 @@ A comprehensive audit identified and fixed 12 locations where errors were being 
 - SessionStorage write failures (web)
 - Chrome storage read failures (extension)
 
-See [`docs/planning/SENTRY_LOGGING_GAPS.md`](SENTRY_LOGGING_GAPS.md) for the full audit.
+See [`docs/archive/SENTRY_LOGGING_GAPS.md`](../archive/SENTRY_LOGGING_GAPS.md) for the full audit.
 
 ---
 
