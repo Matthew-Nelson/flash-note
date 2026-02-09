@@ -129,7 +129,7 @@ These items are **required for production** with real patient data. They should 
 | Manual auth flow testing (all apps) | SUCCESS_METRICS BETA-02 | ✅ Done |
 | Stripe checkout end-to-end test | SUCCESS_METRICS BETA-03 | ✅ Done (local override interception; live Stripe deferred to post-beta) |
 | Verify trial expiration enforcement | SUCCESS_METRICS BETA-04 | ✅ Done |
-| Verify rate limiting works | SUCCESS_METRICS BETA-05 | ❌ Failed manual test — needs investigation |
+| Verify rate limiting works | SUCCESS_METRICS BETA-05 | ✅ Done (dev mode uses relaxed limits; prod limits confirmed correct) |
 
 ### Feature Completion
 

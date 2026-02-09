@@ -74,7 +74,7 @@ These items must be complete before beta testing with real PTs.
 | BETA-02 | Auth flow fully tested (manual) | All | P0 | ✅ Done (manually verified) |
 | BETA-03 | Stripe checkout flow works end-to-end | All | P0 | ✅ Done (local override; live Stripe deferred to post-beta) |
 | BETA-04 | Trial expiration enforced | Backend | P0 | ✅ Done (manually verified) |
-| BETA-05 | Rate limiting works (verified) | Backend | P0 | ❌ Failed manual test — needs investigation |
+| BETA-05 | Rate limiting works (verified) | Backend | P0 | ✅ Done (dev mode uses relaxed limits; prod limits confirmed correct) |
 | BETA-06 | Password validation matches spec | All | P0 | ✅ Done |
 | BETA-07 | Web dashboard shows real data | Web | P0 | ⚠️ Auth/subscription live, usage mock |
 | BETA-08 | Privacy policy page exists | Web | P0 | ✅ Done |
