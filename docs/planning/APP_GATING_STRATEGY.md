@@ -935,6 +935,246 @@ The owner account is the highest-privilege role and controls billing. Additional
 
 ---
 
+## Platform Operations: How You (the App Owner) Oversee Everything
+
+This section addresses a fundamentally different question from the clinic admin dashboard above. Clinic admins manage *their team*. You need to manage *the entire platform* -- all users, all clinics, all billing, all compliance. These are two completely separate concerns with different tools.
+
+### The Core Principle: Don't Build an Admin Panel
+
+**Building a custom admin dashboard inside FlashNote is a trap.** It sounds appealing ("god mode!") but it's a massive surface area to build, secure, and maintain -- and better tools already exist for every single thing you'd put in it.
+
+Here's why:
+
+1. **Security liability**: An in-app super-admin account is a single point of compromise. If that account is breached, the attacker has access to everything through a purpose-built UI. This is categorically worse than compromising a database credential (which is scoped and audited at the infrastructure level).
+
+2. **HIPAA scope creep**: Every admin feature you build that touches user data needs the same PHI sanitization, audit logging, and access control as the rest of the app. You'd be doubling your compliance surface area.
+
+3. **Opportunity cost**: Every hour building admin tooling is an hour not spent on the product PTs are paying for. At your stage, this is the wrong tradeoff.
+
+4. **Purpose-built tools are better**: Stripe's dashboard is better at billing management than anything you'd build. Sentry is better at error tracking. Axiom is better at log analysis. PostgreSQL queries are more flexible than any admin UI.
+
+### What You Actually Need (and Where to Get It)
+
+#### Layer 1: Business Metrics (Stripe Dashboard)
+
+This is your primary business operations view. Stripe already gives you:
+
+| What You Need | Where You Get It |
+|---------------|-----------------|
+| MRR, ARR, revenue trends | Stripe Dashboard → Revenue |
+| Active subscriptions by plan | Stripe Dashboard → Subscriptions |
+| Churn rate | Stripe Dashboard → Revenue → Churn |
+| Failed payments and retries | Stripe Dashboard → Payments → Failed |
+| Individual customer details | Stripe Dashboard → Customers → Search |
+| Refund management | Stripe Dashboard → Payments → Refund |
+| Clinic plan seat counts | Stripe Dashboard → Subscriptions → Quantity |
+| Invoice history | Stripe Dashboard → Invoices |
+
+**You're already paying Stripe 2.9% + $0.30 per transaction. Use their dashboard -- it's world-class.**
+
+For your revenue target of $3K/mo MRR (100 users at $30/mo), the Stripe dashboard tells you exactly where you stand without writing a line of code.
+
+#### Layer 2: Error Visibility (Sentry)
+
+Already implemented across all three components. This is your "is the product working?" view.
+
+| What You Need | Where You Get It |
+|---------------|-----------------|
+| Are there production errors? | Sentry → Issues (already configured) |
+| Which users are affected? | Sentry → Issue → Tags → userId |
+| Is it getting worse? | Sentry → Issue → Frequency graph |
+| Did a deploy break something? | Sentry → Releases (configure in CI) |
+| What's the stack trace? | Sentry → Issue → Event detail |
+
+You already have PHI-safe `beforeSend` hooks on all three components. Sentry is ready to use as-is.
+
+#### Layer 3: Operational Logs (Axiom)
+
+This is the piece you're missing. Axiom fills the gap between "Sentry shows errors" and "I need to understand what's happening in the system."
+
+**What Axiom gives you that Sentry doesn't:**
+
+| Concern | Sentry | Axiom |
+|---------|--------|-------|
+| Errors and exceptions | Yes | Also, but Sentry is better |
+| Request volume and latency | No | Yes -- how many notes/day, P95 response time |
+| User activity patterns | No | Yes -- who's active, who churned, peak usage times |
+| Audit log queries | No | Yes -- "show me all logins for user X this week" |
+| Business dashboards | No | Yes -- "notes generated per clinic per month" |
+| Security anomaly detection | Partial | Yes -- "show me all failed logins from this IP range" |
+| Webhook delivery monitoring | No | Yes -- "are Stripe webhooks processing successfully?" |
+
+**Axiom setup is already spec'd in your MONITORING_SETUP.md** (winston + @axiomhq/winston transport). The free tier gives you 500GB/month which is more than enough.
+
+**What to log to Axiom (HIPAA-safe):**
+
+```typescript
+// Every API request (in middleware)
+logger.info('api_request', {
+  method: req.method,
+  path: req.path,
+  statusCode: res.statusCode,
+  durationMs: elapsed,
+  userId: req.user?.userId,   // Safe: just a UUID
+  orgId: req.user?.orgId,     // Safe: just a UUID
+});
+
+// Note generation events (already tracked, just pipe to Axiom)
+logger.info('note_generated', {
+  userId, noteType, durationMs, tokensUsed, model, success: true
+});
+
+// Auth events (already in audit_logs, mirror to Axiom for querying)
+logger.info('auth_event', {
+  action: 'LOGIN', userId, success: true
+});
+```
+
+**What Axiom is NOT:** It's not a replacement for your PostgreSQL `audit_logs` table. Audit logs are your HIPAA-mandated source of truth (6-year retention, immutability). Axiom is for operational queries -- "what happened in the last 2 hours" not "prove to an auditor what happened 3 years ago."
+
+#### Layer 4: Uptime (UptimeRobot)
+
+Already planned in MONITORING_SETUP.md. Free tier, 5-minute intervals, alerts via email/Slack.
+
+#### Splunk, Datadog, etc.?
+
+**No. Not at your scale.** Splunk starts at ~$1,800/year. Datadog starts at ~$15/host/month and grows fast. These are enterprise tools for teams with dedicated SRE staff. Axiom's free tier does everything you need for the next 12-18 months. Revisit when you're past $10K MRR and have operational complexity that warrants the cost.
+
+### How You Manage Users and Clinics Day-to-Day
+
+**Use direct database queries + Stripe dashboard, not an admin panel.**
+
+```bash
+# How many users do I have?
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM users;"
+
+# Who signed up this week?
+psql $DATABASE_URL -c "
+  SELECT id, email, subscription_status, created_at
+  FROM users WHERE created_at > NOW() - INTERVAL '7 days'
+  ORDER BY created_at DESC;"
+
+# How many notes were generated this month?
+psql $DATABASE_URL -c "
+  SELECT SUM(notes_generated) as total_notes, COUNT(DISTINCT user_id) as active_users
+  FROM usage WHERE month = '2026-02';"
+
+# Which clinics exist and how many seats are used?
+psql $DATABASE_URL -c "
+  SELECT o.name, o.max_seats, o.subscription_status,
+    COUNT(om.id) FILTER (WHERE om.removed_at IS NULL) as active_members
+  FROM organizations o
+  LEFT JOIN organization_members om ON om.organization_id = o.id
+  GROUP BY o.id ORDER BY o.created_at DESC;"
+
+# What did user X do recently? (audit trail)
+psql $DATABASE_URL -c "
+  SELECT action, status, metadata, created_at
+  FROM audit_logs WHERE user_id = 'uuid-here'
+  ORDER BY created_at DESC LIMIT 20;"
+```
+
+At 5-50 clinics, this is faster than any admin UI and infinitely more flexible. When you're running these queries daily and getting annoyed, *that's* when you consider automation -- but likely through Axiom dashboards, not custom code.
+
+### Onboarding a Clinic: Self-Serve vs. High-Touch
+
+#### Phase 3 (Beta - 1-2 Clinics): High-Touch Onboarding
+
+At this stage, you onboard clinics personally. The process:
+
+1. **Sales conversation** -- you talk to the clinic owner/manager
+2. **Clinic-level BAA** -- they sign your BAA template (PDF/DocuSign, stored in business records)
+3. **You create beta invite codes** -- via CLI script or direct DB insert:
+   ```bash
+   # Generate a beta code for the clinic admin
+   node scripts/generate-invite-code.js --type=beta --expires=30d
+   ```
+4. **Clinic admin registers** -- uses the beta code, gets an account
+5. **Clinic admin purchases plan** -- Stripe checkout creates the org automatically
+6. **Clinic admin generates invite codes for PTs** -- self-serve from the Team dashboard
+7. **PTs register and start using** -- each accepts legal terms individually
+
+Steps 5-7 are fully self-serve. You're only involved in 1-4, and only because you want direct feedback during beta.
+
+#### Phase 4 (Public Launch): Self-Serve Onboarding
+
+The entire flow becomes self-serve:
+
+1. Clinic admin visits pricing page → selects "Clinic Plan"
+2. Enters clinic name + seat count during checkout
+3. Stripe checkout → webhook creates org → admin becomes owner
+4. Admin generates invite codes from Team dashboard
+5. PTs register with codes
+
+**The clinic-level BAA is the one part that's hard to fully automate.** Options:
+
+| Approach | Effort | When |
+|----------|--------|------|
+| Manual (email PDF, DocuSign) | Zero code | Beta, up to ~20 clinics |
+| Clickwrap in checkout flow ("I represent [Clinic] and accept the BAA") | Medium | When manual becomes a bottleneck |
+| Full e-signature integration (DocuSign API, PandaDoc) | High | Enterprise, $50K+ deals |
+
+For now, manual is fine. The individual per-user legal acceptance (already built) covers the HIPAA requirement for individual users. The entity-level BAA is a business agreement, not a per-click obligation.
+
+### Is a "God Mode" User Bad Practice?
+
+**Yes, an in-app god mode is bad practice.** Here's why specifically for healthcare software:
+
+1. **Audit trail ambiguity**: If a super-admin modifies a user's subscription or generates notes "on behalf of" a user, the audit trail becomes murky. HIPAA auditors want to know exactly who did what.
+
+2. **PHI exposure risk**: A god-mode user who can view "any user's data" is seeing data they have no clinical need for. HIPAA's minimum necessary standard says you should only access PHI you need for your specific role.
+
+3. **Single account compromise**: One compromised password exposes everything. With the external tools approach, an attacker would need to compromise Stripe + Sentry + your database separately.
+
+4. **You don't need it**: Everything a god-mode account would do, you can already do through existing tools:
+
+| "I want to..." | How |
+|----------------|-----|
+| See all users | `psql` query |
+| Check a user's subscription | Stripe Dashboard → Customers |
+| Reset a user's password | `psql` → update password_hash, or tell them to use forgot-password |
+| Disable a user | `psql` → set subscription_status = 'canceled', increment token_version |
+| Generate invite codes | CLI script → inserts into invite_codes table |
+| View usage stats | `psql` query or Axiom dashboard |
+| Debug an error | Sentry → search by userId |
+| Monitor uptime | UptimeRobot |
+
+**The principle: Use the right tool for each job, not one tool for all jobs.**
+
+### What You Should Build (and When)
+
+| Tool | When | Why |
+|------|------|-----|
+| CLI script: `generate-invite-code.js` | Wave 1 (now) | You need this to create beta codes |
+| Axiom integration (winston transport) | Before beta launch | Operational visibility |
+| UptimeRobot monitors | Before beta launch | Know when things are down |
+| Axiom dashboard: "FlashNote Overview" | First month of beta | Business metrics at a glance |
+| CLI script: `manage-user.js` (disable, reset) | When you need it | Ad-hoc user management |
+| Internal Retool/Metabase dashboard | $10K+ MRR | When psql queries feel slow |
+
+### Your Daily Operations Workflow (Beta)
+
+```
+Morning:
+  1. Open Stripe Dashboard → check revenue, failed payments
+  2. Open Sentry → check for new errors, triage
+  3. Open Axiom → glance at notes generated, active users
+  4. Open UptimeRobot → confirm everything's green
+
+When a support request comes in:
+  1. Get user email → look up in Stripe Dashboard (billing)
+  2. Get userId → search in Sentry (errors they've hit)
+  3. Get userId → query audit_logs in psql (what they did)
+  4. Get userId → query Axiom (recent activity)
+
+When onboarding a new clinic:
+  1. Sales conversation → agree on plan/seats
+  2. Generate invite code → share with clinic admin
+  3. Monitor their first week in Axiom → proactive support
+```
+
+---
+
 ## What NOT to Build Yet
 
 | Feature | Why Not Yet |
