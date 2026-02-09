@@ -30,6 +30,7 @@ const DUMMY_HASH = '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYq1IpHBBUGK
 interface LoginContext {
   ipAddress?: string;
   userAgent?: string;
+  acceptedLegalTerms?: true;
 }
 
 class AuthService {
@@ -50,22 +51,24 @@ class AuthService {
       await client.query('BEGIN');
       user = await createUserWithClient(client, email, passwordHash);
 
-      try {
-        await recordLegalAcceptances(
-          client,
-          user.id,
-          context.ipAddress ?? null,
-          context.userAgent ?? null
-        );
-      } catch (error) {
-        Sentry.captureException(error, {
-          extra: {
-            source: 'auth_service',
-            errorType: 'legal_acceptance_recording_failed',
-            userId: user.id,
-          },
-        });
-        throw error;
+      if (context.acceptedLegalTerms) {
+        try {
+          await recordLegalAcceptances(
+            client,
+            user.id,
+            context.ipAddress ?? null,
+            context.userAgent ?? null
+          );
+        } catch (error) {
+          Sentry.captureException(error, {
+            extra: {
+              source: 'auth_service',
+              errorType: 'legal_acceptance_recording_failed',
+              userId: user.id,
+            },
+          });
+          throw error;
+        }
       }
 
       await client.query('COMMIT');

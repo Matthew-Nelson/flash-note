@@ -744,7 +744,7 @@ describe('AuthService', () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [existingUser] });
 
       await expect(
-        authService.register('existing@example.com', 'ValidPass123')
+        authService.register('existing@example.com', 'ValidPass123', { acceptedLegalTerms: true })
       ).rejects.toThrow('Email already registered');
     });
 
@@ -789,7 +789,7 @@ describe('AuthService', () => {
       // Update token hash
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      const result = await authService.register('new@example.com', 'ValidPass123');
+      const result = await authService.register('new@example.com', 'ValidPass123', { acceptedLegalTerms: true });
 
       // Registration should succeed despite email failure
       expect(result).not.toBeNull();

@@ -75,12 +75,12 @@ const validateResetTokenSchema = z.object({
 // POST /auth/register
 authRouter.post('/register', registerRateLimit, async (req, res, next) => {
   try {
-    const { email, password } = registerSchema.parse(req.body);
+    const { email, password, acceptedLegalTerms } = registerSchema.parse(req.body);
     const ipAddress = req.ip ?? undefined;
     const userAgent = req.get('user-agent');
 
     // HIGH-006: Pass context for device binding on session creation
-    const result = await authService.register(email, password, { ipAddress, userAgent });
+    const result = await authService.register(email, password, { ipAddress, userAgent, acceptedLegalTerms });
 
     await auditService.log({
       userId: result.user.id,
