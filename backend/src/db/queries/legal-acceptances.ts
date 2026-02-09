@@ -1,5 +1,6 @@
 import type pg from 'pg';
 import { LEGAL_DOCUMENT_VERSIONS } from '../../config.js';
+import { sanitizeIpAddress } from '../../utils/request-utils.js';
 import type { LegalAcceptanceRow } from '../../types/database.js';
 
 /**
@@ -13,6 +14,7 @@ export async function recordLegalAcceptances(
   ipAddress: string | null,
   userAgent: string | null
 ): Promise<LegalAcceptanceRow[]> {
+  const safeIp = sanitizeIpAddress(ipAddress);
   const rows: LegalAcceptanceRow[] = [];
 
   for (const [docType, version] of Object.entries(LEGAL_DOCUMENT_VERSIONS)) {
@@ -20,7 +22,7 @@ export async function recordLegalAcceptances(
       `INSERT INTO legal_acceptances (user_id, document_type, document_version, ip_address, user_agent)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [userId, docType, version, ipAddress, userAgent]
+      [userId, docType, version, safeIp, userAgent]
     );
     rows.push(result.rows[0]!);
   }
