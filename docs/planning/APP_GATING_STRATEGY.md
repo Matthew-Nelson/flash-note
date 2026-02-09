@@ -1,8 +1,36 @@
-# App Gating Strategy: Beta Rollout & Clinic Seat Management
+# App Gating Strategy: Beta Rollout & Clinic Management
 
 > **Status: PLANNING**
 >
-> This document covers the strategy for gating FlashNote from closed → beta → public launch, and how that same mechanism extends to enterprise/clinic seat management.
+> This document covers:
+> 1. Gating FlashNote from closed → beta → public launch
+> 2. Full clinic-level management: roles, permissions, seat lifecycle, usage dashboards
+> 3. How the usage endpoint design changes for org-level reporting
+> 4. How existing systems (legal acceptance, subscription middleware, audit logging) adapt
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Environment Strategy](#environment-strategy)
+- [Registration Gating](#registration-gating)
+- [Invite Code Design](#invite-code-design)
+- [Data Model: All New Tables & Changes](#data-model-all-new-tables--changes)
+- [Roles & Permissions](#roles--permissions)
+- [Clinic Admin Capabilities](#clinic-admin-capabilities)
+- [Seat Lifecycle Management](#seat-lifecycle-management)
+- [Onboarding Flows](#onboarding-flows)
+- [Legal Acceptance & Clinic Onboarding](#legal-acceptance--clinic-onboarding)
+- [Subscription Middleware Changes](#subscription-middleware-changes)
+- [Usage Endpoint Design](#usage-endpoint-design)
+- [Stripe Integration for Clinic Plans](#stripe-integration-for-clinic-plans)
+- [API Endpoints](#api-endpoints)
+- [Audit Logging](#audit-logging)
+- [Security Considerations](#security-considerations)
+- [Rollout Phases](#rollout-phases)
+- [What NOT to Build Yet](#what-not-to-build-yet)
+- [Implementation Order](#implementation-order)
 
 ---
 
@@ -11,9 +39,11 @@
 FlashNote needs two related access-control mechanisms:
 
 1. **Launch gating** - Control who can register as we move from closed to beta to public
-2. **Clinic seat management** - Allow clinics to buy a multi-seat package and invite/remove therapists
+2. **Clinic seat management** - Allow clinics to buy a multi-seat package and manage their therapists
 
-These share a core primitive: **invite codes**. Rather than building two separate systems, we design one invite code system that handles both use cases. The code's `type` field determines whether it's a standalone beta invite or a clinic seat assignment.
+These share a core primitive: **invite codes**. One invite code system handles both use cases. The code's `type` field determines whether it's a standalone beta invite or a clinic seat assignment.
+
+**Key insight: a clinic IS a beta test environment.** When we onboard a clinic during beta, the clinic admin becomes our distribution channel. They manage their PTs, we manage the clinics. This reduces our direct support burden from N therapists down to 1-2 clinic admins.
 
 ---
 
@@ -85,103 +115,272 @@ The registration form has one invite code field regardless of code type. The bac
 - **Single-use**: Each code is redeemed by exactly one user (audit trail)
 - **Expirable**: Codes have an `expires_at` timestamp (e.g., 30 days for clinic invites)
 - **Revocable**: `is_active` can be set to `false` before redemption
-- **8-character alphanumeric**: Short enough to share verbally, long enough to avoid collisions (36^8 = ~2.8 trillion combinations)
+- **8-character alphanumeric**: Short enough to share verbally, long enough to avoid collisions
 
 ### Code Generation
 
 ```
 Format: XXXX-XXXX (e.g., "AB3K-M7RN")
-Alphabet: A-Z, 0-9 (no lowercase, no ambiguous chars like 0/O, 1/I/L)
-Effective alphabet: ~30 chars → ~30^8 = 656 billion combinations
+Alphabet: A-Z, 2-9 (no 0/O, 1/I/L confusion)
+Effective alphabet: 30 chars → 30^8 = ~656 billion combinations
 ```
 
 ---
 
-## Clinic / Enterprise Seat Management
+## Data Model: All New Tables & Changes
 
-### New Tables
+### New Table: `organizations`
 
-**organizations**
 ```sql
 CREATE TABLE organizations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
-  max_seats INT NOT NULL,
+  max_seats INT NOT NULL CHECK (max_seats > 0),
+
+  -- Billing (mirrors user-level Stripe fields)
   stripe_customer_id TEXT,
   subscription_id TEXT,
-  subscription_status TEXT DEFAULT 'trialing',
+  subscription_status TEXT DEFAULT 'trialing'
+    CHECK (subscription_status IN ('trialing', 'active', 'canceled', 'past_due', 'unpaid')),
   trial_ends_at TIMESTAMPTZ,
+
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 ```
 
-**organization_members**
+### New Table: `organization_members`
+
 ```sql
 CREATE TABLE organization_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   organization_id UUID NOT NULL REFERENCES organizations(id),
   user_id UUID NOT NULL REFERENCES users(id),
-  role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
+  role TEXT NOT NULL DEFAULT 'member'
+    CHECK (role IN ('owner', 'admin', 'member')),
   joined_at TIMESTAMPTZ DEFAULT NOW(),
   removed_at TIMESTAMPTZ,
+
+  -- Prevent duplicate active memberships
+  -- (a user CAN be re-added after removal, creating a new row)
   UNIQUE(organization_id, user_id)
 );
+
+CREATE INDEX idx_org_members_user ON organization_members(user_id)
+  WHERE removed_at IS NULL;
+
+CREATE INDEX idx_org_members_org ON organization_members(organization_id)
+  WHERE removed_at IS NULL;
 ```
 
-**users table addition**
+### New Table: `invite_codes`
+
+(See [Invite Code Design](#invite-code-design) above for full DDL)
+
 ```sql
-ALTER TABLE users ADD COLUMN invited_by_code UUID REFERENCES invite_codes(id);
+CREATE INDEX idx_invite_codes_code ON invite_codes(code);
+CREATE INDEX idx_invite_codes_org ON invite_codes(organization_id)
+  WHERE used_by IS NULL AND is_active = TRUE;
+```
+
+### Modified Table: `users`
+
+```sql
+ALTER TABLE users ADD COLUMN organization_id UUID REFERENCES organizations(id);
+```
+
+This is a denormalized convenience column. The source of truth is `organization_members`, but having `organization_id` on the user allows the subscription middleware to do a single query instead of a JOIN. It's set on join, cleared on removal.
+
+### No Changes Needed
+
+- **`usage`** - Already per-user, per-month. Org-level aggregation done via JOINs, no schema change.
+- **`legal_acceptances`** - Already per-user. Each PT must individually accept terms (HIPAA requirement). No change.
+- **`audit_logs`** - Already flexible via JSONB `metadata`. New audit actions added to the enum, but table schema unchanged.
+- **`sessions`** - No change. Sessions are per-user regardless of org membership.
+
+---
+
+## Roles & Permissions
+
+### Three Roles
+
+| Role | Who | How They Get It |
+|------|-----|-----------------|
+| **`owner`** | The person who purchased the clinic plan | Automatically assigned at org creation |
+| **`admin`** | Delegated manager (e.g., lead PT, office manager) | Promoted by owner |
+| **`member`** | Therapist using the product | Joins via invite code |
+
+### Permission Matrix
+
+| Action | Owner | Admin | Member | Individual PT |
+|--------|-------|-------|--------|---------------|
+| Generate notes | Yes | Yes | Yes | Yes (own sub) |
+| View own usage stats | Yes | Yes | Yes | Yes |
+| View clinic usage dashboard | Yes | Yes | No | N/A |
+| View per-member usage breakdown | Yes | Yes | No | N/A |
+| Generate invite codes | Yes | Yes | No | N/A |
+| Revoke unused invite codes | Yes | Yes | No | N/A |
+| Remove members | Yes | Yes (not owner) | No | N/A |
+| Promote member → admin | Yes | No | No | N/A |
+| Demote admin → member | Yes | No | No | N/A |
+| Manage billing (add/reduce seats) | Yes | No | No | N/A |
+| Access Stripe portal | Yes | No | No | Own billing |
+| View team legal compliance | Yes | Yes | No | N/A |
+| Leave clinic voluntarily | No* | Yes | Yes | N/A |
+| Transfer ownership | Yes | No | No | N/A |
+
+*Owner cannot leave without transferring ownership first.
+
+### Why Three Roles (Not Two)
+
+The `admin` role exists for a common real-world scenario: the clinic **owner** (practice manager, business owner) purchases the plan but delegates day-to-day management to a **lead PT** or **office manager**. The admin can handle team management without access to billing.
+
+Without this, the owner would have to handle every invite code generation and member removal personally, which doesn't scale even for a 5-person clinic.
+
+---
+
+## Clinic Admin Capabilities
+
+### 1. Team Dashboard (`/dashboard/team`)
+
+What admins and owners see:
+
+```
+┌─────────────────────────────────────────────────┐
+│ Acme Physical Therapy              5 of 8 seats │
+│ Plan: Clinic (8 seats) · Active                 │
+│                                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ [Generate Invite Code]  [Manage Billing*]   │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ Team Members                                    │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ Sarah Johnson (you)      Owner   12 notes  ↗│ │
+│ │ Mike Chen                Admin    8 notes  ✕│ │
+│ │ Lisa Park                Member  22 notes  ✕│ │
+│ │ James Wilson             Member  15 notes  ✕│ │
+│ │ Emily Rodriguez          Member   3 notes  ✕│ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ Pending Invites                                 │
+│ ┌─────────────────────────────────────────────┐ │
+│ │ AB3K-M7RN  Created Feb 5  Expires Mar 7  ✕ │ │
+│ │ QW9P-2XKL  Created Feb 8  Expires Mar 10 ✕ │ │
+│ └─────────────────────────────────────────────┘ │
+│                                                 │
+│ * Billing management visible to owner only      │
+└─────────────────────────────────────────────────┘
+```
+
+### 2. Invite Code Generation
+
+- Click "Generate Invite Code" → backend checks `active_seats < max_seats`
+- Returns a code like `AB3K-M7RN` with a copy button
+- Admin shares the code however they want (email, text, Slack, sticky note)
+- Admin can see all pending (unused) codes and revoke them
+- We do NOT send invite emails - this avoids collecting non-user PII
+
+### 3. Member Removal
+
+- Click the `✕` next to a member's name
+- Confirmation dialog: "Remove [Name] from Acme Physical Therapy? They will lose access to FlashNote under this clinic's plan."
+- Backend: sets `organization_members.removed_at = NOW()`, clears `users.organization_id`
+- **Immediate revocation**: increments the removed user's `token_version` and deletes their sessions, using the existing infrastructure in `auth-service.ts`
+- Seat is freed instantly for reuse
+
+### 4. Role Management (Owner Only)
+
+- Owner can promote a member to admin or demote an admin to member
+- Simple role update on `organization_members`
+- Logged to audit trail
+
+### 5. Billing Management (Owner Only)
+
+- "Manage Billing" opens the Stripe customer portal (same pattern as individual billing)
+- Owner can add seats (updates Stripe subscription quantity → webhook updates `max_seats`)
+- Owner can reduce seats (only if `active_seats <= new_max_seats`)
+
+### 6. Legal Compliance View
+
+- Admin/owner can see which team members have accepted the current legal document versions
+- Surfaces members who registered under an older ToS/BAA version (when we bump `LEGAL_DOCUMENT_VERSIONS`)
+- Does NOT show the acceptance details (IP, user agent) - that's audit-level data, not admin data
+
+---
+
+## Seat Lifecycle Management
+
+### States
+
+```
+                 ┌─────────────┐
+    Invite code  │   INVITED   │  Code generated, not yet redeemed
+    generated    │  (pending)  │
+                 └──────┬──────┘
+                        │ PT redeems code + registers
+                        ▼
+                 ┌─────────────┐
+                 │   ACTIVE    │  Seat occupied, PT using product
+                 │             │
+                 └──────┬──────┘
+                        │
+              ┌─────────┼─────────┐
+              │                   │
+     Admin removes PT      PT leaves voluntarily
+              │                   │
+              ▼                   ▼
+       ┌─────────────┐    ┌─────────────┐
+       │   REMOVED   │    │    LEFT     │
+       │ (by admin)  │    │(voluntarily)│
+       └─────────────┘    └─────────────┘
+              │                   │
+              └─────────┬─────────┘
+                        │
+                   Seat freed
+                  (can be reused)
 ```
 
 ### Seat Counting
 
-```
-Active seats   = COUNT(*) FROM organization_members
-                 WHERE organization_id = X AND removed_at IS NULL
+```sql
+-- Active seats (occupied)
+SELECT COUNT(*) FROM organization_members
+WHERE organization_id = $1 AND removed_at IS NULL;
 
-Available seats = organizations.max_seats - active_seats
+-- Pending invites (codes generated but not yet redeemed)
+SELECT COUNT(*) FROM invite_codes
+WHERE organization_id = $1 AND used_by IS NULL AND is_active = TRUE AND expires_at > NOW();
 
-Can generate invite code = available_seats > 0
-```
-
-The clinic admin (who uses the product themselves) counts as a seat.
-
-### Subscription Middleware Change
-
-The existing `requireActiveSubscription` middleware checks `users.subscription_status`. It needs one additional check:
-
-```
-Current flow:
-  1. User has active/trialing subscription? → allow
-  2. Otherwise → deny
-
-New flow:
-  1. User has active/trialing individual subscription? → allow
-  2. User is active member of an org with active subscription? → allow
-  3. Otherwise → deny
+-- Available seats
+available = max_seats - active_seats
+-- Note: pending invites do NOT reserve seats. If the code expires unused, no seat was wasted.
+-- If two codes are out and only one seat remains, the first to register gets it. The second
+-- code fails at redemption time ("no seats available").
 ```
 
-```typescript
-// Pseudocode for the new check (step 2)
-const orgAccess = await db.query(`
-  SELECT o.subscription_status, o.trial_ends_at
-  FROM organization_members om
-  JOIN organizations o ON o.id = om.organization_id
-  WHERE om.user_id = $1 AND om.removed_at IS NULL
-  LIMIT 1
-`, [userId]);
+**Design decision: pending invites don't reserve seats.** This avoids "phantom seat" problems where an admin generates codes that never get used, blocking the org from reaching capacity. The tradeoff is that two simultaneous redemptions could race for the last seat. The backend handles this with a check at registration time. The loser gets a clear error: "This clinic has no available seats. Contact your clinic administrator."
 
-if (orgAccess.rows.length > 0) {
-  const org = orgAccess.rows[0];
-  if (org.subscription_status === 'active') { next(); return; }
-  if (org.subscription_status === 'trialing' && new Date() < org.trial_ends_at) {
-    next(); return;
-  }
-}
-```
+### What Happens to Removed Members
 
-This is a single additional query. It can be optimized later with caching if needed, but at the scale of 5-50 clinics it's negligible.
+1. `organization_members.removed_at` set to `NOW()`
+2. `users.organization_id` cleared to `NULL`
+3. `users.token_version` incremented (instantly invalidates all JWTs)
+4. All rows in `sessions` for this user deleted (kills refresh tokens)
+5. User account persists (email, password, audit trail all intact)
+6. User's next action: sees 402 `subscription_required`
+7. User can: subscribe individually, or accept an invite to another clinic
+
+### Re-adding a Previously Removed Member
+
+If a PT was removed but needs to come back:
+1. Admin generates a new invite code
+2. PT uses it to re-join
+3. Since the user already exists, the registration flow detects the existing account
+4. Instead of creating a new user, the PT logs in and "redeems" the code from a dedicated join flow
+5. New `organization_members` row created (the old one with `removed_at` stays for audit trail)
+
+This is a future flow - for v1, the PT would need to contact support or the admin could re-add them via a direct "Add existing user" feature.
 
 ---
 
@@ -191,73 +390,305 @@ This is a single additional query. It can be optimized later with caching if nee
 
 ```
 1. PT receives beta invite code (email, social media, etc.)
-2. PT visits web app → registration page shows invite code field
-3. PT enters code + email + password → backend validates:
-   - Code exists, is_active = true, not expired, not already used
-   - type = 'beta' → create user normally
-   - Set invite_codes.used_by, used_at
-   - Set users.invited_by_code
+2. Visits web app → registration page shows invite code field
+3. Enters code + email + password + accepts legal terms → backend:
+   a. Validates code (exists, active, not expired, not used)
+   b. type = 'beta' → create user in transaction:
+      - Create user
+      - Record legal acceptances (BAA, ToS, Privacy Policy)
+      - Mark invite code as used
+   c. Send verification email
 4. PT gets 14-day trial → standard subscription flow
-5. PT installs Chrome extension → logs in → uses product
+5. Installs Chrome extension → logs in → uses product
 ```
 
 ### Flow 2: Clinic Admin Purchases Plan
 
 ```
-1. Clinic admin signs up as individual PT (beta code or open registration)
-2. Admin visits pricing page → selects "Clinic Plan" (e.g., 5 seats)
-3. Stripe checkout with seat quantity selector
-4. Webhook fires → backend creates:
-   - Organization (name, max_seats = 5, stripe subscription info)
-   - Organization member (admin user, role = 'admin')
-5. Admin now sees "Team" tab in web dashboard
+1. Admin signs up as individual (with beta code or after open registration)
+2. Visits pricing page → selects "Clinic Plan" (e.g., 5 seats)
+3. Enters clinic name during checkout flow
+4. Stripe checkout with seat quantity selector
+5. Webhook fires → backend (in transaction):
+   a. Create organization (name, max_seats = quantity from Stripe)
+   b. Link Stripe subscription to organization
+   c. Create organization_member (role = 'owner')
+   d. Set users.organization_id
+   e. Audit log: ORG_CREATED
+6. Admin returns to dashboard → "Team" tab now visible
+7. Individual subscription (if any) remains for billing continuity,
+   but the owner's access now comes from the org subscription
 ```
 
 ### Flow 3: Clinic Admin Invites a PT
 
 ```
 1. Admin opens Team page → sees seat usage (e.g., "2 of 5 seats used")
-2. Admin clicks "Generate Invite Code"
+2. Clicks "Generate Invite Code"
    - Backend checks: active_seats < max_seats
    - Creates invite_code with type = 'clinic', organization_id set
-   - Returns code (e.g., "AB3K-M7RN")
-3. Admin shares code with PT via email, Slack, text, etc.
-   (We don't send the email - the admin handles distribution.
-    This avoids us collecting non-user email addresses.)
-4. PT visits web app → enters clinic code → registers
-   - Backend validates code, sees type = 'clinic'
-   - Creates user account (NO individual subscription needed)
-   - Creates organization_member (role = 'member')
-   - Marks code as used
-5. PT installs extension → logs in → subscription check passes via org
+   - Returns code (e.g., "AB3K-M7RN") with copy button
+3. Admin shares code with PT however they prefer
+4. PT visits web app → enters clinic code → registers:
+   a. Backend validates code, sees type = 'clinic'
+   b. Checks seat availability (active_seats < max_seats)
+   c. In transaction:
+      - Create user
+      - Record legal acceptances (PT must accept individually - HIPAA)
+      - Create organization_member (role = 'member')
+      - Set users.organization_id
+      - Mark invite code as used
+   d. Send verification email
+5. PT does NOT need to pay - org subscription covers access
+6. Installs extension → logs in → subscription check passes via org
 ```
 
 ### Flow 4: Clinic Admin Removes a PT
 
 ```
-1. Admin opens Team page → sees list of active members
-2. Admin clicks "Remove" on a therapist
-3. Backend sets organization_members.removed_at = NOW()
-4. Seat is freed (available_seats increases by 1)
-5. Admin can generate a new invite code for replacement PT
-
-What happens to the removed PT:
-- Their user account remains (no data loss)
-- Next API call: middleware checks org membership → removed → falls through
-- No individual subscription either → gets 402 "subscription_required"
-- They see a message: "Your clinic access has ended. Subscribe individually to continue."
-- They can convert to an individual plan at any time
+1. Admin opens Team page → clicks "Remove" on a therapist
+2. Confirmation dialog with therapist name
+3. Backend (in transaction):
+   a. Set organization_members.removed_at = NOW()
+   b. Clear users.organization_id = NULL
+   c. Increment users.token_version (immediate JWT invalidation)
+   d. Delete all sessions for this user
+   e. Audit log: ORG_MEMBER_REMOVED
+4. Seat freed immediately
+5. Removed PT experiences:
+   - Current browser/extension session fails on next API call
+   - Sees: "Your clinic access has ended. Subscribe individually to continue."
+   - Can purchase individual plan at any time
 ```
 
-### Flow 5: PT Leaves a Clinic Voluntarily
+### Flow 5: PT Leaves Voluntarily
 
 ```
 1. PT opens Settings → sees "Clinic: Acme Physical Therapy"
-2. PT clicks "Leave Clinic"
-3. Backend sets organization_members.removed_at = NOW()
-4. Seat is freed for the clinic
-5. PT can subscribe individually or join another clinic
+2. Clicks "Leave Clinic" → confirmation dialog
+3. Backend:
+   a. Validates user is not the owner (owners must transfer first)
+   b. Set organization_members.removed_at = NOW()
+   c. Clear users.organization_id = NULL
+   d. Audit log: ORG_MEMBER_LEFT
+4. Seat freed for the clinic
+5. PT's access immediately changes to individual subscription check
+   - If they have no individual sub → 402
+   - They can subscribe individually
 ```
+
+---
+
+## Legal Acceptance & Clinic Onboarding
+
+### Why Every PT Must Individually Accept Terms
+
+HIPAA requires that each individual who accesses PHI through the system has personally acknowledged the BAA and privacy obligations. A clinic admin cannot accept on behalf of their therapists.
+
+**Current system (already built):**
+- Registration requires `acceptedLegalTerms: true`
+- Backend atomically records acceptance of BAA v1.0, ToS v1.0, Privacy Policy v1.0 in `legal_acceptances` table
+- Each record includes IP address and user agent for audit trail
+
+**What changes for clinic members: Nothing.** The same legal acceptance flow fires whether the user registered with a beta code or a clinic code. The invite code type only affects subscription/billing, not legal consent.
+
+### Clinic-Level BAA
+
+In addition to individual PT acceptance, the **clinic itself** (as a Covered Entity) may want to sign a separate BAA with FlashNote. This is a business/legal process, not a software feature:
+
+- We already have `docs/legal/BAA_TEMPLATE.md` for this
+- Clinic admin downloads/signs the BAA during sales process
+- Stored in our business records (not in the database)
+- The `legal_acceptances` table tracks individual user consent, not entity-level agreements
+
+### Admin Compliance View
+
+Admins can view which team members have accepted current document versions:
+
+```sql
+-- For each org member, get their latest acceptance per document type
+SELECT
+  u.id, u.email,
+  la.document_type, la.document_version, la.accepted_at
+FROM organization_members om
+JOIN users u ON u.id = om.user_id
+LEFT JOIN LATERAL (
+  SELECT document_type, document_version, accepted_at
+  FROM legal_acceptances
+  WHERE user_id = u.id
+  ORDER BY accepted_at DESC
+) la ON true
+WHERE om.organization_id = $1 AND om.removed_at IS NULL;
+```
+
+This surfaces: "Mike Chen accepted BAA v1.0 on Feb 3, but we're now on v1.1" - useful when we update terms and need re-acceptance.
+
+---
+
+## Subscription Middleware Changes
+
+### Current Flow (`requireActiveSubscription`)
+
+```
+1. Get user's subscription_status and trial_ends_at from users table
+2. If 'trialing' and trial not expired → allow
+3. If 'active' → allow
+4. Otherwise → 402
+```
+
+### New Flow
+
+```
+1. Get user's subscription_status, trial_ends_at, AND organization_id from users table
+   (single query, no extra round trip since organization_id is on the users table)
+2. If user has active/trialing individual subscription → allow
+3. If user has organization_id set:
+   a. Query organizations table for subscription_status
+   b. If org subscription is 'active' → allow
+   c. If org subscription is 'trialing' and trial not expired → allow
+4. Otherwise → 402 with appropriate error code:
+   - 'trial_expired' if individual trial ran out
+   - 'subscription_required' if no subscription at all
+   - 'clinic_subscription_expired' if org sub lapsed (new code)
+```
+
+```typescript
+// Step 3 pseudocode - only runs if user has org_id but no individual sub
+const orgResult = await db.query<OrgSubscriptionRow>(
+  `SELECT subscription_status, trial_ends_at FROM organizations WHERE id = $1`,
+  [user.organization_id]
+);
+
+if (orgResult.rows.length > 0) {
+  const org = orgResult.rows[0]!;
+  if (org.subscription_status === 'active') { next(); return; }
+  if (org.subscription_status === 'trialing' && new Date() < org.trial_ends_at) {
+    next(); return;
+  }
+}
+```
+
+**Performance note:** The denormalized `users.organization_id` means we already have the org ID from the first query. The second query is a primary key lookup on `organizations` - effectively free.
+
+---
+
+## Usage Endpoint Design
+
+### Current State
+
+- `usageService.incrementUsage(userId, tokensUsed)` called after note generation (works, non-blocking)
+- `usageService.getMonthlyUsage(userId)` returns `{notesGenerated, tokensUsed}`
+- **No API endpoint exists** - dashboard shows hardcoded mock data
+
+### New Endpoints
+
+#### `GET /usage/me` - Individual Usage Stats
+
+For any authenticated user (individual or org member). Returns their personal usage.
+
+```typescript
+// Response
+{
+  success: true,
+  data: {
+    currentMonth: "2026-02",
+    notesGenerated: 42,
+    tokensUsed: 18500,
+    // Include org context if applicable
+    organization: {                   // null for individual users
+      name: "Acme Physical Therapy",
+      role: "member"
+    }
+  }
+}
+```
+
+**Implementation:** Calls existing `usageService.getMonthlyUsage(userId)`, adds org context from `users.organization_id` JOIN.
+
+#### `GET /organization/usage` - Clinic Usage Dashboard (Admin/Owner Only)
+
+Aggregated clinic-level usage. This is the admin dashboard data.
+
+```typescript
+// Response
+{
+  success: true,
+  data: {
+    organization: {
+      name: "Acme Physical Therapy",
+      maxSeats: 8,
+      activeSeats: 5,
+      subscriptionStatus: "active"
+    },
+    currentMonth: "2026-02",
+    totals: {
+      notesGenerated: 87,
+      tokensUsed: 42000
+    },
+    members: [
+      {
+        userId: "uuid",
+        email: "sarah@clinic.com",
+        role: "owner",
+        joinedAt: "2026-01-15T...",
+        usage: { notesGenerated: 12, tokensUsed: 5200 }
+      },
+      {
+        userId: "uuid",
+        email: "mike@clinic.com",
+        role: "admin",
+        joinedAt: "2026-01-20T...",
+        usage: { notesGenerated: 8, tokensUsed: 3800 }
+      },
+      {
+        userId: "uuid",
+        email: "lisa@clinic.com",
+        role: "member",
+        joinedAt: "2026-02-01T...",
+        usage: { notesGenerated: 22, tokensUsed: 10100 }
+      }
+      // ...
+    ],
+    pendingInvites: 2
+  }
+}
+```
+
+**Implementation:**
+
+```sql
+-- Aggregated org usage for current month
+SELECT
+  u.id AS user_id,
+  u.email,
+  om.role,
+  om.joined_at,
+  COALESCE(us.notes_generated, 0) AS notes_generated,
+  COALESCE(us.tokens_used, 0) AS tokens_used
+FROM organization_members om
+JOIN users u ON u.id = om.user_id
+LEFT JOIN usage us ON us.user_id = om.user_id AND us.month = $2
+WHERE om.organization_id = $1 AND om.removed_at IS NULL
+ORDER BY om.role ASC, us.notes_generated DESC NULLS LAST;
+```
+
+#### `GET /organization/usage/history` - Month-over-Month (Future)
+
+For trend charts. Returns last N months of aggregated org usage. Not needed for v1 but the schema supports it since `usage` already has per-month rows.
+
+### Usage Service Changes
+
+The existing `UsageService` class needs two new methods:
+
+```typescript
+// New method: Org-level aggregated usage
+async getOrganizationUsage(organizationId: string): Promise<OrgUsageStats>
+
+// New method: Org usage per member
+async getOrganizationMemberUsage(organizationId: string): Promise<MemberUsageStats[]>
+```
+
+No changes to `incrementUsage()` - it already tracks per-user, which is the right granularity. Org-level numbers are derived via aggregation, not stored separately. This avoids dual-write consistency issues.
 
 ---
 
@@ -267,58 +698,204 @@ What happens to the removed PT:
 
 | Product | Price | Model |
 |---------|-------|-------|
-| FlashNote Individual | $30/mo | Per-user subscription |
+| FlashNote Individual | $30/mo or $288/yr | Per-user subscription |
 | FlashNote Clinic | $25/seat/mo | Quantity-based subscription |
 
-The clinic plan offers a per-seat discount as incentive. Stripe handles quantity-based billing natively.
+Stripe handles quantity-based billing natively. The per-seat discount incentivizes clinic plans over individual purchases.
 
-### Seat Changes (Future Enhancement)
+### New Environment Variables
 
-When a clinic admin wants to add more seats:
+```
+STRIPE_PRICE_CLINIC_MONTHLY=price_xxx   # Clinic per-seat monthly price
+```
+
+Added to `config.ts` env schema:
+```typescript
+STRIPE_PRICE_CLINIC_MONTHLY: z.string().optional(),
+```
+
+### Checkout Flow Changes
+
+The existing `/billing/checkout` endpoint gets a new `plan` parameter:
+
+```typescript
+// Existing: individual checkout
+POST /billing/checkout
+{ priceId: "price_monthly_xxx" }
+
+// New: clinic checkout
+POST /billing/checkout
+{ priceId: "price_clinic_monthly_xxx", quantity: 5, clinicName: "Acme PT" }
+```
+
+The webhook handler for `checkout.session.completed` checks whether the price is a clinic plan and, if so, creates the organization.
+
+### Webhook Event Handling
+
+| Event | Individual | Clinic |
+|-------|-----------|--------|
+| `checkout.session.completed` | Update user subscription | Create org + assign owner |
+| `customer.subscription.updated` | Update `users.subscription_status` | Update `organizations.subscription_status` + sync `max_seats` with quantity |
+| `customer.subscription.deleted` | Set user status to `canceled` | Set org status to `canceled` (all members lose access) |
+| `invoice.payment_failed` | Set user status to `past_due` | Set org status to `past_due`, all members affected |
+
+### Seat Changes via Stripe
+
+When admin adds seats:
 1. Admin clicks "Add Seats" → selects new total
-2. Backend updates Stripe subscription quantity
-3. Backend updates `organizations.max_seats`
-4. Stripe prorates the billing automatically
+2. Backend calls Stripe: update subscription quantity
+3. Stripe webhook fires `customer.subscription.updated` with new quantity
+4. Backend updates `organizations.max_seats` from the webhook (single source of truth)
 
-When a clinic downsizes:
-1. Admin must first remove PTs to get below new seat count
-2. Admin clicks "Reduce Seats" → selects new total
-3. Backend validates `active_seats <= new_max_seats`
-4. Updates Stripe subscription quantity and `organizations.max_seats`
+When admin reduces seats:
+1. Backend validates `active_seats <= requested_new_max` before calling Stripe
+2. If valid, updates Stripe subscription quantity
+3. Webhook syncs `organizations.max_seats`
 
-### Webhook Events to Handle
-
-| Event | Action |
-|-------|--------|
-| `checkout.session.completed` (clinic plan) | Create organization + assign admin |
-| `customer.subscription.updated` | Sync `organizations.subscription_status` |
-| `customer.subscription.deleted` | Set org status to `canceled`, all members lose access |
-| `invoice.payment_failed` | Set org status to `past_due`, notify admin |
+**Stripe is the source of truth for `max_seats`.** The backend never sets `max_seats` directly - it always flows through Stripe webhooks. This prevents billing/access desync.
 
 ---
 
-## Access Control Summary
+## API Endpoints
 
-### Who Can Do What
+### Registration Change
 
-| Action | Individual PT | Clinic Admin | Clinic Member |
-|--------|--------------|--------------|---------------|
-| Generate notes | Yes (own sub) | Yes (org sub) | Yes (org sub) |
-| View own usage | Yes | Yes | Yes |
-| View team usage | N/A | Yes | No |
-| Generate invite codes | N/A | Yes (up to seat limit) | No |
-| Remove team members | N/A | Yes | No |
-| Manage billing | Own only | Clinic billing | No |
-| Leave clinic | N/A | No (must transfer admin) | Yes |
+```
+POST /auth/register
+  Body: { email, password, acceptedLegalTerms: true, inviteCode? }
+  - If REGISTRATION_MODE=closed → 403 "registration_closed"
+  - If REGISTRATION_MODE=invite → inviteCode required, 400 if missing
+  - If REGISTRATION_MODE=open → inviteCode optional (for clinic codes)
+  - If code type=clinic → auto-join org, no trial needed
+  - If code type=beta or no code → normal trial flow
+```
 
-### Constraint: One Organization Per User
+### Usage Endpoints
 
-A user can belong to at most one organization at a time. This simplifies:
-- Billing (no question about which org is "paying" for a given usage)
-- The subscription middleware (one org lookup, not many)
-- Usage tracking (usage attributed to one org or individual, never ambiguous)
+```
+GET /usage/me                      Own usage stats (any authenticated user)
+```
 
-If a PT works at two clinics, they pick one clinic affiliation and use an individual plan for the other. This matches the real-world pattern where PTs typically have one primary employer.
+### Organization Endpoints
+
+```
+GET    /organization                Org details + seat count (any org member)
+GET    /organization/usage          Org usage dashboard (owner/admin only)
+GET    /organization/members        List active members (owner/admin only)
+DELETE /organization/members/:id    Remove a member (owner/admin only, not self, not owner)
+PATCH  /organization/members/:id    Change role (owner only)
+POST   /organization/leave          Leave org (admin/member only, not owner)
+POST   /organization/transfer       Transfer ownership (owner only)
+```
+
+### Invite Code Endpoints
+
+```
+POST   /organization/invites           Generate invite code (owner/admin, checks seat limit)
+GET    /organization/invites           List pending invite codes (owner/admin)
+DELETE /organization/invites/:id       Revoke an unused invite code (owner/admin)
+POST   /invite-codes/validate          Check if a code is valid (public, pre-registration)
+```
+
+### Middleware Stack for Org Endpoints
+
+```
+Organization read endpoints:
+  requireAuth → requireCsrf → requireOrgMembership
+
+Organization admin endpoints:
+  requireAuth → requireCsrf → requireOrgRole(['owner', 'admin'])
+
+Organization owner endpoints:
+  requireAuth → requireCsrf → requireOrgRole(['owner'])
+```
+
+New middleware:
+
+- **`requireOrgMembership`**: Checks `users.organization_id` is set and membership is active
+- **`requireOrgRole(roles)`**: Checks `organization_members.role` is in the allowed list
+
+---
+
+## Audit Logging
+
+### New Audit Actions
+
+Add to `AuditAction` enum in `types/index.ts`:
+
+```typescript
+// Organization lifecycle
+ORG_CREATED = 'ORG_CREATED',
+ORG_SUBSCRIPTION_CHANGED = 'ORG_SUBSCRIPTION_CHANGED',
+
+// Membership changes
+ORG_MEMBER_INVITED = 'ORG_MEMBER_INVITED',         // Invite code generated
+ORG_MEMBER_JOINED = 'ORG_MEMBER_JOINED',           // Code redeemed, member added
+ORG_MEMBER_REMOVED = 'ORG_MEMBER_REMOVED',         // Admin removed a member
+ORG_MEMBER_LEFT = 'ORG_MEMBER_LEFT',               // Member left voluntarily
+ORG_MEMBER_ROLE_CHANGED = 'ORG_MEMBER_ROLE_CHANGED',
+ORG_OWNERSHIP_TRANSFERRED = 'ORG_OWNERSHIP_TRANSFERRED',
+
+// Invite code lifecycle
+INVITE_CODE_GENERATED = 'INVITE_CODE_GENERATED',
+INVITE_CODE_REDEEMED = 'INVITE_CODE_REDEEMED',
+INVITE_CODE_REVOKED = 'INVITE_CODE_REVOKED',
+```
+
+### What Gets Logged (and What Doesn't)
+
+| Action | Logged Metadata | NOT Logged |
+|--------|----------------|------------|
+| Invite code generated | userId, orgId, codeId, type, expiresAt | The code value itself |
+| Code redeemed | newUserId, orgId, codeId | The code value |
+| Member removed | adminUserId, removedUserId, orgId, reason | |
+| Member left | userId, orgId | |
+| Org created | ownerUserId, orgId, maxSeats, clinicName | |
+| Org sub changed | orgId, oldStatus, newStatus | |
+| Role changed | adminUserId, targetUserId, orgId, oldRole, newRole | |
+| Ownership transferred | oldOwnerId, newOwnerId, orgId | |
+
+**Never log invite code values** - they are credentials. Log the `codeId` (UUID) for cross-referencing.
+
+---
+
+## Security Considerations
+
+### 1. Invite Code Brute Force
+
+Rate-limit the `/invite-codes/validate` and `/auth/register` endpoints. The existing rate limits cover registration (3/hour in prod). Add a dedicated rate limit for code validation: 10/minute per IP.
+
+### 2. Privilege Escalation
+
+All org management endpoints validate role server-side. The `requireOrgRole` middleware checks `organization_members.role` on every request - never trust client-side role claims. The role check queries the DB, not the JWT (JWTs don't carry role info).
+
+### 3. Immediate Access Revocation
+
+When a member is removed:
+1. `users.token_version` incremented → all existing JWTs fail on next use (checked in `requireAuth` middleware, already built)
+2. All `sessions` rows deleted → refresh tokens destroyed
+3. `users.organization_id` cleared → subscription middleware check fails
+
+This means a removed member is locked out within seconds, not hours. The infrastructure for this is already in place in `auth-service.ts` and `auth.ts` middleware.
+
+### 4. Cross-Org Data Isolation
+
+- Usage data is per-user, not per-org. Org aggregation happens via JOINs scoped to `organization_id`.
+- A user can only be in one org at a time (`users.organization_id` is singular).
+- Org endpoints always scope queries to the authenticated user's `organization_id`.
+- No endpoint accepts an `organization_id` parameter - it's always derived from the authenticated user's membership.
+
+### 5. Owner Account Security
+
+The owner account is the highest-privilege role and controls billing. Additional protections:
+- Ownership transfer requires re-authentication (password confirmation)
+- Owner cannot be removed by admins
+- Owner cannot leave without transferring first
+- If the owner account is compromised, the lockout system (5 failed attempts → 15 min lock) still applies
+
+### 6. Org Deletion
+
+**Not supported.** Canceling the subscription sets `subscription_status = 'canceled'` but preserves all records. The org, membership history, and audit trail are retained indefinitely (HIPAA audit requirement). If needed in the future, implement soft-delete with a retention period.
 
 ---
 
@@ -330,114 +907,92 @@ If a PT works at two clinics, they pick one clinic affiliation and use an indivi
 - Extension in Chrome developer mode
 - Internal testing and bug fixes
 - Complete HIPAA critical path items
+- **Build:** `REGISTRATION_MODE` support, invite code table, `/usage/me` endpoint
 
-### Phase 2: Beta (5-10 Individual PTs)
+### Phase 2: Beta - Individual PTs (5-10 PTs)
 - `REGISTRATION_MODE=invite`
 - Production infrastructure live (HIPAA BAA signed)
-- Generate beta invite codes, share directly with PTs
+- Generate `beta` invite codes, share directly with PTs
 - Extension published as **unlisted** on Chrome Web Store
-- Individual subscriptions only (no clinic plans yet)
-- Monitor Sentry, collect feedback, watch usage
+- **Individual subscriptions only** (no clinic plans yet)
+- Monitor Sentry, collect feedback, watch usage patterns
+- Dashboard shows real usage data via `/usage/me`
 
-### Phase 3: Clinic Pilot (1-2 Clinics)
+### Phase 3: Beta - Clinic Pilot (1-2 Clinics)
 - Still `REGISTRATION_MODE=invite`
-- Build clinic plan Stripe product + team dashboard
+- **Build:** organizations, org_members, clinic checkout, team dashboard, org usage endpoint
 - Onboard 1-2 clinics with direct support
-- Validate seat management flow end-to-end
-- Clinic admins generate invite codes for their PTs
+- Clinic admin purchases plan → generates invite codes for PTs
+- Validate full seat management lifecycle end-to-end
+- Watch for: seat counting edge cases, removed-member UX, usage reporting accuracy
 
 ### Phase 4: Public Launch
 - `REGISTRATION_MODE=open`
 - Extension republished as **public**
-- Both individual and clinic plans available on pricing page
-- Invite code field becomes optional (for clinic invites / referral tracking)
+- Both individual and clinic plans on pricing page
+- Invite code field optional on registration (only for clinic codes)
 - Self-serve clinic signup
 
 ---
 
-## API Endpoints (New)
+## What NOT to Build Yet
 
-### Invite Code Endpoints
-
-```
-POST   /api/invite-codes          Create an invite code (admin only)
-GET    /api/invite-codes           List invite codes (admin: org codes, super: all)
-DELETE /api/invite-codes/:id       Deactivate an invite code
-POST   /api/invite-codes/validate  Check if a code is valid (public, pre-registration)
-```
-
-### Organization Endpoints
-
-```
-GET    /api/organization              Get current user's org details + seat usage
-POST   /api/organization/members      List org members (admin only)
-DELETE /api/organization/members/:id   Remove a member (admin only)
-POST   /api/organization/leave         Leave org (member only, not admin)
-```
-
-### Registration Change
-
-```
-POST /api/auth/register
-  Body: { email, password, inviteCode? }
-  - If REGISTRATION_MODE=closed → 403 regardless
-  - If REGISTRATION_MODE=invite → inviteCode required
-  - If REGISTRATION_MODE=open → inviteCode optional
-```
-
----
-
-## Audit Logging
-
-All organization and invite code actions must be logged (HIPAA requirement for access control changes):
-
-| Action | Logged Data |
-|--------|-------------|
-| Invite code generated | userId, orgId, codeId, type |
-| Invite code redeemed | userId, orgId, codeId |
-| Member removed | adminUserId, removedUserId, orgId |
-| Member left voluntarily | userId, orgId |
-| Org created | adminUserId, orgId, maxSeats |
-| Org subscription changed | orgId, oldStatus, newStatus |
-
-Never log the invite code value itself in plain text (treat as a credential).
-
----
-
-## Security Considerations
-
-1. **Invite code brute force**: Rate-limit the validate and register endpoints. 8-char codes with 30-char alphabet = 656B combinations, but rate limiting is still essential.
-
-2. **Clinic admin impersonation**: Only users with `role = 'admin'` in `organization_members` can generate codes or remove members. Verified server-side on every request.
-
-3. **Removed member access window**: When a member is removed, their existing JWT access token (up to 1 hour) still works. This is acceptable given the 1-hour expiry. For immediate revocation, the token version system already exists - increment the removed user's token version to invalidate all their tokens instantly.
-
-4. **Invite code leakage**: Codes are single-use and expire. Even if leaked, the damage is limited to one unauthorized registration (which still requires email verification). Clinic admins can see who redeemed each code.
-
-5. **Org deletion**: Do not support org deletion. Instead, cancel the subscription. The org record and membership history are retained for audit purposes.
-
----
-
-## What NOT to Build (Yet)
-
-- **Admin transfers**: If an admin needs to leave, handle manually (DB update) for now
-- **Multiple admins per org**: One admin per org is sufficient initially
-- **Org name changes**: Not worth building UI for; handle via support
-- **Seat auto-scaling**: Manual seat changes only; no automatic scaling
-- **Invite via email**: We don't send invite emails - admin shares codes directly
-- **Referral tracking / affiliate codes**: Same table could support this later, but don't build it now
+| Feature | Why Not Yet |
+|---------|-------------|
+| Multiple admins per org | One owner + one admin is enough for 5-20 seat clinics |
+| Org name changes | Handle via support request |
+| Seat auto-scaling | Manual seat management via Stripe portal |
+| Invite-via-email (we send the email) | Avoids collecting non-user PII; admin shares codes directly |
+| Referral/affiliate codes | Same table could support it later; don't add the code paths now |
+| Usage history charts | The data's there (per-month rows); build the UI when clinics ask for it |
+| Usage export (CSV) | Same - data exists, build when needed |
+| Multi-org membership | One org per user is sufficient. Revisit only if PTs working at multiple clinics becomes a real pattern |
+| SSO/SAML for clinics | Way too early. Custom JWT auth is fine for 5-50 clinics |
 
 ---
 
 ## Implementation Order
 
-If/when this moves from planning to implementation:
+When this moves from planning to implementation:
 
-1. **Database migrations**: `invite_codes` table, `organizations` table, `organization_members` table, `users.invited_by_code` column
-2. **`REGISTRATION_MODE` env var** + registration endpoint changes
-3. **Invite code CRUD** (generate, validate, redeem, deactivate)
-4. **Subscription middleware update** (org-based access check)
-5. **Web dashboard: Team page** (admin view: seat usage, invite code generation, member removal)
-6. **Stripe clinic plan** (product, checkout, webhooks)
-7. **Extension: Settings** (show clinic affiliation, "Leave Clinic" option)
-8. **Audit logging** for all new actions
+### Wave 1: Individual Gating + Usage Endpoint (Beta prep)
+1. Add `REGISTRATION_MODE` to `config.ts` env schema
+2. Migration 009: `invite_codes` table
+3. Modify `/auth/register` to enforce registration mode + accept invite codes
+4. Invite code generation utility (for us to create beta codes manually or via script)
+5. `POST /invite-codes/validate` public endpoint
+6. `GET /usage/me` endpoint (expose existing `usageService.getMonthlyUsage`)
+7. Web dashboard: replace mock usage with real `/usage/me` data
+
+### Wave 2: Clinic Infrastructure
+8. Migration 010: `organizations` table, `organization_members` table, `users.organization_id` column
+9. Modify `requireActiveSubscription` middleware for org-based access
+10. `requireOrgMembership` and `requireOrgRole` middleware
+11. New audit actions in `AuditAction` enum
+12. Organization service (create, query, member management)
+13. Modify registration flow: clinic invite code → auto-join org
+
+### Wave 3: Clinic Admin Dashboard
+14. `GET /organization` endpoint (org details + seat count)
+15. `GET /organization/members` endpoint
+16. `GET /organization/usage` endpoint (aggregated + per-member)
+17. `POST /organization/invites` (generate clinic invite code)
+18. `GET /organization/invites` (list pending invites)
+19. `DELETE /organization/invites/:id` (revoke)
+20. `DELETE /organization/members/:id` (remove member + revoke access)
+21. Web: Team dashboard page (`/dashboard/team`)
+
+### Wave 4: Clinic Billing
+22. Stripe clinic product + price setup
+23. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
+24. Modify webhook handler for org-level subscription events
+25. `max_seats` sync from Stripe webhook
+26. Web: clinic plan on pricing page
+27. Owner billing management (Stripe portal link)
+
+### Wave 5: Polish
+28. `PATCH /organization/members/:id` (role changes)
+29. `POST /organization/leave` (voluntary departure)
+30. `POST /organization/transfer` (ownership transfer)
+31. Extension: show org affiliation in settings
+32. Admin compliance view (legal acceptance status per member)
