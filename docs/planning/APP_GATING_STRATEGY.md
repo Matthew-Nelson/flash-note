@@ -161,6 +161,7 @@ CREATE TABLE organization_members (
   user_id UUID NOT NULL REFERENCES users(id),
   role TEXT NOT NULL DEFAULT 'member'
     CHECK (role IN ('owner', 'admin', 'member')),
+  is_billable BOOLEAN NOT NULL DEFAULT TRUE,
   joined_at TIMESTAMPTZ DEFAULT NOW(),
   removed_at TIMESTAMPTZ
 );
@@ -210,11 +211,13 @@ This is a denormalized convenience column. The source of truth is `organization_
 
 ### Three Roles
 
-| Role | Who | How They Get It |
-|------|-----|-----------------|
-| **`owner`** | The person who purchased the clinic plan | Automatically assigned at org creation |
-| **`admin`** | Delegated manager (e.g., lead PT, office manager) | Promoted by owner |
-| **`member`** | Therapist using the product | Joins via invite code |
+| Role | Who | How They Get It | Default `is_billable` |
+|------|-----|-----------------|----------------------|
+| **`owner`** | The person who purchased the clinic plan | Automatically assigned at org creation | `FALSE` (non-clinical by default) |
+| **`admin`** | Delegated manager (e.g., lead PT, office manager) | Promoted by owner | Inherits from previous role |
+| **`member`** | Therapist using the product | Joins via invite code | `TRUE` |
+
+**Non-clinical seats:** Owners and admins who don't generate notes shouldn't consume billable seats. The `is_billable` flag on `organization_members` controls this. Owners default to non-billable since many are practice managers who only oversee the team. If the owner also generates notes, they (or an admin) can toggle this from the Team dashboard. Only billable members count against `max_seats` for subscription purposes.
 
 ### Permission Matrix
 
@@ -229,6 +232,7 @@ This is a denormalized convenience column. The source of truth is `organization_
 | Remove members | Yes | Yes (not owner) | No | N/A |
 | Promote member → admin | Yes | No | No | N/A |
 | Demote admin → member | Yes | No | No | N/A |
+| Toggle member billable status | Yes | Yes (not owner) | No | N/A |
 | Manage billing (add/reduce seats) | Yes | No | No | N/A |
 | Access Stripe portal | Yes | No | No | Own billing |
 | View team legal compliance | Yes | Yes | No | N/A |
@@ -252,40 +256,39 @@ Without this, the owner would have to handle every invite code generation and me
 What admins and owners see:
 
 ```
-┌─────────────────────────────────────────────────┐
-│ Acme Physical Therapy              5 of 8 seats │
-│ Plan: Clinic (8 seats) · Active                 │
-│                                                 │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ [Generate Invite Code]  [Manage Billing*]   │ │
-│ └─────────────────────────────────────────────┘ │
-│                                                 │
-│ Team Members                                    │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ Sarah Johnson (you)      Owner   12 notes  ↗│ │
-│ │ Mike Chen                Admin    8 notes  ✕│ │
-│ │ Lisa Park                Member  22 notes  ✕│ │
-│ │ James Wilson             Member  15 notes  ✕│ │
-│ │ Emily Rodriguez          Member   3 notes  ✕│ │
-│ └─────────────────────────────────────────────┘ │
-│                                                 │
-│ Pending Invites                                 │
-│ ┌─────────────────────────────────────────────┐ │
-│ │ AB3K-M7RN  Created Feb 5  Expires Mar 7  ✕ │ │
-│ │ QW9P-2XKL  Created Feb 8  Expires Mar 10 ✕ │ │
-│ └─────────────────────────────────────────────┘ │
-│                                                 │
-│ * Billing management visible to owner only      │
-└─────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────┐
+│ Acme Physical Therapy           3 of 8 clinical seats│
+│ Plan: Clinic (8 seats) · Active · 5 total members    │
+│                                                      │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ [Generate Invite Code]  [Manage Billing*]        │ │
+│ └──────────────────────────────────────────────────┘ │
+│                                                      │
+│ Team Members                                         │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ Sarah Johnson (you)  Owner    Non-clinical  12  ↗│ │
+│ │ Mike Chen            Admin    Non-clinical   8  ✕│ │
+│ │ Lisa Park            Member   Clinical      22  ✕│ │
+│ │ James Wilson         Member   Clinical      15  ✕│ │
+│ │ Emily Rodriguez      Member   Clinical       3  ✕│ │
+│ └──────────────────────────────────────────────────┘ │
+│                                                      │
+│ Pending Invites                                      │
+│ ┌──────────────────────────────────────────────────┐ │
+│ │ AB3K-M7RN  Created Feb 5  Expires Mar 7  ✕      │ │
+│ │ QW9P-2XKL  Created Feb 8  Expires Mar 10 ✕      │ │
+│ └──────────────────────────────────────────────────┘ │
+│                                                      │
+│ * Billing management visible to owner only           │
+└──────────────────────────────────────────────────────┘
 ```
 
 ### 2. Invite Code Generation
 
-- Click "Generate Invite Code" → backend checks `active_seats < max_seats`
+- Click "Generate Invite Code" → backend checks `active_billable_seats < max_seats`
 - Returns a code like `AB3K-M7RN` with a copy button
-- Admin shares the code however they want (email, text, Slack, sticky note)
 - Admin can see all pending (unused) codes and revoke them
-- We do NOT send invite emails - this avoids collecting non-user PII
+- **Optional invite email:** After generating a code, the admin can optionally enter the PT's email address to send an invite email through our system (Resend). This reduces friction — instead of copying a code and texting it, one click sends a branded email with the code and a registration link. If the admin skips the email, they share the code however they prefer (text, Slack, sticky note). The email address is used only for delivery and is NOT stored — the `invite_codes` table does not have an email column. The email service fires-and-forgets.
 
 ### 3. Member Removal
 
@@ -349,8 +352,14 @@ What admins and owners see:
 
 ### Seat Counting
 
+Only billable members count against `max_seats`. Owners and admins can be marked `is_billable = FALSE` if they don't generate notes (e.g., office managers who only manage the team). The owner is `is_billable = FALSE` by default at org creation — if the owner also generates notes, they can be marked billable from the team dashboard.
+
 ```sql
--- Active seats (occupied)
+-- Billable seats (count against max_seats)
+SELECT COUNT(*) FROM organization_members
+WHERE organization_id = $1 AND removed_at IS NULL AND is_billable = TRUE;
+
+-- Total active members (all roles, for display purposes)
 SELECT COUNT(*) FROM organization_members
 WHERE organization_id = $1 AND removed_at IS NULL;
 
@@ -359,7 +368,7 @@ SELECT COUNT(*) FROM invite_codes
 WHERE organization_id = $1 AND used_by IS NULL AND is_active = TRUE AND expires_at > NOW();
 
 -- Available seats
-available = max_seats - active_seats
+available = max_seats - billable_seats
 -- Note: pending invites do NOT reserve seats. If the code expires unused, no seat was wasted.
 -- If two codes are out and only one seat remains, the first to register gets it. The second
 -- code fails at redemption time ("no seats available").
@@ -374,11 +383,11 @@ BEGIN;
   -- Lock the org row to prevent concurrent over-allocation
   SELECT max_seats FROM organizations WHERE id = $1 FOR UPDATE;
 
-  -- Count active seats (safe because org row is locked)
-  SELECT COUNT(*) AS active_seats FROM organization_members
-  WHERE organization_id = $1 AND removed_at IS NULL;
+  -- Count billable seats (safe because org row is locked)
+  SELECT COUNT(*) AS billable_seats FROM organization_members
+  WHERE organization_id = $1 AND removed_at IS NULL AND is_billable = TRUE;
 
-  -- If active_seats < max_seats → proceed with INSERT into organization_members
+  -- If billable_seats < max_seats → proceed with INSERT into organization_members
   -- Otherwise → ROLLBACK and return "no seats available"
 COMMIT;
 ```
@@ -395,14 +404,23 @@ COMMIT;
 
 ### Re-adding a Previously Removed Member
 
-If a PT was removed but needs to come back:
-1. Admin generates a new invite code
-2. PT uses it to re-join
-3. Since the user already exists, the registration flow detects the existing account
-4. Instead of creating a new user, the PT logs in and "redeems" the code from a dedicated join flow
-5. New `organization_members` row created (the old one with `removed_at` stays for audit trail)
+PTs leave and rejoin clinics frequently. This must be smooth without requiring support intervention.
 
-This is a future flow - for v1, the PT would need to contact support or the admin could re-add them via a direct "Add existing user" feature.
+**Flow:**
+1. Admin generates a new invite code (same as any new invite)
+2. PT visits signup page, enters code
+3. Backend detects email already has an account → instead of "email already registered" error, responds with `{ existingUser: true, clinicName: "Acme Physical Therapy" }`
+4. Frontend shows: "Welcome back! Log in to rejoin Acme Physical Therapy."
+5. PT logs in → sees a prompt: "You've been invited to rejoin Acme Physical Therapy. [Accept] [Decline]"
+6. Accept → `POST /organization/join` (authenticated, accepts invite code):
+   - Validates code, checks seat availability
+   - Creates new `organization_members` row (old row with `removed_at` stays for audit trail)
+   - Sets `users.organization_id`
+   - Marks invite code as used
+   - Audit log: `ORG_MEMBER_JOINED`
+7. Decline → code remains unused, PT stays independent
+
+**New endpoint required:** `POST /organization/join` — authenticated endpoint for existing users to redeem a clinic invite code. The `/auth/register` endpoint handles new users; this endpoint handles existing users.
 
 ---
 
@@ -438,16 +456,20 @@ This is a future flow - for v1, the PT would need to contact support or the admi
    d. Set users.organization_id
    e. Audit log: ORG_CREATED
 6. Admin returns to dashboard → "Team" tab now visible
-7. Individual subscription (if any) remains for billing continuity,
-   but the owner's access now comes from the org subscription
+7. If owner has an active individual subscription, dashboard shows a
+   notification: "You have an active individual subscription ($30/mo).
+   Your clinic plan already covers your access — you may want to cancel
+   your individual plan to avoid double-billing." with a link to the
+   Stripe portal. We do NOT auto-cancel — the individual sub is the
+   owner's safety net if the org sub later fails (see Edge Case 3).
 ```
 
 ### Flow 3: Clinic Admin Invites a PT
 
 ```
-1. Admin opens Team page → sees seat usage (e.g., "2 of 5 seats used")
+1. Admin opens Team page → sees seat usage (e.g., "2 of 5 clinical seats used")
 2. Clicks "Generate Invite Code"
-   - Backend checks: active_seats < max_seats
+   - Backend checks: billable_seats < max_seats
    - Creates invite_code with type = 'clinic', organization_id set
    - Returns code (e.g., "AB3K-M7RN") with copy button
 3. Admin shares code with PT however they prefer
@@ -609,6 +631,36 @@ if (orgResult.rows.length > 0) {
 - `usageService.incrementUsage(userId, tokensUsed)` called after note generation (works, non-blocking)
 - `usageService.getMonthlyUsage(userId)` returns `{notesGenerated, tokensUsed}`
 - **No API endpoint exists** - dashboard shows hardcoded mock data
+- The `usage` table currently has a single `tokens_used INT` column. This is insufficient — input and output tokens have different costs (e.g., Gemini Flash: ~$0.15/1M input vs ~$0.60/1M output). We need to split this into `input_tokens` and `output_tokens` before building the usage endpoints.
+
+### Usage Schema Migration (part of Wave 1)
+
+```sql
+-- Add granular token tracking columns
+ALTER TABLE usage ADD COLUMN input_tokens INT DEFAULT 0;
+ALTER TABLE usage ADD COLUMN output_tokens INT DEFAULT 0;
+
+-- Migrate existing data: assign all tokens_used to output_tokens (conservative cost estimate)
+UPDATE usage SET output_tokens = tokens_used WHERE tokens_used > 0;
+
+-- Drop the legacy column
+ALTER TABLE usage DROP COLUMN tokens_used;
+```
+
+Update `usageService.incrementUsage()` signature:
+```typescript
+async incrementUsage(userId: string, inputTokens: number, outputTokens: number): Promise<void>
+```
+
+### What to Show vs. What to Store
+
+| Audience | Show in UI | Stored (for platform owner) |
+|----------|-----------|----------------------------|
+| Individual PT | Notes generated this month | input_tokens, output_tokens per month |
+| Clinic admin | Notes per member, total notes for org | Same, aggregated via JOINs |
+| Platform owner (you) | Everything: notes, tokens, estimated cost | Query via psql/Axiom |
+
+Users and clinic admins see **note counts only**. Token counts and cost data are internal operational metrics — surfacing them to users adds confusion without value.
 
 ### New Endpoints
 
@@ -623,7 +675,7 @@ For any authenticated user (individual or org member). Returns their personal us
   data: {
     currentMonth: "2026-02",
     notesGenerated: 42,
-    tokensUsed: 18500,
+    // Token counts NOT exposed to users — internal metric only
     // Include org context if applicable
     organization: {                   // null for individual users
       name: "Acme Physical Therapy",
@@ -633,7 +685,7 @@ For any authenticated user (individual or org member). Returns their personal us
 }
 ```
 
-**Implementation:** Calls existing `usageService.getMonthlyUsage(userId)`, adds org context from `users.organization_id` JOIN.
+**Implementation:** Calls existing `usageService.getMonthlyUsage(userId)`, adds org context from `users.organization_id` JOIN. Returns note counts only — token data is stored but not surfaced in the API response.
 
 #### `GET /organization/usage` - Clinic Usage Dashboard (Admin/Owner Only)
 
@@ -647,37 +699,50 @@ Aggregated clinic-level usage. This is the admin dashboard data.
     organization: {
       name: "Acme Physical Therapy",
       maxSeats: 8,
-      activeSeats: 5,
+      billableSeats: 5,           // Only is_billable=TRUE members
+      totalMembers: 6,            // All active members (including non-billable)
       subscriptionStatus: "active"
     },
     currentMonth: "2026-02",
     totals: {
-      notesGenerated: 87,
-      tokensUsed: 42000
+      notesGenerated: 87          // Token counts NOT exposed — internal metric only
     },
-    members: [
+    activeMembers: [
       {
         userId: "uuid",
         email: "sarah@clinic.com",
         role: "owner",
+        isBillable: false,
         joinedAt: "2026-01-15T...",
-        usage: { notesGenerated: 12, tokensUsed: 5200 }
+        usage: { notesGenerated: 12 }
       },
       {
         userId: "uuid",
         email: "mike@clinic.com",
         role: "admin",
+        isBillable: false,
         joinedAt: "2026-01-20T...",
-        usage: { notesGenerated: 8, tokensUsed: 3800 }
+        usage: { notesGenerated: 8 }
       },
       {
         userId: "uuid",
         email: "lisa@clinic.com",
         role: "member",
+        isBillable: true,
         joinedAt: "2026-02-01T...",
-        usage: { notesGenerated: 22, tokensUsed: 10100 }
+        usage: { notesGenerated: 22 }
       }
       // ...
+    ],
+    // Members removed during the current month — included for billing accuracy
+    formerMembers: [
+      {
+        userId: "uuid",
+        email: "james@clinic.com",
+        role: "member",
+        removedAt: "2026-02-06T...",
+        usage: { notesGenerated: 15 }
+      }
     ],
     pendingInvites: 2
   }
@@ -687,19 +752,21 @@ Aggregated clinic-level usage. This is the admin dashboard data.
 **Implementation:**
 
 ```sql
--- Aggregated org usage for current month
+-- Aggregated org usage for current month (active + recently removed members)
 SELECT
   u.id AS user_id,
   u.email,
   om.role,
+  om.is_billable,
   om.joined_at,
-  COALESCE(us.notes_generated, 0) AS notes_generated,
-  COALESCE(us.tokens_used, 0) AS tokens_used
+  om.removed_at,
+  COALESCE(us.notes_generated, 0) AS notes_generated
 FROM organization_members om
 JOIN users u ON u.id = om.user_id
 LEFT JOIN usage us ON us.user_id = om.user_id AND us.month = $2
-WHERE om.organization_id = $1 AND om.removed_at IS NULL
-ORDER BY om.role ASC, us.notes_generated DESC NULLS LAST;
+WHERE om.organization_id = $1
+  AND (om.removed_at IS NULL OR om.removed_at >= date_trunc('month', $2::date))
+ORDER BY om.removed_at NULLS FIRST, om.role ASC, us.notes_generated DESC NULLS LAST;
 ```
 
 #### `GET /organization/usage/history` - Month-over-Month (Future)
@@ -718,7 +785,7 @@ async getOrganizationUsage(organizationId: string): Promise<OrgUsageStats>
 async getOrganizationMemberUsage(organizationId: string): Promise<MemberUsageStats[]>
 ```
 
-No changes to `incrementUsage()` - it already tracks per-user, which is the right granularity. Org-level numbers are derived via aggregation, not stored separately. This avoids dual-write consistency issues.
+`incrementUsage()` signature changes to accept `inputTokens` and `outputTokens` separately (see [Usage Schema Migration](#usage-schema-migration-part-of-wave-1) above). Org-level numbers are derived via aggregation, not stored separately. This avoids dual-write consistency issues.
 
 ---
 
@@ -833,6 +900,7 @@ GET    /organization/usage          Org usage dashboard (owner/admin only)
 GET    /organization/members        List active members (owner/admin only)
 DELETE /organization/members/:id    Remove a member (owner/admin only, not self, not owner)
 PATCH  /organization/members/:id    Change role (owner only)
+POST   /organization/join            Redeem invite code as existing user (authenticated, not in an org)
 POST   /organization/leave          Leave org (admin/member only, not owner)
 POST   /organization/transfer       Transfer ownership (owner only)
 ```
@@ -1207,9 +1275,7 @@ Issues identified during planning review that must be addressed during implement
 
 The org usage query (in [Usage Endpoint Design](#usage-endpoint-design)) filters `WHERE om.removed_at IS NULL`. This means if a PT generated 50 notes before being removed mid-month, those notes vanish from the org's usage totals — misleading for billing reconciliation.
 
-**Resolution:** The org usage query should include members who were active during the queried month, not just currently active members. Either:
-- **Option A (recommended):** Always include removed members in the usage response with a `removedAt` field, so the dashboard can display them separately (e.g., "Former members: 50 notes"). This preserves billing accuracy.
-- **Option B:** Use `WHERE om.removed_at IS NULL OR (om.removed_at >= date_trunc('month', NOW()))` to include members removed during the current month.
+**Resolution:** The org usage query includes members who were active during the queried month, not just currently active members. The query uses `WHERE om.removed_at IS NULL OR (om.removed_at >= date_trunc('month', $2::date))` and the API response separates them into `activeMembers` and `formerMembers` arrays. The dashboard displays former members in a separate section (e.g., "Former Members (this month): James Wilson — 15 notes"). This preserves billing accuracy and provides a clear historical record. See updated [Usage Endpoint Design](#get-organizationusage---clinic-usage-dashboard-adminowner-only) for the implementation.
 
 ### 2. Org Subscription Canceled — Member State Limbo
 
@@ -1229,7 +1295,7 @@ Flow 2 step 7 says the owner's individual subscription "remains for billing cont
 - If the individual sub lapses but the org sub is active, the owner still has access. Fine. But the Stripe dashboard shows a "canceled" individual subscription, which looks like a problem.
 - If the org sub lapses but the individual sub is still active, the owner retains access but their PTs don't.
 
-**Resolution:** When an org is created and the owner is assigned, the checkout flow should prompt the owner to cancel their individual subscription (or we cancel it automatically as part of the org creation webhook). Document this in the checkout UX spec. The middleware already handles the fallback correctly (check individual first, then org), so no backend change needed — this is purely a billing hygiene concern.
+**Resolution:** Do NOT auto-cancel the owner's individual subscription. The individual sub serves as a safety net — if the org sub later fails (payment issue, cancellation), the owner retains personal access and can still manage the clinic. Instead, after org creation the dashboard shows a persistent notification: "Your clinic plan covers your access. You may want to cancel your individual plan ($30/mo) to avoid double-billing." with a link to the Stripe portal. The owner decides. The middleware already handles the fallback correctly (check individual first, then org), so no backend change needed — this is purely a UX nudge.
 
 ### 4. `/invite-codes/validate` Response Must Be Minimal
 
@@ -1258,6 +1324,49 @@ No migration script needed, but this should be verified in staging before the `R
 
 The existing `processed_webhook_events` table handles individual subscription webhooks. The same idempotency pattern must apply to org-creating webhooks (`checkout.session.completed` for clinic plans). If the webhook fires twice, we must not create two organizations. The existing pattern (check `processed_webhook_events` before processing) handles this, but the org creation code must be inside the idempotency guard.
 
+### 8. Individual Trial User Joins an Org
+
+A user on day 5 of their 14-day individual trial redeems a clinic invite code. What happens?
+
+- Their individual `subscription_status` remains `'trialing'` and `trial_ends_at` stays set — we do NOT pause or reset the trial.
+- They now have `organization_id` set, so the subscription middleware grants access through the org subscription.
+- The trial becomes irrelevant while they're in the org — org subscription takes precedence.
+- If they leave the org on day 20 (trial expired), they'd need to subscribe individually.
+- If they leave the org on day 10 (trial still active), the middleware falls back to the individual trial check and access continues.
+
+**Resolution:** No special handling needed. The trial timer continues ticking regardless of org membership. The subscription middleware's fallback logic (check individual first, then org) handles all combinations correctly.
+
+### 9. Account Deletion & Trial Abuse Prevention
+
+**Can users delete their accounts?** Not yet — and this is intentional. HIPAA audit trail requirements mean we cannot hard-delete user records (audit logs reference `user_id` and must be retained for 6 years). Soft-delete (setting an `is_deleted` flag) is the eventual approach.
+
+**What if a user deletes and re-signs up for another free trial?** This is a real abuse vector. Mitigations:
+
+1. **Email-based trial tracking:** The `users` table enforces `UNIQUE(email)`. A soft-deleted user's email remains claimed. Re-registration with the same email would need to reactivate the existing account (with the already-expired trial), not create a new one.
+2. **No trial on re-activation:** If a previously-deleted account is reactivated, `subscription_status` and `trial_ends_at` retain their original values. The user does not get a fresh trial.
+3. **Stripe customer ID persistence:** Even if a user creates a new account with a different email, Stripe tracks by payment method. Stripe's own fraud detection catches most repeated trial abuse.
+4. **Rate limiting registration:** Already in place (3/hour per IP in prod). Prevents automated trial farming.
+
+**Implementation plan for account deletion (Wave 5+):**
+
+```sql
+ALTER TABLE users ADD COLUMN deleted_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN deletion_reason TEXT;
+-- Soft-delete: set deleted_at, clear PII fields, retain ID for audit trail
+-- Email is hashed (for re-registration detection) rather than cleared
+```
+
+The deletion flow:
+1. User requests deletion from Settings page
+2. Confirmation dialog with clear warning about data loss
+3. Backend: sets `deleted_at`, clears `password_hash`, replaces `email` with hash of email (for duplicate detection), revokes all sessions
+4. If user is an org owner → must transfer ownership first (same as voluntary leave)
+5. If user is an org member → auto-removed from org (seat freed)
+6. Audit log: `ACCOUNT_DELETED` (retains `user_id` for the mandatory audit trail)
+7. Stripe subscription canceled via API (if active)
+
+Re-registration attempt with same email → detected via email hash → "This email was previously associated with a deleted account. Please contact support." This prevents trial abuse while giving you a manual path for legitimate re-signups.
+
 ---
 
 ## What NOT to Build Yet
@@ -1267,12 +1376,14 @@ The existing `processed_webhook_events` table handles individual subscription we
 | Multiple admins per org | One owner + one admin is enough for 5-20 seat clinics |
 | Org name changes | Handle via support request |
 | Seat auto-scaling | Manual seat management via Stripe portal |
-| Invite-via-email (we send the email) | Avoids collecting non-user PII; admin shares codes directly |
+| Invite-via-email (mandatory) | Email is optional at invite time; admin can always share codes directly instead |
 | Referral/affiliate codes | Same table could support it later; don't add the code paths now |
 | Usage history charts | The data's there (per-month rows); build the UI when clinics ask for it |
 | Usage export (CSV) | Same - data exists, build when needed |
 | Multi-org membership | One org per user is sufficient. Revisit only if PTs working at multiple clinics becomes a real pattern |
 | SSO/SAML for clinics | Way too early. Custom JWT auth is fine for 5-50 clinics |
+| Account deletion (self-serve) | Design is spec'd in [Edge Case 9](#9-account-deletion--trial-abuse-prevention) but implementation deferred to Wave 5+. Handle via support request until then |
+| Trial abuse detection | Email hash + Stripe fraud detection covers most cases. Build active monitoring only if abuse is observed |
 
 ---
 
@@ -1281,43 +1392,95 @@ The existing `processed_webhook_events` table handles individual subscription we
 When this moves from planning to implementation:
 
 ### Wave 1: Individual Gating + Usage Endpoint (Beta prep)
-1. Add `REGISTRATION_MODE` to `config.ts` env schema
-2. Migration 009: `invite_codes` table
-3. Modify `/auth/register` to enforce registration mode + accept invite codes
-4. Invite code generation utility (for us to create beta codes manually or via script)
-5. `POST /invite-codes/validate` public endpoint
-6. `GET /usage/me` endpoint (expose existing `usageService.getMonthlyUsage`)
-7. Web dashboard: replace mock usage with real `/usage/me` data
+
+**Goal:** Get to invite-only beta with real usage data. No org features yet — individual PTs only.
+**Prerequisite for:** Phase 2 (Beta - Individual PTs) in [Rollout Phases](#rollout-phases).
+**Estimated scope:** ~15-20 files touched (backend routes, config, migration, web dashboard, tests).
+
+1. Usage schema migration: split `tokens_used` into `input_tokens` + `output_tokens`
+2. Update `usageService.incrementUsage()` signature and callers (notes route, AI service)
+3. Add `REGISTRATION_MODE` to `config.ts` env schema
+4. Migration 009: `invite_codes` table
+5. Modify `/auth/register` to enforce registration mode + accept invite codes
+6. Invite code generation CLI script (`scripts/generate-invite-code.js`)
+7. `POST /invite-codes/validate` public endpoint (with rate limit: 10/min per IP)
+8. `GET /usage/me` endpoint (expose `usageService.getMonthlyUsage`, note counts only)
+9. Web dashboard: replace mock usage with real `/usage/me` data
+10. Web signup page: add optional invite code field
+
+**Done when:** You can set `REGISTRATION_MODE=invite`, generate a beta code via CLI, have a PT register with it, and see their real usage on the dashboard.
 
 ### Wave 2: Clinic Infrastructure
-8. Migration 010: `organizations` table, `organization_members` table, `users.organization_id` column
-9. Modify `requireActiveSubscription` middleware for org-based access
-10. `requireOrgMembership` and `requireOrgRole` middleware
-11. New audit actions in `AuditAction` enum
-12. Organization service (create, query, member management)
-13. Modify registration flow: clinic invite code → auto-join org
+
+**Goal:** Database and middleware foundation for multi-tenant clinic support. No UI yet.
+**Prerequisite for:** Phase 3 (Beta - Clinic Pilot) in [Rollout Phases](#rollout-phases).
+**Estimated scope:** ~10-15 files (migrations, middleware, services, types).
+
+11. Migration 010: `organizations` table, `organization_members` table (with `is_billable`), `users.organization_id` column
+12. Modify `requireActiveSubscription` middleware for org-based access
+13. `requireOrgMembership` and `requireOrgRole` middleware
+14. New audit actions in `AuditAction` enum
+15. Organization service (create, query, member management, billable seat counting)
+16. Modify registration flow: clinic invite code → auto-join org
+17. `POST /organization/join` endpoint (existing user re-joining via invite code)
+
+**Done when:** A clinic invite code can be redeemed by both new and existing users, and subscription access works through the org.
 
 ### Wave 3: Clinic Admin Dashboard
-14. `GET /organization` endpoint (org details + seat count)
-15. `GET /organization/members` endpoint
-16. `GET /organization/usage` endpoint (aggregated + per-member)
-17. `POST /organization/invites` (generate clinic invite code)
-18. `GET /organization/invites` (list pending invites)
-19. `DELETE /organization/invites/:id` (revoke)
-20. `DELETE /organization/members/:id` (remove member + revoke access)
-21. Web: Team dashboard page (`/dashboard/team`)
+
+**Goal:** Clinic admins can manage their team through the web UI.
+**Estimated scope:** ~15-20 files (backend endpoints, web pages, tests).
+
+18. `GET /organization` endpoint (org details + billable/total seat counts)
+19. `GET /organization/members` endpoint
+20. `GET /organization/usage` endpoint (aggregated + per-member, including former members)
+21. `POST /organization/invites` (generate clinic invite code, with optional invite email)
+22. `GET /organization/invites` (list pending invites)
+23. `DELETE /organization/invites/:id` (revoke)
+24. `DELETE /organization/members/:id` (remove member + revoke access)
+25. `PATCH /organization/members/:id` (role changes, billable status toggle)
+26. Web: Team dashboard page (`/dashboard/team`)
+
+**Done when:** A clinic admin can generate invite codes (with optional email), view team usage including former members, remove members, and toggle billable status — all through the web UI.
 
 ### Wave 4: Clinic Billing
-22. Stripe clinic product + price setup
-23. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
-24. Modify webhook handler for org-level subscription events
-25. `max_seats` sync from Stripe webhook
-26. Web: clinic plan on pricing page
-27. Owner billing management (Stripe portal link)
 
-### Wave 5: Polish
-28. `PATCH /organization/members/:id` (role changes)
-29. `POST /organization/leave` (voluntary departure)
-30. `POST /organization/transfer` (ownership transfer)
-31. Extension: show org affiliation in settings
-32. Admin compliance view (legal acceptance status per member)
+**Goal:** Self-serve clinic plan purchase through Stripe.
+**Estimated scope:** ~10 files (billing service, webhook handler, web pricing page).
+
+27. Stripe clinic product + price setup
+28. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
+29. Modify webhook handler for org-level subscription events
+30. `max_seats` sync from Stripe webhook
+31. Web: clinic plan on pricing page
+32. Owner billing management (Stripe portal link)
+33. Owner dual-subscription notification (see [Edge Case 3](#3-owners-dual-subscription-ambiguity))
+
+**Done when:** A user can self-serve purchase a clinic plan, the org is created automatically, and seat quantity syncs through Stripe webhooks.
+
+### Wave 5: Polish & Voluntary Flows
+
+**Goal:** Complete the remaining org lifecycle flows.
+**Estimated scope:** ~8-10 files.
+
+34. `POST /organization/leave` (voluntary departure)
+35. `POST /organization/transfer` (ownership transfer)
+36. Extension: show org affiliation in settings
+37. Extension: handle `clinic_subscription_expired` error distinctly
+38. Admin compliance view (legal acceptance status per member)
+
+**Done when:** PTs can leave clinics voluntarily, owners can transfer ownership, and the extension properly handles org-level subscription errors.
+
+### Transition Between Waves
+
+Each wave is independently deployable and testable. The recommended cadence:
+
+| Wave | Deploy to Staging | Deploy to Production | Gate |
+|------|-------------------|---------------------|------|
+| Wave 1 | Immediately | After staging QA | Enables `REGISTRATION_MODE=invite` |
+| Wave 2 | After Wave 1 is stable in prod | After staging QA + your manual testing | No new user-facing features — middleware only |
+| Wave 3 | After Wave 2 | After staging QA + 1 pilot clinic tests on staging | Team dashboard becomes visible to org members |
+| Wave 4 | After Wave 3 | After staging QA + test Stripe checkout end-to-end | Self-serve clinic purchase enabled |
+| Wave 5 | After Wave 4 | After staging QA | Voluntary leave + ownership transfer live |
+
+**Do not start a wave until the previous wave is stable in production.** Each wave builds on the last, and bugs in earlier waves compound. The exception is Wave 2 + Wave 4 which can be developed in parallel if needed, since Wave 4 is Stripe integration (backend) while Wave 3 is UI (frontend).
