@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "tsx watch --import @sentry/node/preload src/index.ts",
     "dev:test": "NODE_ENV=test tsx watch --import @sentry/node/preload src/index.ts",
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node --import @sentry/node/preload dist/index.js",
     "test": "NODE_ENV=production vitest --run",
     "test:watch": "NODE_ENV=production vitest",

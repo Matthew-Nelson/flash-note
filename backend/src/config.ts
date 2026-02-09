@@ -117,3 +117,13 @@ export const isTest = config.NODE_ENV === 'test';
 // SECURITY: 12 rounds provides ~250ms hash time, balancing security and UX
 // Increasing to 13+ would double hash time; adjust only if hardware improves significantly
 export const BCRYPT_ROUNDS = 12;
+
+// Legal document versions - bump independently when each document is updated
+// Recorded in legal_acceptances for audit trail
+export const LEGAL_DOCUMENT_VERSIONS = {
+  baa: '1.0',
+  terms_of_service: '1.0',
+  privacy_policy: '1.0',
+} as const;
+
+export type LegalDocumentType = keyof typeof LEGAL_DOCUMENT_VERSIONS;

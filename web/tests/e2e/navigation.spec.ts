@@ -72,7 +72,7 @@ baseTest.describe('Cross-Page Navigation Flows', () => {
     await baseExpect(page).toHaveURL('/login');
 
     // Navigate to signup from login
-    await page.getByRole('link', { name: 'create a new account' }).click();
+    await page.getByRole('link', { name: 'Sign up' }).click();
     await baseExpect(page).toHaveURL('/signup');
   });
 });

@@ -85,7 +85,7 @@ describe('Extension API Client', () => {
         json: () => Promise.resolve(createMockApiResponse(mockResponse)),
       });
 
-      const result = await api.register('new@example.com', 'Password1');
+      const result = await api.register('new@example.com', 'Password1', true);
       expect(result.user).toBeDefined();
       expect(storage.setAuth).toHaveBeenCalled();
     });

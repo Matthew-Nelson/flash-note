@@ -232,15 +232,13 @@ These are researched but not prioritized for current development.
 
 ## Technical Debt / UX Improvements
 
-| Issue | Description | Priority |
-|-------|-------------|----------|
-| Auth UI consistency | Extension and web app have different validation UX. Extension uses HTML5 native validation (browser tooltips) while web app uses React/Zod. Should unify to React/Zod validation with styled error messages for consistent UX. Remove `type="email"` and `minLength` HTML5 validation; use `noValidate` on forms. | Medium |
-| Form validation pattern | Establish consistent pattern: validate on blur/change with Zod, show styled `.error-message` divs, not browser tooltips. Document in CLAUDE.md. | Medium |
+*No outstanding items.*
 
 ## Recently Completed
 
 | Feature | Notes |
 |---------|-------|
+| Auth Form UX Unification | ✅ Unified validation UX across web and extension. Shared `AuthLayout` component, consolidated error blocks with field-level borders (`invalid` prop), `invalidFields` in extension validation helpers, consistent headings/footers, removed native HTML5 validation. |
 | Unified Styling System | ✅ Implemented "Warm Wellness" theme - shared design tokens, component CSS, consistent green/teal palette across extension and web. See `/shared/README.md`. |
 
 ---

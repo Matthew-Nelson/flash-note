@@ -1,10 +1,15 @@
 import { z } from 'zod';
 
 /**
+ * Shared email validation
+ */
+export const emailSchema = z.string().email('Please enter a valid email address');
+
+/**
  * Authentication Schemas
  */
 export const loginSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: emailSchema,
   password: z.string().min(1, 'Password is required'),
 });
 
@@ -18,8 +23,15 @@ const passwordSchema = z
   .regex(/[0-9]/, 'Password must contain at least one number');
 
 export const registerSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
+  email: emailSchema,
   password: passwordSchema,
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
+  acceptedLegalTerms: z.literal(true, {
+    errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
+  }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
 });
 
 /**
@@ -164,25 +176,47 @@ export type GeneratedNote = z.infer<typeof generatedNoteSchema>;
 /**
  * Validation helpers
  */
-export function validateLogin(data: unknown): { success: true; data: LoginInput } | { success: false; errors: string[] } {
+export function validateEmail(email: unknown): { success: true; data: string } | { success: false; errors: string[]; invalidFields: string[] } {
+  const result = emailSchema.safeParse(email);
+  if (result.success) {
+    return { success: true, data: result.data };
+  }
+  return {
+    success: false,
+    errors: result.error.errors.map((e) => e.message),
+    invalidFields: ['email'],
+  };
+}
+
+export function validateLogin(data: unknown): { success: true; data: LoginInput } | { success: false; errors: string[]; invalidFields: string[] } {
   const result = loginSchema.safeParse(data);
   if (result.success) {
     return { success: true, data: result.data };
   }
+  const fieldSet = new Set<string>();
+  result.error.errors.forEach((e) => {
+    if (e.path[0]) fieldSet.add(String(e.path[0]));
+  });
   return {
     success: false,
     errors: result.error.errors.map((e) => e.message),
+    invalidFields: [...fieldSet],
   };
 }
 
-export function validateRegister(data: unknown): { success: true; data: RegisterInput } | { success: false; errors: string[] } {
+export function validateRegister(data: unknown): { success: true; data: RegisterInput } | { success: false; errors: string[]; invalidFields: string[] } {
   const result = registerSchema.safeParse(data);
   if (result.success) {
     return { success: true, data: result.data };
   }
+  const fieldSet = new Set<string>();
+  result.error.errors.forEach((e) => {
+    if (e.path[0]) fieldSet.add(String(e.path[0]));
+  });
   return {
     success: false,
     errors: result.error.errors.map((e) => e.message),
+    invalidFields: [...fieldSet],
   };
 }
 

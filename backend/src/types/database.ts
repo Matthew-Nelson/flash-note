@@ -82,6 +82,19 @@ export interface EmailTokenRow {
 }
 
 /**
+ * legal_acceptances table row
+ */
+export interface LegalAcceptanceRow {
+  id: string;
+  user_id: string;
+  document_type: string;
+  document_version: string;
+  ip_address: string | null;
+  user_agent: string | null;
+  accepted_at: Date;
+}
+
+/**
  * Partial row types for SELECT queries that only fetch specific columns
  */
 export interface UserLockoutRow {

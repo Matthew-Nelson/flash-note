@@ -4,12 +4,13 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: ReactNode;
+  invalid?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, className = '', id, ...props }, ref) => {
+  ({ label, error, hint, invalid, className = '', id, ...props }, ref) => {
     const inputId = id || props.name;
-    const hasError = Boolean(error);
+    const hasError = Boolean(error) || Boolean(invalid);
 
     return (
       <div className="w-full">
@@ -23,7 +24,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           id={inputId}
           className={`input-field w-full px-3 py-2 ${hasError ? 'input-field-error' : ''} ${className}`}
           aria-invalid={hasError}
-          aria-describedby={hasError ? `${inputId}-error` : undefined}
+          aria-describedby={error ? `${inputId}-error` : undefined}
           {...props}
         />
         {error && (

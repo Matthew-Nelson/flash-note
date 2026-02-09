@@ -148,6 +148,8 @@ export enum AuditAction {
   SESSION_LIMIT_EXCEEDED = 'SESSION_LIMIT_EXCEEDED',
   // Webhook processing (MEDIUM-013)
   WEBHOOK_PROCESSING_FAILED = 'WEBHOOK_PROCESSING_FAILED',
+  // Legal consent
+  LEGAL_CONSENT_ACCEPTED = 'LEGAL_CONSENT_ACCEPTED',
 }
 
 export interface AuditLogEntry {

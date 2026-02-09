@@ -252,10 +252,10 @@ export const api = {
   /**
    * Register new account
    */
-  async register(email: string, password: string): Promise<AuthResponse> {
+  async register(email: string, password: string, acceptedLegalTerms: boolean): Promise<AuthResponse> {
     const data = await request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, acceptedLegalTerms }),
     });
 
     storage.setAuth({

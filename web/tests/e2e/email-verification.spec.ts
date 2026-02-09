@@ -159,6 +159,7 @@ test.describe('Signup to Verification Flow', () => {
     await page.getByLabel('Email address').fill(testEmail);
     await page.getByLabel('Password', { exact: true }).fill(testPassword);
     await page.getByLabel('Confirm Password').fill(testPassword);
+    await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: 'Create account' }).click();
 
     // Should redirect to verify-email page or dashboard

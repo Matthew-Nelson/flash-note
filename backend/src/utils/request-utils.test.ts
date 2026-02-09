@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { Request } from 'express';
-import { getRequestMetadata, safeAuditLog } from './request-utils.js';
+import { getRequestMetadata, safeAuditLog, sanitizeIpAddress } from './request-utils.js';
 
 describe('request-utils', () => {
   describe('getRequestMetadata', () => {
@@ -81,6 +81,37 @@ describe('request-utils', () => {
       const result = getRequestMetadata(mockReq);
 
       expect(result.ipAddress).toBeUndefined();
+    });
+  });
+
+  describe('sanitizeIpAddress', () => {
+    it('should return valid IPv4 address', () => {
+      expect(sanitizeIpAddress('192.168.1.1')).toBe('192.168.1.1');
+    });
+
+    it('should return valid IPv6 address', () => {
+      expect(sanitizeIpAddress('::1')).toBe('::1');
+      expect(sanitizeIpAddress('2001:db8::1')).toBe('2001:db8::1');
+    });
+
+    it('should return null for malformed IP', () => {
+      expect(sanitizeIpAddress('not-an-ip')).toBeNull();
+      expect(sanitizeIpAddress('999.999.999.999')).toBeNull();
+      expect(sanitizeIpAddress('192.168.1')).toBeNull();
+    });
+
+    it('should return null for null or undefined', () => {
+      expect(sanitizeIpAddress(null)).toBeNull();
+      expect(sanitizeIpAddress(undefined)).toBeNull();
+    });
+
+    it('should return null for empty string', () => {
+      expect(sanitizeIpAddress('')).toBeNull();
+    });
+
+    it('should return valid loopback addresses', () => {
+      expect(sanitizeIpAddress('127.0.0.1')).toBe('127.0.0.1');
+      expect(sanitizeIpAddress('::1')).toBe('::1');
     });
   });
 
