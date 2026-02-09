@@ -1,7 +1,7 @@
 # FlashNote Testing Strategy & Guidelines
 
 > **Document Status:** Partial Implementation
-> **Last Updated:** February 2026
+> **Last Updated:** February 8, 2026
 > **Owner:** Engineering Team
 
 ## Overview
@@ -34,14 +34,14 @@ This document defines the testing strategy, guidelines, and requirements for Fla
 
 | Project | Testing Framework | Test Coverage | Status |
 |---------|------------------|---------------|--------|
-| Backend | Vitest 4.0.18 | 95%+ (28 test files) | Healthcare-grade |
-| Extension | None | 0% | Not configured |
-| Web | None | 0% | Not configured |
+| Backend | Vitest 4.0.18 | 95%+ (31 test files, ~683 tests) | Healthcare-grade |
+| Extension | Vitest 4 + RTL 16 | ~93% (14 test files, ~233 tests) | ✅ Configured |
+| Web | Vitest 4 + RTL 16 | ~92% (19 test files, ~224 tests) | ✅ Configured |
 | CI/CD | GitHub Actions | Backend tests, builds, security audit | Configured |
 
 ### Existing Test Files
 
-**Backend (28 test files):**
+**Backend (31 test files, ~683 tests):**
 - **Services:** auth-service, audit-service, ai-service, billing-service, email-service, lockout-service, token-service, usage-service
 - **Middleware:** auth, csrf, email-verification, error-handler, rate-limit, subscription
 - **LLM Providers:** claude-provider, gemini-provider, provider-factory, schemas, errors, index
@@ -50,12 +50,21 @@ This document defines the testing strategy, guidelines, and requirements for Fla
 - **Other:** config, pt-prompts
 - **Test Setup:** `backend/src/test/setup.ts` - Test utilities and mocks
 
+**Extension (14 test files, ~233 tests):**
+- Co-located test files alongside source (`*.test.ts(x)`)
+- Coverage thresholds: 80% enforced in vitest.config.ts
+- Standalone vitest.config.ts (not merged with vite.config.ts — chrome extension build plugin breaks tests)
+
+**Web (19 test files, ~224 tests):**
+- Co-located test files alongside source (`*.test.ts(x)`)
+- Coverage thresholds: 80% enforced in vitest.config.ts
+
 ### Critical Gaps
 
-1. **Extension:** No testing infrastructure - React components handling auth tokens are untested
-2. **Web:** No testing infrastructure - Next.js pages/components untested
+1. ~~**Extension:** No testing infrastructure~~ ✅ **DONE** - 14 test files, ~93% coverage
+2. ~~**Web:** No testing infrastructure~~ ✅ **DONE** - 19 test files, ~92% coverage
 3. ~~**CI/CD:** No automated test execution in pipelines~~ ✅ **DONE** - GitHub Actions configured
-4. **E2E:** No end-to-end testing for critical user journeys
+4. **E2E:** Foundation complete (37 Playwright tests) — gaps remain (error handling, token refresh, copy functionality)
 5. **Security:** DAST (OWASP ZAP) not yet configured; secret scanning (GitLeaks) not implemented
 
 ---
@@ -1028,3 +1037,4 @@ pnpm --filter e2e test --ui
 |------|---------|--------|---------|
 | Jan 2026 | 1.0 | Engineering | Initial document |
 | Feb 2026 | 1.1 | Engineering | Updated to reflect current state: CI/CD configured, backend at 95%+ coverage with 28 test files, updated roadmap progress |
+| Feb 8, 2026 | 1.2 | Engineering | Updated all test counts: backend 31 files/~683 tests, extension 14 files/~233 tests (~93%), web 19 files/~224 tests (~92%). Marked extension/web testing gaps as resolved. |

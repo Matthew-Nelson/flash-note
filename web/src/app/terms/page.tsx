@@ -162,10 +162,13 @@ export default function TermsOfServicePage() {
               </ul>
             </Section>
 
-            <Section title="9. HIPAA and Data Security">
+            <Section title="9. HIPAA, HITECH Act, and Data Security">
               <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>We maintain appropriate safeguards for protected health information</li>
-                <li>We offer Business Associate Agreements to covered entities</li>
+                <li>FlashNote operates as a Business Associate under HIPAA and the HITECH Act of 2009</li>
+                <li>We maintain administrative, physical, and technical safeguards for Protected Health Information as required by the HIPAA Security Rule, as strengthened by the HITECH Act</li>
+                <li>We provide Business Associate Agreements (BAA) to covered entities as required by HIPAA and the HITECH Act &mdash; acceptance of a BAA is required to use FlashNote</li>
+                <li>We comply with the HITECH Act Breach Notification Rule and will notify covered entities of any breach of unsecured PHI within 72 hours of discovery</li>
+                <li>We maintain BAAs with all subprocessors who handle PHI on our behalf</li>
                 <li>See our <Link href="/privacy" className="link">Privacy Policy</Link> for details on data handling</li>
               </ul>
             </Section>

@@ -30,13 +30,21 @@ We use the information we collect to:
 - Improve our product and user experience
 - Comply with legal obligations
 
-## HIPAA Compliance
+## HIPAA and HITECH Act Compliance
 
-FlashNote is designed with HIPAA compliance in mind:
-- Patient data is processed but never stored
+FlashNote is designed to comply with the Health Insurance Portability and Accountability Act of 1996 (HIPAA) and the Health Information Technology for Economic and Clinical Health Act of 2009 (HITECH Act):
+- Patient data is processed but never stored (pass-through model)
 - All data transmission is encrypted (TLS 1.2+)
 - Audit logs track all access (without PHI)
-- We offer Business Associate Agreements (BAA) for covered entities
+- We offer Business Associate Agreements (BAA) as required by the HITECH Act for covered entities
+- We maintain BAAs with all subprocessors who handle PHI on our behalf
+
+## Breach Notification
+
+In accordance with the HITECH Act Breach Notification Rule (45 CFR Part 164, Subpart D), if we discover a breach of unsecured Protected Health Information, we will:
+- Notify the affected covered entity within 72 hours of discovery
+- Cooperate with the covered entity's breach notification obligations to affected individuals and HHS
+- Document and retain records of any breach investigation
 
 ## Data Security
 

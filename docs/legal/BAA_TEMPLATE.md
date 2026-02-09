@@ -14,7 +14,7 @@ and
 
 ## RECITALS
 
-WHEREAS, Covered Entity is a "covered entity" as defined by the Health Insurance Portability and Accountability Act of 1996 ("HIPAA") and its implementing regulations;
+WHEREAS, Covered Entity is a "covered entity" as defined by the Health Insurance Portability and Accountability Act of 1996 ("HIPAA"), as amended by the Health Information Technology for Economic and Clinical Health Act of 2009 ("HITECH Act"), and their implementing regulations;
 
 WHEREAS, Business Associate provides AI-powered documentation services to Covered Entity;
 
@@ -24,7 +24,7 @@ NOW, THEREFORE, the parties agree as follows:
 
 ## 1. DEFINITIONS
 
-Terms used but not otherwise defined in this Agreement shall have the same meaning as those terms in HIPAA.
+Terms used but not otherwise defined in this Agreement shall have the same meaning as those terms in HIPAA and the HITECH Act.
 
 **1.1 "Protected Health Information" or "PHI"** means any information, including demographic information, that relates to the past, present, or future physical or mental health or condition of an individual, or the provision of health care to an individual, that identifies the individual or could reasonably be used to identify the individual.
 
@@ -69,7 +69,7 @@ Business Associate agrees to:
 
 Business Associate shall:
 
-**4.1** Implement administrative, physical, and technical safeguards as required by the HIPAA Security Rule.
+**4.1** Implement administrative, physical, and technical safeguards as required by the HIPAA Security Rule, as strengthened by the HITECH Act.
 
 **4.2** Ensure the confidentiality, integrity, and availability of electronic PHI.
 
@@ -81,13 +81,15 @@ Business Associate shall:
 
 ## 5. BREACH NOTIFICATION
 
-**5.1** Business Associate shall notify Covered Entity of any breach of unsecured PHI within 72 hours of discovery.
+**5.1** In accordance with the HITECH Act Breach Notification Rule (45 CFR §§ 164.400–414), Business Associate shall notify Covered Entity of any breach of unsecured PHI within 72 hours of discovery.
 
 **5.2** Notification shall include:
 - The nature of the breach
 - Types of information involved
 - Identity of individuals affected (if known)
 - Steps being taken to investigate and mitigate
+
+**5.3** Business Associate acknowledges that, under the HITECH Act, the burden of proof rests with Business Associate to demonstrate that any unauthorized access, use, or disclosure did not constitute a breach of unsecured PHI.
 
 ## 6. TERM AND TERMINATION
 
@@ -101,7 +103,7 @@ Business Associate shall:
 
 **7.1** This Agreement may not be modified except in writing signed by both parties.
 
-**7.2** Any ambiguity shall be resolved in favor of a meaning that permits compliance with HIPAA.
+**7.2** Any ambiguity shall be resolved in favor of a meaning that permits compliance with HIPAA and the HITECH Act.
 
 **7.3** This Agreement shall be governed by [STATE] law.
 

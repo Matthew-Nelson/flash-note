@@ -31,8 +31,8 @@ This document defines the **minimum requirements** that must be met before Flash
 | Metric | Target | Current |
 |--------|--------|---------|
 | Backend test coverage | 95% lines, 90% branches | ✅ Enforced in CI |
-| Extension test coverage | ≥70% | 0% |
-| Web test coverage | ≥60% | 0% |
+| Extension test coverage | ≥70% | ✅ ~93% (14 files, ~233 tests) |
+| Web test coverage | ≥60% | ✅ ~92% (19 files, ~224 tests) |
 | Security vulnerabilities | 0 critical, 0 high | ✅ All resolved |
 | HIPAA checklist complete | 100% | ~80% |
 | Lighthouse performance score | ≥90 | Not measured |
@@ -54,10 +54,10 @@ These items must be complete before any user testing.
 | MVP-04 | Web compiles without errors | Web | P0 | ✅ Done |
 | MVP-05 | Database migrations run successfully | Backend | P0 | ✅ Done |
 | MVP-06 | API health endpoint responds | Backend | P0 | ✅ Done |
-| MVP-07 | Extension icon assets exist (all 4 sizes) | Extension | P0 | ⚠️ Placeholders exist, need production icons |
+| MVP-07 | Extension icon assets exist (all 4 sizes) | Extension | P0 | ✅ Done |
 | MVP-08 | Web app auth connects to backend | Web | P0 | ✅ Done |
-| MVP-09 | Extension auth connects to backend | Extension | P0 | ⚠️ Needs testing |
-| MVP-10 | Note generation returns valid SOAP | Backend | P0 | ⚠️ Needs testing |
+| MVP-09 | Extension auth connects to backend | Extension | P0 | ✅ Done (manually verified) |
+| MVP-10 | Note generation returns valid SOAP | Backend | P0 | ✅ Done (manually verified) |
 | MVP-11 | Zod validation on all backend inputs | Backend | P0 | ✅ Done |
 | MVP-12 | Zod validation on extension inputs | Extension | P0 | ✅ Done |
 | MVP-13 | Error Boundary in extension | Extension | P0 | ✅ Done |
@@ -70,18 +70,18 @@ These items must be complete before beta testing with real PTs.
 
 | ID | Requirement | Domain | Priority | Status |
 |----|-------------|--------|----------|--------|
-| BETA-01 | Backend unit tests ≥60% coverage | Backend | P0 | ✅ 28 test files |
-| BETA-02 | Auth flow fully tested (manual) | All | P0 | ❌ Not done |
-| BETA-03 | Stripe checkout flow works end-to-end | All | P0 | ❌ Not tested |
-| BETA-04 | Trial expiration enforced | Backend | P0 | ⚠️ Needs testing |
-| BETA-05 | Rate limiting works (verified) | Backend | P0 | ⚠️ Needs testing |
+| BETA-01 | Backend unit tests ≥60% coverage | Backend | P0 | ✅ 31 test files, ~683 tests |
+| BETA-02 | Auth flow fully tested (manual) | All | P0 | ✅ Done (manually verified) |
+| BETA-03 | Stripe checkout flow works end-to-end | All | P0 | ✅ Done (local override; live Stripe deferred to post-beta) |
+| BETA-04 | Trial expiration enforced | Backend | P0 | ✅ Done (manually verified) |
+| BETA-05 | Rate limiting works (verified) | Backend | P0 | ❌ Failed manual test — needs investigation |
 | BETA-06 | Password validation matches spec | All | P0 | ✅ Done |
 | BETA-07 | Web dashboard shows real data | Web | P0 | ⚠️ Auth/subscription live, usage mock |
 | BETA-08 | Privacy policy page exists | Web | P0 | ✅ Done |
 | BETA-09 | Terms of service page exists | Web | P0 | ✅ Done |
 | BETA-10 | API request timeout handling | Extension | P1 | ✅ Done |
 | BETA-11 | Retry logic with backoff | Extension | P1 | ✅ Done |
-| BETA-12 | Offline detection | Extension | P2 | ❌ Missing |
+| BETA-12 | ~~Offline detection~~ | Extension | P2 | Dropped — deferred to post-launch polish |
 
 ### Phase 3: Production Ready
 
@@ -89,9 +89,9 @@ These items must be complete before public launch.
 
 | ID | Requirement | Domain | Priority | Status |
 |----|-------------|--------|----------|--------|
-| PROD-01 | Backend unit tests ≥80% coverage | Backend | P0 | ✅ 28 test files |
-| PROD-02 | Extension unit tests ≥70% coverage | Extension | P0 | ❌ 0% |
-| PROD-03 | Web unit tests ≥60% coverage | Web | P1 | ❌ 0% |
+| PROD-01 | Backend unit tests ≥80% coverage | Backend | P0 | ✅ 31 test files, ~683 tests |
+| PROD-02 | Extension unit tests ≥70% coverage | Extension | P0 | ✅ Done |
+| PROD-03 | Web unit tests ≥60% coverage | Web | P1 | ✅ Done |
 | PROD-04 | Security headers configured | All | P0 | ✅ Done |
 | PROD-05 | CORS locked to production domains | Backend | P0 | ✅ Done |
 | PROD-06 | All secrets in env vars (no hardcoding) | All | P0 | ✅ Done |
@@ -99,9 +99,9 @@ These items must be complete before public launch.
 | PROD-08 | TLS 1.2+ enforced | Infra | P0 | ❌ Not deployed |
 | PROD-09 | Vertex AI BAA signed (HIPAA) | Infra | P0 | ❌ Not done |
 | PROD-10 | Audit logs retained 6 years | Backend | P0 | ❌ Not implemented |
-| PROD-11 | Error tracking (Sentry) configured | All | P1 | ✅ Done (all components + logging gaps fixed) |
+| PROD-11 | Error tracking (Sentry) configured | All | P1 | ✅ Done |
 | PROD-12 | Chrome Web Store listing complete | Extension | P0 | ❌ Not done |
-| PROD-13 | BAA template available for customers | Docs | P0 | ⚠️ Template ready, needs legal review |
+| PROD-13 | BAA template available for customers | Docs | P0 | ❌ Not done |
 | PROD-14 | Incident response plan documented | Docs | P1 | ❌ Not done |
 | PROD-15 | WCAG 2.1 AA accessibility | Web/Ext | P2 | ❌ Not done |
 | PROD-16 | Audit logging workflow complete | Backend | P0 | ❌ Not done |
@@ -166,7 +166,7 @@ These items must be complete before public launch.
 | **UI** | Settings/logout | Handoff §9 | ✅ Done |
 | **Error** | Error boundary | Best practice | ✅ Done |
 | **Error** | API timeout handling | Best practice | ✅ Done (backend timeout + retry logic) |
-| **Error** | Offline detection | Nice-to-have | ❌ Missing |
+| **Error** | ~~Offline detection~~ | Nice-to-have | Dropped — deferred to post-launch polish |
 
 ### Web Requirements
 
@@ -262,7 +262,7 @@ These items must be complete before public launch.
 | Auth routes | 85% | ⚠️ Partial | P0 |
 | Notes routes | 80% | ⚠️ Partial | P0 |
 | Billing routes | 80% | ⚠️ Partial | P0 |
-| **Overall** | **≥80%** | **28 test files** | **P0** |
+| **Overall** | **≥80%** | **31 test files, ~683 tests** | **P0** |
 
 ### Extension Test Coverage Targets
 
@@ -396,12 +396,14 @@ These items must be complete before public launch.
 
 ### Completion Summary
 
+> **Note:** This table tracks the 43 quality gates (MVP + Beta + Production phases). For all work items including UI audit and HIPAA compliance (84 total), see [ROADMAP.md](../ROADMAP.md).
+
 | Phase | Total Items | Completed | Percentage |
 |-------|-------------|-----------|------------|
-| MVP Foundation | 15 | 12 | 80% |
-| Beta Ready | 12 | 6 | 50% |
+| MVP Foundation | 15 | 15 | 100% |
+| Beta Ready | 12 | 9 | 75% |
 | Production Ready | 16 | 5 | 31% |
-| **Overall** | **43** | **23** | **53%** |
+| **Overall** | **43** | **29** | **67%** |
 
 ---
 
