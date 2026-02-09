@@ -42,8 +42,8 @@ test.describe('Login Page', () => {
   });
 
   test.describe('Navigation Links', () => {
-    test('create account link goes to signup', async ({ page }) => {
-      await page.getByRole('link', { name: 'create a new account' }).click();
+    test('sign up link goes to signup', async ({ page }) => {
+      await page.getByRole('link', { name: 'Sign up' }).click();
       await expect(page).toHaveURL('/signup');
     });
 
@@ -73,33 +73,37 @@ test.describe('Signup Page', () => {
       await page.getByLabel('Email address').fill(generateTestEmail());
       await page.getByLabel('Password', { exact: true }).fill(invalidPasswords.noUppercase);
       await page.getByLabel('Confirm Password').fill(invalidPasswords.noUppercase);
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create account' }).click();
 
-      await expect(page.getByText(/uppercase/i)).toBeVisible();
+      await expect(page.getByText('Password must contain at least one uppercase letter')).toBeVisible();
     });
 
     test('shows error for password without lowercase', async ({ page }) => {
       await page.getByLabel('Email address').fill(generateTestEmail());
       await page.getByLabel('Password', { exact: true }).fill(invalidPasswords.noLowercase);
       await page.getByLabel('Confirm Password').fill(invalidPasswords.noLowercase);
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create account' }).click();
 
-      await expect(page.getByText(/lowercase/i)).toBeVisible();
+      await expect(page.getByText('Password must contain at least one lowercase letter')).toBeVisible();
     });
 
     test('shows error for password without number', async ({ page }) => {
       await page.getByLabel('Email address').fill(generateTestEmail());
       await page.getByLabel('Password', { exact: true }).fill(invalidPasswords.noNumber);
       await page.getByLabel('Confirm Password').fill(invalidPasswords.noNumber);
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create account' }).click();
 
-      await expect(page.getByText(/number/i)).toBeVisible();
+      await expect(page.getByText('Password must contain at least one number')).toBeVisible();
     });
 
     test('shows error when passwords do not match', async ({ page }) => {
       await page.getByLabel('Email address').fill(generateTestEmail());
       await page.getByLabel('Password', { exact: true }).fill('ValidPass1');
       await page.getByLabel('Confirm Password').fill('DifferentPass1');
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create account' }).click();
 
       await expect(page.getByText(/do not match/i)).toBeVisible();
@@ -114,6 +118,7 @@ test.describe('Signup Page', () => {
       await page.getByLabel('Email address').fill(email);
       await page.getByLabel('Password', { exact: true }).fill(password);
       await page.getByLabel('Confirm Password').fill(password);
+      await page.getByRole('checkbox').check();
       await page.getByRole('button', { name: 'Create account' }).click();
 
       // Should redirect to either dashboard or verify-email page
