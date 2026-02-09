@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 8, 2026
-**Overall Progress:** 31% (26/84 quality gates complete)
+**Last Updated:** February 9, 2026
+**Overall Progress:** 27% (30/113 items complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -111,7 +111,8 @@ These items are **required for production** with real patient data. They should 
 | TLS 1.2+ enforced on all connections | SUCCESS_METRICS PROD-08 | Not deployed |
 | HIPAA-compliant hosting provider with BAA | PRE_LAUNCH_CHECKLIST §2 | Not done |
 | Breach notification / incident response procedure | HITECH Act requirement | Not documented |
-| BAA acceptance in signup flow | PRE_LAUNCH_LEGAL_COMPLIANCE | Not implemented |
+| BAA acceptance in signup flow (backend) | PRE_LAUNCH_LEGAL_COMPLIANCE | ✅ Done (legal_acceptances table + recordLegalAcceptances in auth-service) |
+| **Create `/baa` web page** (so users can read the BAA) | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
 
 **Note:** Without these items complete, we cannot legally handle real PHI in production. Under the HITECH Act, FlashNote is directly liable for compliance failures — independent of covered entities.
 
@@ -136,13 +137,60 @@ These items are **required for production** with real patient data. They should 
 | Task | Source | Status |
 |------|--------|--------|
 | Extension password validation | SUCCESS_METRICS BETA-06 | ✅ Done |
-| Backend `/usage/stats` endpoint | Web buildout dependency | Not started |
-| Web dashboard with real data | SUCCESS_METRICS BETA-07 | ⚠️ Auth/subscription live, usage mock |
+| ~~Backend `/usage/stats` endpoint~~ | ~~Web buildout dependency~~ | Superseded by `GET /usage/me` in Wave 1 below |
+| ~~Web dashboard with real data~~ | ~~SUCCESS_METRICS BETA-07~~ | Superseded by Wave 1 items 8-9 below |
 | Privacy policy page on web | SUCCESS_METRICS BETA-08 | ✅ Done |
 | Terms of service page on web | SUCCESS_METRICS BETA-09 | ✅ Done |
 | API request timeout handling | SUCCESS_METRICS BETA-10 | ✅ Done |
 | Retry logic with backoff | SUCCESS_METRICS BETA-11 | ✅ Done |
 | **Create `/baa` web page** | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
+
+### Registration Gating (Wave 1) — Beta Blocker
+
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md). Wave 1 enables invite-only beta with real usage data. No org/clinic features yet.
+
+| Task | Source | Status |
+|------|--------|--------|
+| Usage schema migration: split `tokens_used` → `input_tokens` + `output_tokens` | APP_GATING_STRATEGY Wave 1 | Not started |
+| Update `usageService.incrementUsage()` signature and callers | APP_GATING_STRATEGY Wave 1 | Not started |
+| Add `REGISTRATION_MODE` to `config.ts` env schema | APP_GATING_STRATEGY Wave 1 | Not started |
+| Migration 009: `invite_codes` table | APP_GATING_STRATEGY Wave 1 | Not started |
+| Modify `/auth/register` to enforce registration mode + accept invite codes | APP_GATING_STRATEGY Wave 1 | Not started |
+| Invite code generation CLI script (`scripts/generate-invite-code.js`) | APP_GATING_STRATEGY Wave 1 | Not started |
+| `POST /invite-codes/validate` endpoint (with rate limit) | APP_GATING_STRATEGY Wave 1 | Not started |
+| `GET /usage/me` endpoint (replaces mock dashboard data) | APP_GATING_STRATEGY Wave 1 | Not started |
+| Web dashboard: replace mock usage with real `/usage/me` data | APP_GATING_STRATEGY Wave 1 | Not started |
+| Web signup page: add optional invite code field | APP_GATING_STRATEGY Wave 1 | Not started |
+
+**Done when:** `REGISTRATION_MODE=invite` works, beta code can be generated via CLI, PT registers with it, and dashboard shows real usage.
+
+---
+
+## Phase 2.5: Clinic Pilot
+
+**Goal:** Onboard 1-2 clinics with multi-seat plans. Still `REGISTRATION_MODE=invite`.
+
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Waves 2-3.
+
+### Wave 2: Clinic Infrastructure
+
+| Task | Source | Status |
+|------|--------|--------|
+| Migration 010: `organizations`, `organization_members` tables, `users.organization_id` | APP_GATING_STRATEGY Wave 2 | Not started |
+| Modify `requireActiveSubscription` middleware for org-based access | APP_GATING_STRATEGY Wave 2 | Not started |
+| `requireOrgMembership` and `requireOrgRole` middleware | APP_GATING_STRATEGY Wave 2 | Not started |
+| New audit actions in `AuditAction` enum (ORG_*, INVITE_*) | APP_GATING_STRATEGY Wave 2 | Not started |
+| Organization service (create, query, member management, billable seats) | APP_GATING_STRATEGY Wave 2 | Not started |
+| Modify registration: clinic invite code → auto-join org | APP_GATING_STRATEGY Wave 2 | Not started |
+| `POST /organization/join` endpoint (existing user re-join) | APP_GATING_STRATEGY Wave 2 | Not started |
+
+### Wave 3: Clinic Admin Dashboard
+
+| Task | Source | Status |
+|------|--------|--------|
+| Org API endpoints (GET /organization, /members, /usage, /invites) | APP_GATING_STRATEGY Wave 3 | Not started |
+| Org management endpoints (POST/DELETE/PATCH invites, members) | APP_GATING_STRATEGY Wave 3 | Not started |
+| Web: Team dashboard page (`/dashboard/team`) | APP_GATING_STRATEGY Wave 3 | Not started |
 
 ---
 
@@ -199,6 +247,28 @@ See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for full requirement
 - Copy functionality tests
 - Rate limiting UX tests
 
+### Wave 4: Clinic Billing (Pre-Launch)
+
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 4.
+
+| Task | Source | Status |
+|------|--------|--------|
+| Stripe clinic product + price setup | APP_GATING_STRATEGY Wave 4 | Not started |
+| Modify `/billing/checkout` for clinic plans (quantity + clinic name) | APP_GATING_STRATEGY Wave 4 | Not started |
+| Modify webhook handler for org-level subscription events | APP_GATING_STRATEGY Wave 4 | Not started |
+| `max_seats` sync from Stripe webhook | APP_GATING_STRATEGY Wave 4 | Not started |
+| Web: clinic plan on pricing page | APP_GATING_STRATEGY Wave 4 | Not started |
+| Owner dual-subscription notification | APP_GATING_STRATEGY Wave 4 | Not started |
+
+### Wave 5: Polish & Voluntary Flows (Pre-Launch)
+
+| Task | Source | Status |
+|------|--------|--------|
+| `POST /organization/leave` (voluntary departure) | APP_GATING_STRATEGY Wave 5 | Not started |
+| `POST /organization/transfer` (ownership transfer) | APP_GATING_STRATEGY Wave 5 | Not started |
+| Extension: org affiliation in settings + `clinic_subscription_expired` handling | APP_GATING_STRATEGY Wave 5 | Not started |
+| Admin compliance view (legal acceptance status per member) | APP_GATING_STRATEGY Wave 5 | Not started |
+
 ### Launch Preparation
 
 | Task | Source | Status |
@@ -249,16 +319,17 @@ These are researched but not prioritized for current development.
 
 ## Progress Summary
 
-> **Note:** This table tracks all work items across the project (84 total), including UI audit findings and HIPAA compliance tasks. For quality gates only (43 items), see [SUCCESS_METRICS.md](./SUCCESS_METRICS.md).
+> **Note:** This table tracks all work items across the project, including UI audit findings, HIPAA compliance, and gating strategy. For quality gates only (43 items), see [SUCCESS_METRICS.md](./SUCCESS_METRICS.md).
 
 | Phase | Items | Done | Progress |
 |-------|-------|------|----------|
 | MVP Foundation | 15 | 15 | 100% |
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
-| Beta Ready | 12 | 9 | 75% |
-| Production Ready | 16 | 5 | 31% |
-| HIPAA/HITECH Critical Path | 8 | 0 | 0% |
-| **Total** | **84** | **29** | **35%** |
+| Beta Ready (incl. Wave 1) | 20 | 9 | 45% |
+| Clinic Pilot (Waves 2-3) | 10 | 0 | 0% |
+| Production Ready (incl. Waves 4-5) | 26 | 5 | 19% |
+| HIPAA/HITECH Critical Path | 9 | 1 | 11% |
+| **Total** | **113** | **30** | **27%** |
 
 ---
 
@@ -276,6 +347,7 @@ These are researched but not prioritized for current development.
 - [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) - Detailed quality gates
 - [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Business launch requirements
 - [STRIPE_TODOS.md](./STRIPE_TODOS.md) - Payment integration details
+- [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) - **Critical** - Beta rollout gating, clinic seat management, implementation waves
 - [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) - **Critical** - Unit, integration, E2E, and penetration testing requirements
 - [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md) - **Critical** - UI quality audit: accessibility, error handling, responsiveness, styling
 - [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) - Sentry, UptimeRobot, Axiom setup plan
