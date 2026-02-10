@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, mockClientQuery, mockClientRelease, resetMocks } from '../test/setup.js';
+import { mockClientQuery, mockClientRelease, resetMocks } from '../test/setup.js';
 
 // Mock config before any imports that use it (error-handler → config)
 vi.mock('../config.js', () => ({
