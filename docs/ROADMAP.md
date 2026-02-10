@@ -147,44 +147,46 @@ These items are **required for production** with real patient data. They should 
 
 ### Registration Gating + Clinic Infrastructure (Wave 1) — Beta Blocker
 
-> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 1. Enables invite-only beta with both individual and clinic onboarding paths from day one.
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 1. Each part is a separate PR with a code review gate — see the planning doc for review focus areas per PR.
 
-**Part A — Foundation:**
-
-| Task | Source | Status |
-|------|--------|--------|
-| Usage schema migration: split `tokens_used` → `input_tokens` + `output_tokens` | APP_GATING_STRATEGY Wave 1A | Not started |
-| Update `usageService.incrementUsage()` signature and callers | APP_GATING_STRATEGY Wave 1A | Not started |
-| Add `REGISTRATION_MODE` to `config.ts` env schema | APP_GATING_STRATEGY Wave 1A | Not started |
-
-**Part B — Invite codes + registration gating:**
+**PR 1A — Usage token split + config:**
 
 | Task | Source | Status |
 |------|--------|--------|
-| Migration 009: `invite_codes` table | APP_GATING_STRATEGY Wave 1B | Not started |
-| Modify `/auth/register`: registration mode + invite codes | APP_GATING_STRATEGY Wave 1B | Not started |
-| Invite code generation CLI script (`scripts/generate-invite-code.js`) | APP_GATING_STRATEGY Wave 1B | Not started |
-| `POST /invite-codes/validate` endpoint (with rate limit) | APP_GATING_STRATEGY Wave 1B | Not started |
+| Usage schema migration: split `tokens_used` → `input_tokens` + `output_tokens` | APP_GATING_STRATEGY PR 1A | Not started |
+| Update `usageService.incrementUsage()` signature and callers | APP_GATING_STRATEGY PR 1A | Not started |
+| Add `REGISTRATION_MODE` to `config.ts` env schema | APP_GATING_STRATEGY PR 1A | Not started |
 
-**Part C — Organization infrastructure:**
-
-| Task | Source | Status |
-|------|--------|--------|
-| Migration 010: `organizations`, `organization_members` tables, `users.organization_id` | APP_GATING_STRATEGY Wave 1C | Not started |
-| New audit actions in `AuditAction` enum (ORG_*, INVITE_*) | APP_GATING_STRATEGY Wave 1C | Not started |
-| Organization service (create, query, member management, billable seats) | APP_GATING_STRATEGY Wave 1C | Not started |
-| Modify `requireActiveSubscription` middleware for org-based access | APP_GATING_STRATEGY Wave 1C | Not started |
-| `requireOrgMembership` and `requireOrgRole` middleware | APP_GATING_STRATEGY Wave 1C | Not started |
-| Modify registration: clinic invite code → auto-join org | APP_GATING_STRATEGY Wave 1C | Not started |
-| `POST /organization/join` endpoint (existing user re-join) | APP_GATING_STRATEGY Wave 1C | Not started |
-
-**Part D — Usage endpoints + web UI:**
+**PR 1B — Invite codes + registration gating:**
 
 | Task | Source | Status |
 |------|--------|--------|
-| `GET /usage/me` endpoint (replaces mock dashboard data) | APP_GATING_STRATEGY Wave 1D | Not started |
-| Web dashboard: replace mock usage with real `/usage/me` data | APP_GATING_STRATEGY Wave 1D | Not started |
-| Web signup page: add invite code field | APP_GATING_STRATEGY Wave 1D | Not started |
+| Migration 009: `invite_codes` table | APP_GATING_STRATEGY PR 1B | Not started |
+| Modify `/auth/register`: registration mode + invite codes | APP_GATING_STRATEGY PR 1B | Not started |
+| Invite code generation CLI script (`scripts/generate-invite-code.ts`) | APP_GATING_STRATEGY PR 1B | Not started |
+| `POST /invite-codes/validate` endpoint (with rate limit + audit logging) | APP_GATING_STRATEGY PR 1B | Not started |
+| Web signup: invite code field + extension schema sync | APP_GATING_STRATEGY PR 1B | Not started |
+
+**PR 1C — Organization infrastructure:**
+
+| Task | Source | Status |
+|------|--------|--------|
+| Migration 010: `organizations`, `organization_members` tables, `users.organization_id` | APP_GATING_STRATEGY PR 1C | Not started |
+| New audit actions in `AuditAction` enum (ORG_*, INVITE_*) | APP_GATING_STRATEGY PR 1C | Not started |
+| Organization service (create, query, member management, billable seats) | APP_GATING_STRATEGY PR 1C | Not started |
+| Modify `requireActiveSubscription` middleware for org-based access | APP_GATING_STRATEGY PR 1C | Not started |
+| `requireOrgMembership` and `requireOrgRole` middleware | APP_GATING_STRATEGY PR 1C | Not started |
+| Modify registration: clinic invite code → auto-join org | APP_GATING_STRATEGY PR 1C | Not started |
+| `POST /organization/join` endpoint (existing user re-join, transactional) | APP_GATING_STRATEGY PR 1C | Not started |
+
+**PR 1D — Usage endpoint + web dashboard:**
+
+| Task | Source | Status |
+|------|--------|--------|
+| `GET /usage/me` endpoint (replaces mock dashboard data) | APP_GATING_STRATEGY PR 1D | Not started |
+| Web dashboard: replace mock usage with real `/usage/me` data | APP_GATING_STRATEGY PR 1D | Not started |
+| Handle all subscription statuses distinctly in dashboard UI | APP_GATING_STRATEGY PR 1D | Not started |
+| Extension: add `organizationId` to `storedUserSchema` | APP_GATING_STRATEGY PR 1D | Not started |
 
 **Done when:** `REGISTRATION_MODE=invite` works, PT can register with beta code and see real usage, AND clinic admin can register → org created (manually) → clinic invite codes generated → PTs join org → subscription access works through org.
 
@@ -245,35 +247,31 @@ See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for full requirement
 
 ### Wave 2: Clinic Admin Dashboard (Post-Beta)
 
-> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 2.
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 2. Three PRs: read endpoints, management endpoints, web UI.
 
-| Task | Source | Status |
-|------|--------|--------|
-| Org API endpoints (GET /organization, /members, /usage, /invites) | APP_GATING_STRATEGY Wave 2 | Not started |
-| Org management endpoints (POST/DELETE/PATCH invites, members) | APP_GATING_STRATEGY Wave 2 | Not started |
-| Web: Team dashboard page (`/dashboard/team`) | APP_GATING_STRATEGY Wave 2 | Not started |
+| PR | Task | Status |
+|----|------|--------|
+| 2A | Org read endpoints (GET /organization, /members, /usage) | Not started |
+| 2B | Org management endpoints (POST/DELETE/PATCH invites, members) | Not started |
+| 2C | Web: Team dashboard page (`/dashboard/team`) | Not started |
 
 ### Wave 3: Clinic Billing (Pre-Launch)
 
-> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 3.
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 3. Two PRs: Stripe integration, web UI.
 
-| Task | Source | Status |
-|------|--------|--------|
-| Stripe clinic product + price setup | APP_GATING_STRATEGY Wave 3 | Not started |
-| Modify `/billing/checkout` for clinic plans (quantity + clinic name) | APP_GATING_STRATEGY Wave 3 | Not started |
-| Modify webhook handler for org-level subscription events | APP_GATING_STRATEGY Wave 3 | Not started |
-| `max_seats` sync from Stripe webhook | APP_GATING_STRATEGY Wave 3 | Not started |
-| Web: clinic plan on pricing page | APP_GATING_STRATEGY Wave 3 | Not started |
-| Owner dual-subscription notification | APP_GATING_STRATEGY Wave 3 | Not started |
+| PR | Task | Status |
+|----|------|--------|
+| 3A | Stripe clinic plan integration (checkout, webhooks, `max_seats` sync) | Not started |
+| 3B | Web: clinic plan on pricing page + owner billing UX | Not started |
 
 ### Wave 4: Polish & Voluntary Flows (Pre-Launch)
 
-| Task | Source | Status |
-|------|--------|--------|
-| `POST /organization/leave` (voluntary departure) | APP_GATING_STRATEGY Wave 4 | Not started |
-| `POST /organization/transfer` (ownership transfer) | APP_GATING_STRATEGY Wave 4 | Not started |
-| Extension: org affiliation in settings + `clinic_subscription_expired` handling | APP_GATING_STRATEGY Wave 4 | Not started |
-| Admin compliance view (legal acceptance status per member) | APP_GATING_STRATEGY Wave 4 | Not started |
+> Full design: [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) Wave 4. Two PRs: backend flows, extension + compliance.
+
+| PR | Task | Status |
+|----|------|--------|
+| 4A | `POST /organization/leave` + `/transfer` endpoints | Not started |
+| 4B | Extension org support + admin compliance view | Not started |
 
 ### Launch Preparation
 

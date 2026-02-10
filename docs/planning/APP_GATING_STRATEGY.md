@@ -132,6 +132,10 @@ Alphabet: A-Z minus O/I/L = 23 letters, plus 2-9 = 8 digits
 Effective alphabet: 31 chars → 31^8 = ~852 billion combinations
 ```
 
+### Case Handling
+
+Codes are stored uppercase. Input validation accepts lowercase (for UX) and the backend **must uppercase before DB lookup**. The validation regex must exclude the lowercase equivalents of ambiguous characters (`i`, `o`, `l`) — otherwise a user typing `o` passes client-side validation, gets uppercased to `O`, and will never match a valid code (since `O` is excluded from the generation alphabet). Use `[A-HJ-NP-Za-hj-np-z2-9]` in the regex (no `/i` flag) or uppercase before validation.
+
 ---
 
 ## Data Model: All New Tables & Changes
@@ -201,6 +205,8 @@ ALTER TABLE users ADD COLUMN organization_id UUID REFERENCES organizations(id);
 ```
 
 This is a denormalized convenience column. The source of truth is `organization_members`, but having `organization_id` on the user allows the subscription middleware to do a single query instead of a JOIN. It's set on join, cleared on removal.
+
+**`trial_ends_at` nullability:** The existing `users.trial_ends_at` column is nullable. Users who join via clinic invite codes may never have a trial period set (they get access through the org subscription). All code that reads `trial_ends_at` must handle `null` — type it as `Date | null`, not `Date`. Comparison `new Date() < null` happens to return `false` (fail-closed), but relying on this implicit coercion is fragile.
 
 ### No Changes Needed
 
@@ -417,7 +423,9 @@ PTs leave and rejoin clinics frequently. This must be smooth without requiring s
 4. Frontend shows: "Welcome back! Log in to rejoin Acme Physical Therapy."
 5. PT logs in → sees a prompt: "You've been invited to rejoin Acme Physical Therapy. [Accept] [Decline]"
 6. Accept → `POST /organization/join` (authenticated, accepts invite code):
-   - Validates code, checks seat availability
+   - **All of the following must happen inside a single transaction:**
+   - Re-checks that user has no active org membership (guards against concurrent join requests — the pre-transaction check is necessary for UX but not sufficient for safety)
+   - Validates code, checks seat availability (with `SELECT ... FOR UPDATE` on the org row, same as registration)
    - Creates new `organization_members` row (old row with `removed_at` stays for audit trail)
    - Sets `users.organization_id`
    - Marks invite code as used
@@ -651,6 +659,8 @@ UPDATE usage SET output_tokens = tokens_used WHERE tokens_used > 0;
 -- Drop the legacy column
 ALTER TABLE usage DROP COLUMN tokens_used;
 ```
+
+**Migration safety note:** This migration drops `tokens_used` in the same transaction as adding new columns. During a zero-downtime rolling deploy, any old app instance still serving requests would fail on queries referencing `tokens_used`. **Pre-beta (no traffic), this is fine as a single migration.** For production deploys with live traffic, split into two migrations: (1) add new columns + migrate data, deploy new code, then (2) drop old column. Add a `-- TODO: split for production rolling deploy` comment as a reminder.
 
 Update `usageService.incrementUsage()` signature:
 ```typescript
@@ -986,6 +996,8 @@ INVITE_CODE_REVOKED = 'INVITE_CODE_REVOKED',
 ### 1. Invite Code Brute Force
 
 Rate-limit the `/invite-codes/validate` and `/auth/register` endpoints. The existing rate limits cover registration (3/hour in prod). Add a dedicated rate limit for code validation: 10/minute per IP.
+
+**Audit logging on failed attempts:** Log failed invite code validation attempts to the audit trail (action: `INVITE_CODE_VALIDATION_FAILED`, metadata: IP address, attempt count). The rate limiter catches single-IP brute force, but distributed attacks across IPs would only be visible through audit logs. This is a HIPAA requirement — all access control decisions should be auditable.
 
 ### 2. Privilege Escalation
 
@@ -1389,85 +1401,189 @@ Re-registration attempt with same email → detected via email hash → "This em
 
 ## Implementation Order
 
-When this moves from planning to implementation:
+**Each part below is a separate PR with a code review gate.** Do not start the next PR until the previous one is reviewed, approved, and merged. This keeps diffs small (~100-200 lines), reviews focused on one domain, and bugs caught before they compound.
 
 ### Wave 1: Registration Gating + Clinic Infrastructure + Usage (Beta prep)
 
 **Goal:** Get to invite-only beta with both individual and clinic onboarding paths, plus real usage data.
 **Prerequisite for:** Phase 2 (Beta) in [Rollout Phases](#rollout-phases).
-**Estimated scope:** ~25-30 files touched (backend routes, config, migrations, middleware, services, web dashboard, web signup, tests).
 
-**Part A — Foundation (no org dependency):**
+---
+
+#### PR 1A — Usage token split + config (`→ main`)
+
+**Scope:** Backend only, ~5 files, no new tables, no behavioral changes to existing features.
+
 1. Usage schema migration: split `tokens_used` into `input_tokens` + `output_tokens`
-2. Update `usageService.incrementUsage()` signature and callers (notes route, AI service)
-3. Add `REGISTRATION_MODE` to `config.ts` env schema
+2. Update `usageService.incrementUsage()` signature and callers (notes route, AI service, mock AI service)
+3. Update usage service tests for new signature
+4. Add `REGISTRATION_MODE` to `config.ts` env schema (default: `open` for backward compat)
 
-**Part B — Invite codes + registration gating:**
-4. Migration 009: `invite_codes` table
-5. Modify `/auth/register` to enforce registration mode + accept invite codes
-6. Invite code generation CLI script (`scripts/generate-invite-code.js`)
-7. `POST /invite-codes/validate` public endpoint (with rate limit: 10/min per IP)
+**Review focus:** Migration correctness, usage service contract, no regressions in note generation flow.
+**Done when:** Existing tests pass, usage tracking works with split tokens, `REGISTRATION_MODE` is readable from config.
 
-**Part C — Organization infrastructure:**
-8. Migration 010: `organizations` table, `organization_members` table (with `is_billable`), `users.organization_id` column
-9. New audit actions in `AuditAction` enum (ORG_*, INVITE_*)
-10. Organization service (create, query, member management, billable seat counting)
-11. Modify `requireActiveSubscription` middleware for org-based access
-12. `requireOrgMembership` and `requireOrgRole` middleware
-13. Modify registration flow: clinic invite code → auto-join org
-14. `POST /organization/join` endpoint (existing user re-joining via invite code)
+---
 
-**Part D — Usage endpoints + web UI:**
-15. `GET /usage/me` endpoint (expose `usageService.getMonthlyUsage`, note counts only)
-16. Web dashboard: replace mock usage with real `/usage/me` data
-17. Web signup page: add invite code field
+#### PR 1B — Invite codes + registration gating (`→ main`)
 
-**Done when:** You can set `REGISTRATION_MODE=invite`, generate a beta code via CLI, have a PT register and see real usage on the dashboard, AND have a clinic admin register → create an org (manually via DB for now) → generate clinic invite codes → PTs register and join the org → subscription access works through the org.
+**Scope:** Backend + web/extension schema sync, ~8-10 files, one new table.
+
+1. Migration 009: `invite_codes` table
+2. Invite code query module (generate, find, validate, mark used)
+3. Modify `/auth/register` to enforce registration mode + accept invite codes
+4. `POST /invite-codes/validate` public endpoint (with rate limit: 10/min per IP, audit logging on failed attempts)
+5. Invite code generation CLI script (`scripts/generate-invite-code.ts`)
+6. Web signup page: add invite code field + client-side validation schema
+7. Extension schema: add `inviteCode` to registration schema
+8. Tests for invite code queries, registration gating (all 3 modes), validate endpoint
+
+**Review focus:** Invite code entropy/security, registration gating logic for all 3 modes, rate limiting, case handling (see [Case Handling](#case-handling)), audit trail for failed validations.
+**Done when:** `REGISTRATION_MODE=invite` blocks registration without a code, `REGISTRATION_MODE=open` allows registration without a code, CLI can generate codes, validate endpoint works with rate limiting.
+
+---
+
+#### PR 1C — Organization infrastructure (`→ main`)
+
+**Scope:** Backend only, ~12-15 files, two new tables, new middleware, new service. This is the largest PR in Wave 1 — if it exceeds ~300 lines, split into 1C-i (schema + types + service) and 1C-ii (middleware + routes).
+
+1. Migration 010: `organizations` table, `organization_members` table (with `is_billable`), `users.organization_id` column
+2. New audit actions in `AuditAction` enum (ORG_*, INVITE_*)
+3. Database query modules: organizations, organization-members
+4. Organization service (create, query, member management, billable seat counting)
+5. Modify `requireActiveSubscription` middleware for org-based access (handle `trial_ends_at` as `Date | null`)
+6. `requireOrgMembership` and `requireOrgRole` middleware (use explicit column lists, not `SELECT *`)
+7. Modify registration flow: clinic invite code → auto-join org (transaction with `SELECT ... FOR UPDATE`)
+8. `POST /organization/join` endpoint (existing user re-join — membership check **inside** transaction, see [Re-adding a Previously Removed Member](#re-adding-a-previously-removed-member))
+9. Tests for org service, subscription middleware (individual + org + fallback paths), org middleware, join endpoint
+
+**Review focus:** Transaction safety (TOCTOU races), `SELECT ... FOR UPDATE` for seat allocation, subscription middleware fallback logic, privilege escalation prevention in middleware, `trial_ends_at` null handling.
+**Done when:** Clinic invite codes auto-join users to orgs, subscription middleware grants access through org subscription, `requireOrgRole` correctly gates admin endpoints.
+
+---
+
+#### PR 1D — Usage endpoint + web dashboard (`→ main`)
+
+**Scope:** Backend route + web frontend, ~6-8 files.
+
+1. `GET /usage/me` endpoint (note counts only, org context included)
+2. Usage response Zod schema (backend + web)
+3. Web dashboard: replace mock usage with real `/usage/me` data
+4. Format `currentMonth` from API (`"2026-02"`) into human-readable display (`"February 2026"`)
+5. Handle all subscription statuses distinctly in dashboard UI (`trialing`, `active`, `past_due`, `canceled`, `unpaid`)
+6. Add loading state for usage data (avoid flash of `0`)
+7. Extension: add `organizationId` to `storedUserSchema`
+8. Tests for usage endpoint, dashboard rendering with different subscription states
+
+**Review focus:** API contract match between backend and frontend, no PHI in responses, correct handling of all subscription status values, accessibility (aria-labels on dismiss buttons).
+**Done when:** Dashboard shows real usage data, all subscription statuses show correct messaging, extension schema matches backend contract.
+
+---
+
+**Wave 1 complete when:** You can set `REGISTRATION_MODE=invite`, generate a beta code via CLI, have a PT register and see real usage on the dashboard, AND have a clinic admin register → create an org (manually via DB for now) → generate clinic invite codes → PTs register and join the org → subscription access works through the org.
+
+---
 
 ### Wave 2: Clinic Admin Dashboard
 
 **Goal:** Clinic admins can manage their team through the web UI. Self-serve team management replaces manual DB operations.
-**Estimated scope:** ~15-20 files (backend endpoints, web pages, tests).
 
-19. `GET /organization` endpoint (org details + billable/total seat counts)
-20. `GET /organization/members` endpoint
-21. `GET /organization/usage` endpoint (aggregated + per-member, including former members)
-22. `POST /organization/invites` (generate clinic invite code, with optional invite email)
-23. `GET /organization/invites` (list pending invites)
-24. `DELETE /organization/invites/:id` (revoke)
-25. `DELETE /organization/members/:id` (remove member + revoke access)
-26. `PATCH /organization/members/:id` (role changes, billable status toggle)
-27. Web: Team dashboard page (`/dashboard/team`)
+---
 
-**Done when:** A clinic admin can generate invite codes (with optional email), view team usage including former members, remove members, and toggle billable status — all through the web UI.
+#### PR 2A — Org read endpoints (`→ main`)
+
+1. `GET /organization` endpoint (org details + billable/total seat counts)
+2. `GET /organization/members` endpoint
+3. `GET /organization/usage` endpoint (aggregated + per-member, including former members)
+4. Tests
+
+**Review focus:** Cross-org data isolation, only admin/owner can see member details, former member usage included for billing accuracy.
+
+---
+
+#### PR 2B — Invite + member management endpoints (`→ main`)
+
+1. `POST /organization/invites` (generate clinic invite code, rate limit: 10/hour per org)
+2. `GET /organization/invites` (list pending invites)
+3. `DELETE /organization/invites/:id` (revoke)
+4. `DELETE /organization/members/:id` (remove member + immediate revocation)
+5. `PATCH /organization/members/:id` (role changes, billable status toggle)
+6. Tests
+
+**Review focus:** Privilege escalation (admin can't remove owner, only owner can change roles), immediate access revocation on removal, rate limiting on invite generation.
+
+---
+
+#### PR 2C — Team dashboard web UI (`→ main`)
+
+1. Web: Team dashboard page (`/dashboard/team`)
+2. Invite code generation + copy UX
+3. Member list with role badges, usage, remove buttons
+4. Pending invites list with revoke
+
+**Review focus:** XSS prevention, no PHI in rendered output, correct role-based UI gating (show/hide billing link based on role), accessibility.
+
+**Wave 2 done when:** A clinic admin can generate invite codes, view team usage including former members, remove members, and toggle billable status — all through the web UI.
+
+---
 
 ### Wave 3: Clinic Billing
 
 **Goal:** Self-serve clinic plan purchase through Stripe. Replaces manual org creation.
-**Estimated scope:** ~10 files (billing service, webhook handler, web pricing page).
 
-28. Stripe clinic product + price setup
-29. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
-30. Modify webhook handler for org-level subscription events
-31. `max_seats` sync from Stripe webhook
-32. Web: clinic plan on pricing page
-33. Owner billing management (Stripe portal link)
-34. Owner dual-subscription notification (see [Edge Case 3](#3-owners-dual-subscription-ambiguity))
+---
 
-**Done when:** A user can self-serve purchase a clinic plan, the org is created automatically, and seat quantity syncs through Stripe webhooks.
+#### PR 3A — Stripe clinic plan integration (`→ main`)
+
+1. Stripe clinic product + price setup (env vars)
+2. Modify `/billing/checkout` for clinic plans (quantity + clinic name metadata)
+3. Modify webhook handler for org-level subscription events (idempotent, inside `processed_webhook_events` guard)
+4. `max_seats` sync from Stripe webhook quantity
+5. Tests
+
+**Review focus:** Webhook idempotency (no duplicate org creation), correct disambiguation between individual and clinic subscription events, `max_seats` only set via webhook (Stripe as source of truth).
+
+---
+
+#### PR 3B — Clinic billing web UI (`→ main`)
+
+1. Web: clinic plan on pricing page
+2. Owner billing management (Stripe portal link, scoped to owner role)
+3. Owner dual-subscription notification (see [Edge Case 3](#3-owners-dual-subscription-ambiguity))
+
+**Review focus:** Only owner sees billing controls, notification is informational (no auto-cancel).
+
+**Wave 3 done when:** A user can self-serve purchase a clinic plan, the org is created automatically, and seat quantity syncs through Stripe webhooks.
+
+---
 
 ### Wave 4: Polish & Voluntary Flows
 
 **Goal:** Complete the remaining org lifecycle flows.
-**Estimated scope:** ~8-10 files.
 
-35. `POST /organization/leave` (voluntary departure)
-36. `POST /organization/transfer` (ownership transfer)
-37. Extension: show org affiliation in settings
-38. Extension: handle `clinic_subscription_expired` error distinctly
-39. Admin compliance view (legal acceptance status per member)
+---
 
-**Done when:** PTs can leave clinics voluntarily, owners can transfer ownership, and the extension properly handles org-level subscription errors.
+#### PR 4A — Voluntary departure + ownership transfer (`→ main`)
+
+1. `POST /organization/leave` (voluntary departure — not owner)
+2. `POST /organization/transfer` (ownership transfer — requires re-auth)
+3. Tests
+
+**Review focus:** Owner cannot leave without transferring, re-authentication on ownership transfer, audit trail.
+
+---
+
+#### PR 4B — Extension org support + admin compliance (`→ main`)
+
+1. Extension: show org affiliation in settings
+2. Extension: handle `clinic_subscription_expired` error distinctly from `subscription_required`
+3. Admin compliance view (legal acceptance status per member)
+4. Tests
+
+**Review focus:** Extension error handling covers all org-specific error codes, compliance view doesn't expose audit-level data to admins.
+
+**Wave 4 done when:** PTs can leave clinics voluntarily, owners can transfer ownership, and the extension properly handles org-level subscription errors.
+
+---
 
 ### Transition Between Waves
 
@@ -1475,11 +1591,13 @@ Each wave is independently deployable and testable. The recommended cadence:
 
 | Wave | Deploy to Staging | Deploy to Production | Gate |
 |------|-------------------|---------------------|------|
-| Wave 1 | Immediately | After staging QA | Enables `REGISTRATION_MODE=invite` with individual + clinic paths |
-| Wave 2 | After Wave 1 is stable in prod | After staging QA + 1 pilot clinic tests on staging | Team dashboard becomes visible to org members |
-| Wave 3 | After Wave 2 | After staging QA + test Stripe checkout end-to-end | Self-serve clinic purchase enabled |
-| Wave 4 | After Wave 3 | After staging QA | Voluntary leave + ownership transfer live |
+| Wave 1 (PRs 1A-1D) | Immediately | After staging QA | Enables `REGISTRATION_MODE=invite` with individual + clinic paths |
+| Wave 2 (PRs 2A-2C) | After Wave 1 is stable in prod | After staging QA + 1 pilot clinic tests on staging | Team dashboard becomes visible to org members |
+| Wave 3 (PRs 3A-3B) | After Wave 2 | After staging QA + test Stripe checkout end-to-end | Self-serve clinic purchase enabled |
+| Wave 4 (PRs 4A-4B) | After Wave 3 | After staging QA | Voluntary leave + ownership transfer live |
 
-**Do not start a wave until the previous wave is stable in production.** Each wave builds on the last, and bugs in earlier waves compound. The exception is Wave 3 + Wave 4 which can be developed in parallel if needed, since Wave 3 is Stripe integration (backend) while Wave 2's UI is frontend.
+**Do not start a wave until the previous wave is stable in production.** Each wave builds on the last, and bugs in earlier waves compound. The exception is Wave 3 + Wave 4 which can be developed in parallel if needed, since Wave 3 is Stripe integration (backend) while Wave 4 is extension + compliance (no overlap).
 
-**Beta launch requires only Wave 1.** During early beta, clinic orgs are created manually (you run a SQL insert or CLI script after the clinic-level BAA is signed). Waves 2-3 make this self-serve. Wave 4 is polish.
+**Within a wave, each PR is merged to `main` before starting the next.** PRs within a wave build on each other (1B depends on 1A's migration, 1C depends on 1B's invite code module, etc.). Do not branch PRs off each other — always branch from `main` after the previous PR merges.
+
+**Beta launch requires only Wave 1 (PRs 1A-1D).** During early beta, clinic orgs are created manually (you run a SQL insert or CLI script after the clinic-level BAA is signed). Waves 2-3 make this self-serve. Wave 4 is polish.
