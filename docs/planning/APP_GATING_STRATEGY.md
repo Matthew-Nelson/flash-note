@@ -1,6 +1,6 @@
 # App Gating Strategy: Beta Rollout & Clinic Management
 
-> **Status: PLANNING**
+> **Status: Wave 1 IN PROGRESS — PR 1A (usage split + config), PR 1B (invite codes), PR 1C (org infrastructure) COMPLETE. PR 1D next.**
 >
 > This document covers:
 > 1. Gating FlashNote from closed → beta → public launch

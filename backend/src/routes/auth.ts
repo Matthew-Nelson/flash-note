@@ -138,9 +138,21 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
       });
     }
 
+    // Log organization join when clinic code auto-joins user
+    if (result.joinedOrganizationId) {
+      await auditService.log({
+        userId: result.user.id,
+        action: AuditAction.ORG_MEMBER_JOINED,
+        status: 'SUCCESS',
+        metadata: { organizationId: result.joinedOrganizationId, source: 'registration' },
+        ipAddress,
+        userAgent,
+      });
+    }
+
     // Strip internal fields before sending to client
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { redeemedCodeId: _redeemedCodeId, ...clientData } = result;
+    const { redeemedCodeId: _redeemedCodeId, joinedOrganizationId: _joinedOrgId, ...clientData } = result;
 
     res.status(201).json({
       success: true,

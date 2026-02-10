@@ -92,6 +92,7 @@ export function createMockUserRow(overrides: Partial<{
   email_verified: boolean;
   email_verified_at: Date | null;
   token_version: number;
+  organization_id: string | null;
 }> = {}) {
   return {
     id: 'test-user-id',
@@ -109,6 +110,59 @@ export function createMockUserRow(overrides: Partial<{
     email_verified: true,
     email_verified_at: new Date(),
     token_version: 1,
+    organization_id: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Helper to create a mock organization row
+ */
+export function createMockOrgRow(overrides: Partial<{
+  id: string;
+  name: string;
+  max_seats: number;
+  stripe_customer_id: string | null;
+  subscription_id: string | null;
+  subscription_status: string;
+  trial_ends_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}> = {}) {
+  return {
+    id: 'org-uuid',
+    name: 'Test Clinic',
+    max_seats: 5,
+    stripe_customer_id: null,
+    subscription_id: null,
+    subscription_status: 'active',
+    trial_ends_at: null,
+    created_at: new Date(),
+    updated_at: new Date(),
+    ...overrides,
+  };
+}
+
+/**
+ * Helper to create a mock organization member row
+ */
+export function createMockOrgMemberRow(overrides: Partial<{
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: string;
+  is_billable: boolean;
+  joined_at: Date;
+  removed_at: Date | null;
+}> = {}) {
+  return {
+    id: 'member-uuid',
+    organization_id: 'org-uuid',
+    user_id: 'test-user-id',
+    role: 'member',
+    is_billable: true,
+    joined_at: new Date(),
+    removed_at: null,
     ...overrides,
   };
 }

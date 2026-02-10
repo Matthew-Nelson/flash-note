@@ -26,6 +26,7 @@ export interface UserRow {
   email_verified: boolean;
   email_verified_at: Date | null;
   token_version: number;
+  organization_id: string | null;
 }
 
 /**
@@ -147,7 +148,44 @@ export interface LockoutUpdateRow {
  */
 export interface UserSubscriptionRow {
   subscription_status: string;
-  trial_ends_at: Date;
+  trial_ends_at: Date | null;
+  organization_id: string | null;
+}
+
+/**
+ * Organization subscription status for org-based subscription fallback
+ */
+export interface OrgSubscriptionRow {
+  subscription_status: string;
+  trial_ends_at: Date | null;
+}
+
+/**
+ * organizations table row
+ */
+export interface OrganizationRow {
+  id: string;
+  name: string;
+  max_seats: number;
+  stripe_customer_id: string | null;
+  subscription_id: string | null;
+  subscription_status: string;
+  trial_ends_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * organization_members table row
+ */
+export interface OrganizationMemberRow {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: string;
+  is_billable: boolean;
+  joined_at: Date;
+  removed_at: Date | null;
 }
 
 /**

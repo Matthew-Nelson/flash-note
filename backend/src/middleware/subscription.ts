@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { db } from '../db/index.js';
 import { auditService } from '../services/audit-service.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
-import type { UserSubscriptionRow } from '../types/database.js';
+import type { UserSubscriptionRow, OrgSubscriptionRow } from '../types/database.js';
 import { getRequestMetadata, safeAuditLog } from '../utils/request-utils.js';
 
 // Middleware to check subscription status
@@ -39,7 +39,7 @@ export async function requireActiveSubscription(
     const userId = authenticatedReq.user.userId;
 
     const result = await db.query<UserSubscriptionRow>(
-      `SELECT subscription_status, trial_ends_at FROM users WHERE id = $1`,
+      `SELECT subscription_status, trial_ends_at, organization_id FROM users WHERE id = $1`,
       [userId]
     );
 
@@ -64,13 +64,64 @@ export async function requireActiveSubscription(
 
     const user = result.rows[0]!;
 
-    // Check if in active trial
-    if (user.subscription_status === 'trialing') {
-      if (new Date() < user.trial_ends_at) {
-        next();
+    // 1. Individual trialing + valid → allow
+    if (user.subscription_status === 'trialing' && user.trial_ends_at && new Date() < user.trial_ends_at) {
+      next();
+      return;
+    }
+
+    // 2. Individual active → allow
+    if (user.subscription_status === 'active') {
+      next();
+      return;
+    }
+
+    // 3. Individual check failed — try org fallback before returning 402
+    if (user.organization_id) {
+      const orgResult = await db.query<OrgSubscriptionRow>(
+        `SELECT o.subscription_status, o.trial_ends_at
+         FROM organizations o
+         JOIN organization_members om ON om.organization_id = o.id
+         WHERE o.id = $1 AND om.user_id = $2 AND om.removed_at IS NULL`,
+        [user.organization_id, userId]
+      );
+
+      if (orgResult.rows.length > 0) {
+        const org = orgResult.rows[0]!;
+        if (org.subscription_status === 'active') {
+          next();
+          return;
+        }
+        if (org.subscription_status === 'trialing' && org.trial_ends_at && new Date() < org.trial_ends_at) {
+          next();
+          return;
+        }
+        // Org exists but subscription lapsed
+        safeAuditLog(
+          auditService.log({
+            userId,
+            action: AuditAction.ACCESS_DENIED,
+            status: 'FAILURE',
+            metadata: { reason: 'clinic_subscription_expired', path: req.path },
+            ipAddress,
+            userAgent,
+          }),
+          'subscription:clinic_subscription_expired'
+        );
+        res.status(402).json({
+          success: false,
+          error: {
+            code: 'clinic_subscription_expired',
+            message: "Your clinic's subscription has ended. Subscribe individually or contact your clinic administrator.",
+          },
+        });
         return;
       }
-      // Trial expired
+    }
+
+    // 4. Both individual and org checks failed — return original individual error
+    if (user.subscription_status === 'trialing') {
+      // Trial existed but expired
       safeAuditLog(
         auditService.log({
           userId,
@@ -92,13 +143,7 @@ export async function requireActiveSubscription(
       return;
     }
 
-    // Check for active subscription
-    if (user.subscription_status === 'active') {
-      next();
-      return;
-    }
-
-    // Not subscribed
+    // No active subscription at all
     safeAuditLog(
       auditService.log({
         userId,

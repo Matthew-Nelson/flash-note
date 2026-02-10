@@ -137,6 +137,22 @@ export const inviteCodeValidateRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+// SECURITY: Rate limit for organization join endpoint
+// Defense-in-depth against invite code brute force
+export const orgJoinRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: isDev ? 100 : 5, // 5 attempts per 15 minutes per IP in prod, 100 in dev
+  message: {
+    success: false,
+    error: {
+      code: 'too_many_attempts',
+      message: 'Too many join attempts. Please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // SECURITY: Rate limit for email verification token submission
 // Defense-in-depth against token brute force (tokens have 256-bit entropy,
 // but rate limiting adds another layer of protection)
