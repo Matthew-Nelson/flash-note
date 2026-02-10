@@ -46,6 +46,10 @@ These share a core primitive: **invite codes**. One invite code system handles b
 
 **Key insight: a clinic IS a beta test environment.** When we onboard a clinic during beta, the clinic admin becomes our distribution channel. They manage their PTs, we manage the clinics. This reduces our direct support burden from N therapists down to 1-2 clinic admins.
 
+**Individual PTs sign the BAA directly at registration.** This is industry standard for healthcare SaaS. The BAA covers FlashNote's obligations for whatever data the user inputs. Whether the PT has internal authorization from their employer to use FlashNote is a compliance matter between the PT and their clinic — not FlashNote's responsibility to police. FlashNote's additional protection: we don't store PHI (pass-through to LLM only).
+
+**Clinic plans are available from day one** as an upsell path, not a gate. When a clinic purchases a multi-seat plan, they sign a clinic-level BAA as part of that business relationship. Individual PTs are never blocked from using the product.
+
 ---
 
 ## Environment Strategy
@@ -538,12 +542,13 @@ HIPAA requires that each individual who accesses PHI through the system has pers
 
 ### Clinic-Level BAA
 
-In addition to individual PT acceptance, the **clinic itself** (as a Covered Entity) may want to sign a separate BAA with FlashNote. This is a business/legal process, not a software feature:
+When a clinic purchases a multi-seat plan, the clinic (as a Covered Entity) signs a BAA with FlashNote as part of that business relationship. This is separate from the individual BAA each PT accepts at registration.
 
 - We already have `docs/legal/BAA_TEMPLATE.md` for this
-- Clinic admin downloads/signs the BAA during sales process
-- Stored in our business records (not in the database)
+- Clinic admin signs the BAA during onboarding (DocuSign/PDF during beta, clickwrap at scale)
+- Stored in our business records (not in the database — entity-level agreements are separate from individual consent)
 - The `legal_acceptances` table tracks individual user consent, not entity-level agreements
+- **Individual PTs are never blocked.** Every user accepts a BAA at registration. Whether their clinic has separately authorized FlashNote is between the PT and their clinic — standard for healthcare SaaS
 
 ### Admin Compliance View
 
@@ -883,7 +888,7 @@ POST /auth/register
   - If REGISTRATION_MODE=invite → inviteCode required, 400 if missing
   - If REGISTRATION_MODE=open → inviteCode optional (for clinic codes)
   - If code type=clinic → auto-join org, no trial needed
-  - If code type=beta or no code → normal trial flow
+  - If code type=beta or no code → normal individual trial flow
 ```
 
 ### Usage Endpoints
@@ -1024,31 +1029,26 @@ The owner account is the highest-privilege role and controls billing. Additional
 - Extension in Chrome developer mode
 - Internal testing and bug fixes
 - Complete HIPAA critical path items
-- **Build:** `REGISTRATION_MODE` support, invite code table, `/usage/me` endpoint
+- **Build:** All beta infrastructure — registration gating, invite codes, org/clinic support, usage endpoints, team dashboard
 
-### Phase 2: Beta - Individual PTs (5-10 PTs)
+### Phase 2: Beta (Individual PTs + Clinics from Day 1)
 - `REGISTRATION_MODE=invite`
-- Production infrastructure live (HIPAA BAA signed)
-- Generate `beta` invite codes, share directly with PTs
+- Production infrastructure live (HIPAA BAA signed, hosting BAA in place)
 - Extension published as **unlisted** on Chrome Web Store
-- **Individual subscriptions only** (no clinic plans yet)
+- **Both individual and clinic paths available from launch:**
+  - Individual PTs: beta invite code → trial/subscription → BAA accepted at registration
+  - Clinic PTs: clinic admin onboards first → admin generates invite codes → PTs join org
+- 5-10 individual PTs for product feedback
+- 1-2 clinics onboarded with high-touch support (you generate beta codes for clinic admins, they self-serve from there)
 - Monitor Sentry, collect feedback, watch usage patterns
 - Dashboard shows real usage data via `/usage/me`
 
-### Phase 3: Beta - Clinic Pilot (1-2 Clinics)
-- Still `REGISTRATION_MODE=invite`
-- **Build:** organizations, org_members, clinic checkout, team dashboard, org usage endpoint
-- Onboard 1-2 clinics with direct support
-- Clinic admin purchases plan → generates invite codes for PTs
-- Validate full seat management lifecycle end-to-end
-- Watch for: seat counting edge cases, removed-member UX, usage reporting accuracy
-
-### Phase 4: Public Launch
+### Phase 3: Public Launch
 - `REGISTRATION_MODE=open`
 - Extension republished as **public**
 - Both individual and clinic plans on pricing page
 - Invite code field optional on registration (only for clinic codes)
-- Self-serve clinic signup
+- Self-serve clinic signup (Stripe checkout creates org automatically)
 
 ---
 
@@ -1195,7 +1195,7 @@ At 5-50 clinics, this is faster than any admin UI and infinitely more flexible. 
 
 ### Onboarding a Clinic: Self-Serve vs. High-Touch
 
-#### Phase 3 (Beta - 1-2 Clinics): High-Touch Onboarding
+#### Phase 2 (Beta - 1-2 Clinics): High-Touch Onboarding
 
 At this stage, you onboard clinics personally. The process:
 
@@ -1213,7 +1213,7 @@ At this stage, you onboard clinics personally. The process:
 
 Steps 5-7 are fully self-serve. You're only involved in 1-4, and only because you want direct feedback during beta.
 
-#### Phase 4 (Public Launch): Self-Serve Onboarding
+#### Phase 3 (Public Launch): Self-Serve Onboarding
 
 The entire flow becomes self-serve:
 
@@ -1347,7 +1347,7 @@ A user on day 5 of their 14-day individual trial redeems a clinic invite code. W
 3. **Stripe customer ID persistence:** Even if a user creates a new account with a different email, Stripe tracks by payment method. Stripe's own fraud detection catches most repeated trial abuse.
 4. **Rate limiting registration:** Already in place (3/hour per IP in prod). Prevents automated trial farming.
 
-**Implementation plan for account deletion (Wave 5+):**
+**Implementation plan for account deletion (post-Wave 4):**
 
 ```sql
 ALTER TABLE users ADD COLUMN deleted_at TIMESTAMPTZ;
@@ -1382,7 +1382,7 @@ Re-registration attempt with same email → detected via email hash → "This em
 | Usage export (CSV) | Same - data exists, build when needed |
 | Multi-org membership | One org per user is sufficient. Revisit only if PTs working at multiple clinics becomes a real pattern |
 | SSO/SAML for clinics | Way too early. Custom JWT auth is fine for 5-50 clinics |
-| Account deletion (self-serve) | Design is spec'd in [Edge Case 9](#9-account-deletion--trial-abuse-prevention) but implementation deferred to Wave 5+. Handle via support request until then |
+| Account deletion (self-serve) | Design is spec'd in [Edge Case 9](#9-account-deletion--trial-abuse-prevention) but implementation deferred to post-Wave 4. Handle via support request until then |
 | Trial abuse detection | Email hash + Stripe fraud detection covers most cases. Build active monitoring only if abuse is observed |
 
 ---
@@ -1391,83 +1391,81 @@ Re-registration attempt with same email → detected via email hash → "This em
 
 When this moves from planning to implementation:
 
-### Wave 1: Individual Gating + Usage Endpoint (Beta prep)
+### Wave 1: Registration Gating + Clinic Infrastructure + Usage (Beta prep)
 
-**Goal:** Get to invite-only beta with real usage data. No org features yet — individual PTs only.
-**Prerequisite for:** Phase 2 (Beta - Individual PTs) in [Rollout Phases](#rollout-phases).
-**Estimated scope:** ~15-20 files touched (backend routes, config, migration, web dashboard, tests).
+**Goal:** Get to invite-only beta with both individual and clinic onboarding paths, plus real usage data.
+**Prerequisite for:** Phase 2 (Beta) in [Rollout Phases](#rollout-phases).
+**Estimated scope:** ~25-30 files touched (backend routes, config, migrations, middleware, services, web dashboard, web signup, tests).
 
+**Part A — Foundation (no org dependency):**
 1. Usage schema migration: split `tokens_used` into `input_tokens` + `output_tokens`
 2. Update `usageService.incrementUsage()` signature and callers (notes route, AI service)
 3. Add `REGISTRATION_MODE` to `config.ts` env schema
+
+**Part B — Invite codes + registration gating:**
 4. Migration 009: `invite_codes` table
 5. Modify `/auth/register` to enforce registration mode + accept invite codes
 6. Invite code generation CLI script (`scripts/generate-invite-code.js`)
 7. `POST /invite-codes/validate` public endpoint (with rate limit: 10/min per IP)
-8. `GET /usage/me` endpoint (expose `usageService.getMonthlyUsage`, note counts only)
-9. Web dashboard: replace mock usage with real `/usage/me` data
-10. Web signup page: add optional invite code field
 
-**Done when:** You can set `REGISTRATION_MODE=invite`, generate a beta code via CLI, have a PT register with it, and see their real usage on the dashboard.
+**Part C — Organization infrastructure:**
+8. Migration 010: `organizations` table, `organization_members` table (with `is_billable`), `users.organization_id` column
+9. New audit actions in `AuditAction` enum (ORG_*, INVITE_*)
+10. Organization service (create, query, member management, billable seat counting)
+11. Modify `requireActiveSubscription` middleware for org-based access
+12. `requireOrgMembership` and `requireOrgRole` middleware
+13. Modify registration flow: clinic invite code → auto-join org
+14. `POST /organization/join` endpoint (existing user re-joining via invite code)
 
-### Wave 2: Clinic Infrastructure
+**Part D — Usage endpoints + web UI:**
+15. `GET /usage/me` endpoint (expose `usageService.getMonthlyUsage`, note counts only)
+16. Web dashboard: replace mock usage with real `/usage/me` data
+17. Web signup page: add invite code field
 
-**Goal:** Database and middleware foundation for multi-tenant clinic support. No UI yet.
-**Prerequisite for:** Phase 3 (Beta - Clinic Pilot) in [Rollout Phases](#rollout-phases).
-**Estimated scope:** ~10-15 files (migrations, middleware, services, types).
+**Done when:** You can set `REGISTRATION_MODE=invite`, generate a beta code via CLI, have a PT register and see real usage on the dashboard, AND have a clinic admin register → create an org (manually via DB for now) → generate clinic invite codes → PTs register and join the org → subscription access works through the org.
 
-11. Migration 010: `organizations` table, `organization_members` table (with `is_billable`), `users.organization_id` column
-12. Modify `requireActiveSubscription` middleware for org-based access
-13. `requireOrgMembership` and `requireOrgRole` middleware
-14. New audit actions in `AuditAction` enum
-15. Organization service (create, query, member management, billable seat counting)
-16. Modify registration flow: clinic invite code → auto-join org
-17. `POST /organization/join` endpoint (existing user re-joining via invite code)
+### Wave 2: Clinic Admin Dashboard
 
-**Done when:** A clinic invite code can be redeemed by both new and existing users, and subscription access works through the org.
-
-### Wave 3: Clinic Admin Dashboard
-
-**Goal:** Clinic admins can manage their team through the web UI.
+**Goal:** Clinic admins can manage their team through the web UI. Self-serve team management replaces manual DB operations.
 **Estimated scope:** ~15-20 files (backend endpoints, web pages, tests).
 
-18. `GET /organization` endpoint (org details + billable/total seat counts)
-19. `GET /organization/members` endpoint
-20. `GET /organization/usage` endpoint (aggregated + per-member, including former members)
-21. `POST /organization/invites` (generate clinic invite code, with optional invite email)
-22. `GET /organization/invites` (list pending invites)
-23. `DELETE /organization/invites/:id` (revoke)
-24. `DELETE /organization/members/:id` (remove member + revoke access)
-25. `PATCH /organization/members/:id` (role changes, billable status toggle)
-26. Web: Team dashboard page (`/dashboard/team`)
+19. `GET /organization` endpoint (org details + billable/total seat counts)
+20. `GET /organization/members` endpoint
+21. `GET /organization/usage` endpoint (aggregated + per-member, including former members)
+22. `POST /organization/invites` (generate clinic invite code, with optional invite email)
+23. `GET /organization/invites` (list pending invites)
+24. `DELETE /organization/invites/:id` (revoke)
+25. `DELETE /organization/members/:id` (remove member + revoke access)
+26. `PATCH /organization/members/:id` (role changes, billable status toggle)
+27. Web: Team dashboard page (`/dashboard/team`)
 
 **Done when:** A clinic admin can generate invite codes (with optional email), view team usage including former members, remove members, and toggle billable status — all through the web UI.
 
-### Wave 4: Clinic Billing
+### Wave 3: Clinic Billing
 
-**Goal:** Self-serve clinic plan purchase through Stripe.
+**Goal:** Self-serve clinic plan purchase through Stripe. Replaces manual org creation.
 **Estimated scope:** ~10 files (billing service, webhook handler, web pricing page).
 
-27. Stripe clinic product + price setup
-28. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
-29. Modify webhook handler for org-level subscription events
-30. `max_seats` sync from Stripe webhook
-31. Web: clinic plan on pricing page
-32. Owner billing management (Stripe portal link)
-33. Owner dual-subscription notification (see [Edge Case 3](#3-owners-dual-subscription-ambiguity))
+28. Stripe clinic product + price setup
+29. Modify `/billing/checkout` for clinic plans (quantity + clinic name)
+30. Modify webhook handler for org-level subscription events
+31. `max_seats` sync from Stripe webhook
+32. Web: clinic plan on pricing page
+33. Owner billing management (Stripe portal link)
+34. Owner dual-subscription notification (see [Edge Case 3](#3-owners-dual-subscription-ambiguity))
 
 **Done when:** A user can self-serve purchase a clinic plan, the org is created automatically, and seat quantity syncs through Stripe webhooks.
 
-### Wave 5: Polish & Voluntary Flows
+### Wave 4: Polish & Voluntary Flows
 
 **Goal:** Complete the remaining org lifecycle flows.
 **Estimated scope:** ~8-10 files.
 
-34. `POST /organization/leave` (voluntary departure)
-35. `POST /organization/transfer` (ownership transfer)
-36. Extension: show org affiliation in settings
-37. Extension: handle `clinic_subscription_expired` error distinctly
-38. Admin compliance view (legal acceptance status per member)
+35. `POST /organization/leave` (voluntary departure)
+36. `POST /organization/transfer` (ownership transfer)
+37. Extension: show org affiliation in settings
+38. Extension: handle `clinic_subscription_expired` error distinctly
+39. Admin compliance view (legal acceptance status per member)
 
 **Done when:** PTs can leave clinics voluntarily, owners can transfer ownership, and the extension properly handles org-level subscription errors.
 
@@ -1477,10 +1475,11 @@ Each wave is independently deployable and testable. The recommended cadence:
 
 | Wave | Deploy to Staging | Deploy to Production | Gate |
 |------|-------------------|---------------------|------|
-| Wave 1 | Immediately | After staging QA | Enables `REGISTRATION_MODE=invite` |
-| Wave 2 | After Wave 1 is stable in prod | After staging QA + your manual testing | No new user-facing features — middleware only |
-| Wave 3 | After Wave 2 | After staging QA + 1 pilot clinic tests on staging | Team dashboard becomes visible to org members |
-| Wave 4 | After Wave 3 | After staging QA + test Stripe checkout end-to-end | Self-serve clinic purchase enabled |
-| Wave 5 | After Wave 4 | After staging QA | Voluntary leave + ownership transfer live |
+| Wave 1 | Immediately | After staging QA | Enables `REGISTRATION_MODE=invite` with individual + clinic paths |
+| Wave 2 | After Wave 1 is stable in prod | After staging QA + 1 pilot clinic tests on staging | Team dashboard becomes visible to org members |
+| Wave 3 | After Wave 2 | After staging QA + test Stripe checkout end-to-end | Self-serve clinic purchase enabled |
+| Wave 4 | After Wave 3 | After staging QA | Voluntary leave + ownership transfer live |
 
-**Do not start a wave until the previous wave is stable in production.** Each wave builds on the last, and bugs in earlier waves compound. The exception is Wave 2 + Wave 4 which can be developed in parallel if needed, since Wave 4 is Stripe integration (backend) while Wave 3 is UI (frontend).
+**Do not start a wave until the previous wave is stable in production.** Each wave builds on the last, and bugs in earlier waves compound. The exception is Wave 3 + Wave 4 which can be developed in parallel if needed, since Wave 3 is Stripe integration (backend) while Wave 2's UI is frontend.
+
+**Beta launch requires only Wave 1.** During early beta, clinic orgs are created manually (you run a SQL insert or CLI script after the clinic-level BAA is signed). Waves 2-3 make this self-serve. Wave 4 is polish.
