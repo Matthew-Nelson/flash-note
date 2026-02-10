@@ -34,6 +34,9 @@ const envSchema = z.object({
   ANTHROPIC_TEMPERATURE: z.string().transform(Number).default('0.7'),
   ANTHROPIC_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
+  // Registration gating (see docs/planning/APP_GATING_STRATEGY.md)
+  REGISTRATION_MODE: z.enum(['open', 'closed', 'invite']).default('open'),
+
   // Development
   USE_MOCK_AI: z
     .string()
