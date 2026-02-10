@@ -63,7 +63,8 @@ export interface UsageRow {
   user_id: string;
   month: string;
   notes_generated: number;
-  tokens_used: number;
+  input_tokens: number;
+  output_tokens: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -113,7 +114,8 @@ export interface TokenUserIdRow {
 
 export interface UsageStatsRow {
   notes_generated: number;
-  tokens_used: number;
+  input_tokens: number;
+  output_tokens: number;
 }
 
 /**

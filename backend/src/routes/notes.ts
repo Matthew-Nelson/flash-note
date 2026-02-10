@@ -51,7 +51,8 @@ notesRouter.post('/generate', async (req, res, next) => {
         status: 'SUCCESS',
         metadata: {
           noteType,
-          tokensUsed: result.metadata.tokensUsed,
+          inputTokens: result.metadata.inputTokens,
+          outputTokens: result.metadata.outputTokens,
           generationTimeMs: result.metadata.generationTimeMs,
           // Security monitoring - does NOT include PHI, only detection flags
           suspiciousPatternDetected: result.securityMetadata?.suspiciousPatternDetected ?? false,
@@ -65,12 +66,12 @@ notesRouter.post('/generate', async (req, res, next) => {
 
     // Update usage tracking
     if (userId) {
-      await usageService.incrementUsage(userId, result.metadata.tokensUsed);
+      await usageService.incrementUsage(userId, result.metadata.inputTokens, result.metadata.outputTokens);
     }
 
     // SECURITY: Only return data the frontend actually needs
     // - securityMetadata: NEVER expose (helps attackers refine injection attempts)
-    // - metadata.model, metadata.tokensUsed: Not used by FE, unnecessary exposure
+    // - metadata.model, metadata.inputTokens/outputTokens/totalTokens: Not used by FE, unnecessary exposure
     // - metadata.generationTimeMs: Used by FE for "Generated in X.Xs" display
     const clientResponse = {
       subjective: result.subjective,

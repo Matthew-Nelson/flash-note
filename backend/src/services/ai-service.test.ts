@@ -83,6 +83,9 @@ describe('AIService', () => {
       expect(result.assessment).toBeDefined();
       expect(result.plan).toBeDefined();
       expect(result.metadata.model).toBe('gemini-2.5-flash');
+      expect(result.metadata.inputTokens).toBe(100);
+      expect(result.metadata.outputTokens).toBe(50);
+      expect(result.metadata.totalTokens).toBe(150);
       expect(result.metadata.generationTimeMs).toBeGreaterThanOrEqual(0);
     });
 

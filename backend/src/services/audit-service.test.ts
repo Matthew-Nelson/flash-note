@@ -94,7 +94,8 @@ describe('AuditService', () => {
         status: 'SUCCESS',
         metadata: {
           noteType: 'daily_note',
-          tokensUsed: 150,
+          inputTokens: 100,
+          outputTokens: 50,
           nested: { key: 'value' },
         },
       });
@@ -103,7 +104,7 @@ describe('AuditService', () => {
       const metadataParam = params[3];
 
       expect(metadataParam).toBe(
-        '{"noteType":"daily_note","tokensUsed":150,"nested":{"key":"value"}}'
+        '{"noteType":"daily_note","inputTokens":100,"outputTokens":50,"nested":{"key":"value"}}'
       );
     });
 
