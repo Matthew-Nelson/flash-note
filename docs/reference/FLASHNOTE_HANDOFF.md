@@ -1393,7 +1393,7 @@ LLM_PROVIDER=gemini  // or 'claude'
 // Gemini config (required when LLM_PROVIDER=gemini)
 GEMINI_API_KEY=your_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
-GEMINI_MAX_TOKENS=2000
+GEMINI_MAX_TOKENS=4000
 GEMINI_TEMPERATURE=0.7
 GEMINI_TIMEOUT_MS=30000
 

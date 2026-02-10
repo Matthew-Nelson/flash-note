@@ -12,3 +12,4 @@
     - https://www.simplepractice.com/terms/
     - https://www.simplepractice.com/privacy/
 - Go through all account management and everything on the web app? What would make sense? There are some complicated interactions and what if I need to rapidly update a doc? Should we consider server side providing any of this crap seeing as we might need to rapidy change some docs or something and extension approval and deployment can take some time? WHat is best here?
+- https://github.com/remotion-dev/remotion - animations

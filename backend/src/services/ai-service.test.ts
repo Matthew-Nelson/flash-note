@@ -6,7 +6,7 @@ const { mockConfig } = vi.hoisted(() => ({
     LLM_PROVIDER: 'gemini' as const,
     GEMINI_API_KEY: 'test-api-key',
     GEMINI_MODEL: 'gemini-2.5-flash',
-    GEMINI_MAX_TOKENS: 4096,
+    GEMINI_MAX_TOKENS: 4000,
     GEMINI_TEMPERATURE: 0.7,
     GEMINI_TIMEOUT_MS: 30000,
     USE_MOCK_AI: false,

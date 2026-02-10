@@ -23,7 +23,7 @@ const envSchema = z.object({
   // Gemini AI (required when LLM_PROVIDER=gemini)
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
-  GEMINI_MAX_TOKENS: z.string().transform(Number).default('2000'),
+  GEMINI_MAX_TOKENS: z.string().transform(Number).default('4000'),
   GEMINI_TEMPERATURE: z.string().transform(Number).default('0.7'),
   GEMINI_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
