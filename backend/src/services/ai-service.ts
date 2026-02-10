@@ -119,7 +119,9 @@ class AIService {
         // Metadata
         metadata: {
           model: this.provider.model,
-          tokensUsed: result.usage.totalTokens,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          totalTokens: result.usage.totalTokens,
           generationTimeMs,
         },
         securityMetadata,

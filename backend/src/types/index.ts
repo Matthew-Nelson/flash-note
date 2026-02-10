@@ -97,13 +97,23 @@ export interface GeneratedNote {
   // Metadata
   metadata: {
     model: string;
-    tokensUsed: number;
+    inputTokens: number;
+    outputTokens: number;
+    totalTokens: number; // inputTokens + outputTokens
     generationTimeMs: number;
   };
 
   // Security metadata for audit purposes (MEDIUM-005)
   // Optional for backwards compatibility with mock service
   securityMetadata?: PromptSecurityMetadata;
+}
+
+// Usage types
+export interface MonthlyUsageStats {
+  notesGenerated: number;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
 }
 
 // AI types

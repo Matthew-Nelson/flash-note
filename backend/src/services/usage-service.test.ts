@@ -20,18 +20,18 @@ describe('UsageService', () => {
     it('should insert or update usage record with UPSERT', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      await usageService.incrementUsage('user-123', 500);
+      await usageService.incrementUsage('user-123', 100, 400);
 
       expect(mockDbQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO usage'),
-        expect.arrayContaining(['user-123', expect.stringMatching(/^\d{4}-\d{2}$/), 500])
+        expect.arrayContaining(['user-123', expect.stringMatching(/^\d{4}-\d{2}$/), 100, 400])
       );
     });
 
     it('should use ON CONFLICT for upsert behavior', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      await usageService.incrementUsage('user-123', 100);
+      await usageService.incrementUsage('user-123', 50, 50);
 
       expect(mockDbQuery).toHaveBeenCalledWith(
         expect.stringContaining('ON CONFLICT'),
@@ -39,14 +39,15 @@ describe('UsageService', () => {
       );
     });
 
-    it('should increment notes_generated and tokens_used on conflict', async () => {
+    it('should increment notes_generated and split token columns on conflict', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      await usageService.incrementUsage('user-123', 200);
+      await usageService.incrementUsage('user-123', 80, 120);
 
       const query = mockDbQuery.mock.calls[0]?.[0] as string;
       expect(query).toContain('notes_generated = usage.notes_generated + 1');
-      expect(query).toContain('tokens_used = usage.tokens_used + $3');
+      expect(query).toContain('input_tokens = usage.input_tokens + $3');
+      expect(query).toContain('output_tokens = usage.output_tokens + $4');
     });
 
     it('should not throw on database error (swallow and log)', async () => {
@@ -54,7 +55,7 @@ describe('UsageService', () => {
 
       // Should not throw
       await expect(
-        usageService.incrementUsage('user-123', 100)
+        usageService.incrementUsage('user-123', 50, 50)
       ).resolves.toBeUndefined();
 
       // Should log the error
@@ -67,7 +68,7 @@ describe('UsageService', () => {
     it('should format month as YYYY-MM', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
-      await usageService.incrementUsage('user-123', 100);
+      await usageService.incrementUsage('user-123', 50, 50);
 
       const params = mockDbQuery.mock.calls[0]?.[1] as unknown[];
       const month = params[1] as string;
@@ -78,14 +79,16 @@ describe('UsageService', () => {
   describe('getMonthlyUsage', () => {
     it('should return usage stats when record exists', async () => {
       mockDbQuery.mockResolvedValueOnce({
-        rows: [{ notes_generated: 25, tokens_used: 5000 }],
+        rows: [{ notes_generated: 25, input_tokens: 2000, output_tokens: 3000 }],
       });
 
       const result = await usageService.getMonthlyUsage('user-123');
 
       expect(result).toEqual({
         notesGenerated: 25,
-        tokensUsed: 5000,
+        inputTokens: 2000,
+        outputTokens: 3000,
+        totalTokens: 5000,
       });
     });
 
@@ -96,7 +99,9 @@ describe('UsageService', () => {
 
       expect(result).toEqual({
         notesGenerated: 0,
-        tokensUsed: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
       });
     });
 
@@ -111,13 +116,13 @@ describe('UsageService', () => {
       );
     });
 
-    it('should select notes_generated and tokens_used', async () => {
+    it('should select notes_generated and split token columns', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       await usageService.getMonthlyUsage('user-123');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT notes_generated, tokens_used'),
+        expect.stringContaining('SELECT notes_generated, input_tokens, output_tokens'),
         expect.any(Array)
       );
     });

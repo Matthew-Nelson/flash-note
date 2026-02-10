@@ -213,14 +213,14 @@ export async function generateMockSOAPNote(
   const mockResponse = MOCK_RESPONSES[noteType];
   const generationTimeMs = Date.now() - startTime;
 
-  // Calculate approximate token count based on content length
-  const totalChars =
-    quickNotes.length +
+  // Calculate approximate token counts based on content length (~4 chars per token)
+  const outputChars =
     mockResponse.subjective.length +
     mockResponse.objective.length +
     mockResponse.assessment.length +
     mockResponse.plan.length;
-  const estimatedTokens = Math.ceil(totalChars / 4); // ~4 chars per token
+  const inputTokens = Math.ceil(quickNotes.length / 4);
+  const outputTokens = Math.ceil(outputChars / 4);
 
   console.log(`[MockAI] Generated mock ${noteType} (${generationTimeMs}ms)`);
 
@@ -234,7 +234,9 @@ export async function generateMockSOAPNote(
     alerts: mockResponse.alerts,
     metadata: {
       model: 'mock-gemini-2.5-flash',
-      tokensUsed: estimatedTokens,
+      inputTokens,
+      outputTokens,
+      totalTokens: inputTokens + outputTokens,
       generationTimeMs,
     },
   };
