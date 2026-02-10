@@ -29,6 +29,7 @@ export const registerSchema = z.object({
   acceptedLegalTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
   }),
+  inviteCode: z.string().max(20).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: 'Passwords do not match',
   path: ['confirmPassword'],

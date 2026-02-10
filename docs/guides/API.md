@@ -45,9 +45,13 @@ POST /auth/register
 ```json
 {
   "email": "therapist@clinic.com",
-  "password": "SecurePass123"
+  "password": "SecurePass123",
+  "acceptedLegalTerms": true,
+  "inviteCode": "AB3K-M7RN"
 }
 ```
+
+> `inviteCode` is required when `REGISTRATION_MODE=invite`, ignored when `open`, rejected when `closed`.
 
 **Response 201:**
 ```json
@@ -71,7 +75,39 @@ POST /auth/register
 
 **Errors:**
 - `400` - Validation error (invalid email, weak password)
+- `400 invite_code_required` - Invite code missing when `REGISTRATION_MODE=invite`
+- `400 invalid_invite_code` - Code is expired, already used, revoked, or not found
+- `403 registration_closed` - Registration is disabled (`REGISTRATION_MODE=closed`)
 - `409` - Email already registered
+
+#### Validate Invite Code
+
+```
+POST /auth/invite-codes/validate
+```
+
+Pre-check whether an invite code is valid before submitting registration. Only returns meaningful results when `REGISTRATION_MODE=invite`.
+
+**Request:**
+```json
+{
+  "code": "AB3K-M7RN"
+}
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": { "valid": true }
+}
+```
+
+> Returns `{ "valid": false }` for invalid/expired/used codes or when `REGISTRATION_MODE` is not `invite`.
+
+**Rate limit:** 10 requests per minute.
+
+---
 
 #### Login
 
@@ -483,6 +519,7 @@ All errors follow this format:
 | `POST /auth/resend-verification` | 3 requests | 1 hour |
 | `POST /auth/request-password-reset` | 3 requests | 1 hour |
 | `POST /auth/reset-password` | 5 requests | 15 minutes |
+| `POST /auth/invite-codes/validate` | 10 requests | 1 minute |
 | `POST /notes/generate` | 30 requests | 1 minute |
 | `GET /user/me` | 100 requests | 1 minute |
 | All other endpoints | 100 requests | 1 minute |

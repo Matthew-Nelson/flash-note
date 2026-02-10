@@ -5,6 +5,7 @@ import { config, BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '../config.js';
 import { db } from '../db/index.js';
 import { findUserByEmail, findUserById, createUserWithClient } from '../db/queries/users.js';
 import { recordLegalAcceptances } from '../db/queries/legal-acceptances.js';
+import { findByCodeForUpdate, markCodeAsUsed, validateCodeRedeemable } from '../db/queries/invite-codes.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateCsrfToken } from '../middleware/csrf.js';
 import { lockoutService } from './lockout-service.js';
@@ -34,6 +35,7 @@ interface LoginContext {
 
 interface RegisterContext extends LoginContext {
   acceptedLegalTerms: true;
+  inviteCode?: string; // Already uppercased by route handler
 }
 
 class AuthService {
@@ -47,11 +49,27 @@ class AuthService {
     // Hash password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // Create user + record legal consent atomically
+    // Create user + record legal consent + redeem invite code atomically
     const client = await db.connect();
     let user;
+    let redeemedCodeId: string | undefined;
     try {
       await client.query('BEGIN');
+
+      // If invite code provided, lock and validate inside transaction
+      // This prevents race conditions where two users redeem the same code
+      let validatedCode: Awaited<ReturnType<typeof findByCodeForUpdate>> = null;
+      if (context.inviteCode) {
+        validatedCode = await findByCodeForUpdate(client, context.inviteCode);
+        if (!validatedCode) {
+          throw new AppError(400, 'invalid_invite_code', 'This invite code is invalid or has expired');
+        }
+        const invalidReason = validateCodeRedeemable(validatedCode);
+        if (invalidReason) {
+          throw new AppError(400, 'invalid_invite_code', 'This invite code is invalid or has expired');
+        }
+      }
+
       user = await createUserWithClient(client, email, passwordHash);
 
       try {
@@ -70,6 +88,12 @@ class AuthService {
           },
         });
         throw error;
+      }
+
+      // Mark invite code as used within the same transaction
+      if (validatedCode) {
+        await markCodeAsUsed(client, validatedCode.id, user.id);
+        redeemedCodeId = validatedCode.id;
       }
 
       await client.query('COMMIT');
@@ -120,6 +144,7 @@ class AuthService {
       refreshToken,
       csrfToken: generateCsrfToken(user.id),
       emailVerificationRequired: true,
+      redeemedCodeId,
     };
   }
 

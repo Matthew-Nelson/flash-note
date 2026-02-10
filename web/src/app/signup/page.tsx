@@ -15,6 +15,7 @@ export default function SignupPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
@@ -33,7 +34,7 @@ export default function SignupPage() {
     setInvalidFields(new Set());
 
     // Validate input
-    const result = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms });
+    const result = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms, inviteCode: inviteCode || undefined });
     if (!result.success) {
       const messages: string[] = [];
       const invalid = new Set<string>();
@@ -49,7 +50,7 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await register(email, password, acceptedLegalTerms);
+      const response = await register(email, password, acceptedLegalTerms, inviteCode || undefined);
 
       // Check if email verification is required
       if (response.emailVerificationRequired) {
@@ -69,6 +70,17 @@ export default function SignupPage() {
           case 'weak_password':
             setErrors(['Password does not meet requirements']);
             setInvalidFields(new Set(['password']));
+            break;
+          case 'registration_closed':
+            setErrors(['Registration is not available at this time']);
+            break;
+          case 'invite_code_required':
+            setErrors(['An invite code is required to register']);
+            setInvalidFields(new Set(['inviteCode']));
+            break;
+          case 'invalid_invite_code':
+            setErrors(['This invite code is invalid or has expired']);
+            setInvalidFields(new Set(['inviteCode']));
             break;
           default:
             setErrors([err.message || 'Failed to create account']);
@@ -132,6 +144,17 @@ export default function SignupPage() {
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           invalid={invalidFields.has('confirmPassword')}
+        />
+
+        <Input
+          label="Invite Code"
+          name="inviteCode"
+          type="text"
+          autoComplete="off"
+          value={inviteCode}
+          onChange={(e) => setInviteCode(e.target.value)}
+          invalid={invalidFields.has('inviteCode')}
+          hint="Format: XXXX-XXXX"
         />
 
         <div>

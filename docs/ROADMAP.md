@@ -153,19 +153,19 @@ These items are **required for production** with real patient data. They should 
 
 | Task | Source | Status |
 |------|--------|--------|
-| Usage schema migration: split `tokens_used` → `input_tokens` + `output_tokens` | APP_GATING_STRATEGY PR 1A | Not started |
-| Update `usageService.incrementUsage()` signature and callers | APP_GATING_STRATEGY PR 1A | Not started |
-| Add `REGISTRATION_MODE` to `config.ts` env schema | APP_GATING_STRATEGY PR 1A | Not started |
+| Usage schema migration: split `tokens_used` → `input_tokens` + `output_tokens` | APP_GATING_STRATEGY PR 1A | Done |
+| Update `usageService.incrementUsage()` signature and callers | APP_GATING_STRATEGY PR 1A | Done |
+| Add `REGISTRATION_MODE` to `config.ts` env schema | APP_GATING_STRATEGY PR 1A | Done |
 
 **PR 1B — Invite codes + registration gating:**
 
 | Task | Source | Status |
 |------|--------|--------|
-| Migration 009: `invite_codes` table | APP_GATING_STRATEGY PR 1B | Not started |
-| Modify `/auth/register`: registration mode + invite codes | APP_GATING_STRATEGY PR 1B | Not started |
-| Invite code generation CLI script (`scripts/generate-invite-code.ts`) | APP_GATING_STRATEGY PR 1B | Not started |
-| `POST /invite-codes/validate` endpoint (with rate limit + audit logging) | APP_GATING_STRATEGY PR 1B | Not started |
-| Web signup: invite code field + extension schema sync | APP_GATING_STRATEGY PR 1B | Not started |
+| Migration 010: `invite_codes` table | APP_GATING_STRATEGY PR 1B | Done |
+| Modify `/auth/register`: registration mode + invite codes | APP_GATING_STRATEGY PR 1B | Done |
+| Invite code generation CLI script (`scripts/generate-invite-code.ts`) | APP_GATING_STRATEGY PR 1B | Done |
+| `POST /auth/invite-codes/validate` endpoint (with rate limit + audit logging) | APP_GATING_STRATEGY PR 1B | Done |
+| Web signup: invite code field + extension schema sync | APP_GATING_STRATEGY PR 1B | Done |
 
 **PR 1C — Organization infrastructure:**
 

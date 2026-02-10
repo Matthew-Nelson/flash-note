@@ -121,6 +121,22 @@ export const passwordResetCompleteRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+// SECURITY: Rate limit for invite code validation endpoint
+// Prevents brute-force enumeration of valid codes
+export const inviteCodeValidateRateLimit = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: isDev ? 100 : 10, // 10 validation attempts per minute per IP in prod, 100 in dev
+  message: {
+    success: false,
+    error: {
+      code: 'rate_limit_exceeded',
+      message: 'Too many validation attempts. Please try again later.',
+    },
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // SECURITY: Rate limit for email verification token submission
 // Defense-in-depth against token brute force (tokens have 256-bit entropy,
 // but rate limiting adds another layer of protection)

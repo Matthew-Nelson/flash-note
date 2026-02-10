@@ -96,6 +96,22 @@ export interface LegalAcceptanceRow {
 }
 
 /**
+ * invite_codes table row
+ */
+export interface InviteCodeRow {
+  id: string;
+  code: string;
+  type: 'beta' | 'clinic';
+  organization_id: string | null;
+  created_by: string;
+  used_by: string | null;
+  used_at: Date | null;
+  expires_at: Date;
+  is_active: boolean;
+  created_at: Date;
+}
+
+/**
  * Partial row types for SELECT queries that only fetch specific columns
  */
 export interface UserLockoutRow {

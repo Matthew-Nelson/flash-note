@@ -157,7 +157,7 @@ describe('AuthContext', () => {
         await captured.register('new@example.com', 'Password1', true);
       });
 
-      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true);
+      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true, undefined);
       expect(screen.getByTestId('authenticated').textContent).toBe('true');
     });
   });

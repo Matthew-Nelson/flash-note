@@ -13,6 +13,7 @@ import {
   verificationCompleteRateLimit,
   passwordResetRequestRateLimit,
   passwordResetCompleteRateLimit,
+  inviteCodeValidateRateLimit,
 } from '../middleware/rate-limit.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireCsrf } from '../middleware/csrf.js';
@@ -20,7 +21,8 @@ import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
 import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion, resetLockout } from '../db/queries/users.js';
 import { deleteSessionsByUserId } from '../db/queries/sessions.js';
-import { BCRYPT_ROUNDS } from '../config.js';
+import { findByCode, validateCodeRedeemable } from '../db/queries/invite-codes.js';
+import { BCRYPT_ROUNDS, config } from '../config.js';
 
 export const authRouter: Router = Router();
 
@@ -40,6 +42,7 @@ const registerSchema = z.object({
   acceptedLegalTerms: z.literal(true, {
     errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
   }),
+  inviteCode: z.string().max(20).optional(),
 });
 
 const loginSchema = z.object({
@@ -75,12 +78,45 @@ const validateResetTokenSchema = z.object({
 // POST /auth/register
 authRouter.post('/register', registerRateLimit, async (req, res, next) => {
   try {
-    const { email, password, acceptedLegalTerms } = registerSchema.parse(req.body);
+    const { email, password, acceptedLegalTerms, inviteCode } = registerSchema.parse(req.body);
     const ipAddress = req.ip ?? undefined;
     const userAgent = req.get('user-agent');
 
+    // Registration gating — enforce REGISTRATION_MODE
+    if (config.REGISTRATION_MODE === 'closed') {
+      throw new AppError(403, 'registration_closed', 'Registration is not available at this time');
+    }
+
+    // Invite code processing:
+    // - In 'invite' mode: code is required, validated, and redeemed atomically
+    // - In 'open' mode: invite code field is ignored (users register freely)
+    const isInviteMode = config.REGISTRATION_MODE === 'invite';
+    const normalizedCode = isInviteMode ? inviteCode?.trim().toUpperCase() : undefined;
+
+    if (isInviteMode && !normalizedCode) {
+      throw new AppError(400, 'invite_code_required', 'An invite code is required to register');
+    }
+
+    // Pre-check invite code before starting registration transaction
+    // Authoritative validation happens inside the transaction with FOR UPDATE
+    if (normalizedCode) {
+      const code = await findByCode(normalizedCode);
+      if (!code) {
+        throw new AppError(400, 'invalid_invite_code', 'This invite code is invalid or has expired');
+      }
+      const invalidReason = validateCodeRedeemable(code);
+      if (invalidReason) {
+        throw new AppError(400, 'invalid_invite_code', 'This invite code is invalid or has expired');
+      }
+    }
+
     // HIGH-006: Pass context for device binding on session creation
-    const result = await authService.register(email, password, { ipAddress, userAgent, acceptedLegalTerms });
+    const result = await authService.register(email, password, {
+      ipAddress,
+      userAgent,
+      acceptedLegalTerms,
+      inviteCode: normalizedCode,
+    });
 
     await auditService.log({
       userId: result.user.id,
@@ -90,9 +126,25 @@ authRouter.post('/register', registerRateLimit, async (req, res, next) => {
       userAgent,
     });
 
+    // Log invite code redemption (use codeId from transaction, never the code string)
+    if (result.redeemedCodeId) {
+      await auditService.log({
+        userId: result.user.id,
+        action: AuditAction.INVITE_CODE_REDEEMED,
+        status: 'SUCCESS',
+        metadata: { codeId: result.redeemedCodeId },
+        ipAddress,
+        userAgent,
+      });
+    }
+
+    // Strip internal fields before sending to client
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { redeemedCodeId: _redeemedCodeId, ...clientData } = result;
+
     res.status(201).json({
       success: true,
-      data: result,
+      data: clientData,
     });
   } catch (error) {
     next(error);
@@ -388,6 +440,58 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
       success: true,
       data: { message: 'Password reset successfully. Please log in with your new password.' },
     });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /auth/invite-codes/validate - Pre-registration code validation (public)
+const validateInviteCodeSchema = z.object({
+  code: z.string().min(1, 'Code is required').max(20),
+});
+
+authRouter.post('/invite-codes/validate', inviteCodeValidateRateLimit, async (req, res, next) => {
+  try {
+    const { code } = validateInviteCodeSchema.parse(req.body);
+    const ipAddress = req.ip ?? undefined;
+    const userAgent = req.get('user-agent');
+
+    // Only validate codes when registration is in invite mode
+    // In other modes, codes aren't accepted — don't leak code validity
+    if (config.REGISTRATION_MODE !== 'invite') {
+      res.json({ success: true, data: { valid: false } });
+      return;
+    }
+
+    const uppercased = code.trim().toUpperCase();
+    const inviteCode = await findByCode(uppercased);
+    const invalidReason = inviteCode ? validateCodeRedeemable(inviteCode) : 'not_found';
+    const valid = invalidReason === null;
+
+    if (valid) {
+      await auditService.log({
+        userId: null,
+        action: AuditAction.INVITE_CODE_VALIDATED,
+        status: 'SUCCESS',
+        metadata: { codeId: inviteCode!.id },
+        ipAddress,
+        userAgent,
+      });
+    } else {
+      await auditService.log({
+        userId: null,
+        action: AuditAction.INVITE_CODE_VALIDATION_FAILED,
+        status: 'FAILURE',
+        metadata: {
+          codeId: inviteCode?.id ?? null,
+          reason: invalidReason,
+        },
+        ipAddress,
+        userAgent,
+      });
+    }
+
+    res.json({ success: true, data: { valid } });
   } catch (error) {
     next(error);
   }

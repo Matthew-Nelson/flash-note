@@ -27,7 +27,7 @@ interface AuthContextValue {
   isAuthenticated: boolean;
   sessionEndReason: SessionEndReason | null;
   login: (email: string, password: string) => Promise<AuthResponse>;
-  register: (email: string, password: string, acceptedLegalTerms: boolean) => Promise<AuthResponse>;
+  register: (email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   fetchUser: () => Promise<User | null>;
@@ -126,8 +126,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return response;
   }, []);
 
-  const register = useCallback(async (email: string, password: string, acceptedLegalTerms: boolean) => {
-    const response = await api.register(email, password, acceptedLegalTerms);
+  const register = useCallback(async (email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string) => {
+    const response = await api.register(email, password, acceptedLegalTerms, inviteCode);
     setUser(response.user);
     setSessionEndReason(null);
     lastFetchTime.current = Date.now();

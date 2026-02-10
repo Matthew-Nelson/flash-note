@@ -748,6 +748,166 @@ describe('AuthService', () => {
       ).rejects.toThrow('Email already registered');
     });
 
+    it('should redeem invite code atomically during registration', async () => {
+      // User not found (email doesn't exist) - via pool query
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      // Transaction via client:
+      const newUser = createMockUserRow({
+        id: 'new-user-id',
+        email: 'new@example.com',
+        token_version: 1,
+      });
+      const mockInviteCodeRow = {
+        id: 'code-uuid-1',
+        code: 'AB3K-M7RN',
+        type: 'beta',
+        organization_id: null,
+        created_by: 'admin-uuid',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate (SELECT ... FOR UPDATE)
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockInviteCodeRow] });
+      // createUserWithClient
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
+      // recordLegalAcceptances (3 document types)
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
+      // markCodeAsUsed
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // COMMIT
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      // Token creation for email verification (via pool query)
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+
+      // Mock email sending to succeed
+      const { emailService } = await import('./email-service.js');
+      const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
+        .mockResolvedValueOnce(undefined);
+
+      // Session limit check
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
+      // Insert session
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
+      // Update token hash
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await authService.register('new@example.com', 'ValidPass123', {
+        acceptedLegalTerms: true,
+        inviteCode: 'AB3K-M7RN',
+      });
+
+      expect(result).not.toBeNull();
+      expect(result.user.email).toBe('new@example.com');
+
+      // Verify FOR UPDATE was used
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('FOR UPDATE'),
+        ['AB3K-M7RN']
+      );
+
+      // Verify code was marked as used
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE invite_codes SET used_by'),
+        ['new-user-id', 'code-uuid-1']
+      );
+
+      sendVerificationSpy.mockRestore();
+    });
+
+    it('should throw when invite code is not found during transaction', async () => {
+      // User not found (email doesn't exist)
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate - not found
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // ROLLBACK (error handler)
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'XXXX-XXXX',
+        })
+      ).rejects.toThrow('This invite code is invalid or has expired');
+    });
+
+    it('should throw when invite code is expired during transaction', async () => {
+      // User not found
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const expiredCode = {
+        id: 'code-uuid-1',
+        code: 'AB3K-M7RN',
+        type: 'beta',
+        organization_id: null,
+        created_by: 'admin-uuid',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() - 1000), // expired
+        is_active: true,
+        created_at: new Date(),
+      };
+
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate - found but expired
+      mockClientQuery.mockResolvedValueOnce({ rows: [expiredCode] });
+      // ROLLBACK
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'AB3K-M7RN',
+        })
+      ).rejects.toThrow('This invite code is invalid or has expired');
+    });
+
+    it('should throw when invite code is already used during transaction', async () => {
+      // User not found
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const usedCode = {
+        id: 'code-uuid-1',
+        code: 'AB3K-M7RN',
+        type: 'beta',
+        organization_id: null,
+        created_by: 'admin-uuid',
+        used_by: 'other-user-id',
+        used_at: new Date(),
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate - found but already used
+      mockClientQuery.mockResolvedValueOnce({ rows: [usedCode] });
+      // ROLLBACK
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'AB3K-M7RN',
+        })
+      ).rejects.toThrow('This invite code is invalid or has expired');
+    });
+
     it('should still succeed if verification email fails', async () => {
       // User not found (email doesn't exist) - via pool query
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
