@@ -287,15 +287,15 @@ describe('Subscription Middleware', () => {
   });
 
   describe('database query', () => {
-    it('should query only subscription_status and trial_ends_at (minimal data)', async () => {
+    it('should query subscription_status, trial_ends_at, and organization_id', async () => {
       mockDbQuery.mockResolvedValueOnce({
-        rows: [{ subscription_status: 'active', trial_ends_at: null }],
+        rows: [{ subscription_status: 'active', trial_ends_at: null, organization_id: null }],
       });
 
       await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('SELECT subscription_status, trial_ends_at FROM users'),
+        expect.stringContaining('SELECT subscription_status, trial_ends_at, organization_id FROM users'),
         ['user-123']
       );
     });
@@ -342,6 +342,149 @@ describe('Subscription Middleware', () => {
 
       expect(statusMock).toHaveBeenCalledWith(402);
       expect(mockNext).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('organization subscription fallback', () => {
+    it('should allow access when individual inactive but org active', async () => {
+      // Individual: canceled, has org
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      // Org subscription: active
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'active', trial_ends_at: null }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should allow access when individual inactive but org trialing (not expired)', async () => {
+      const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      // Individual: canceled, has org
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      // Org subscription: trialing with valid trial
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'trialing', trial_ends_at: futureDate }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      expect(statusMock).not.toHaveBeenCalled();
+    });
+
+    it('should return 402 clinic_subscription_expired when org trial expired', async () => {
+      const pastDate = new Date(Date.now() - 1000);
+      // Individual: canceled, has org
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      // Org subscription: trialing but expired
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'trialing', trial_ends_at: pastDate }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(402);
+      expect(jsonMock).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'clinic_subscription_expired',
+          message: "Your clinic's subscription has ended. Subscribe individually or contact your clinic administrator.",
+        },
+      });
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should return 402 subscription_required when no org membership', async () => {
+      // Individual: canceled, has org_id but no active membership
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      // Org subscription: no active membership found (stale org_id)
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(402);
+      expect(jsonMock).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'subscription_required',
+          message: 'Please subscribe to use FlashNote.',
+        },
+      });
+    });
+
+    it('should return 402 trial_expired when individual trial expired and no org', async () => {
+      const pastDate = new Date(Date.now() - 1000);
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'trialing', trial_ends_at: pastDate, organization_id: null }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(402);
+      expect(jsonMock).toHaveBeenCalledWith({
+        success: false,
+        error: {
+          code: 'trial_expired',
+          message: 'Your trial has ended. Please subscribe to continue.',
+        },
+      });
+    });
+
+    it('should fail-closed when org trial_ends_at is null (trialing status)', async () => {
+      // Individual: canceled, has org
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      // Org subscription: trialing but trial_ends_at is null (fail-closed)
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'trialing', trial_ends_at: null }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(statusMock).toHaveBeenCalledWith(402);
+      expect(mockNext).not.toHaveBeenCalled();
+    });
+
+    it('should not query org when individual subscription is active', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'active', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalled();
+      // Only one DB query (the user query), not the org query
+      expect(mockDbQuery).toHaveBeenCalledTimes(1);
+    });
+
+    it('should query org subscription with JOIN for defense-in-depth', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'canceled', trial_ends_at: null, organization_id: 'org-123' }],
+      });
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'active', trial_ends_at: null }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      const orgQuery = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      expect(orgQuery[0]).toContain('JOIN organization_members');
+      expect(orgQuery[0]).toContain('removed_at IS NULL');
+      expect(orgQuery[1]).toEqual(['org-123', 'user-123']);
     });
   });
 });

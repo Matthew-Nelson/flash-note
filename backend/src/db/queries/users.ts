@@ -8,7 +8,7 @@ const USER_COLUMNS = `
   id, email, password_hash, stripe_customer_id, subscription_id,
   subscription_status, trial_ends_at, created_at, updated_at,
   failed_login_attempts, locked_until, last_failed_login_at,
-  email_verified, email_verified_at, token_version
+  email_verified, email_verified_at, token_version, organization_id
 `;
 
 /**
@@ -31,6 +31,7 @@ function rowToUser(row: UserRow): User {
     emailVerified: row.email_verified ?? false,
     emailVerifiedAt: row.email_verified_at,
     tokenVersion: row.token_version ?? 1,
+    organizationId: row.organization_id ?? null,
   };
 }
 
@@ -181,6 +182,35 @@ export async function resetLockout(userId: string): Promise<void> {
          last_failed_login_at = NULL,
          updated_at = NOW()
      WHERE id = $1`,
+    [userId]
+  );
+}
+
+/**
+ * Set user's organization_id (denormalized for fast subscription checks).
+ * Must be called within a transaction (uses PoolClient).
+ */
+export async function updateUserOrganization(
+  client: pg.PoolClient,
+  userId: string,
+  organizationId: string
+): Promise<void> {
+  await client.query(
+    `UPDATE users SET organization_id = $1, updated_at = NOW() WHERE id = $2`,
+    [organizationId, userId]
+  );
+}
+
+/**
+ * Clear user's organization_id (e.g., on org leave/removal).
+ * Must be called within a transaction (uses PoolClient).
+ */
+export async function clearUserOrganization(
+  client: pg.PoolClient,
+  userId: string
+): Promise<void> {
+  await client.query(
+    `UPDATE users SET organization_id = NULL, updated_at = NOW() WHERE id = $1`,
     [userId]
   );
 }

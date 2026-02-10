@@ -37,6 +37,8 @@ export interface User {
   emailVerifiedAt: Date | null;
   // Token versioning for immediate session invalidation
   tokenVersion: number;
+  // Organization membership (PR 1C)
+  organizationId: string | null;
 }
 
 export type SubscriptionStatus =
@@ -55,6 +57,20 @@ export interface TokenPayload {
 
 export interface AuthenticatedRequest extends Request {
   user: TokenPayload;
+}
+
+// Organization types (PR 1C)
+// Must stay in sync with CHECK constraint in migration 011
+export type OrgRole = 'owner' | 'admin' | 'member';
+
+export interface OrgMembership {
+  organizationId: string;
+  role: OrgRole;
+  isBillable: boolean;
+}
+
+export interface OrgMembershipRequest extends AuthenticatedRequest {
+  orgMembership: OrgMembership;
 }
 
 // Note types
@@ -164,6 +180,18 @@ export enum AuditAction {
   INVITE_CODE_REDEEMED = 'INVITE_CODE_REDEEMED',
   INVITE_CODE_VALIDATED = 'INVITE_CODE_VALIDATED',
   INVITE_CODE_VALIDATION_FAILED = 'INVITE_CODE_VALIDATION_FAILED',
+  // Organization lifecycle (PR 1C)
+  ORG_CREATED = 'ORG_CREATED',
+  ORG_SUBSCRIPTION_CHANGED = 'ORG_SUBSCRIPTION_CHANGED',
+  // Membership changes (PR 1C)
+  ORG_MEMBER_JOINED = 'ORG_MEMBER_JOINED',
+  ORG_MEMBER_REMOVED = 'ORG_MEMBER_REMOVED',
+  ORG_MEMBER_LEFT = 'ORG_MEMBER_LEFT',
+  ORG_MEMBER_ROLE_CHANGED = 'ORG_MEMBER_ROLE_CHANGED',
+  ORG_OWNERSHIP_TRANSFERRED = 'ORG_OWNERSHIP_TRANSFERRED',
+  // Invite lifecycle (used in Wave 2+)
+  INVITE_CODE_GENERATED = 'INVITE_CODE_GENERATED',
+  INVITE_CODE_REVOKED = 'INVITE_CODE_REVOKED',
 }
 
 export interface AuditLogEntry {

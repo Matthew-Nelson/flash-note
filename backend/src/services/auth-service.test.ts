@@ -42,7 +42,7 @@ vi.mock('../middleware/csrf.js', () => ({
 }));
 
 // Import after mocking
-import { authService } from './auth-service.js';
+import { authService, sanitizeUser } from './auth-service.js';
 import { AuditAction } from '../types/index.js';
 
 /**
@@ -1044,6 +1044,295 @@ describe('AuthService', () => {
       const result = await authService.refreshTokens(token);
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('register with clinic invite code', () => {
+    it('should auto-join organization when registering with clinic code', async () => {
+      // User not found (email doesn't exist) - via pool query
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      // Transaction via client:
+      const newUser = createMockUserRow({
+        id: 'new-user-id',
+        email: 'new@example.com',
+        token_version: 1,
+      });
+      const clinicInviteCode = {
+        id: 'code-uuid-1',
+        code: 'CLIN-CODE',
+        type: 'clinic',
+        organization_id: 'org-uuid-1',
+        created_by: 'admin-uuid',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate
+      mockClientQuery.mockResolvedValueOnce({ rows: [clinicInviteCode] });
+      // createUserWithClient
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
+      // recordLegalAcceptances (3 document types)
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
+      // SELECT max_seats, name FROM organizations FOR UPDATE
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ max_seats: 5, name: 'Test Clinic' }] });
+      // COUNT billable seats
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ count: '2' }] });
+      // addMember INSERT
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // updateUserOrganization UPDATE
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // markCodeAsUsed
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // COMMIT
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      // Token creation for email verification (via pool query)
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+
+      // Mock email sending
+      const { emailService } = await import('./email-service.js');
+      const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
+        .mockResolvedValueOnce(undefined);
+
+      // Session limit check
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
+      // Insert session
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
+      // Update token hash
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await authService.register('new@example.com', 'ValidPass123', {
+        acceptedLegalTerms: true,
+        inviteCode: 'CLIN-CODE',
+      });
+
+      expect(result.joinedOrganizationId).toBe('org-uuid-1');
+      expect(result.redeemedCodeId).toBe('code-uuid-1');
+      expect(result.user.organizationId).toBe('org-uuid-1');
+
+      sendVerificationSpy.mockRestore();
+    });
+
+    it('should throw 409 when clinic seat limit exceeded during registration', async () => {
+      // User not found
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const clinicInviteCode = {
+        id: 'code-uuid-1',
+        code: 'CLIN-CODE',
+        type: 'clinic',
+        organization_id: 'org-uuid-1',
+        created_by: 'admin-uuid',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+      const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+
+      // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      // findByCodeForUpdate
+      mockClientQuery.mockResolvedValueOnce({ rows: [clinicInviteCode] });
+      // createUserWithClient
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
+      // recordLegalAcceptances (3)
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
+      // SELECT max_seats, name FROM organizations FOR UPDATE
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ max_seats: 3, name: 'Small Clinic' }] });
+      // COUNT billable seats — at limit
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ count: '3' }] });
+      // ROLLBACK
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'CLIN-CODE',
+        })
+      ).rejects.toMatchObject({
+        statusCode: 409,
+        code: 'no_seats_available',
+      });
+    });
+
+    it('should throw 500 when clinic code org not found during registration', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const clinicInviteCode = {
+        id: 'code-uuid-1', code: 'CLIN-CODE', type: 'clinic',
+        organization_id: 'org-uuid-1', created_by: 'admin-uuid',
+        used_by: null, used_at: null,
+        expires_at: new Date(Date.now() + 86400000),
+        is_active: true, created_at: new Date(),
+      };
+      const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [clinicInviteCode] }); // findByCodeForUpdate
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] }); // createUser
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] }); // legal 1
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] }); // legal 2
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] }); // legal 3
+      // findOrganizationByIdForUpdate — org not found (markCodeAsUsed not reached)
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'CLIN-CODE',
+        })
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'invalid_invite_code',
+      });
+    });
+
+    it('should throw 500 when clinic code has no organizationId (broken invariant)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const brokenClinicCode = {
+        id: 'code-uuid-1', code: 'CLIN-CODE', type: 'clinic',
+        organization_id: null, // broken invariant
+        created_by: 'admin-uuid', used_by: null, used_at: null,
+        expires_at: new Date(Date.now() + 86400000),
+        is_active: true, created_at: new Date(),
+      };
+      const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [brokenClinicCode] }); // findByCodeForUpdate
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] }); // createUser
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] }); // legal 1
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] }); // legal 2
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] }); // legal 3
+      // organizationId is null → throws before org query or markCodeAsUsed
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      await expect(
+        authService.register('new@example.com', 'ValidPass123', {
+          acceptedLegalTerms: true,
+          inviteCode: 'CLIN-CODE',
+        })
+      ).rejects.toMatchObject({
+        statusCode: 500,
+        code: 'invalid_invite_code',
+      });
+    });
+
+    it('should not join org when registering with beta code', async () => {
+      // User not found
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const betaCode = {
+        id: 'code-uuid-1', code: 'BETA-CODE', type: 'beta',
+        organization_id: null, created_by: 'admin-uuid',
+        used_by: null, used_at: null,
+        expires_at: new Date(Date.now() + 86400000),
+        is_active: true, created_at: new Date(),
+      };
+      const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
+      mockClientQuery.mockResolvedValueOnce({ rows: [betaCode] }); // findByCodeForUpdate
+      mockClientQuery.mockResolvedValueOnce({ rows: [newUser] }); // createUser
+      mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] }); // legal 1
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] }); // legal 2
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] }); // legal 3
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // markCodeAsUsed
+      mockClientQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      // Token creation for email verification
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const { emailService } = await import('./email-service.js');
+      const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
+        .mockResolvedValueOnce(undefined);
+
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] }); // session limit
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }); // insert session
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // update token hash
+
+      const result = await authService.register('new@example.com', 'ValidPass123', {
+        acceptedLegalTerms: true,
+        inviteCode: 'BETA-CODE',
+      });
+
+      expect(result.joinedOrganizationId).toBeUndefined();
+      expect(result.redeemedCodeId).toBe('code-uuid-1');
+
+      sendVerificationSpy.mockRestore();
+    });
+  });
+
+  describe('sanitizeUser', () => {
+    it('should include organizationId in sanitized output', () => {
+      const user = {
+        id: 'user-123',
+        email: 'test@example.com',
+        passwordHash: 'hash',
+        stripeCustomerId: null,
+        subscriptionId: null,
+        subscriptionStatus: 'trialing' as const,
+        trialEndsAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastFailedLoginAt: null,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        tokenVersion: 1,
+        organizationId: 'org-456',
+      };
+
+      const sanitized = sanitizeUser(user);
+
+      expect(sanitized.organizationId).toBe('org-456');
+      expect(sanitized).not.toHaveProperty('passwordHash');
+    });
+
+    it('should include null organizationId when user has no org', () => {
+      const user = {
+        id: 'user-123',
+        email: 'test@example.com',
+        passwordHash: 'hash',
+        stripeCustomerId: null,
+        subscriptionId: null,
+        subscriptionStatus: 'trialing' as const,
+        trialEndsAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastFailedLoginAt: null,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        tokenVersion: 1,
+        organizationId: null,
+      };
+
+      const sanitized = sanitizeUser(user);
+
+      expect(sanitized.organizationId).toBeNull();
     });
   });
 });

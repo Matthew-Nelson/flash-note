@@ -3,9 +3,11 @@ import jwt from 'jsonwebtoken';
 import * as Sentry from '@sentry/node';
 import { config, BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '../config.js';
 import { db } from '../db/index.js';
-import { findUserByEmail, findUserById, createUserWithClient } from '../db/queries/users.js';
+import { findUserByEmail, findUserById, createUserWithClient, updateUserOrganization } from '../db/queries/users.js';
 import { recordLegalAcceptances } from '../db/queries/legal-acceptances.js';
 import { findByCodeForUpdate, markCodeAsUsed, validateCodeRedeemable } from '../db/queries/invite-codes.js';
+import { addMember, countBillableSeats } from '../db/queries/organization-members.js';
+import { findOrganizationByIdForUpdate } from '../db/queries/organizations.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateCsrfToken } from '../middleware/csrf.js';
 import { lockoutService } from './lockout-service.js';
@@ -53,6 +55,7 @@ class AuthService {
     const client = await db.connect();
     let user;
     let redeemedCodeId: string | undefined;
+    let joinedOrganizationId: string | undefined;
     try {
       await client.query('BEGIN');
 
@@ -90,7 +93,38 @@ class AuthService {
         throw error;
       }
 
-      // Mark invite code as used within the same transaction
+      // Clinic invite code → auto-join organization (inline in registration transaction)
+      if (validatedCode?.type === 'clinic') {
+        if (!validatedCode.organizationId) {
+          // Broken data invariant: clinic code MUST have an org. Fail-secure.
+          throw new AppError(500, 'invalid_invite_code', 'Clinic invite code missing organization');
+        }
+
+        // Lock org row to serialize seat allocation
+        const orgRow = await findOrganizationByIdForUpdate(client, validatedCode.organizationId);
+        if (!orgRow) {
+          throw new AppError(500, 'invalid_invite_code', 'Organization not found for clinic invite code');
+        }
+
+        // Count billable seats
+        const billableSeats = await countBillableSeats(client, validatedCode.organizationId);
+        if (billableSeats >= orgRow.maxSeats) {
+          throw new AppError(409, 'no_seats_available',
+            'This clinic has no available seats. Contact your clinic administrator.');
+        }
+
+        // Add member
+        await addMember(client, validatedCode.organizationId, user.id, 'member', true);
+
+        // Denormalize
+        await updateUserOrganization(client, user.id, validatedCode.organizationId);
+
+        joinedOrganizationId = validatedCode.organizationId;
+        user.organizationId = validatedCode.organizationId;
+      }
+
+      // Mark invite code as used after all validation/membership logic succeeds.
+      // Ordering matches organization-service.joinOrganization: validate → mutate → mark used.
       if (validatedCode) {
         await markCodeAsUsed(client, validatedCode.id, user.id);
         redeemedCodeId = validatedCode.id;
@@ -145,6 +179,7 @@ class AuthService {
       csrfToken: generateCsrfToken(user.id),
       emailVerificationRequired: true,
       redeemedCodeId,
+      joinedOrganizationId,
     };
   }
 
@@ -541,6 +576,7 @@ export function sanitizeUser(user: User) {
     subscriptionStatus: user.subscriptionStatus,
     trialEndsAt: user.trialEndsAt,
     emailVerified: user.emailVerified,
+    organizationId: user.organizationId,
   };
 }
 
