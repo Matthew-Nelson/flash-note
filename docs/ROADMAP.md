@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 9, 2026
-**Overall Progress:** 27% (30/112 items complete)
+**Last Updated:** February 10, 2026
+**Overall Progress:** 33% (37/112 items complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -171,13 +171,13 @@ These items are **required for production** with real patient data. They should 
 
 | Task | Source | Status |
 |------|--------|--------|
-| Migration 010: `organizations`, `organization_members` tables, `users.organization_id` | APP_GATING_STRATEGY PR 1C | Not started |
-| New audit actions in `AuditAction` enum (ORG_*, INVITE_*) | APP_GATING_STRATEGY PR 1C | Not started |
-| Organization service (create, query, member management, billable seats) | APP_GATING_STRATEGY PR 1C | Not started |
-| Modify `requireActiveSubscription` middleware for org-based access | APP_GATING_STRATEGY PR 1C | Not started |
-| `requireOrgMembership` and `requireOrgRole` middleware | APP_GATING_STRATEGY PR 1C | Not started |
-| Modify registration: clinic invite code → auto-join org | APP_GATING_STRATEGY PR 1C | Not started |
-| `POST /organization/join` endpoint (existing user re-join, transactional) | APP_GATING_STRATEGY PR 1C | Not started |
+| Migration 011: `organizations`, `organization_members` tables, `users.organization_id` | APP_GATING_STRATEGY PR 1C | Done |
+| New audit actions in `AuditAction` enum (ORG_*, INVITE_*) | APP_GATING_STRATEGY PR 1C | Done |
+| Organization service (create, query, member management, billable seats) | APP_GATING_STRATEGY PR 1C | Done |
+| Modify `requireActiveSubscription` middleware for org-based access | APP_GATING_STRATEGY PR 1C | Done |
+| `requireOrgMembership` and `requireOrgRole` middleware | APP_GATING_STRATEGY PR 1C | Done |
+| Modify registration: clinic invite code → auto-join org | APP_GATING_STRATEGY PR 1C | Done |
+| `POST /organization/join` endpoint (existing user re-join, transactional) | APP_GATING_STRATEGY PR 1C | Done |
 
 **PR 1D — Usage endpoint + web dashboard:**
 
@@ -329,10 +329,10 @@ These are researched but not prioritized for current development.
 |-------|-------|------|----------|
 | MVP Foundation | 15 | 15 | 100% |
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
-| Beta Ready (Wave 1 + existing) | 26 | 9 | 35% |
+| Beta Ready (Wave 1 + existing) | 26 | 16 | 62% |
 | Production Ready (Waves 2-4 + existing) | 29 | 5 | 17% |
 | HIPAA/HITECH Critical Path | 9 | 1 | 11% |
-| **Total** | **112** | **30** | **27%** |
+| **Total** | **112** | **37** | **33%** |
 
 ---
 

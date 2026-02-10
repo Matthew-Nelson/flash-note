@@ -63,7 +63,8 @@ POST /auth/register
       "email": "therapist@clinic.com",
       "subscriptionStatus": "trialing",
       "trialEndsAt": "2025-02-03T12:00:00Z",
-      "emailVerified": false
+      "emailVerified": false,
+      "organizationId": null
     },
     "accessToken": "eyJ...",
     "refreshToken": "eyJ...",
@@ -132,7 +133,8 @@ POST /auth/login
       "id": "uuid",
       "email": "therapist@clinic.com",
       "subscriptionStatus": "active",
-      "emailVerified": true
+      "emailVerified": true,
+      "organizationId": null
     },
     "accessToken": "eyJ...",
     "refreshToken": "eyJ...",
@@ -167,7 +169,8 @@ POST /auth/refresh
       "id": "uuid",
       "email": "therapist@clinic.com",
       "subscriptionStatus": "active",
-      "emailVerified": true
+      "emailVerified": true,
+      "organizationId": null
     },
     "accessToken": "eyJ...",
     "refreshToken": "eyJ...",
@@ -322,6 +325,48 @@ POST /auth/reset-password
 
 ---
 
+### Organization
+
+#### Join Organization
+
+```
+POST /organization/join
+Authorization: Bearer <token>
+X-CSRF-Token: <csrf_token>
+```
+
+Join an organization using a clinic invite code. The authenticated user must not already be a member of any organization. Seat availability is checked transactionally.
+
+**Request:**
+```json
+{
+  "inviteCode": "AB3K-M7RN"
+}
+```
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "organizationId": "uuid",
+    "organizationName": "Acme Physical Therapy"
+  }
+}
+```
+
+**Errors:**
+- `400 invalid_invite_code` - Code is expired, already used, revoked, or not found
+- `400 invalid_code_type` - Code is not a clinic invite code (e.g., beta code)
+- `401` - Not authenticated
+- `409 already_in_organization` - User is already a member of an organization
+- `409 no_seats_available` - Clinic has reached max billable seats
+- `429` - Too many attempts
+
+**Rate limit:** 5 requests per 15 minutes.
+
+---
+
 ### User
 
 #### Get Current User
@@ -343,7 +388,8 @@ Returns the authenticated user's current profile data. This is a lightweight rea
       "email": "therapist@clinic.com",
       "subscriptionStatus": "active",
       "trialEndsAt": "2025-02-03T12:00:00Z",
-      "emailVerified": true
+      "emailVerified": true,
+      "organizationId": null
     }
   }
 }
@@ -498,6 +544,12 @@ All errors follow this format:
 | `validation_error` | 400 | Input validation failed |
 | `trial_expired` | 402 | Free trial ended |
 | `subscription_required` | 402 | Payment required |
+| `clinic_subscription_expired` | 402 | Org subscription lapsed |
+| `invalid_code_type` | 400 | Wrong invite code type for endpoint |
+| `no_seats_available` | 409 | Clinic seat limit reached |
+| `already_in_organization` | 409 | User already in an org |
+| `no_organization` | 403 | No active org membership |
+| `insufficient_permissions` | 403 | Org role insufficient |
 | `too_many_attempts` | 429 | Rate limit on auth endpoints |
 | `rate_limit_exceeded` | 429 | Too many requests |
 | `ai_error` | 500 | LLM generation failed |
@@ -520,6 +572,7 @@ All errors follow this format:
 | `POST /auth/request-password-reset` | 3 requests | 1 hour |
 | `POST /auth/reset-password` | 5 requests | 15 minutes |
 | `POST /auth/invite-codes/validate` | 10 requests | 1 minute |
+| `POST /organization/join` | 5 requests | 15 minutes |
 | `POST /notes/generate` | 30 requests | 1 minute |
 | `GET /user/me` | 100 requests | 1 minute |
 | All other endpoints | 100 requests | 1 minute |
