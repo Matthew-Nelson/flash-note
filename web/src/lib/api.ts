@@ -12,7 +12,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { storage } from './storage';
-import type { User, AuthResponse, ApiResponse, SessionEndReason } from './types';
+import type { User, AuthResponse, ApiResponse, SessionEndReason, UsageResponse } from './types';
 
 // API URL from environment or default to localhost
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
@@ -387,5 +387,12 @@ export const api = {
     return requestWithRetry('/billing/portal', {
       method: 'POST',
     });
+  },
+
+  /**
+   * Fetch current month usage stats and organization context
+   */
+  async getUsage(): Promise<UsageResponse> {
+    return request<UsageResponse>('/usage/me');
   },
 };

@@ -7,7 +7,8 @@ import * as Sentry from '@sentry/nextjs';
 import { useAuth, ApiError } from '@/lib/auth-context';
 import { api } from '@/lib/api';
 import { ProtectedRoute } from '@/components/auth';
-import { Card, CardContent, SubscriptionBadge, Button } from '@/components/ui';
+import { Card, CardContent, SubscriptionBadge, Button, Spinner } from '@/components/ui';
+import type { UsageResponse } from '@/lib/types';
 
 function DashboardContent() {
   const searchParams = useSearchParams();
@@ -17,12 +18,51 @@ function DashboardContent() {
   const [isPolling, setIsPolling] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usage, setUsage] = useState<UsageResponse | null>(null);
+  const [usageLoading, setUsageLoading] = useState(true);
 
-  // Mock usage data - in real app this would come from an API
-  const usage = {
-    notesGenerated: 42,
-    month: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-  };
+  /**
+   * Format "YYYY-MM" into a human-readable month string.
+   * Uses numeric Date constructor to avoid timezone parsing issues.
+   */
+  function formatMonth(yearMonth: string): string {
+    const [yearStr, monthStr] = yearMonth.split('-');
+    const date = new Date(Number(yearStr), Number(monthStr) - 1);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
+  // Fetch usage data on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function fetchUsage() {
+      try {
+        const data = await api.getUsage();
+        if (!cancelled) {
+          setUsage(data);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          // Non-critical — don't break the dashboard
+          Sentry.captureException(err, {
+            extra: {
+              source: 'dashboard_page',
+              errorType: 'usage_fetch_failed',
+            },
+          });
+        }
+      } finally {
+        if (!cancelled) {
+          setUsageLoading(false);
+        }
+      }
+    }
+
+    void fetchUsage();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Poll for subscription status update after checkout
   // Uses GET /user/me (via fetchUser) instead of POST /auth/refresh
@@ -194,10 +234,25 @@ function DashboardContent() {
               <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
                 Usage This Month
               </h2>
-              <div className="text-4xl font-bold text-gradient mb-2">
-                {usage.notesGenerated}
-              </div>
-              <p className="text-fn-text-secondary">SOAP notes generated in {usage.month}</p>
+              {usageLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Spinner size="lg" />
+                </div>
+              ) : (
+                <>
+                  <div className="text-4xl font-bold text-gradient mb-2">
+                    {usage?.notesGenerated ?? 0}
+                  </div>
+                  <p className="text-fn-text-secondary">
+                    SOAP notes generated in {usage ? formatMonth(usage.currentMonth) : ''}
+                  </p>
+                  {usage?.organization && (
+                    <p className="text-fn-text-secondary text-sm mt-2">
+                      Organization: {usage.organization.name}
+                    </p>
+                  )}
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -247,6 +302,28 @@ function DashboardContent() {
                 <>
                   <p className="text-fn-text-secondary mb-4">
                     Your payment is past due. Please update your payment method.
+                  </p>
+                  <button
+                    onClick={handleManageSubscription}
+                    disabled={portalLoading}
+                    className="link text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {portalLoading ? 'Opening billing portal...' : 'Update payment method'}
+                  </button>
+                </>
+              ) : user?.subscriptionStatus === 'canceled' ? (
+                <>
+                  <p className="text-fn-text-secondary mb-4">
+                    Your subscription has been canceled. Subscribe again to continue using FlashNote.
+                  </p>
+                  <Link href="/pricing">
+                    <Button>Subscribe Now</Button>
+                  </Link>
+                </>
+              ) : user?.subscriptionStatus === 'unpaid' ? (
+                <>
+                  <p className="text-fn-text-secondary mb-4">
+                    Your payment failed. Please update your payment method to restore access.
                   </p>
                   <button
                     onClick={handleManageSubscription}

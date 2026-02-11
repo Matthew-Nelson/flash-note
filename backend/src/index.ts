@@ -18,6 +18,7 @@ import { notesRouter } from './routes/notes.js';
 import { billingRouter } from './routes/billing.js';
 import { userRouter } from './routes/user.js';
 import { organizationRouter } from './routes/organization.js';
+import { usageRouter } from './routes/usage.js';
 
 const app: Express = express();
 
@@ -62,6 +63,7 @@ app.use('/notes', notesRouter);
 app.use('/billing', billingRouter);
 app.use('/user', userRouter);
 app.use('/organization', organizationRouter);
+app.use('/usage', usageRouter);
 
 // Error handling - Sentry must be first to capture errors
 Sentry.setupExpressErrorHandler(app);
