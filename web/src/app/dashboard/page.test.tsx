@@ -21,7 +21,7 @@ vi.mock('@/lib/auth-context', () => ({
 const mockGetUsage = vi.fn();
 vi.mock('@/lib/api', () => ({
   api: {
-    getUsage: (...args: unknown[]) => mockGetUsage(...args),
+    getUsage: (...args: unknown[]): unknown => mockGetUsage(...args),
     createPortalSession: vi.fn(),
   },
 }));
