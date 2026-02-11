@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
 **Last Updated:** February 10, 2026
-**Overall Progress:** 33% (37/112 items complete)
+**Overall Progress:** 37% (41/112 items complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -183,10 +183,10 @@ These items are **required for production** with real patient data. They should 
 
 | Task | Source | Status |
 |------|--------|--------|
-| `GET /usage/me` endpoint (replaces mock dashboard data) | APP_GATING_STRATEGY PR 1D | Not started |
-| Web dashboard: replace mock usage with real `/usage/me` data | APP_GATING_STRATEGY PR 1D | Not started |
-| Handle all subscription statuses distinctly in dashboard UI | APP_GATING_STRATEGY PR 1D | Not started |
-| Extension: add `organizationId` to `storedUserSchema` | APP_GATING_STRATEGY PR 1D | Not started |
+| `GET /usage/me` endpoint (replaces mock dashboard data) | APP_GATING_STRATEGY PR 1D | Done |
+| Web dashboard: replace mock usage with real `/usage/me` data | APP_GATING_STRATEGY PR 1D | Done |
+| Handle all subscription statuses distinctly in dashboard UI | APP_GATING_STRATEGY PR 1D | Done |
+| Extension: add `organizationId` to `storedUserSchema` | APP_GATING_STRATEGY PR 1D | Done |
 
 **Done when:** `REGISTRATION_MODE=invite` works, PT can register with beta code and see real usage, AND clinic admin can register → org created (manually) → clinic invite codes generated → PTs join org → subscription access works through org.
 
@@ -329,10 +329,10 @@ These are researched but not prioritized for current development.
 |-------|-------|------|----------|
 | MVP Foundation | 15 | 15 | 100% |
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
-| Beta Ready (Wave 1 + existing) | 26 | 16 | 62% |
+| Beta Ready (Wave 1 + existing) | 26 | 20 | 77% |
 | Production Ready (Waves 2-4 + existing) | 29 | 5 | 17% |
 | HIPAA/HITECH Critical Path | 9 | 1 | 11% |
-| **Total** | **112** | **37** | **33%** |
+| **Total** | **112** | **41** | **37%** |
 
 ---
 

@@ -260,6 +260,35 @@ describe('Extension Validation Schemas', () => {
       ).toBe(true);
     });
 
+    it('should accept organizationId as a string', () => {
+      expect(
+        storedAuthSchema.safeParse({
+          ...validAuth,
+          user: {
+            ...validAuth.user,
+            organizationId: 'org-uuid-123',
+          },
+        }).success
+      ).toBe(true);
+    });
+
+    it('should accept organizationId as null', () => {
+      expect(
+        storedAuthSchema.safeParse({
+          ...validAuth,
+          user: {
+            ...validAuth.user,
+            organizationId: null,
+          },
+        }).success
+      ).toBe(true);
+    });
+
+    it('should accept user without organizationId (backward compatibility)', () => {
+      // The validAuth fixture doesn't include organizationId — should still pass
+      expect(storedAuthSchema.safeParse(validAuth).success).toBe(true);
+    });
+
     it('should reject missing accessToken', () => {
       const { accessToken: _, ...noToken } = validAuth;
       expect(storedAuthSchema.safeParse(noToken).success).toBe(false);

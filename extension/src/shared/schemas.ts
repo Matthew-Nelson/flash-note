@@ -63,6 +63,7 @@ export const storedUserSchema = z.object({
   subscriptionStatus: z.string(),
   trialEndsAt: z.string().nullable().optional(),
   emailVerified: z.boolean().optional(),
+  organizationId: z.string().nullable().optional(),
 });
 
 export const storedAuthSchema = z.object({

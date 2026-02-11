@@ -402,6 +402,41 @@ Returns the authenticated user's current profile data. This is a lightweight rea
 
 ---
 
+### Usage
+
+#### Get Current Usage
+
+```
+GET /usage/me
+Authorization: Bearer <token>
+```
+
+Returns the authenticated user's usage stats for the current month, plus organization context if the user belongs to one.
+
+**Response 200:**
+```json
+{
+  "success": true,
+  "data": {
+    "currentMonth": "2026-02",
+    "notesGenerated": 42,
+    "organization": {
+      "name": "Acme Physical Therapy",
+      "role": "member"
+    }
+  }
+}
+```
+
+> `organization` is `null` for individual users (not in a clinic).
+
+**Errors:**
+- `401` - Not authenticated (missing or invalid token)
+- `404` - User not found
+- `429` - Rate limit exceeded
+
+---
+
 ### Notes
 
 #### Generate SOAP Note
@@ -575,4 +610,5 @@ All errors follow this format:
 | `POST /organization/join` | 5 requests | 15 minutes |
 | `POST /notes/generate` | 30 requests | 1 minute |
 | `GET /user/me` | 100 requests | 1 minute |
+| `GET /usage/me` | 100 requests | 1 minute |
 | All other endpoints | 100 requests | 1 minute |

@@ -5,6 +5,7 @@ export interface StoredUser {
   subscriptionStatus: string;
   trialEndsAt?: string | null;
   emailVerified?: boolean;
+  organizationId?: string | null;
 }
 
 export interface StoredAuth {
