@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import type { Response, NextFunction } from 'express';
+import type { NextFunction } from 'express';
 import type { AuthenticatedRequest } from '../types/index.js';
 
 // Mock dependencies with vi.hoisted for proper hoisting
