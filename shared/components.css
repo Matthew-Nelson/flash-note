@@ -284,6 +284,12 @@
   opacity: 0.8;
 }
 
+.link:focus-visible {
+  outline: 2px solid var(--fn-accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--fn-radius-sm, 2px);
+}
+
 /* ============================================
    STATUS INDICATORS
    ============================================ */

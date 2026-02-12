@@ -84,7 +84,7 @@
 }
 
 /* Focus state for accessibility */
-#flashnote-floating-button:focus {
+#flashnote-floating-button:focus-visible {
   outline: none;
   box-shadow:
     0 4px 14px rgba(16, 185, 129, 0.4),

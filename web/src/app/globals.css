@@ -76,3 +76,11 @@ body {
   outline: none;
   box-shadow: var(--fn-focus-ring);
 }
+
+/* Global focus-visible fallback for interactive elements without custom focus styles */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--fn-accent-primary);
+    outline-offset: 2px;
+  }
+}

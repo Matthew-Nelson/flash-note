@@ -10,7 +10,7 @@ interface AuthLayoutProps {
 
 export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProps) {
   return (
-    <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center items-center gap-2">
           <span className="text-3xl font-bold text-gradient">FlashNote</span>
@@ -38,6 +38,6 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

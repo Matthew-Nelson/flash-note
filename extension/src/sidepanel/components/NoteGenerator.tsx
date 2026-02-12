@@ -122,11 +122,42 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   const charPercentage = (charCount / 5000) * 100;
   const charColor = charPercentage > 90 ? 'text-red-500' : charPercentage > 70 ? 'text-yellow-500' : 'opacity-50';
 
+  // Threshold-based announcement for screen readers (avoids announcing every keystroke).
+  // Updates the DOM directly via ref so the message clears from the accessibility tree after 3s.
+  const announcementRef = useRef<HTMLSpanElement>(null);
+  const prevThresholdRef = useRef('');
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    const threshold =
+      charCount >= 5000 ? 'Character limit reached' :
+      charCount >= 4500 ? '500 characters remaining' :
+      charCount >= 4000 ? '1,000 characters remaining' :
+      '';
+
+    if (threshold && threshold !== prevThresholdRef.current) {
+      if (announcementRef.current) {
+        announcementRef.current.textContent = threshold;
+      }
+      clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = setTimeout(() => {
+        if (announcementRef.current) {
+          announcementRef.current.textContent = '';
+        }
+      }, 3000);
+      prevThresholdRef.current = threshold;
+    }
+
+    if (!threshold) {
+      prevThresholdRef.current = '';
+    }
+  }, [charCount]);
+
   // Loading state
   if (phase === 'loading') {
     return (
       <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
-        <div className="loading-indicator flex flex-col items-center">
+        <div className="loading-indicator flex flex-col items-center" role="status">
           <div className="relative flex flex-col items-center">
             <div className="loading-spinner">
               <div className="loading-dots">
@@ -149,7 +180,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   // Error state - animated X mark with shake
   if (phase === 'error') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
+      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in" role="alert">
         <div className="error-x-container">
           <div className="error-x-mark">
             <svg
@@ -196,7 +227,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   // Success state - checkmark animation
   if (phase === 'success') {
     return (
-      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in">
+      <div className="flex flex-col items-center justify-center p-8 flex-1 animate-fade-in" role="status">
         <div className="success-checkmark-container hold">
           <div className="success-checkmark">
             <svg
@@ -300,11 +331,12 @@ e.g., reports 40% pain reduction. flex ROM 50->65. MFR lumbar paraspinals. grade
         <p className={`mt-1 text-xs ${charColor} transition-colors`}>
           {charCount.toLocaleString()}/5,000 characters
         </p>
+        <span className="sr-only" aria-live="polite" ref={announcementRef} />
       </div>
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div className="error-message text-sm px-3 py-2 animate-fade-in">
+        <div className="error-message text-sm px-3 py-2 animate-fade-in" role="alert">
           {errors.length === 1 ? (
             errors[0]
           ) : (

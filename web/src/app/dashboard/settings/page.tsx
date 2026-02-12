@@ -70,7 +70,7 @@ function SettingsContent() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 pb-8">
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 pb-8">
         <h1 className="text-2xl font-bold text-fn-text-primary mb-8">Account Settings</h1>
 
         <div className="max-w-2xl space-y-6">

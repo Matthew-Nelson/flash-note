@@ -159,6 +159,7 @@ function AuthenticatedApp({
           onClick={() => setView(view === 'settings' ? 'generator' : 'settings')}
           className="icon-btn p-2 rounded-md"
           title="Settings"
+          aria-label="Settings"
         >
           <svg
             className="w-5 h-5"

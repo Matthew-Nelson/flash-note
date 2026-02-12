@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor, act } from '@testing-library/react';
+import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NoteGenerator from './NoteGenerator';
 import { api } from '@/shared/api';
@@ -178,6 +178,61 @@ describe('NoteGenerator', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to generate note')).toBeInTheDocument();
     });
+  });
+
+  it('should not announce character count below 4000', () => {
+    renderGenerator();
+    const textarea = screen.getByLabelText(/session notes/i);
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(3999) } });
+    expect(screen.getByText('3,999/5,000 characters')).toBeInTheDocument();
+    const announcement = document.querySelector('[aria-live="polite"].sr-only');
+    expect(announcement).toHaveTextContent('');
+  });
+
+  it('should announce 1,000 characters remaining at 4000 chars', async () => {
+    renderGenerator();
+    const textarea = screen.getByLabelText(/session notes/i);
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(4000) } });
+    await waitFor(() => {
+      const announcement = document.querySelector('[aria-live="polite"].sr-only');
+      expect(announcement).toHaveTextContent('1,000 characters remaining');
+    });
+  });
+
+  it('should announce 500 characters remaining at 4500 chars', async () => {
+    renderGenerator();
+    const textarea = screen.getByLabelText(/session notes/i);
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(4500) } });
+    await waitFor(() => {
+      const announcement = document.querySelector('[aria-live="polite"].sr-only');
+      expect(announcement).toHaveTextContent('500 characters remaining');
+    });
+  });
+
+  it('should announce character limit reached at 5000 chars', async () => {
+    renderGenerator();
+    const textarea = screen.getByLabelText(/session notes/i);
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(5000) } });
+    await waitFor(() => {
+      const announcement = document.querySelector('[aria-live="polite"].sr-only');
+      expect(announcement).toHaveTextContent('Character limit reached');
+    });
+  });
+
+  it('should clear character announcement after timeout', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    renderGenerator();
+    const textarea = screen.getByLabelText(/session notes/i);
+    fireEvent.change(textarea, { target: { value: 'a'.repeat(4000) } });
+    await waitFor(() => {
+      const announcement = document.querySelector('[aria-live="polite"].sr-only');
+      expect(announcement).toHaveTextContent('1,000 characters remaining');
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3000);
+    });
+    const announcement = document.querySelector('[aria-live="polite"].sr-only');
+    expect(announcement).toHaveTextContent('');
   });
 
   it('should allow changing note type', async () => {
