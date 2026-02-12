@@ -126,7 +126,7 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   // Updates the DOM directly via ref so the message clears from the accessibility tree after 3s.
   const announcementRef = useRef<HTMLSpanElement>(null);
   const prevThresholdRef = useRef('');
-  const clearTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     const threshold =
@@ -151,6 +151,10 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
     if (!threshold) {
       prevThresholdRef.current = '';
     }
+
+    return () => {
+      clearTimeout(clearTimerRef.current);
+    };
   }, [charCount]);
 
   // Loading state
