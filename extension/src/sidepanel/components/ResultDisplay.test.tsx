@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResultDisplay from './ResultDisplay';
 import { createMockGeneratedNote } from '@/test/helpers';
@@ -9,6 +9,10 @@ describe('ResultDisplay', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('should render all SOAP sections', () => {
@@ -65,6 +69,68 @@ describe('ResultDisplay', () => {
     expect(clipboardSpy).toHaveBeenCalledWith(
       expect.stringContaining(note.subjective)
     );
+  });
+
+  it('should show error message when clipboard copy fails', async () => {
+    // Mock clipboard to reject
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard denied')) },
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(
+        new Error('Clipboard denied')
+      );
+    }
+
+    const user = userEvent.setup();
+    render(<ResultDisplay note={createMockGeneratedNote()} onBack={onBack} />);
+
+    await user.click(screen.getByText('Copy All'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Failed to copy — please try again or manually select the text')
+      ).toBeInTheDocument();
+    });
+
+    // "Copied!" should NOT appear
+    expect(screen.queryByText('Copied!')).not.toBeInTheDocument();
+  });
+
+  it('should auto-dismiss copy error after 3 seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: vi.fn().mockRejectedValue(new Error('Clipboard denied')) },
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue(
+        new Error('Clipboard denied')
+      );
+    }
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    render(<ResultDisplay note={createMockGeneratedNote()} onBack={onBack} />);
+
+    await user.click(screen.getByText('Copy All'));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to copy/)).toBeInTheDocument();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Failed to copy/)).not.toBeInTheDocument();
+    });
   });
 
   it('should display generation time when metadata is present', () => {

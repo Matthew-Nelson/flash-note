@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type GeneratedNote } from '@/shared/schemas';
+import { captureException } from '@/shared/sentry';
 
 interface ResultDisplayProps {
   note: GeneratedNote;
@@ -17,15 +18,36 @@ const SECTIONS: { key: SectionKey; label: string }[] = [
 
 export default function ResultDisplay({ note, onBack }: ResultDisplayProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const successTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    return () => {
+      clearTimeout(successTimerRef.current);
+      clearTimeout(errorTimerRef.current);
+    };
+  }, []);
 
   const copyToClipboard = async (text: string, section: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      setCopyError(null);
+      clearTimeout(errorTimerRef.current);
+      clearTimeout(successTimerRef.current);
       setCopiedSection(section);
-      setTimeout(() => setCopiedSection(null), 2000);
+      successTimerRef.current = setTimeout(() => setCopiedSection(null), 2000);
     } catch (err) {
-      /* v8 ignore next -- clipboard failure is a UX fallback; requires real browser clipboard API */
+      captureException(err instanceof Error ? err : new Error(String(err)), {
+        source: 'result_display',
+        errorType: 'clipboard_write_failed',
+      });
       console.error('Failed to copy:', err);
+      setCopiedSection(null);
+      clearTimeout(successTimerRef.current);
+      clearTimeout(errorTimerRef.current);
+      setCopyError('Failed to copy — please try again or manually select the text');
+      errorTimerRef.current = setTimeout(() => setCopyError(null), 3000);
     }
   };
 
@@ -82,6 +104,13 @@ ${note.plan}`;
           )}
         </button>
       </div>
+
+      {/* Copy error feedback */}
+      {copyError && (
+        <div className="error-message text-sm px-4 py-2 mx-4 mt-2 animate-fade-in">
+          {copyError}
+        </div>
+      )}
 
       {/* Document content */}
       <div className="flex-1 overflow-auto p-4">
