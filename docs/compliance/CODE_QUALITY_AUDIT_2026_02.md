@@ -772,3 +772,697 @@ The following security measures are correctly implemented and should be maintain
 13. **Strict CSP in extension** — `script-src 'self'` only
 14. **Audit logging** — Comprehensive auth event logging (login, logout, token refresh, failures)
 15. **User data sanitization** — Sensitive fields stripped before API responses
+
+---
+---
+
+# SECOND-PASS: Deep Dive Audit
+
+**Date:** 2026-02-12
+**Methodology:** Targeted deep analysis of subtle bugs, race conditions, edge cases, test coverage gaps, and dependency risks that a first pass would miss.
+
+## Second-Pass Summary
+
+The second pass uncovered **78 additional findings** across 8 audit domains. Many of these are subtle race conditions, non-atomic multi-step operations, test coverage blind spots, and dependency risks that only become apparent through line-by-line analysis of interacting code paths.
+
+| Severity | Count | Key Themes |
+|----------|-------|------------|
+| **CRITICAL** | 4 | Rate limit tests provide zero coverage; production mock-AI guard untested; middleware chain integration untested |
+| **HIGH** | 22 | Refresh token race conditions, non-atomic password reset, duplicate subscriptions, cost control gaps, unmaintained bcryptjs |
+| **MEDIUM** | 32 | Timing oracles, PHI retention, webhook reorder attacks, billing accuracy, missing audit trails |
+| **LOW** | 20 | Type coercion, config validation, code quality, minor security hardening |
+
+---
+
+## 8. Second-Pass: Authentication & Token Lifecycle
+
+### SP-1. Refresh Token Rotation Race Condition — Replay Window
+
+**File:** `backend/src/services/auth-service.ts`, lines 279-312
+**Severity:** HIGH
+**Category:** Refresh Token Rotation / Race Condition
+
+The `refreshTokens()` method performs validate → revoke → issue in separate non-transactional steps. If two concurrent requests arrive with the same refresh token, both can pass validation before either reaches revocation. Both requests succeed, producing two valid sessions from one token — defeating token rotation's purpose.
+
+**Attack Vector:** An attacker who intercepts a refresh token sends two concurrent refresh requests. Both succeed, giving the attacker a valid session even after the legitimate client refreshes.
+
+---
+
+### SP-2. Legacy Refresh Token Path Leaves Sessions Unrevoked
+
+**File:** `backend/src/services/auth-service.ts`, lines 555-561
+**Severity:** HIGH
+**Category:** Token Lifecycle / Incomplete Revocation
+
+When `revokeRefreshToken` is called with an empty sessionId (legacy tokens), it returns early without deleting anything. During `refreshTokens()`, the old session row with its valid bcrypt hash remains in the database. The legacy validation path iterates ALL active sessions. **Result:** For legacy tokens, refresh token rotation is completely broken — old refresh tokens remain valid indefinitely.
+
+---
+
+### SP-3. Non-Atomic Password Reset Creates Inconsistent State Windows
+
+**File:** `backend/src/routes/auth.ts`, lines 426-440
+**Severity:** HIGH
+**Category:** Race Condition / Inconsistent State
+
+Four sequential operations without a transaction:
+1. `updatePassword` → 2. `incrementTokenVersion` → 3. `deleteSessionsByUserId` → 4. `resetLockout`
+
+- **Crash after step 1:** Password changed but old JWTs still valid (up to 1 hour)
+- **Crash after step 2:** Old access tokens invalidated but refresh tokens still work
+- **Crash after step 3:** Sessions cleared but lockout not reset — user locked out with new password
+
+---
+
+### SP-4. Per-Request DB Query on Every Auth Check — DoS Amplification
+
+**File:** `backend/src/middleware/auth.ts`, line 47
+**Severity:** MEDIUM
+**Category:** Denial of Service / Performance
+
+`requireAuth` performs `getTokenVersion(payload.userId)` on every authenticated request. With a pool of 20 connections and 2-second timeout, an attacker with a valid token can exhaust the connection pool before endpoint-specific rate limiting kicks in.
+
+---
+
+### SP-5. CSRF Token Not Invalidated on Password Reset
+
+**File:** `backend/src/middleware/csrf.ts`, lines 15-23
+**Severity:** MEDIUM
+**Category:** CSRF Token Lifecycle
+
+CSRF tokens are stateless HMAC-signed tokens valid for 24 hours. Password reset invalidates access tokens and refresh tokens, but CSRF tokens remain valid. A previously-obtained CSRF token remains usable for up to 24 hours after password reset.
+
+---
+
+### SP-6. Timing Oracle on Locked Accounts
+
+**File:** `backend/src/services/auth-service.ts`, lines 186-244
+**Severity:** MEDIUM
+**Category:** Timing Side Channel
+
+When an account is locked:
+- Wrong password → `recordFailedAttempt` (UPDATE query, slower)
+- Correct password → `getAccountLockoutStatus` (SELECT query, faster)
+
+The timing difference is small but consistent and measurable, partially defeating the purpose of checking lockout after password validation.
+
+---
+
+### SP-7. Registration Email Enumeration via HTTP Status Code
+
+**File:** `backend/src/services/auth-service.ts`, lines 44-49
+**Severity:** MEDIUM
+**Category:** Information Disclosure
+
+Registration throws `AppError(409, 'email_exists')` with a distinct HTTP status. Unlike login (which uses timing-safe comparison), registration explicitly reveals whether an email is registered. In a healthcare context, this reveals someone is a physical therapist or uses PT services.
+
+---
+
+### SP-8. Concurrent Registration Race Condition
+
+**File:** `backend/src/services/auth-service.ts`, lines 44-76
+**Severity:** MEDIUM
+**Category:** Race Condition
+
+Email uniqueness check happens outside the transaction. The ~250ms bcrypt hash creates a window where two registrations with the same email both pass the check. The UNIQUE constraint catches this, but the error surfaces as a 500 instead of a clean 409.
+
+---
+
+### SP-9. Token Invalidation and Creation Not Atomic
+
+**File:** `backend/src/services/token-service.ts`, lines 67-88
+**Severity:** MEDIUM
+**Category:** Race Condition
+
+`createToken` invalidates existing tokens and inserts a new one in separate queries without a transaction. Concurrent "resend verification" requests can both succeed, creating multiple valid tokens simultaneously.
+
+---
+
+### SP-10. Audit Failure During Login Creates Orphaned Sessions
+
+**File:** `backend/src/routes/auth.ts`, lines 179-197
+**Severity:** MEDIUM
+**Category:** HIPAA / Audit Integrity
+
+If `auditService.log()` fails after a successful login, the error propagates as a 500. The client receives no tokens, but the server has already created a valid session — an orphaned session the user doesn't know about.
+
+---
+
+### SP-11. NaN Passes CSRF Timestamp Check
+
+**File:** `backend/src/middleware/csrf.ts`, line 47
+**Severity:** LOW
+**Category:** Validation Edge Case
+
+If `parseInt(timestamp, 10)` returns `NaN`, both `NaN > CSRF_TOKEN_EXPIRY_MS` and `NaN < 0` are `false`, so the timestamp check passes. The HMAC check would subsequently fail, so this is not exploitable but is a defense-in-depth gap.
+
+---
+
+### SP-12. Orphaned Placeholder Sessions Can Exhaust Session Limit
+
+**File:** `backend/src/services/auth-service.ts`, lines 366-400
+**Severity:** LOW
+**Category:** Resource Leak
+
+If bcrypt hash or UPDATE fails after the placeholder INSERT, orphaned session rows accumulate. Each counts against `MAX_SESSIONS_PER_USER = 5`. Repeated failures could lock a user out of creating new sessions.
+
+---
+
+## 9. Second-Pass: LLM / AI Service
+
+### SP-13. Retry After Timeout Causes Duplicate Billable LLM Calls
+
+**File:** `backend/src/services/llm/provider.ts`, lines 131-167
+**Severity:** HIGH
+**Category:** Cost Control
+
+When the client-side AbortController fires on timeout, the retry logic sends the same prompt again. The original request may have already completed on the LLM provider's side. With 3 retries, a single slow request can cost 4x the expected amount.
+
+---
+
+### SP-14. No Input Token Budget Check Before Sending to LLM
+
+**File:** `backend/src/services/ai-service.ts`, lines 71-136
+**Severity:** HIGH
+**Category:** Cost Control
+
+`maxTokens` only controls output. With 5,000-character quickNotes + system prompt (~5,000 chars), input can reach 2,500+ tokens per request. There is no per-user daily/monthly token budget enforcement — `usageService.incrementUsage` tracks after generation but never enforces a pre-check.
+
+---
+
+### SP-15. XML Closing Tag Injection Not Escaped in User Content
+
+**File:** `backend/src/utils/prompt-sanitization.ts`, lines 86-91
+**Severity:** HIGH
+**Category:** Prompt Injection
+
+`wrapWithDelimiters` does not escape closing tags. A user providing `</clinician_notes>` in quickNotes prematurely closes the delimiter and injects content the LLM interprets as system instructions. `detectSuspiciousPatterns` monitors but does not block, and has **zero patterns** for XML delimiter manipulation.
+
+---
+
+### SP-16. Error `cause` Chain May Leak PHI to Sentry
+
+**File:** `backend/src/services/llm/errors.ts`, lines 24-41
+**Severity:** MEDIUM
+**Category:** PHI Leakage
+
+`LLMError` subclasses pass `cause` to the native Error constructor. Sentry serializes the full chain including `cause`. `ParseError` causes can contain Zod validation errors with fragments of LLM response content (which contains PHI). The `beforeSend` hook does not sanitize the `error.cause` chain.
+
+---
+
+### SP-17. Token Usage Silently Defaults to Zero
+
+**File:** `backend/src/services/llm/gemini-provider.ts`, lines 226-227
+**Severity:** MEDIUM
+**Category:** Billing Accuracy
+
+Both providers default token counts to `0` when API responses omit usage metadata. A systematic API change could result in massive uncounted costs with no alerting.
+
+---
+
+### SP-18. No Clinical Content Validation on LLM Output
+
+**File:** `backend/src/services/llm/schemas.ts`, lines 160-207
+**Severity:** MEDIUM
+**Category:** Patient Safety
+
+The Zod schema validates structure only. `z.string()` accepts empty strings. A production LLM glitch returning empty SOAP sections would pass validation and be returned to the clinician.
+
+---
+
+### SP-19. No Per-User Rate Limit on LLM Generation
+
+**File:** `backend/src/middleware/rate-limit.ts`, lines 47-59
+**Severity:** MEDIUM
+**Category:** Cost Control
+
+30 generations/minute rate limit is per-IP only. A single user across multiple IPs faces no aggregate limit. Sustained abuse at 30 req/min = ~11.7M tokens/hour per IP.
+
+---
+
+### SP-20. Prompt Injection Detection Has No XML Delimiter Patterns
+
+**File:** `backend/src/utils/prompt-sanitization.ts`, lines 45-72
+**Severity:** MEDIUM
+**Category:** Security Monitoring Gap
+
+The `SUSPICIOUS_PATTERNS` array has zero patterns for detecting `</clinician_notes>`, `</patient_context>`, or other XML delimiter manipulation — the exact attack that would bypass the system's primary defense.
+
+---
+
+### SP-21. Model Name Injected into URL Without Validation
+
+**File:** `backend/src/services/llm/gemini-provider.ts`, line 134
+**Severity:** MEDIUM
+**Category:** Configuration Injection
+
+`GEMINI_MODEL` is interpolated into the API URL with no validation beyond `z.string()`. A malicious env var like `../../v1/some-other-endpoint` could cause path traversal.
+
+---
+
+## 10. Second-Pass: Billing & Stripe
+
+### SP-22. No Server-Side Guard Against Duplicate Subscriptions
+
+**File:** `backend/src/services/billing-service.ts`, lines 19-42
+**Severity:** HIGH
+**Category:** Double-Charge / Billing Manipulation
+
+`createCheckoutSession` creates a Stripe checkout without checking if the user already has an active subscription or Stripe customer. The only guard is a client-side check in `pricing/page.tsx`. A user with `active` subscription can create additional checkout sessions via direct API call, resulting in multiple Stripe subscriptions and double-billing.
+
+---
+
+### SP-23. Webhook Out-of-Order: `invoice.paid` Can Re-Activate Canceled Subscription
+
+**File:** `backend/src/services/billing-service.ts`, lines 181-216
+**Severity:** HIGH
+**Category:** Webhook Reorder Attack
+
+`handleInvoicePaid` unconditionally sets status to `active`. If a delayed `invoice.paid` event arrives after a `customer.subscription.deleted` event, the user's canceled subscription is silently re-activated. Idempotency checks prevent replay but not reorder.
+
+---
+
+### SP-24. Orphaned Stripe Customers on Re-Subscription
+
+**File:** `backend/src/services/billing-service.ts`, lines 24-35
+**Severity:** MEDIUM
+**Category:** Stripe State Inconsistency
+
+Checkout uses `customer_email` instead of reusing existing Stripe customer. Re-subscribing creates Customer B, orphaning Customer A (with its payment methods and history).
+
+---
+
+### SP-25. No Audit Trail for `handleSubscriptionUpdate`
+
+**File:** `backend/src/services/billing-service.ts`, lines 150-160
+**Severity:** MEDIUM
+**Category:** HIPAA Audit Gap
+
+Subscription status updates via webhook do not create audit entries, unlike checkout completion and deletion. Access-control-relevant state changes go unaudited.
+
+---
+
+### SP-26. `past_due` Immediately Blocks Access — No Grace Period
+
+**File:** `backend/src/middleware/subscription.ts`, lines 67-77
+**Severity:** MEDIUM
+**Category:** Business Logic
+
+First payment failure instantly locks users out. No grace period during Stripe's retry cycle. No payment failure email notification (TODO in code). An expired credit card causes instant lockout before user notification.
+
+---
+
+### SP-27. Usage Tracking Failure Silently Swallowed Without Sentry
+
+**File:** `backend/src/services/usage-service.ts`, lines 20-24
+**Severity:** MEDIUM
+**Category:** Observability / Billing
+
+`incrementUsage` catches all errors and only logs to console. No Sentry capture. Persistent failures mean users generate unlimited notes without usage being recorded.
+
+---
+
+### SP-28. No Organization-Level Usage Aggregation
+
+**File:** `backend/src/routes/notes.ts`, line 69
+**Severity:** MEDIUM
+**Category:** Organization Billing
+
+Usage is tracked per-user only. No mechanism for org-wide usage limits, team usage visibility, or per-seat billing based on actual consumption.
+
+---
+
+## 11. Second-Pass: Chrome Extension
+
+### SP-29. Token Refresh Race Condition — No Mutex
+
+**File:** `extension/src/shared/api.ts`, lines 79-133
+**Severity:** HIGH
+**Category:** Token Refresh Race Condition
+
+No deduplication mechanism for concurrent refresh calls. Multiple API calls detecting an expired token simultaneously each call `refreshToken()` independently. The first succeeds and rotates; the second fails with the now-invalid old token and calls `storage.clearAuth()`, wiping the valid new tokens. **Result: Silent logout.**
+
+---
+
+### SP-30. PHI Retained in React State After Logout
+
+**File:** `extension/src/sidepanel/App.tsx`, lines 94, 141-148
+**Severity:** HIGH
+**Category:** PHI Retention
+
+`generatedNote` state (SOAP content), `patientContext`, and `quickNotes` (raw clinical input) are not explicitly cleared on logout. React unmounting abandons state to garbage collection with no zeroing. In shared-workstation clinical environments, PHI could persist in JS heap.
+
+---
+
+### SP-31. No AbortController for In-Flight Requests on Logout
+
+**File:** `extension/src/sidepanel/components/NoteGenerator.tsx`, lines 86-119
+**Severity:** MEDIUM
+**Category:** Resource Leak / PHI
+
+If the user logs out during note generation, the API call continues with retry logic (up to 3 retries with exponential backoff). The response with PHI is received but has nowhere to go — sitting in heap until GC.
+
+---
+
+### SP-32. PHI Persists in System Clipboard Indefinitely
+
+**File:** `extension/src/sidepanel/components/ResultDisplay.tsx`, lines 32-52
+**Severity:** MEDIUM
+**Category:** PHI in Clipboard
+
+`copyToClipboard` writes SOAP content to the system clipboard with no expiration timer. In shared-workstation environments, clipboard managers may persist history. No clipboard clearing on logout.
+
+---
+
+### SP-33. No React Error Boundary in Extension
+
+**File:** `extension/src/sidepanel/App.tsx`, line 235
+**Severity:** MEDIUM
+**Category:** Error Boundary Gap
+
+No error boundary wraps the component tree. Any rendering error crashes the entire sidepanel UI to a white screen with no recovery path.
+
+---
+
+### SP-34. Service Worker State Loss on Restart
+
+**File:** `extension/src/background/service-worker.ts`, lines 29, 132-160
+**Severity:** MEDIUM
+**Category:** Service Worker Lifecycle
+
+`sidepanelOpenByWindow` Map is in-memory. Chrome MV3 service workers can be killed after 30 seconds of inactivity. State loss desyncs floating button visual state.
+
+---
+
+### SP-35. Content Script Monkey-Patches History API Without Cleanup
+
+**File:** `extension/src/content/floating-button.ts`, lines 182-192
+**Severity:** MEDIUM
+**Category:** EMR Compatibility
+
+`history.pushState` and `history.replaceState` are overridden globally. Never cleaned up. Could interfere with EMR SPA routing.
+
+---
+
+### SP-36. Login Form Retains Password in State After Login
+
+**File:** `extension/src/sidepanel/components/LoginForm.tsx`, lines 16-17
+**Severity:** MEDIUM
+**Category:** Credential Retention
+
+`password` and `confirmPassword` state not explicitly cleared before unmount. In shared-workstation clinical environments, credentials linger in heap until GC.
+
+---
+
+### SP-37. Missing Origin Validation on Runtime Messages
+
+**File:** `extension/src/background/service-worker.ts`, lines 109-125
+**Severity:** MEDIUM
+**Category:** Chrome Extension Security
+
+`SIDEPANEL_OPENED`/`SIDEPANEL_CLOSED` messages accept `windowId` from the message payload instead of from `sender.tab?.windowId`. A compromised content script could spoof these messages.
+
+---
+
+## 12. Second-Pass: Database & Infrastructure
+
+### SP-38. Migration Script Uses Pool-Level Transactions (Accidentally Safe)
+
+**File:** `backend/src/db/migrate.ts`, lines 77-86
+**Severity:** HIGH
+**Category:** Migration Safety
+
+`BEGIN`/`COMMIT`/`ROLLBACK` are called on the Pool object, not a dedicated client. Only safe because `max: 1` forces a single connection. If pool size ever changes, transactions silently break.
+
+---
+
+### SP-39. No Graceful Shutdown for HTTP Server
+
+**File:** `backend/src/index.ts`, lines 73-77
+**Severity:** HIGH
+**Category:** Reliability
+
+The `app.listen()` return value is never captured. No `server.close()` on shutdown. On SIGTERM, `db.end()` kills the pool underneath in-flight requests. No SIGINT handler. Sentry never flushed. In-flight SOAP note generations are abruptly terminated.
+
+---
+
+### SP-40. `updatePassword` and `incrementTokenVersion` Not Transactional
+
+**File:** `backend/src/db/queries/users.ts`, lines 130-141, 161-172
+**Severity:** MEDIUM
+**Category:** Security / Session Invalidation
+
+Separate functions executing as individual pool queries. Crash between them leaves password changed but all existing tokens valid.
+
+---
+
+### SP-41. DATABASE_URL Validated as Generic URL, Not PostgreSQL
+
+**File:** `backend/src/config.ts`, line 12
+**Severity:** MEDIUM
+**Category:** Configuration Validation
+
+`z.string().url()` accepts `http://`, `ftp://`, `file://` — doesn't enforce `postgres://` or `postgresql://` schema.
+
+---
+
+### SP-42. No Down-Migration Strategy
+
+**File:** `backend/src/db/migrate.ts`
+**Severity:** MEDIUM
+**Category:** Migration Safety
+
+No rollback mechanism. No `DOWN` SQL. Production migration failures require manual database intervention.
+
+---
+
+### SP-43. `incrementTokenVersion` Has No Empty-Result Guard
+
+**File:** `backend/src/db/queries/users.ts`, line 171
+**Severity:** MEDIUM
+**Category:** Defensive Programming
+
+`result.rows[0]!.token_version` — if user was deleted between auth check and this call, throws unhandled TypeError.
+
+---
+
+## 13. Second-Pass: Test Coverage Gaps
+
+### SP-44. Rate Limit Tests Provide ZERO Security Coverage
+
+**File:** `backend/src/middleware/rate-limit.test.ts`
+**Severity:** CRITICAL
+**Category:** False Confidence
+
+Tests only verify rate limiters are exported as functions with correct arity. No test for: correct window sizes, correct max values, production vs development limits, response format, or key function. `inviteCodeValidateRateLimit` and `orgJoinRateLimit` are not tested at all.
+
+---
+
+### SP-45. Production Mock-AI Guard Is Untested
+
+**File:** `backend/src/services/ai-service.ts`, lines 17-22
+**Severity:** CRITICAL
+**Category:** Patient Safety
+
+The guard `if (isProduction && config.USE_MOCK_AI) throw` prevents fake clinical notes in production. **Zero test coverage.** If this guard fails, PTs receive fabricated SOAP notes entered into patient records.
+
+---
+
+### SP-46. No Integration Test for Middleware Chain
+
+**Severity:** CRITICAL
+**Category:** Missing Integration Tests
+
+`requireAuth` → `requireCsrf` → `requireActiveSubscription` chain is tested in isolation only. No test verifies: correct ordering, request mutation propagation (`req.user`), or error handler interaction.
+
+---
+
+### SP-47. No Registration Test Without Invite Code
+
+**File:** `backend/src/services/auth-service.test.ts`
+**Severity:** CRITICAL
+**Category:** Missing Coverage
+
+No test for standard registration (without invite code). No test verifying bcrypt rounds match production config (tests mock 10, production requires 12). No test for `acceptedLegalTerms` enforcement at the service layer.
+
+---
+
+### SP-48. Stripe Webhook Signature Verification Is Mocked Away
+
+**File:** `backend/src/services/billing-service.test.ts`
+**Severity:** HIGH
+**Category:** False Confidence
+
+`stripe.webhooks.constructEvent` is mocked to return whatever the test wants. The actual Stripe signature verification logic is never executed. A Stripe SDK upgrade changing the API would not be caught.
+
+---
+
+### SP-49. Algorithm Confusion Attack Resistance Not Tested
+
+**File:** `backend/src/middleware/auth.test.ts`
+**Severity:** HIGH
+**Category:** Missing Security Test
+
+No test verifies that a JWT signed with `algorithm: 'none'` is rejected. The implementation correctly specifies `algorithms: ['HS256']`, but no test guards this.
+
+---
+
+### SP-50. Token Version in JWT Payload Not Tested
+
+**File:** `backend/src/services/auth-service.test.ts`
+**Severity:** HIGH
+**Category:** Missing Security Test
+
+No test verifies that generated access tokens contain `tokenVersion`. If accidentally removed, the password-reset-invalidates-sessions feature silently breaks.
+
+---
+
+### SP-51. Database Failure Paths Not Tested in Auth/Billing
+
+**Severity:** HIGH
+**Category:** Missing Failure Tests
+
+No test for: `getTokenVersion` DB failure in auth middleware, `updateUserSubscription` failure after Stripe checkout, `storeRefreshToken` INSERT failure. All are fail-open risks.
+
+---
+
+### SP-52. `sanitizeUser` Not Fully Tested
+
+**File:** `backend/src/services/auth-service.test.ts`
+**Severity:** MEDIUM
+**Category:** Missing Coverage
+
+No test verifying `stripeCustomerId`, `subscriptionId`, `failedLoginAttempts`, `lockedUntil`, `lastFailedLoginAt`, or `tokenVersion` are excluded from sanitized user output.
+
+---
+
+## 14. Second-Pass: Dependency Analysis
+
+### SP-53. `bcryptjs` Unmaintained Since 2017
+
+**Severity:** HIGH
+**Category:** Dependency Maintenance
+
+`bcryptjs@2.4.3` — last published 8+ years ago. No security patches if vulnerabilities are discovered. For a healthcare application's password hashing, this is a significant risk.
+
+**Recommendation:** Evaluate migration to `bcrypt` (native, maintained) or `argon2` (OWASP recommended).
+
+---
+
+### SP-54. Security-Critical Dependencies Not Pinned to Exact Versions
+
+**Severity:** HIGH
+**Category:** Supply Chain
+
+Every dependency uses caret (`^`) ranges including `bcryptjs`, `jsonwebtoken`, `helmet`, `express`, `stripe`, `pg`. Any `pnpm install` without `--frozen-lockfile` can silently upgrade these.
+
+---
+
+### SP-55. Zod Version Mismatch Across Packages
+
+**Severity:** HIGH
+**Category:** Version Mismatch
+
+Backend and extension use `^3.22.4`, web uses `^3.25.76`. Schema behavior differences between versions could cause inconsistent validation — especially dangerous for shared password policy schemas.
+
+---
+
+### SP-56. Express 5.x Ecosystem Maturity
+
+**Severity:** MEDIUM
+**Category:** Stability
+
+Express 5 only reached stable release in mid-2025. Middleware ecosystem compatibility is still being established. For healthcare software, Express 4.x has a much longer track record.
+
+---
+
+### SP-57. No `.npmrc` With Security Hardening
+
+**Severity:** MEDIUM
+**Category:** Configuration
+
+Missing: `save-exact=true`, `engine-strict=true`. No enforcement of exact version pinning or Node.js version requirements.
+
+---
+
+---
+
+## 15. Combined Remediation Priority Matrix
+
+### Tier 1: Immediate (Before Launch) — 15 items
+
+| # | Finding | Effort | Impact |
+|---|---------|--------|--------|
+| C-2 | Configure `trust proxy` in Express | Low | All IP-based security broken without it |
+| C-1 | Add security headers to web app (CSP, HSTS) | Low | XSS/clickjacking defense |
+| SP-39 | Add graceful shutdown (capture server, close properly) | Low | In-flight request reliability |
+| SP-3 | Wrap password reset operations in a transaction | Low | Non-atomic state change |
+| SP-22 | Add server-side duplicate subscription check | Low | Double-billing prevention |
+| H-1 | Remove email from audit log metadata | Low | PII compliance |
+| H-10 | Require Stripe price IDs in production config | Low | Price manipulation |
+| C-5 | Fix CI security audit `continue-on-error` | Low | Vulnerable deps merged silently |
+| SP-29 | Add token refresh mutex in extension API client | Medium | Silent logout on concurrent calls |
+| SP-1 | Wrap refresh token rotation in a transaction | Medium | Token replay attack |
+| SP-30 | Clear PHI state on logout (extension) | Low | PHI retention on shared workstations |
+| SP-15 | Escape XML delimiter tags in user content | Low | Prompt injection |
+| SP-23 | Check Stripe subscription state before re-activating | Low | Webhook reorder attack |
+| H-6 | Add CHECK constraint to users.subscription_status | Low | Invalid subscription states |
+| H-7 | Add NOT NULL to timestamp columns | Low | Audit trail integrity |
+
+### Tier 2: Short-Term (Next Sprint) — 18 items
+
+| # | Finding | Effort | Impact |
+|---|---------|--------|--------|
+| C-3 | Change ON DELETE CASCADE to RESTRICT on sessions/usage | Medium | HIPAA data retention |
+| C-4 | Sanitize webhook error bodies before Sentry | Low | PII leak to monitoring |
+| H-2 | Add server-side auth middleware for web app | Medium | No SSR protection |
+| H-4 | Validate API responses with Zod (extension + web) | Medium | Malformed data accepted |
+| SP-44 | Replace rate limit tests with behavioral tests | Medium | Zero security coverage |
+| SP-45 | Add test for production mock-AI guard | Low | Patient safety |
+| SP-46 | Add middleware chain integration tests | Medium | Untested security boundary |
+| SP-48 | Add real Stripe signature verification test | Medium | Webhook security |
+| SP-33 | Add React error boundary in extension | Low | White screen crash |
+| SP-32 | Clear clipboard on logout; consider auto-clear timer | Low | PHI in clipboard |
+| SP-25 | Add audit log in handleSubscriptionUpdate | Low | HIPAA compliance |
+| SP-27 | Add Sentry to usage tracking failures | Low | Silent billing failures |
+| M-5 | Add user-keyed rate limiting on generation | Medium | Rate limit bypass |
+| M-6 | Fix bcrypt rounds to 12 for refresh tokens | Low | Policy inconsistency |
+| M-10 | Refactor auth pages to use API client (CSRF) | Medium | CSRF gap |
+| SP-55 | Align Zod versions across all packages | Low | Schema inconsistency |
+| SP-54 | Pin security-critical deps to exact versions | Low | Supply chain risk |
+| SP-38 | Use dedicated client for migration transactions | Low | Migration safety |
+
+### Tier 3: Medium-Term (Next Quarter) — 12 items
+
+| # | Finding | Effort | Impact |
+|---|---------|--------|--------|
+| H-3 | Evaluate httpOnly cookies for refresh tokens | High | XSS = session takeover |
+| SP-53 | Evaluate replacing bcryptjs with bcrypt/argon2 | Medium | Unmaintained dependency |
+| SP-14 | Add input token budget pre-check | Medium | Cost control |
+| SP-13 | Add idempotency keys for LLM retry logic | Medium | Duplicate billable calls |
+| SP-18 | Add minimum length validation on SOAP output | Low | Empty clinical notes |
+| M-15 | Add advisory locks to migrations | Low | Concurrent deployment risk |
+| SP-42 | Implement down-migration strategy | Medium | Production rollback |
+| SP-35 | Replace history API monkey-patching | Medium | EMR compatibility |
+| M-14 | Restrict web_accessible_resources matches | Low | Extension fingerprinting |
+| SP-17 | Alert on zero-token usage responses | Low | Billing accuracy |
+| SP-21 | Validate GEMINI_MODEL against allowed pattern | Low | Config injection |
+| SP-36 | Clear credentials from state on login success | Low | Credential retention |
+
+---
+
+## 16. Final Assessment
+
+### Strengths
+This codebase demonstrates **strong security fundamentals**. The development team clearly understands HIPAA requirements and has built defense-in-depth into the architecture. SQL injection is non-existent. Authentication uses timing-safe patterns. PHI logging is carefully avoided. Audit logging is comprehensive. The Sentry configuration is HIPAA-aware. These are not trivial to get right and indicate security-conscious development.
+
+### Areas for Improvement
+The primary gaps fall into three categories:
+
+1. **Atomicity:** Many multi-step security operations (password reset, token rotation, session creation) execute as individual queries without database transactions. This creates windows where crashes or concurrent requests can leave the system in inconsistent security states.
+
+2. **Client-Side Trust:** Both the web app and extension trust data from sessionStorage/chrome.storage without runtime validation, display backend error messages verbatim, and lack server-side middleware for route protection.
+
+3. **Test Coverage False Confidence:** Several test suites mock away the exact security mechanisms they claim to test (Stripe signatures, rate limit values, production guards). The rate limit test suite provides zero actual security assurance.
+
+### Risk Rating
+**Overall: MEDIUM-HIGH for production deployment.** The codebase is far above average for security awareness, but the atomicity gaps and test coverage holes mean there are realistic attack vectors (particularly around billing manipulation and token replay) that should be addressed before handling real patient interactions.
