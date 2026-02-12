@@ -26,9 +26,9 @@ Audit based on a senior engineer's production-readiness checklist covering:
 | Severity | Count |
 |----------|-------|
 | CRITICAL | 2 |
-| HIGH | 5 |
-| MEDIUM | 7 |
-| LOW | 10 |
+| HIGH | 7 |
+| MEDIUM | 13 |
+| LOW | 15 |
 
 ---
 
@@ -118,6 +118,32 @@ becomes user-facing is a significant operational gap.
 **Recommendation:** Add a query wrapper that logs execution time and captures slow queries
 to Sentry. Add pool event listeners for utilization metrics.
 
+### H-6: Login Failure Audit Log Stores Raw Email (PII) [Second Pass]
+
+**File:** `backend/src/routes/auth.ts:183`
+
+**Problem:** The failed login audit log includes `metadata: { email }` — the raw user email
+address. This means the `audit_logs` table becomes a PII store, since every failed login attempt
+writes the email into the JSONB metadata column. Under HIPAA, this adds data retention and access
+control obligations to the audit_logs table beyond what's necessary. The email could also surface
+in Sentry if audit service errors reference metadata.
+
+**Recommended fix:** Remove the raw email from audit log metadata. Log only a boolean
+`emailProvided: true` or a one-way hash. The audit trail captures `ipAddress` and `userAgent`
+which are sufficient for investigating failed login patterns.
+
+### H-7: Token Creation Non-Atomic (Invalidate + Insert) [Second Pass]
+
+**File:** `backend/src/services/token-service.ts:72-85`
+
+**Problem:** `createToken()` first invalidates existing tokens (UPDATE to set `used_at`),
+then inserts a new token — in two separate queries with no transaction. If the process crashes
+between the UPDATE and the INSERT, the user's existing verification/reset token is invalidated
+but no replacement exists. The user cannot verify their email or complete a password reset until
+they request a new token.
+
+**Recommended fix:** Wrap the token invalidation and insertion in a database transaction.
+
 ---
 
 ## MEDIUM Findings
@@ -188,6 +214,81 @@ flood the DSN with junk errors to exhaust quotas. `.gitignore` doesn't cover the
 
 **Recommendation:** Add `.env.development` and `.env.production` to `.gitignore`.
 
+### M-8: No Expired Session Cleanup (Unbounded Table Growth) [Second Pass]
+
+**Files:** `backend/src/db/queries/sessions.ts`, `backend/src/services/auth-service.ts`
+
+**Problem:** The `sessions` table has no automated cleanup of expired sessions. Sessions have
+`expires_at` but nothing ever deletes rows where `expires_at < NOW()`. With 5 concurrent
+sessions per user and 7-day expiry, this table grows indefinitely. Under HIPAA, unbounded
+retention of session metadata (IP addresses, user agents) is a compliance concern — data
+should be purged when no longer needed for its original purpose.
+
+**Recommended fix:** Add a periodic cleanup job (pg_cron or application-level scheduler) to
+`DELETE FROM sessions WHERE expires_at < NOW()`. Run daily.
+
+### M-9: cleanupExpiredTokens() Never Called [Second Pass]
+
+**File:** `backend/src/services/token-service.ts:167-175`
+
+**Problem:** The `cleanupExpiredTokens()` method exists but is never invoked — no cron job,
+scheduler, startup routine, or endpoint calls it. The `email_tokens` table grows indefinitely
+with expired and used tokens.
+
+**Recommended fix:** Add a periodic invocation via pg_cron or a startup setInterval. Can share
+a cleanup schedule with M-8 (expired sessions).
+
+### M-10: Rate Limiters Use IP-Only Keying [Second Pass]
+
+**File:** `backend/src/middleware/rate-limit.ts`
+
+**Problem:** All rate limiters use the default `express-rate-limit` key generator (IP-based).
+In clinical environments (the target user base), many PTs share a single office IP behind NAT.
+One user hitting a rate limit locks out every user at that clinic. This is compounded by M-13
+(missing `trust proxy` — behind a load balancer, ALL users share a single perceived IP).
+
+**Recommended fix:** Use composite keying on auth endpoints (IP + email/username). For
+authenticated endpoints, key by user ID instead of (or in addition to) IP.
+
+### M-11: Webhook Handler Errors Not Caught Per-Event (Compounds C-1) [Second Pass]
+
+**File:** `backend/src/services/billing-service.ts:89-119`
+
+**Problem:** The individual event handlers (`handleCheckoutComplete`, `handleSubscriptionUpdate`,
+etc.) are called directly without per-handler try/catch. If any handler throws (e.g., DB error
+in `updateUserSubscription`), the entire `handleWebhook` method throws a 500 to Stripe. Combined
+with C-1 (idempotency already marked before processing), this means the event is marked processed
+AND returns an error — Stripe retries are blocked AND the event was never processed.
+
+**Recommended fix:** Wrap each event handler case in try/catch. On failure, capture to Sentry
+with event type context. This should be addressed alongside C-1.
+
+### M-12: Error Handler console.error May Log PHI [Second Pass]
+
+**File:** `backend/src/middleware/error-handler.ts:24-28`
+
+**Problem:** The global error handler logs `err.message` to stdout via `console.error`. For
+unexpected errors, the message may contain user-supplied input (e.g., failed JSON parse of a
+request body containing patient names). These logs flow to whatever log aggregation service is
+configured in production.
+
+**Recommended fix:** In production, log only error name/code and a sanitized identifier, not
+the raw message. The full error is already captured to Sentry with PHI sanitization.
+
+### M-13: No `trust proxy` Express Configuration [Second Pass]
+
+**File:** `backend/src/index.ts`
+
+**Problem:** Express does not have `app.set('trust proxy', ...)` configured. Behind a reverse
+proxy or load balancer (standard in production), `req.ip` returns the proxy's IP, not the
+client's. This has two compounding effects:
+
+1. **Rate limiting is effectively disabled** — all users share a single IP bucket
+2. **Audit logs record the wrong IP** — HIPAA audit trail integrity is compromised
+
+**Recommended fix:** Configure `trust proxy` based on deployment architecture (e.g.,
+`app.set('trust proxy', 1)` for a single proxy layer).
+
 ---
 
 ## LOW Findings
@@ -204,6 +305,11 @@ flood the DSN with junk errors to exhaust quotas. `.gitignore` doesn't cover the
 | L-8 | Backend source maps generated in production | `backend/tsconfig.json:16` | Low risk if not served |
 | L-9 | CI security audit uses `continue-on-error: true` | `.github/workflows/ci.yml:214` | Vulnerabilities don't block CI |
 | L-10 | Email case sensitivity (PostgreSQL WHERE email = $1) | `db/queries/users.ts:40` | Functional concern, not security |
+| L-11 | Health endpoint doesn't check DB connectivity | `routes/health.ts` | Load balancer routes to broken instances [Second Pass] |
+| L-12 | `getRequestMetadata` doesn't call `sanitizeIpAddress` | `utils/request-utils.ts:19-27` | Invalid IPs could break audit log INSERT [Second Pass] |
+| L-13 | Graceful shutdown only handles SIGTERM, not SIGINT | `db/index.ts:30-35` | Undrained connections on Ctrl+C / some orchestrators [Second Pass] |
+| L-14 | Web app stores refresh token in sessionStorage | `web/src/lib/storage.ts` | XSS-accessible (known architecture trade-off) [Second Pass] |
+| L-15 | `storeRefreshToken` non-atomic insert-then-update | `auth-service.ts:366-400` | Zombie session rows on crash between queries [Second Pass] |
 
 ---
 
@@ -254,3 +360,9 @@ flood the DSN with junk errors to exhaust quotas. `.gitignore` doesn't cover the
 6. **Partition audit_logs table** -- Time-based partitioning for unbounded growth
 7. **Add `past_due` grace period** -- Don't instantly lock out users on first payment failure
 8. **Normalize email to lowercase** -- Prevent case-variant duplicate accounts
+9. **Configure `trust proxy`** (M-13) -- Critical for rate limiting and audit IP accuracy
+10. **Add expired data cleanup jobs** (M-8, M-9) -- Sessions and email_tokens tables
+11. **Remove PII from audit log metadata** (H-6) -- Email addresses in failed login logs
+12. **Add composite rate limit keying** (M-10) -- IP + identifier for shared-IP clinics
+13. **Add DB health check to `/health`** (L-11) -- `SELECT 1` with fast timeout
+14. **Sanitize error handler logs** (M-12) -- Don't log raw error messages in production
