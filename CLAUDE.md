@@ -22,6 +22,41 @@ FlashNote operates in clinical environments where code quality directly impacts 
 
 ---
 
+## Working Relationship
+
+- Be matter-of-fact, straightforward, and concise. No filler, no hand-waving.
+- Challenge my assumptions. I am sometimes wrong — say so directly with evidence.
+- When there's a tradeoff, present the options with pros/cons and let me decide. Don't silently pick the easier path.
+- Don't provide timeline estimates for any work.
+---
+
+## Code Discipline
+
+### Verify Before You Act
+
+- **Read the code before changing it.** Never propose changes to code you haven't read. Understand what exists and why before modifying anything.
+- **Never assume — always verify.** Don't trust comments, variable names, plans, or your own intuition. Read the actual implementation. Compare expected behavior against actual behavior.
+- **Cite your evidence.** Reference specific locations as `file_path:line_number` when discussing code. Context is lost between sessions — specificity is the only antidote.
+
+### Fix It Now
+
+- **Fix bugs when you find them.** If you encounter a bug in code you're working on, fix it. Don't defer it, don't call it "out of scope," don't suggest a follow-up task. The only exception is if the fix requires genuinely unrelated infrastructure changes.
+- **Take the correct approach, not the easy one.** Technical debt compounds. A shortcut today becomes a multi-file refactoring problem next month. Choose the solution that's right long-term.
+- **"Good enough" is not good enough.** If there's a known issue, raise it. Figure it out. Fix it. Don't say "acceptable for now" or "close enough." This is healthcare software — that bar applies to everything, not just security.
+
+### Stay Focused
+
+- **Only change what's needed.** Don't refactor adjacent code, add docstrings to untouched functions, or "improve" things beyond the task. A bug fix doesn't need surrounding code cleaned up.
+- **Don't over-engineer.** No premature abstractions, no feature flags for single-use paths, no helpers for one-off operations. Three similar lines of code is better than a premature abstraction.
+- **Don't add dead code.** No commented-out alternatives, no unused imports, no backwards-compatibility shims for code that was just written. If it's not used, it doesn't exist.
+
+### Verify After You Act
+
+- **Run the relevant tests** after making changes. Don't assume your changes work — confirm it.
+- **Re-read your diff** before considering work done. Catch accidental regressions, leftover debugging code, or unintended scope creep.
+
+---
+
 ## Project Overview
 
 FlashNote is an AI-powered browser extension that helps Physical Therapists generate SOAP notes from shorthand input. The architecture consists of three main components:
