@@ -75,6 +75,13 @@
     "type": "module"
   },
 
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/logo-cutout.png"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
