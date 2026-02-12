@@ -186,6 +186,166 @@ Password requirements are enforced by Zod schemas in the backend:
 - **Code Review Mindset**: Write code as if it will be audited by a security firm and reviewed by regulators
 - **Fail Secure**: When something goes wrong, fail closed. Deny access by default. Never expose data in error states
 
+## Mandatory Engineering Rules
+
+The following rules address specific patterns that have caused issues in this codebase. They are not guidelines — they are requirements. Violating them introduces security vulnerabilities or data integrity risks.
+
+### Rule 1: Multi-Step Security Operations MUST Use Database Transactions
+
+Any operation that performs multiple database writes that must succeed or fail together MUST use a dedicated `PoolClient` with `BEGIN`/`COMMIT`/`ROLLBACK`. Never rely on sequential `db.query()` calls on the pool — they may go to different connections and provide zero transactional guarantees.
+
+**This applies to:**
+- Password reset (update password + invalidate tokens + delete sessions + reset lockout)
+- Token rotation (revoke old token + create new token)
+- Session creation (insert session + update token hash)
+- Any multi-table write operation
+
+```typescript
+// CORRECT: Dedicated client with transaction
+const client = await db.connect();
+try {
+  await client.query('BEGIN');
+  await client.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+  await client.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
+  await client.query('DELETE FROM sessions WHERE user_id = $1', [userId]);
+  await client.query('COMMIT');
+} catch (err) {
+  await client.query('ROLLBACK');
+  throw err;
+} finally {
+  client.release();
+}
+
+// WRONG: Sequential pool queries (no transaction isolation)
+await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, userId]);
+await db.query('UPDATE users SET token_version = token_version + 1 WHERE id = $1', [userId]);
+// If the process crashes here, password is changed but tokens are still valid
+```
+
+### Rule 2: Never Display Backend Error Messages to Users
+
+All user-facing error messages MUST be curated client-side strings mapped from error codes. Never pass `err.message` or `error.message` from API responses directly into UI state. Backend error messages are for developers, not clinicians.
+
+```typescript
+// CORRECT: Map error codes to curated messages
+switch (err.code) {
+  case 'invalid_credentials': setError('Invalid email or password.'); break;
+  case 'trial_expired': setError('Your free trial has ended.'); break;
+  default: setError('Something went wrong. Please try again.');
+}
+
+// WRONG: Display backend message directly
+setError(err.message || 'Failed to sign in');
+```
+
+**This applies to:** Every `catch` block in the extension and web app that displays errors to users.
+
+### Rule 3: Always Validate Data from External Sources at Runtime
+
+Use Zod `.parse()` or `.safeParse()` to validate:
+- **API responses** before using them (both in extension and web app)
+- **Data read from storage** (sessionStorage, chrome.storage.local) before trusting it
+- **Webhook payloads** after signature verification
+- **URL query parameters** (reset tokens, verification tokens)
+
+Never use `as SomeType` to cast external data. TypeScript type assertions provide zero runtime safety.
+
+```typescript
+// CORRECT: Runtime validation
+const result = apiResponseSchema.safeParse(await response.json());
+if (!result.success) {
+  throw new Error('Invalid API response');
+}
+return result.data;
+
+// WRONG: Trust-casting external data
+const result = (await response.json()) as ApiResponse<User>;
+```
+
+### Rule 4: Clear PHI from Client State on Logout
+
+When a user logs out (extension or web), ALL of the following must be explicitly cleared:
+- Auth tokens (access, refresh, CSRF)
+- Generated note content (SOAP notes)
+- User input fields (quickNotes, patientContext)
+- System clipboard (if SOAP content was copied)
+- Any in-flight API requests must be aborted
+
+Do not rely on garbage collection. Set state variables to empty/null explicitly before unmounting.
+
+### Rule 5: Use the Centralized API Client for ALL Backend Calls
+
+Both the extension (`extension/src/shared/api.ts`) and web app (`web/src/lib/api.ts`) have centralized API clients that handle auth headers, CSRF tokens, token refresh, and error handling. **All pages and components must use these clients.** Never use raw `fetch()` to call the backend — it bypasses CSRF protection, retry logic, and consistent error handling.
+
+### Rule 6: Tests Must Exercise Real Security Mechanisms
+
+Tests for security features must validate actual security behavior, not just verify that functions exist or return values. Specifically:
+
+- **Rate limit tests** must verify that requests are actually blocked after the limit
+- **Webhook tests** must verify signature validation rejects invalid signatures (don't mock `constructEvent` to always succeed)
+- **Auth tests** must verify that `algorithm: 'none'` JWTs are rejected
+- **Middleware tests** must include integration tests of the full chain (auth → CSRF → subscription)
+- **Never mock the exact mechanism you're testing** — if the test is "does CSRF work?", the CSRF logic must run, not be mocked
+
+```typescript
+// CORRECT: Test actual rate limiting behavior
+it('blocks requests after limit exceeded', async () => {
+  for (let i = 0; i < 5; i++) {
+    await request(app).post('/auth/login').send(creds).expect(200);
+  }
+  await request(app).post('/auth/login').send(creds).expect(429);
+});
+
+// WRONG: Test that rate limiter exists
+it('exports a rate limiter', () => {
+  expect(typeof loginRateLimit).toBe('function');
+});
+```
+
+### Rule 7: Error Messages MUST Be Generic in All Environments
+
+Never return raw `err.message` in API error responses, even in development or staging. Error details belong in server-side logs, not in HTTP responses. Staging environments may contain realistic test data that includes PHI.
+
+```typescript
+// CORRECT: Always generic
+res.status(500).json({
+  success: false,
+  error: { code: 'internal_error', message: 'An unexpected error occurred' }
+});
+
+// WRONG: Leaking details in non-production
+message: config.NODE_ENV === 'production' ? 'An unexpected error occurred' : err.message
+```
+
+### Rule 8: Server-Side Authorization Is Mandatory (Never Client-Only)
+
+Every protected resource must be enforced on the server. Client-side auth checks (ProtectedRoute, useAuth) are UX conveniences, not security controls. Specifically:
+
+- Backend: Every endpoint except `/auth/*` and `/health` must use `requireAuth` middleware
+- Backend: State-changing endpoints must use `requireCsrf` middleware
+- Backend: Billing/subscription features must check subscription status server-side
+- Web: Protected Next.js routes should have server-side middleware validation (not just client-side `useAuth()`)
+
+### Rule 9: Audit Logs Must Be in the Same Transaction as the Action
+
+When an operation requires a HIPAA audit log entry, the audit write should be part of the same database transaction as the action it documents. If that's not possible (e.g., fire-and-forget for performance), the failure must be captured to Sentry with `Sentry.captureException()`.
+
+### Rule 10: Database Query Results Must Be Defensively Checked
+
+Never use TypeScript non-null assertion (`!`) on `result.rows[0]` from database queries without first checking that rows exist. This applies to all queries, including `INSERT ... RETURNING` and `UPDATE ... RETURNING`.
+
+```typescript
+// CORRECT: Check before access
+const result = await client.query('UPDATE users SET ... WHERE id = $1 RETURNING *', [id]);
+if (result.rows.length === 0) {
+  throw new AppError(404, 'user_not_found', 'User not found');
+}
+return result.rows[0];
+
+// WRONG: Blind non-null assertion
+return result.rows[0]!;
+```
+
 ## Error Monitoring (Sentry)
 
 **Visibility into production errors is critical.** If an error is caught and handled gracefully, it becomes invisible unless explicitly captured to Sentry. Silent failures in healthcare software are unacceptable.
