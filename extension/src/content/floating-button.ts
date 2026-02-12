@@ -67,19 +67,16 @@ function createFloatingButton(): void {
   button.setAttribute('aria-label', 'Toggle FlashNote sidebar');
   button.setAttribute('title', 'FlashNote');
 
-  // Create SVG lightning bolt icon (matches FlashNote logo style - sharp angles)
-  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('class', 'flashnote-bolt-svg');
+  // Logo image (uses PNG from extension assets)
+  const LOGO_FILE = 'icons/logo-cutout.png';
 
-  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-  // Sharp angular bolt with connected middle point
-  path.setAttribute('d', 'M13 2L5 11L11 12L8 22L17 13L11 12Z');
-  path.setAttribute('fill', 'white');
+  const img = document.createElement('img');
+  img.src = chrome.runtime.getURL(LOGO_FILE);
+  img.alt = 'FlashNote';
+  img.className = 'flashnote-bolt-img';
+  img.draggable = false;
 
-  svg.appendChild(path);
-  button.appendChild(svg);
+  button.appendChild(img);
 
   // Create tooltip
   const tooltip = document.createElement('div');
