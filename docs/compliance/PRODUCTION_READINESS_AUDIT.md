@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-12
 **Scope:** Full codebase audit against production engineering checklist
-**Status:** Findings documented, critical/high fixes applied
+**Status:** Findings documented, no fixes applied yet
 
 ---
 
@@ -23,47 +23,47 @@ Audit based on a senior engineer's production-readiness checklist covering:
 
 ## Findings Summary
 
-| Severity | Count | Fixed | Remaining |
-|----------|-------|-------|-----------|
-| CRITICAL | 2 | 2 | 0 |
-| HIGH | 5 | 3 | 2 |
-| MEDIUM | 7 | 3 | 4 |
-| LOW | 10 | 0 | 10 |
+| Severity | Count |
+|----------|-------|
+| CRITICAL | 2 |
+| HIGH | 5 |
+| MEDIUM | 7 |
+| LOW | 10 |
 
 ---
 
 ## CRITICAL Findings
 
-### C-1: Webhook Idempotency Race Condition [FIXED]
+### C-1: Webhook Idempotency Race Condition
 
 **File:** `backend/src/services/billing-service.ts:80-87`
 
-**Problem:** The idempotency check (`tryMarkWebhookProcessed`) ran _before_ the actual
-processing. If the event was marked as processed and then the handler threw (e.g., database
-error during `updateUserSubscription`), the event was permanently marked as processed. Stripe
-retries would be silently skipped. **A user could pay and never get access.**
+**Problem:** The idempotency check (`tryMarkWebhookProcessed`) runs _before_ the actual
+processing. If the event is marked as processed and then the handler throws (e.g., database
+error during `updateUserSubscription`), the event is permanently marked as processed. Stripe
+retries are silently skipped. **A user can pay and never get access.**
 
-**Fix:** Moved idempotency check inside a try/catch. On processing failure, the idempotency
-record is deleted so Stripe retries can succeed. Also added Sentry capture for the rollback.
+**Recommended fix:** Wrap event processing in a try/catch. On processing failure, delete the
+idempotency record so Stripe retries can succeed. Add Sentry capture for the rollback failure case.
 
-### C-2: Token Refresh Double-Use Vulnerability [FIXED]
+### C-2: Token Refresh Double-Use Vulnerability
 
 **File:** `backend/src/services/auth-service.ts:279-313`
 
-**Problem:** The `refreshTokens()` method had a validate-then-revoke pattern that was not
-atomic. Two concurrent refresh requests using the same token could both pass validation before
-either revoked the session, resulting in token multiplication. An attacker with a stolen refresh
-token could create multiple valid sessions that couldn't be revoked individually.
+**Problem:** The `refreshTokens()` method has a validate-then-revoke pattern that is not
+atomic. Two concurrent refresh requests using the same token can both pass validation before
+either revokes the session, resulting in token multiplication. An attacker with a stolen refresh
+token can create multiple valid sessions that can't be revoked individually.
 
-**Fix:** Changed to an atomic `DELETE ... RETURNING` pattern that validates and revokes the
-session in a single SQL statement. The first request succeeds; the second finds no matching row
-and fails. This eliminates the TOCTOU race condition entirely.
+**Recommended fix:** Change to an atomic `DELETE ... RETURNING` pattern that validates and
+revokes the session in a single SQL statement. The first request succeeds; the second finds
+no matching row and fails. This eliminates the TOCTOU race condition entirely.
 
 ---
 
 ## HIGH Findings
 
-### H-1: No Process-Level Error Handlers [FIXED]
+### H-1: No Process-Level Error Handlers
 
 **File:** `backend/src/index.ts`
 
@@ -72,29 +72,29 @@ Any error outside Express middleware (e.g., during database pool initialization,
 would crash the process silently without Sentry visibility. While Sentry's SDK registers its own
 handlers, without `SENTRY_DSN` configured these events are completely unhandled.
 
-**Fix:** Added explicit handlers that capture to Sentry and ensure graceful shutdown
+**Recommended fix:** Add explicit handlers that capture to Sentry and ensure graceful shutdown
 (flush Sentry, close DB pool) before exiting.
 
-### H-2: Email Service Logs PII Without Production Guard [FIXED]
+### H-2: Email Service Logs PII Without Production Guard
 
 **File:** `backend/src/services/email-service.ts:182-191`
 
 **Problem:** When `RESEND_API_KEY` is not configured, the email service logs the full recipient
-email address, subject, and body to stdout. The guard was `if (!this.resend)` with no
+email address, subject, and body to stdout. The guard is `if (!this.resend)` with no
 production environment check. If the API key were accidentally unset in production, PII would
 be logged to stdout.
 
-**Fix:** Added a production environment check. In production without Resend configured, throws
-an error instead of silently logging PII.
+**Recommended fix:** Add a production environment check. In production without Resend configured,
+throw an error instead of silently logging PII.
 
-### H-3: Web App Missing Security Headers [FIXED]
+### H-3: Web App Missing Security Headers
 
 **File:** `web/next.config.ts`
 
 **Problem:** No security headers configured. Missing Content-Security-Policy, HSTS,
 X-Frame-Options, X-Content-Type-Options, Referrer-Policy, and Permissions-Policy.
 
-**Fix:** Added comprehensive security headers via Next.js `headers()` configuration.
+**Recommended fix:** Add comprehensive security headers via Next.js `headers()` configuration.
 
 ### H-4: Redundant User Queries in Middleware Chain [NOT FIXED - Architectural]
 
@@ -122,34 +122,34 @@ to Sentry. Add pool event listeners for utilization metrics.
 
 ## MEDIUM Findings
 
-### M-1: Email Verification Middleware Bypasses Error Handler [FIXED]
+### M-1: Email Verification Middleware Bypasses Error Handler
 
 **File:** `backend/src/middleware/email-verification.ts:76-83`
 
-**Problem:** The catch block returned a 500 directly instead of calling `next(error)`,
+**Problem:** The catch block returns a 500 directly instead of calling `next(error)`,
 bypassing Sentry capture and the global error handler.
 
-**Fix:** Changed to use `next(error)` for consistent error handling and Sentry visibility.
+**Recommended fix:** Change to use `next(error)` for consistent error handling and Sentry visibility.
 
-### M-2: Usage Service Missing Sentry [FIXED]
+### M-2: Usage Service Missing Sentry
 
 **File:** `backend/src/services/usage-service.ts:21-24`
 
-**Problem:** Usage tracking failures were only logged to console, not captured to Sentry.
+**Problem:** Usage tracking failures are only logged to console, not captured to Sentry.
 Persistent usage tracking failures would be invisible to monitoring -- a billing integrity risk.
 
-**Fix:** Added `Sentry.captureException()` alongside the existing console.error.
+**Recommended fix:** Add `Sentry.captureException()` alongside the existing console.error.
 
-### M-3: Password Reset Not Atomic [FIXED]
+### M-3: Password Reset Not Atomic
 
 **File:** `backend/src/routes/auth.ts:428-440`
 
 **Problem:** Five sequential operations (update password, increment token version, delete
-sessions, reset lockout, audit log) were not wrapped in a transaction. A crash between
+sessions, reset lockout, audit log) are not wrapped in a transaction. A crash between
 `updatePassword` and `incrementTokenVersion` would leave old tokens valid with the wrong
 password hash.
 
-**Fix:** Wrapped the four security-critical operations in a database transaction.
+**Recommended fix:** Wrap the four security-critical operations in a database transaction.
 
 ### M-4: Duplicate Email Registration Returns 500 Instead of 409 [NOT FIXED]
 
@@ -236,7 +236,7 @@ flood the DSN with junk errors to exhaust quotas. `.gitignore` doesn't cover the
 - Legal acceptance recorded as immutable database records
 - Error responses sanitized (no stack traces or PHI in production)
 
-### Stripe Integration: STRONG (after C-1 fix)
+### Stripe Integration: STRONG (once C-1 is fixed)
 - Webhook signature verification robust
 - Secret key properly isolated to backend
 - Checkout sessions created server-side
