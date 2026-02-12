@@ -356,7 +356,7 @@ function DashboardContent() {
             <ol className="list-decimal list-inside space-y-3 text-fn-text-secondary">
               <li>
                 Install the FlashNote Chrome extension from the{' '}
-                <a href="#" className="link">
+                <a href="https://chromewebstore.google.com" className="link" target="_blank" rel="noopener noreferrer">
                   Chrome Web Store
                 </a>
               </li>

@@ -26,7 +26,7 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <html>
+    <html lang="en">
       <body>
         <div style={{
           display: 'flex',
