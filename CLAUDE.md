@@ -28,8 +28,6 @@ FlashNote operates in clinical environments where code quality directly impacts 
 - Challenge my assumptions. I am sometimes wrong — say so directly with evidence.
 - When there's a tradeoff, present the options with pros/cons and let me decide. Don't silently pick the easier path.
 - Don't provide timeline estimates for any work.
-- Don't add yourself as a co-author on git commits.
-
 ---
 
 ## Code Discipline
