@@ -17,9 +17,9 @@ vi.mock('../config.js', () => ({
   config: mockConfig,
   BCRYPT_ROUNDS: 10,
   LEGAL_DOCUMENT_VERSIONS: {
-    baa: '1.0',
-    terms_of_service: '1.0',
-    privacy_policy: '1.0',
+    baa: '0.1',
+    terms_of_service: '0.1',
+    privacy_policy: '0.1',
   },
 }));
 
@@ -777,7 +777,7 @@ describe('AuthService', () => {
       // createUserWithClient
       mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
       // recordLegalAcceptances (3 document types)
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
       mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
@@ -923,7 +923,7 @@ describe('AuthService', () => {
       // createUserWithClient
       mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
       // recordLegalAcceptances (3 document types)
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
       mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
@@ -964,9 +964,9 @@ describe('AuthService', () => {
           status: 'SUCCESS',
           metadata: expect.objectContaining({
             documentVersions: {
-              baa: '1.0',
-              terms_of_service: '1.0',
-              privacy_policy: '1.0',
+              baa: '0.1',
+              terms_of_service: '0.1',
+              privacy_policy: '0.1',
             },
           }),
         })
@@ -1077,7 +1077,7 @@ describe('AuthService', () => {
       // createUserWithClient
       mockClientQuery.mockResolvedValueOnce({ rows: [newUser] });
       // recordLegalAcceptances (3 document types)
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
       mockClientQuery.mockResolvedValueOnce({ rows: [mockAcceptanceRow] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'terms_of_service' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ ...mockAcceptanceRow, document_type: 'privacy_policy' }] });
@@ -1139,7 +1139,7 @@ describe('AuthService', () => {
         created_at: new Date(),
       };
       const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
 
       // BEGIN
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
@@ -1180,7 +1180,7 @@ describe('AuthService', () => {
         is_active: true, created_at: new Date(),
       };
       const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
 
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
       mockClientQuery.mockResolvedValueOnce({ rows: [clinicInviteCode] }); // findByCodeForUpdate
@@ -1214,7 +1214,7 @@ describe('AuthService', () => {
         is_active: true, created_at: new Date(),
       };
       const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
 
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
       mockClientQuery.mockResolvedValueOnce({ rows: [brokenClinicCode] }); // findByCodeForUpdate
@@ -1248,7 +1248,7 @@ describe('AuthService', () => {
         is_active: true, created_at: new Date(),
       };
       const newUser = createMockUserRow({ id: 'new-user-id', email: 'new@example.com', token_version: 1 });
-      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '1.0', ip_address: null, user_agent: null, accepted_at: new Date() };
+      const mockAcceptanceRow = { id: 'acc-1', user_id: 'new-user-id', document_type: 'baa', document_version: '0.1', ip_address: null, user_agent: null, accepted_at: new Date() };
 
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // BEGIN
       mockClientQuery.mockResolvedValueOnce({ rows: [betaCode] }); // findByCodeForUpdate

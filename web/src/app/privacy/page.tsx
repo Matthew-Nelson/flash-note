@@ -42,111 +42,18 @@ export default function PrivacyPolicyPage() {
       <main className="container mx-auto px-6 py-12">
         <article className="max-w-3xl mx-auto">
           <h1 className="text-4xl font-bold text-fn-text-primary mb-2">Privacy Policy</h1>
-          <p className="text-fn-text-muted mb-8">Last Updated: February 2026</p>
+          <p className="text-fn-text-muted mb-8">Version 0.1 &mdash; Draft</p>
 
-          <div className="prose prose-slate max-w-none">
-            <p className="text-fn-text-secondary text-lg mb-8">
-              <strong>FlashNote</strong> (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;) is committed to protecting your privacy.
-              This Privacy Policy explains how we collect, use, disclose, and safeguard your information
-              when you use our browser extension and related services.
+          <div className="bg-fn-bg-secondary border border-fn-border-color rounded-fn-md p-6">
+            <p className="text-fn-text-primary font-semibold mb-2">PENDING LEGAL REVIEW</p>
+            <p className="text-fn-text-secondary mb-4">
+              Our Privacy Policy is currently being finalized by legal counsel. The final
+              document will be published here before FlashNote is generally available.
             </p>
-
-            <Section title="Information We Collect">
-              <h4 className="text-lg font-semibold text-fn-text-primary mt-4 mb-2">Account Information</h4>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1 mb-4">
-                <li>Email address (for authentication)</li>
-                <li>Password (stored as a secure hash)</li>
-              </ul>
-
-              <h4 className="text-lg font-semibold text-fn-text-primary mt-4 mb-2">Usage Information</h4>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1 mb-4">
-                <li>Number of notes generated</li>
-                <li>Feature usage statistics</li>
-                <li>Error logs (without PHI)</li>
-              </ul>
-
-              <h4 className="text-lg font-semibold text-fn-text-primary mt-4 mb-2">What We Do NOT Collect or Store</h4>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>Patient names</li>
-                <li>Patient notes content</li>
-                <li>Protected Health Information (PHI)</li>
-                <li>Generated SOAP notes (pass-through only)</li>
-              </ul>
-            </Section>
-
-            <Section title="How We Use Your Information">
-              <p className="text-fn-text-secondary mb-4">We use the information we collect to:</p>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>Provide and maintain our service</li>
-                <li>Process your subscription and payments</li>
-                <li>Send important service notifications</li>
-                <li>Improve our product and user experience</li>
-                <li>Comply with legal obligations</li>
-              </ul>
-            </Section>
-
-            <Section title="HIPAA Compliance">
-              <p className="text-fn-text-secondary mb-4">FlashNote is designed with HIPAA compliance in mind:</p>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>Patient data is processed but never stored</li>
-                <li>All data transmission is encrypted (TLS 1.2+)</li>
-                <li>Audit logs track all access (without PHI)</li>
-                <li>We offer Business Associate Agreements (BAA) for covered entities</li>
-              </ul>
-            </Section>
-
-            <Section title="Data Security">
-              <p className="text-fn-text-secondary mb-4">
-                We implement appropriate technical and organizational measures to protect your personal information, including:
-              </p>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>Encryption in transit and at rest</li>
-                <li>Regular security assessments</li>
-                <li>Access controls and authentication</li>
-                <li>Audit logging</li>
-              </ul>
-            </Section>
-
-            <Section title="Data Retention">
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li><strong>Account data:</strong> Retained while your account is active</li>
-                <li><strong>Usage logs:</strong> Retained for 6 years (HIPAA requirement)</li>
-                <li><strong>Audit logs:</strong> Retained for 6 years (HIPAA requirement)</li>
-              </ul>
-            </Section>
-
-            <Section title="Your Rights">
-              <p className="text-fn-text-secondary mb-4">You have the right to:</p>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li>Access your personal data</li>
-                <li>Correct inaccurate data</li>
-                <li>Request deletion of your account</li>
-                <li>Export your data</li>
-                <li>Opt out of marketing communications</li>
-              </ul>
-            </Section>
-
-            <Section title="Third-Party Services">
-              <p className="text-fn-text-secondary mb-4">We use the following third-party services:</p>
-              <ul className="list-disc list-inside text-fn-text-secondary space-y-1">
-                <li><strong>Google Gemini/Vertex AI:</strong> For AI processing (with BAA)</li>
-                <li><strong>Stripe:</strong> For payment processing</li>
-              </ul>
-            </Section>
-
-            <Section title="Changes to This Policy">
-              <p className="text-fn-text-secondary">
-                We may update this Privacy Policy from time to time. We will notify you of any changes
-                by posting the new policy on this page and updating the &quot;Last Updated&quot; date.
-              </p>
-            </Section>
-
-            <Section title="Contact Us">
-              <p className="text-fn-text-secondary">
-                If you have questions about this Privacy Policy, please contact us at:{' '}
-                <a href="mailto:privacy@flashnote.co" className="link">privacy@flashnote.co</a>
-              </p>
-            </Section>
+            <p className="text-fn-text-secondary">
+              For questions, contact us at{' '}
+              <a href="mailto:privacy@flashnote.co" className="link">privacy@flashnote.co</a>.
+            </p>
           </div>
         </article>
       </main>
@@ -154,15 +61,6 @@ export default function PrivacyPolicyPage() {
       {/* Footer */}
       <Footer />
     </div>
-  );
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mb-8">
-      <h3 className="text-xl font-semibold text-fn-text-primary mb-4">{title}</h3>
-      {children}
-    </section>
   );
 }
 
@@ -208,6 +106,11 @@ function Footer() {
               <li>
                 <Link href="/terms" className="hover:text-white transition-colors">
                   Terms of Service
+                </Link>
+              </li>
+              <li>
+                <Link href="/baa" className="hover:text-white transition-colors">
+                  BAA
                 </Link>
               </li>
             </ul>

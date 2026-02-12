@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
 **Last Updated:** February 10, 2026
-**Overall Progress:** 37% (41/112 items complete)
+**Overall Progress:** 36% (41/114 items complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -113,6 +113,7 @@ These items are **required for production** with real patient data. They should 
 | Breach notification / incident response procedure | HITECH Act requirement | Not documented |
 | BAA acceptance in signup flow (backend) | PRE_LAUNCH_LEGAL_COMPLIANCE | ✅ Done (legal_acceptances table + recordLegalAcceptances in auth-service) |
 | **Create `/baa` web page** (so users can read the BAA) | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
+| **Legal document re-acceptance flow** (compare user's accepted version vs current `LEGAL_DOCUMENT_VERSIONS`, prompt re-consent if stale) | LEGAL_VERSIONING | Not started — P1 prod blocker |
 
 **Note:** Without these items complete, we cannot legally handle real PHI in production. Under the HITECH Act, FlashNote is directly liable for compliance failures — independent of covered entities.
 
@@ -217,6 +218,7 @@ See [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) for integration, E2E
 | Vertex AI BAA signed | SUCCESS_METRICS PROD-09 | Not done |
 | Error tracking (Sentry) | SUCCESS_METRICS PROD-11 | ✅ Done (all components + logging gaps fixed) |
 | Audit logging workflow complete | SUCCESS_METRICS PROD-16 | Not done |
+| Legal document re-acceptance flow (prompt existing users when doc versions bump) | LEGAL_VERSIONING | Not started — P1 prod blocker |
 
 ### Testing (Beyond Unit Tests) - Production Blockers
 
@@ -330,9 +332,9 @@ These are researched but not prioritized for current development.
 | MVP Foundation | 15 | 15 | 100% |
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
 | Beta Ready (Wave 1 + existing) | 26 | 20 | 77% |
-| Production Ready (Waves 2-4 + existing) | 29 | 5 | 17% |
-| HIPAA/HITECH Critical Path | 9 | 1 | 11% |
-| **Total** | **112** | **41** | **37%** |
+| Production Ready (Waves 2-4 + existing) | 30 | 5 | 17% |
+| HIPAA/HITECH Critical Path | 10 | 1 | 10% |
+| **Total** | **114** | **41** | **36%** |
 
 ---
 
