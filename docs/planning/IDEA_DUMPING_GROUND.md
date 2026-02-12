@@ -13,3 +13,4 @@
     - https://www.simplepractice.com/privacy/
 - Go through all account management and everything on the web app? What would make sense? There are some complicated interactions and what if I need to rapidly update a doc? Should we consider server side providing any of this crap seeing as we might need to rapidy change some docs or something and extension approval and deployment can take some time? WHat is best here?
 - https://github.com/remotion-dev/remotion - animations
+- API-as-a-product for EMR vendors — offer SOAP note generation as an API that EMR platforms can integrate. ScribePT does this (custom enterprise pricing, not public). Market rates are ~$0.05-$0.15/note or $5-$15/provider/month. Our marginal cost is ~$0.01/note so margins would be 90%+. Pursue after PMF validation (~200 users) — start with 2-3 private pilot integrations before building a full developer platform. Strengthens acquisition story significantly (API revenue = higher multiples).
