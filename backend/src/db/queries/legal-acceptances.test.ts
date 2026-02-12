@@ -5,9 +5,9 @@ import { LEGAL_DOCUMENT_VERSIONS } from '../../config.js';
 // Mock the config module to provide stable versions for testing
 vi.mock('../../config.js', () => ({
   LEGAL_DOCUMENT_VERSIONS: {
-    baa: '1.0',
-    terms_of_service: '1.0',
-    privacy_policy: '1.0',
+    baa: '0.1',
+    terms_of_service: '0.1',
+    privacy_policy: '0.1',
   },
 }));
 
@@ -28,7 +28,7 @@ describe('legal-acceptances queries', () => {
         id: 'test-id',
         user_id: 'user-1',
         document_type: 'baa',
-        document_version: '1.0',
+        document_version: '0.1',
         ip_address: '127.0.0.1',
         user_agent: 'TestAgent',
         accepted_at: new Date(),
@@ -53,7 +53,7 @@ describe('legal-acceptances queries', () => {
           id: 'test-id',
           user_id: 'user-1',
           document_type: 'baa',
-          document_version: '1.0',
+          document_version: '0.1',
           ip_address: null,
           user_agent: null,
           accepted_at: new Date(),
@@ -82,7 +82,7 @@ describe('legal-acceptances queries', () => {
           id: 'test-id',
           user_id: 'user-1',
           document_type: 'baa',
-          document_version: '1.0',
+          document_version: '0.1',
           ip_address: '192.168.1.1',
           user_agent: 'Mozilla/5.0',
           accepted_at: new Date(),
