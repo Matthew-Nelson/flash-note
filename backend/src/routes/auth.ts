@@ -434,7 +434,7 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
 
       // SECURITY: Update password, increment token version (invalidates all access tokens),
       // and reset lockout state in a single UPDATE to minimize round-trips and lock duration
-      await client.query(
+      const updateResult = await client.query(
         `UPDATE users
          SET password_hash = $1,
              token_version = token_version + 1,
@@ -445,6 +445,12 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
          WHERE id = $2`,
         [passwordHash, userId]
       );
+
+      // Rule 10: Defensively check that the UPDATE actually modified a row
+      if (updateResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        throw new AppError(404, 'not_found', 'User not found');
+      }
 
       // SECURITY: Delete all sessions (refresh tokens) to force re-login
       await client.query(
