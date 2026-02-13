@@ -26,6 +26,8 @@ import { usageRouter } from './routes/usage.js';
 process.on('uncaughtException', (err) => {
   console.error('Uncaught exception:', err.name);
   Sentry.captureException(err);
+  // Safety timeout ensures exit even if Sentry.close() never resolves (e.g., no DSN configured)
+  setTimeout(() => process.exit(1), 2000).unref();
   void Sentry.close(2000).finally(() => process.exit(1));
 });
 
@@ -101,6 +103,10 @@ function gracefulShutdown() {
       db.end(),
     ]).finally(() => process.exit(0));
   });
+
+  // Close idle keep-alive connections immediately so server.close() doesn't
+  // block waiting for them to time out. In-flight requests continue to completion.
+  server.closeIdleConnections();
 }
 
 // Start server
