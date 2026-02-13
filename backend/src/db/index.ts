@@ -26,10 +26,3 @@ db.on('error', (err) => {
   });
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('Shutting down database pool...');
-  void db.end().then(() => {
-    process.exit(0);
-  });
-});
