@@ -105,6 +105,11 @@ ${note.plan}`;
         </button>
       </div>
 
+      {/* Copy feedback for screen readers */}
+      <span className="sr-only" aria-live="polite">
+        {copiedSection ? 'Copied to clipboard' : ''}
+      </span>
+
       {/* Copy error feedback */}
       {copyError && (
         <div className="error-message text-sm px-4 py-2 mx-4 mt-2 animate-fade-in" role="alert">

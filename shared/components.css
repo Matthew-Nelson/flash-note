@@ -58,7 +58,6 @@
   color: var(--fn-text-muted);
   box-shadow: none;
   transform: none;
-  opacity: 0.7;
   cursor: not-allowed;
 }
 
@@ -96,8 +95,11 @@
 }
 
 .btn-secondary:disabled {
-  opacity: 0.5;
+  color: var(--fn-text-muted);
   cursor: not-allowed;
+  border: 2px solid var(--fn-border-color);
+  background: var(--fn-card-bg, #ffffff);
+  background-image: none;
 }
 
 /* ============================================

@@ -143,7 +143,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
               </div>
 
               {errors.length > 0 && (
-                <div className="error-message text-sm px-3 py-2 animate-fade-in">
+                <div className="error-message text-sm px-3 py-2 animate-fade-in" role="alert">
                   {errors[0]}
                 </div>
               )}
@@ -299,7 +299,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         )}
 
         {errors.length > 0 && (
-          <div className="error-message text-sm px-3 py-2 animate-fade-in">
+          <div className="error-message text-sm px-3 py-2 animate-fade-in" role="alert">
             {errors.length === 1 ? (
               errors[0]
             ) : (
