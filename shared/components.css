@@ -16,7 +16,7 @@
 /* Uses background-color + background-image so automated a11y tools can verify contrast */
 .btn-primary {
   color: white;
-  border: none;
+  border: 2px solid transparent;
   position: relative;
   overflow: hidden;
   background-color: var(--fn-accent-primary);
@@ -25,6 +25,7 @@
     var(--fn-accent-primary) 0%,
     var(--fn-accent-secondary) 100%
   );
+  background-origin: border-box;
   border-radius: var(--fn-radius-md);
   font-weight: var(--fn-font-medium);
   /* Pre-establish GPU layer to prevent jolt on first hover */
