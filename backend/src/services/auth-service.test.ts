@@ -4,14 +4,19 @@ import bcrypt from 'bcryptjs';
 
 // Mock config before any imports that use it
 // Use vi.hoisted to ensure mock values are available before vi.mock hoisting
-const { mockConfig } = vi.hoisted(() => ({
+const { mockConfig, mockSentry } = vi.hoisted(() => ({
   mockConfig: {
     JWT_SECRET: 'test-jwt-secret-minimum-32-characters-long',
     JWT_REFRESH_SECRET: 'test-refresh-secret-minimum-32-chars',
     NODE_ENV: 'production' as const,
     BCRYPT_ROUNDS: 10,
   },
+  mockSentry: {
+    captureException: vi.fn(),
+  },
 }));
+
+vi.mock('@sentry/node', () => mockSentry);
 
 vi.mock('../config.js', () => ({
   config: mockConfig,
@@ -88,6 +93,7 @@ describe('AuthService', () => {
     mockGetLockoutStatus.mockReset();
     mockRecordFailedAttempt.mockReset();
     mockResetFailedAttempts.mockReset();
+    mockSentry.captureException.mockReset();
   });
 
   describe('login', () => {
@@ -511,82 +517,6 @@ describe('AuthService', () => {
       });
     });
 
-    describe('legacy token fallback', () => {
-      it('should fall back to O(n) validation for tokens without sessionId', async () => {
-        const user = createMockUserRow();
-        const jwt = await import('jsonwebtoken');
-
-        // Legacy token WITHOUT sessionId
-        const legacyToken = jwt.sign(
-          { userId: user.id, type: 'refresh' },
-          mockConfig.JWT_REFRESH_SECRET,
-          { algorithm: 'HS256', expiresIn: '7d' }
-        );
-        const tokenHash = await bcrypt.hash(legacyToken, 10);
-
-        // CR-2: Legacy path uses pool queries for validation + revocation
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({ refresh_token_hash: tokenHash })]
-          }) // O(n) legacy lookup (by user_id only)
-          .mockResolvedValueOnce({ rows: [] })     // DELETE legacy session by id
-          .mockResolvedValueOnce({ rows: [user] }) // findUserById
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
-        // M-26: storeRefreshToken via client transaction
-        mockClientQuery
-          .mockResolvedValueOnce({ rows: [] })                      // BEGIN
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] }) // INSERT new session
-          .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
-          .mockResolvedValueOnce({ rows: [] });                     // COMMIT
-
-        const result = await authService.refreshTokens(legacyToken);
-
-        expect(result).not.toBeNull();
-
-        // Verify O(n) lookup was used (query only has user_id, not session id)
-        const lookupCall = mockDbQuery.mock.calls[0];
-        expect(lookupCall).toBeDefined();
-        expect(lookupCall![0]).toContain('WHERE user_id = $1');
-        expect(lookupCall![0]).not.toContain('WHERE id = $1');
-      });
-
-      it('should revoke legacy token session during refresh (CR-2 bug fix)', async () => {
-        const user = createMockUserRow();
-        const jwt = await import('jsonwebtoken');
-
-        const legacyToken = jwt.sign(
-          { userId: user.id, type: 'refresh' },
-          mockConfig.JWT_REFRESH_SECRET,
-          { algorithm: 'HS256', expiresIn: '7d' }
-        );
-        const tokenHash = await bcrypt.hash(legacyToken, 10);
-
-        // CR-2: Legacy path now revokes the old session
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({ id: 'legacy-session-id', refresh_token_hash: tokenHash })]
-          }) // O(n) legacy lookup
-          .mockResolvedValueOnce({ rows: [] })     // DELETE legacy session by id
-          .mockResolvedValueOnce({ rows: [user] }) // findUserById
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
-        mockClientQuery
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] });
-
-        await authService.refreshTokens(legacyToken);
-
-        // CR-2: Should now DELETE the legacy session by its ID
-        const deleteByIdCall = mockDbQuery.mock.calls.find(call =>
-          typeof call[0] === 'string' &&
-          call[0].includes('DELETE FROM sessions WHERE id = $1')
-        );
-        expect(deleteByIdCall).toBeDefined();
-        expect(deleteByIdCall![1]).toContain('legacy-session-id');
-      });
-    });
-
     describe('device binding (HIGH-006)', () => {
       /**
        * Helper to set up mocks for a refresh flow with device binding test
@@ -737,6 +667,46 @@ describe('AuthService', () => {
         // Should still succeed (lenient mode)
         expect(result).not.toBeNull();
         expect(result!.accessToken).toBeDefined();
+      });
+
+      it('should capture to Sentry and still succeed when audit log throws (Rule 9)', async () => {
+        const user = createMockUserRow();
+        const jwt = await import('jsonwebtoken');
+        const token = jwt.sign(
+          { userId: user.id, sessionId: 'session-123', type: 'refresh' },
+          mockConfig.JWT_REFRESH_SECRET,
+          { algorithm: 'HS256', expiresIn: '7d' }
+        );
+        const tokenHash = await bcrypt.hash(token, 10);
+
+        mockRefreshFlowForDeviceTest(user, tokenHash, {
+          ip_address: '192.168.1.1',
+          user_agent: 'Chrome/120.0',
+        });
+
+        // Force auditService.log to throw (simulates DB error in audit write)
+        const auditError = new Error('Audit DB connection failed');
+        mockAuditLog.mockRejectedValueOnce(auditError);
+
+        // Refresh should still succeed despite audit failure
+        const result = await authService.refreshTokens(token, {
+          ipAddress: '10.0.0.99', // Different IP triggers audit log
+          userAgent: 'Chrome/120.0',
+        });
+
+        expect(result).not.toBeNull();
+        expect(result!.accessToken).toBeDefined();
+
+        // Rule 9: Audit failure must be captured to Sentry
+        expect(mockSentry.captureException).toHaveBeenCalledWith(
+          auditError,
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              source: 'auth_service',
+              errorType: 'device_binding_audit_failed',
+            }),
+          })
+        );
       });
     });
 
@@ -1048,28 +1018,22 @@ describe('AuthService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when legacy token has no matching hash', async () => {
-      const user = createMockUserRow();
+    it('should reject tokens without sessionId (legacy tokens expired)', async () => {
       const jwt = await import('jsonwebtoken');
 
-      // Legacy token WITHOUT sessionId
+      // Token without sessionId — all such tokens have expired
       const legacyToken = jwt.sign(
-        { userId: user.id, type: 'refresh' },
+        { userId: 'user-123', type: 'refresh' },
         mockConfig.JWT_REFRESH_SECRET,
         { algorithm: 'HS256', expiresIn: '7d' }
       );
 
-      // Return sessions but none will match the token hash
-      mockDbQuery.mockResolvedValueOnce({
-        rows: [
-          { id: 'session-1', refresh_token_hash: '$2a$10$differenthash1' },
-          { id: 'session-2', refresh_token_hash: '$2a$10$differenthash2' },
-        ],
-      });
-
       const result = await authService.refreshTokens(legacyToken);
 
       expect(result).toBeNull();
+      // Should be rejected at verification, never hitting the DB
+      expect(mockClientQuery).not.toHaveBeenCalled();
+      expect(mockDbQuery).not.toHaveBeenCalled();
     });
 
     it('should return null and ROLLBACK when token hash does not match (CR-2)', async () => {
