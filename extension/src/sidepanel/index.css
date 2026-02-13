@@ -1,5 +1,6 @@
 /* Import shared design tokens - Warm Wellness Theme */
 @import '../../../shared/design-tokens-warm.css';
+@import '../../../shared/components.css';
 
 @tailwind base;
 @tailwind components;
@@ -31,15 +32,6 @@ body {
    ANIMATIONS
    ============================================ */
 
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
-  }
-  50% {
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
-  }
-}
-
 @keyframes gradient-shift {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -47,13 +39,14 @@ body {
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slide-in-right {
@@ -90,22 +83,6 @@ body {
   100% {
     transform: scale(4);
     opacity: 0;
-  }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes breathe {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.05);
-    opacity: 0.9;
   }
 }
 
@@ -161,7 +138,7 @@ body {
 
   /* Components */
   --btn-disabled-bg: var(--fn-btn-disabled-bg, #f5f5f4);
-  --trial-bg: linear-gradient(135deg, rgba(16, 185, 129, 0.04), rgba(20, 184, 166, 0.04));
+  --trial-bg: linear-gradient(135deg, rgba(4, 120, 87, 0.04), rgba(15, 118, 110, 0.04));
   --trial-border: var(--accent-primary);
   --border-radius-base: var(--fn-radius-md);
   --border-radius-lg: var(--fn-radius-lg);
@@ -211,202 +188,9 @@ body,
   background-clip: text;
 }
 
-/* Primary Button - Gradient with lift effect (no scale to avoid text jitter) */
-.btn-primary {
-  color: white;
-  border: none;
-  position: relative;
-  overflow: hidden;
-  background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-  border-radius: var(--border-radius-base);
-  font-weight: 500;
-  /* Pre-establish GPU layer to prevent jolt on first hover */
-  transform: translateY(0);
-  will-change: transform, box-shadow;
-  box-shadow: 0 2px 8px var(--accent-glow-light);
-  transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, filter 0.15s ease-out;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px var(--accent-glow);
-  filter: brightness(1.02);
-}
-
-.btn-primary:active:not(:disabled) {
-  transform: translateY(0);
-  box-shadow: 0 2px 8px var(--accent-glow-light);
-  filter: brightness(0.98);
-  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out;
-}
-
-.btn-primary:disabled {
-  background: var(--btn-disabled-bg);
-  color: var(--text-muted);
-  box-shadow: none;
-  transform: none;
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-/* Secondary Button - Green gradient border */
-.btn-secondary {
-  color: var(--text-primary);
-  background: var(--bg-card);
-  border: 2px solid transparent;
-  background-image: linear-gradient(var(--bg-card), var(--bg-card)), linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  border-radius: var(--border-radius-base);
-  transition: all 0.2s ease;
-}
-
-.btn-secondary:hover {
-  box-shadow: 0 4px 15px var(--accent-glow-light);
-}
-
-/* Secondary Button Press States */
-.btn-secondary:active {
-  transform: scale(0.97);
-  transition: transform 0.1s ease;
-}
-
-/* Card - White on cream */
-.card {
-  border-radius: var(--border-radius-lg);
-  overflow: hidden;
-  transition: all 0.2s ease;
-  background: var(--bg-card);
-  border: 1px solid var(--border-color);
-}
-
-.card:hover {
-  box-shadow: 0 4px 20px rgba(28, 25, 23, 0.06);
-}
-
-/* Card Header */
-.card-header {
-  padding: 12px 16px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-color);
-  position: relative;
-}
-
-.card-header::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: linear-gradient(180deg, var(--accent-primary), var(--accent-secondary));
-}
-
-/* Input Field */
-.input-field {
-  color: var(--text-primary);
-  border-radius: var(--border-radius-base);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  background: var(--bg-card);
-  border: 2px solid var(--border-color);
-}
-
-.input-field:focus {
-  outline: none;
-  border-color: transparent;
-  background-image: linear-gradient(white, white), linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  box-shadow: 0 0 0 3px var(--accent-glow-light);
-}
-
-.input-field::placeholder {
-  color: var(--text-muted);
-}
-
-.input-field-error {
-  border-color: var(--fn-error);
-}
-
-.input-field-error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
-}
-
-/* Label */
-.label {
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
 /* Loading Indicator */
 .loading-indicator {
   position: relative;
-}
-
-/* Loading Spinner - Same structure, new colors */
-.loading-spinner {
-  width: 60px;
-  height: 60px;
-  position: relative;
-}
-
-/* Outer rotating ring - green/teal */
-.loading-spinner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 3px solid var(--bg-tertiary);
-  border-top-color: var(--accent-primary);
-  border-right-color: var(--accent-secondary);
-  animation: spin-slow 1s linear infinite;
-}
-
-/* Inner pulsing gradient core - 2 colors */
-.loading-spinner::after {
-  content: '';
-  position: absolute;
-  inset: 10px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  animation: breathe 2s ease-in-out infinite;
-  opacity: 0.8;
-}
-
-/* Orbiting dots container */
-.loading-dots {
-  position: absolute;
-  inset: -8px;
-  animation: spin-slow 3s linear infinite;
-}
-
-.loading-dots span {
-  position: absolute;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent-primary);
-}
-
-.loading-dots span:nth-child(1) {
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--accent-primary);
-}
-
-.loading-dots span:nth-child(2) {
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--accent-secondary);
-}
-
-.loading-dots span:nth-child(3) {
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  background: var(--accent-tertiary);
 }
 
 /* Stage text styling */
@@ -433,14 +217,6 @@ body,
   animation: slide-in-right 0.4s ease-out forwards;
 }
 
-/* Error Message */
-.error-message {
-  border-radius: var(--border-radius-base);
-  background: var(--error-bg);
-  border: 1px solid var(--error);
-  color: var(--error);
-}
-
 /* Icon Button */
 .icon-btn {
   color: var(--text-muted);
@@ -448,44 +224,19 @@ body,
 }
 
 .icon-btn:hover {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(20, 184, 166, 0.1));
+  background: linear-gradient(135deg, rgba(4, 120, 87, 0.1), rgba(15, 118, 110, 0.1));
   color: var(--accent-primary);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 /* Icon Button Press States */
 .icon-btn:active {
   transform: scale(0.92);
   transition: transform 0.1s ease;
-}
-
-/* Link */
-.link {
-  transition: opacity 0.2s ease;
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  font-weight: 500;
-}
-
-.link:hover {
-  opacity: 0.8;
-}
-
-/* Status Colors */
-.status-active {
-  color: var(--success);
-}
-
-.status-expired {
-  color: var(--error);
-}
-
-.status-trial {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* Trial Banner */
@@ -498,30 +249,6 @@ body,
   background-origin: border-box;
   background-clip: padding-box, border-box;
 }
-
-/* ============================================
-   UTILITY CLASSES
-   ============================================ */
-
-.animate-fade-in {
-  animation: fade-in 0.3s ease-out;
-}
-
-.animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out;
-  animation-fill-mode: both;
-}
-
-.animate-slide-in-right {
-  animation: slide-in-right 0.3s ease-out;
-}
-
-/* Stagger delays for animations */
-.stagger-1 { animation-delay: 0.05s; }
-.stagger-2 { animation-delay: 0.1s; }
-.stagger-3 { animation-delay: 0.15s; }
-.stagger-4 { animation-delay: 0.2s; }
-.stagger-5 { animation-delay: 0.25s; }
 
 /* ============================================
    DOCUMENT PREVIEW REVEAL ANIMATIONS

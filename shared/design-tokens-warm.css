@@ -199,20 +199,20 @@
   --fn-border-color: var(--fn-stone-200);
   --fn-border-subtle: var(--fn-cream-300);
 
-  /* Brand Accents */
-  --fn-accent-primary: var(--fn-emerald-500);   /* Primary actions */
-  --fn-accent-secondary: var(--fn-teal-500);    /* Secondary elements */
+  /* Brand Accents — WCAG AA compliant (5.0:1+ with white text) */
+  --fn-accent-primary: var(--fn-emerald-700);   /* Primary actions */
+  --fn-accent-secondary: var(--fn-teal-700);    /* Secondary elements */
   --fn-accent-tertiary: var(--fn-amber-500);    /* Highlights, badges */
 
   /* Hover/Active States */
-  --fn-accent-primary-hover: var(--fn-emerald-600);
-  --fn-accent-primary-active: var(--fn-emerald-700);
-  --fn-accent-secondary-hover: var(--fn-teal-600);
+  --fn-accent-primary-hover: var(--fn-emerald-800);
+  --fn-accent-primary-active: var(--fn-emerald-900);
+  --fn-accent-secondary-hover: var(--fn-teal-800);
 
-  /* Glow Effects - Green-based */
-  --fn-accent-glow: rgba(16, 185, 129, 0.35);
-  --fn-accent-glow-light: rgba(16, 185, 129, 0.12);
-  --fn-accent-glow-teal: rgba(20, 184, 166, 0.35);
+  /* Glow Effects - Green-based (updated to match emerald-700 / teal-700) */
+  --fn-accent-glow: rgba(4, 120, 87, 0.35);
+  --fn-accent-glow-light: rgba(4, 120, 87, 0.12);
+  --fn-accent-glow-teal: rgba(15, 118, 110, 0.35);
 
   /* Interactive States */
   --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow-light);
@@ -223,11 +223,11 @@
   --fn-input-bg: #ffffff;
   --fn-card-bg: #ffffff;
 
-  /* Gradients - Refined, 2-color */
-  --fn-gradient-primary: linear-gradient(135deg, var(--fn-emerald-500) 0%, var(--fn-teal-500) 100%);
-  --fn-gradient-primary-hover: linear-gradient(135deg, var(--fn-emerald-600) 0%, var(--fn-teal-600) 100%);
+  /* Gradients - Refined, 2-color (using accessible -700 shades) */
+  --fn-gradient-primary: linear-gradient(135deg, var(--fn-emerald-700) 0%, var(--fn-teal-700) 100%);
+  --fn-gradient-primary-hover: linear-gradient(135deg, var(--fn-emerald-800) 0%, var(--fn-teal-800) 100%);
   --fn-gradient-subtle: linear-gradient(135deg, var(--fn-emerald-50) 0%, var(--fn-teal-50) 100%);
-  --fn-gradient-warm: linear-gradient(135deg, var(--fn-emerald-500) 0%, var(--fn-amber-500) 100%);
+  --fn-gradient-warm: linear-gradient(135deg, var(--fn-emerald-700) 0%, var(--fn-amber-500) 100%);
 }
 
 /* ============================================
@@ -238,10 +238,10 @@
 
 @keyframes fn-pulse-glow {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 15px rgba(4, 120, 87, 0.25);
   }
   50% {
-    box-shadow: 0 0 25px rgba(16, 185, 129, 0.4);
+    box-shadow: 0 0 25px rgba(4, 120, 87, 0.4);
   }
 }
 

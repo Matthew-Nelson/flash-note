@@ -13,16 +13,19 @@
    ============================================ */
 
 /* Primary Button - Gradient background with lift effect (no scale to avoid text jitter) */
+/* Uses background-color + background-image so automated a11y tools can verify contrast */
 .btn-primary {
   color: white;
-  border: none;
+  border: 2px solid transparent;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(
+  background-color: var(--fn-accent-primary);
+  background-image: linear-gradient(
     135deg,
     var(--fn-accent-primary) 0%,
     var(--fn-accent-secondary) 100%
   );
+  background-origin: border-box;
   border-radius: var(--fn-radius-md);
   font-weight: var(--fn-font-medium);
   /* Pre-establish GPU layer to prevent jolt on first hover */
@@ -45,12 +48,17 @@
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, filter 0.1s ease-out;
 }
 
+.btn-primary:focus-visible {
+  outline: 2px solid var(--fn-accent-primary);
+  outline-offset: 3px;
+}
+
 .btn-primary:disabled {
-  background: var(--fn-btn-disabled-bg);
+  background-color: var(--fn-btn-disabled-bg);
+  background-image: none;
   color: var(--fn-text-muted);
   box-shadow: none;
   transform: none;
-  opacity: 0.7;
   cursor: not-allowed;
 }
 
@@ -82,9 +90,17 @@
   transition: transform 0.1s ease;
 }
 
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--fn-accent-primary);
+  outline-offset: 3px;
+}
+
 .btn-secondary:disabled {
-  opacity: 0.5;
+  color: var(--fn-text-muted);
   cursor: not-allowed;
+  border: 2px solid var(--fn-border-color);
+  background: var(--fn-card-bg, #ffffff);
+  background-image: none;
 }
 
 /* ============================================
@@ -282,6 +298,12 @@
 
 .link:hover {
   opacity: 0.8;
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--fn-accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--fn-radius-sm, 2px);
 }
 
 /* ============================================

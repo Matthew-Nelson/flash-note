@@ -70,7 +70,7 @@ function SettingsContent() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 pb-8">
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 pb-8">
         <h1 className="text-2xl font-bold text-fn-text-primary mb-8">Account Settings</h1>
 
         <div className="max-w-2xl space-y-6">
@@ -82,11 +82,11 @@ function SettingsContent() {
               </h2>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm text-fn-text-secondary mb-1">Email</label>
+                  <span className="block text-sm text-fn-text-secondary mb-1">Email</span>
                   <p className="text-fn-text-primary">{user?.email}</p>
                 </div>
                 <div>
-                  <label className="block text-sm text-fn-text-secondary mb-1">Email Status</label>
+                  <span className="block text-sm text-fn-text-secondary mb-1">Email Status</span>
                   <p className="text-fn-text-primary">
                     {user?.emailVerified ? (
                       <span className="inline-flex items-center gap-1 text-fn-success">
@@ -101,7 +101,7 @@ function SettingsContent() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm text-fn-text-secondary mb-1">Subscription</label>
+                  <span className="block text-sm text-fn-text-secondary mb-1">Subscription</span>
                   <p className="text-fn-text-primary capitalize">{user?.subscriptionStatus || 'Unknown'}</p>
                 </div>
               </div>

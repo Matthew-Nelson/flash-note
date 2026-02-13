@@ -34,13 +34,13 @@
   border: 1px solid rgba(255, 255, 255, 0.3);
 
   /* Gradient background matching FlashNote brand */
-  background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
 
   /* Subtle shadow + glow effect */
   box-shadow:
-    0 4px 14px rgba(16, 185, 129, 0.4),
-    0 0 20px rgba(16, 185, 129, 0.2),
-    0 0 40px rgba(16, 185, 129, 0.1);
+    0 4px 14px rgba(4, 120, 87, 0.4),
+    0 0 20px rgba(4, 120, 87, 0.2),
+    0 0 40px rgba(4, 120, 87, 0.1);
 
   /* Clickable cursor */
   cursor: pointer;
@@ -68,9 +68,9 @@
 #flashnote-floating-button:hover {
   transform: translateY(-3px);
   box-shadow:
-    0 8px 24px rgba(16, 185, 129, 0.5),
-    0 0 30px rgba(16, 185, 129, 0.35),
-    0 0 50px rgba(16, 185, 129, 0.2);
+    0 8px 24px rgba(4, 120, 87, 0.5),
+    0 0 30px rgba(4, 120, 87, 0.35),
+    0 0 50px rgba(4, 120, 87, 0.2);
   animation: none; /* Stop pulse on hover */
 }
 
@@ -78,18 +78,15 @@
 #flashnote-floating-button:active {
   transform: translateY(-1px);
   box-shadow:
-    0 4px 12px rgba(16, 185, 129, 0.4),
-    0 0 15px rgba(16, 185, 129, 0.25);
+    0 4px 12px rgba(4, 120, 87, 0.4),
+    0 0 15px rgba(4, 120, 87, 0.25);
   transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
 }
 
-/* Focus state for accessibility */
-#flashnote-floating-button:focus {
-  outline: none;
-  box-shadow:
-    0 4px 14px rgba(16, 185, 129, 0.4),
-    0 0 20px rgba(16, 185, 129, 0.2),
-    0 0 0 3px rgba(16, 185, 129, 0.3);
+/* Focus state for accessibility - consistent outline-offset with all buttons */
+#flashnote-floating-button:focus-visible {
+  outline: 2px solid #047857;
+  outline-offset: 3px;
 }
 
 /* ============================================
@@ -116,7 +113,7 @@
   z-index: 2147483646;
 
   /* Styling */
-  background: linear-gradient(135deg, #10b981 0%, #14b8a6 100%);
+  background: linear-gradient(135deg, #047857 0%, #0f766e 100%);
   color: #ffffff;
   padding: 8px 14px;
   border-radius: 8px;
@@ -150,7 +147,7 @@
   height: 0;
   border-top: 6px solid transparent;
   border-bottom: 6px solid transparent;
-  border-left: 6px solid #14b8a6;
+  border-left: 6px solid #0f766e;
 }
 
 /* Tooltip visible state */
@@ -172,15 +169,15 @@
 @keyframes flashnote-glow-pulse {
   0%, 100% {
     box-shadow:
-      0 4px 14px rgba(16, 185, 129, 0.4),
-      0 0 20px rgba(16, 185, 129, 0.2),
-      0 0 40px rgba(16, 185, 129, 0.1);
+      0 4px 14px rgba(4, 120, 87, 0.4),
+      0 0 20px rgba(4, 120, 87, 0.2),
+      0 0 40px rgba(4, 120, 87, 0.1);
   }
   50% {
     box-shadow:
-      0 4px 18px rgba(16, 185, 129, 0.5),
-      0 0 28px rgba(16, 185, 129, 0.3),
-      0 0 50px rgba(16, 185, 129, 0.15);
+      0 4px 18px rgba(4, 120, 87, 0.5),
+      0 0 28px rgba(4, 120, 87, 0.3),
+      0 0 50px rgba(4, 120, 87, 0.15);
   }
 }
 

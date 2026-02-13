@@ -26,7 +26,7 @@ export const mockDbQuery = vi.fn<MockDbQueryFn>();
 
 // Mock PoolClient returned by db.connect() - delegates to mockDbQuery for test assertions
 export const mockClientQuery = vi.fn<MockDbQueryFn>();
-export const mockClientRelease = vi.fn();
+export const mockClientRelease = vi.fn<() => void>();
 
 const mockClient = {
   query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>

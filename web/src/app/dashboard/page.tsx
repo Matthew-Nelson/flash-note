@@ -163,6 +163,7 @@ function DashboardContent() {
                 href="/dashboard/settings"
                 className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
                 title="Settings"
+                aria-label="Go to settings"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -180,7 +181,7 @@ function DashboardContent() {
       {/* Alerts */}
       <div className="container mx-auto px-6">
         {showSuccessAlert && (
-          <div className="mt-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center justify-between">
+          <div role="status" className="mt-6 bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center justify-between">
             <div className="flex items-center">
               <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -190,6 +191,7 @@ function DashboardContent() {
             <button
               onClick={() => setShowSuccessAlert(false)}
               className="text-green-800 hover:text-green-900"
+              aria-label="Dismiss"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -199,7 +201,7 @@ function DashboardContent() {
         )}
 
         {isPolling && (
-          <div className="mt-6 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg flex items-center">
+          <div role="status" className="mt-6 bg-blue-50 border border-blue-200 text-blue-800 px-4 py-3 rounded-lg flex items-center">
             <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -209,11 +211,12 @@ function DashboardContent() {
         )}
 
         {error && (
-          <div className="mt-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between">
+          <div role="alert" className="mt-6 bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-center justify-between">
             <span>{error}</span>
             <button
               onClick={() => setError(null)}
               className="text-red-800 hover:text-red-900"
+              aria-label="Dismiss"
             >
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -224,7 +227,7 @@ function DashboardContent() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-6 py-8">
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-8">
         <h1 className="text-2xl font-bold text-fn-text-primary mb-8">Dashboard</h1>
 
         <div className="grid md:grid-cols-2 gap-6">
@@ -356,9 +359,8 @@ function DashboardContent() {
             <ol className="list-decimal list-inside space-y-3 text-fn-text-secondary">
               <li>
                 Install the FlashNote Chrome extension from the{' '}
-                <a href="#" className="link">
-                  Chrome Web Store
-                </a>
+                {/* TODO: Replace with <a> linking to actual FlashNote extension listing once published */}
+                <span className="link">Chrome Web Store</span>
               </li>
               <li>Click the FlashNote icon in your browser toolbar</li>
               <li>Sign in with your account credentials</li>

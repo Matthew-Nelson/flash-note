@@ -48,7 +48,7 @@ export default function SessionAlert({ onDismiss }: SessionAlertProps) {
   };
 
   return (
-    <div className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4 animate-fade-in">
+    <div role="alert" className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-4 animate-fade-in">
       <div className="flex items-start gap-3">
         <svg
           className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5"

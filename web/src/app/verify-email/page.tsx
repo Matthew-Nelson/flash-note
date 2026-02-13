@@ -71,7 +71,7 @@ function VerifyEmailContent() {
   }, [token, verifyEmail]);
 
   return (
-    <div className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center items-center gap-2">
           <span className="text-3xl font-bold text-gradient">FlashNote</span>
@@ -82,7 +82,7 @@ function VerifyEmailContent() {
         </h2>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md" aria-live="polite">
         <div className="card py-8 px-4 sm:px-10">
           {status === 'verifying' && (
             <div className="text-center">
@@ -163,7 +163,7 @@ function VerifyEmailContent() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }
 
