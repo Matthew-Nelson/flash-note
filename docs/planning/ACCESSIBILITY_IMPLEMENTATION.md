@@ -3,7 +3,7 @@
 > **Status: IN PROGRESS**
 >
 > - [x] Phase 1: ESLint static analysis (`eslint-plugin-jsx-a11y`)
-> - [~] Phase 2: Fix existing accessibility violations
+> - [x] Phase 2: Fix existing accessibility violations
 > - [ ] Phase 3: Unit test assertions (`vitest-axe`)
 > - [ ] Phase 4: E2E accessibility audits (`@axe-core/playwright`)
 > - [ ] Phase 5: Dev-time overlay (`@axe-core/react`)
