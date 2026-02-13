@@ -23,8 +23,11 @@ export function errorHandler(
   // Log error (but never log PHI)
   console.error('Error:', {
     name: err.name,
-    message: err.message,
-    stack: config.NODE_ENV === 'development' ? err.stack : undefined,
+    ...(err instanceof AppError && { code: err.code, statusCode: err.statusCode }),
+    ...(config.NODE_ENV !== 'production' && {
+      message: err.message,
+      stack: err.stack,
+    }),
   });
 
   // Zod validation errors
@@ -70,9 +73,7 @@ export function errorHandler(
     success: false,
     error: {
       code: 'internal_error',
-      message: config.NODE_ENV === 'production'
-        ? 'An unexpected error occurred'
-        : err.message,
+      message: 'An unexpected error occurred',
     },
   });
 }

@@ -230,18 +230,24 @@ describe('Error Handler Middleware', () => {
         });
       });
 
-      it('should return actual error message in development', () => {
-        mockConfig.NODE_ENV = 'development';
-        const error = new Error('Detailed error for debugging');
+      it('should return generic message in all environments', () => {
+        const envs: Array<'development' | 'test' | 'production'> = ['development', 'test', 'production'];
 
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+        envs.forEach((env) => {
+          jsonMock.mockClear();
+          statusMock.mockClear();
+          mockConfig.NODE_ENV = env;
+          const error = new Error('Sensitive database error details');
 
-        expect(jsonMock).toHaveBeenCalledWith({
-          success: false,
-          error: {
-            code: 'internal_error',
-            message: 'Detailed error for debugging',
-          },
+          errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+
+          expect(jsonMock).toHaveBeenCalledWith({
+            success: false,
+            error: {
+              code: 'internal_error',
+              message: 'An unexpected error occurred',
+            },
+          });
         });
       });
 
@@ -278,60 +284,76 @@ describe('Error Handler Middleware', () => {
     });
 
     describe('logging', () => {
-      it('should log error name and message', () => {
-        const error = new Error('Test error');
-
-        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
-
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error:',
-          expect.objectContaining({
-            name: 'Error',
-            message: 'Test error',
-          })
-        );
-      });
-
-      it('should log stack trace in development only', () => {
+      it('should log message and stack in development', () => {
         mockConfig.NODE_ENV = 'development';
         const error = new Error('Dev error');
 
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error:',
-          expect.objectContaining({
-            stack: expect.any(String),
-          })
-        );
+        const loggedObj = consoleErrorSpy.mock.calls[0]![1];
+        expect(loggedObj).toEqual(expect.objectContaining({
+          name: 'Error',
+          message: 'Dev error',
+          stack: expect.any(String),
+        }));
       });
 
-      it('should NOT log stack trace in production', () => {
-        mockConfig.NODE_ENV = 'production';
-        const error = new Error('Prod error');
+      it('should log message and stack in test', () => {
+        mockConfig.NODE_ENV = 'test';
+        const error = new Error('Test error');
 
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error:',
-          expect.objectContaining({
-            stack: undefined,
-          })
-        );
+        const loggedObj = consoleErrorSpy.mock.calls[0]![1];
+        expect(loggedObj).toEqual(expect.objectContaining({
+          name: 'Error',
+          message: 'Test error',
+          stack: expect.any(String),
+        }));
       });
 
-      it('should log AppError details', () => {
+      it('should NOT log message or stack in production', () => {
+        mockConfig.NODE_ENV = 'production';
+        const error = new Error('Sensitive prod error');
+
+        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+
+        const loggedObj = consoleErrorSpy.mock.calls[0]![1];
+        expect(loggedObj).toEqual({ name: 'Error' });
+        expect(loggedObj).not.toHaveProperty('message');
+        expect(loggedObj).not.toHaveProperty('stack');
+      });
+
+      it('should log AppError code and statusCode in production but not message', () => {
+        mockConfig.NODE_ENV = 'production';
         const error = new AppError(404, 'not_found', 'Resource not found');
 
         errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
 
-        expect(consoleErrorSpy).toHaveBeenCalledWith(
-          'Error:',
-          expect.objectContaining({
-            name: 'AppError',
-            message: 'Resource not found',
-          })
-        );
+        const loggedObj = consoleErrorSpy.mock.calls[0]![1];
+        expect(loggedObj).toEqual({
+          name: 'AppError',
+          code: 'not_found',
+          statusCode: 404,
+        });
+        expect(loggedObj).not.toHaveProperty('message');
+        expect(loggedObj).not.toHaveProperty('stack');
+      });
+
+      it('should log AppError with full details in development', () => {
+        mockConfig.NODE_ENV = 'development';
+        const error = new AppError(404, 'not_found', 'Resource not found');
+
+        errorHandler(error, mockReq as Request, mockRes as Response, mockNext);
+
+        const loggedObj = consoleErrorSpy.mock.calls[0]![1];
+        expect(loggedObj).toEqual(expect.objectContaining({
+          name: 'AppError',
+          code: 'not_found',
+          statusCode: 404,
+          message: 'Resource not found',
+          stack: expect.any(String),
+        }));
       });
     });
 

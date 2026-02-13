@@ -11,6 +11,7 @@ import express, { type Express } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config.js';
+import { db } from './db/index.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
@@ -20,7 +21,27 @@ import { userRouter } from './routes/user.js';
 import { organizationRouter } from './routes/organization.js';
 import { usageRouter } from './routes/usage.js';
 
+// Process-level error handlers — must be registered after Sentry.init() (via instrument.js)
+// so that Sentry can capture these errors before the process exits.
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception:', err.name);
+  Sentry.captureException(err);
+  // Safety timeout ensures exit even if Sentry.close() never resolves (e.g., no DSN configured)
+  setTimeout(() => process.exit(1), 2000).unref();
+  void Sentry.close(2000).finally(() => process.exit(1));
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled rejection');
+  Sentry.captureException(reason);
+  // Node 15+ will re-throw as uncaughtException → exit handled there
+});
+
 const app: Express = express();
+
+// Trust the first proxy hop (Render/Railway/Heroku single reverse proxy).
+// Required for correct req.ip in rate limiting, audit logs, and security middleware.
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(
@@ -69,11 +90,34 @@ app.use('/usage', usageRouter);
 Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
+// Graceful shutdown
+function gracefulShutdown() {
+  console.log('Shutting down gracefully...');
+  const forceExit = setTimeout(() => process.exit(1), 10_000);
+  forceExit.unref();
+
+  server.close(() => {
+    console.log('HTTP server closed');
+    void Promise.all([
+      Sentry.close(5000),
+      db.end(),
+    ]).finally(() => process.exit(0));
+  });
+
+  // Close idle keep-alive connections immediately so server.close() doesn't
+  // block waiting for them to time out. In-flight requests continue to completion.
+  server.closeIdleConnections();
+}
+
 // Start server
 const PORT = config.PORT;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`FlashNote API running on port ${PORT}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 });
+
+// Register shutdown handlers after server is assigned to avoid TDZ reference
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 export default app;
