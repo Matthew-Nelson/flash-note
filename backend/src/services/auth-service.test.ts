@@ -47,17 +47,21 @@ import { AuditAction } from '../types/index.js';
 
 /**
  * Helper to set up mocks for a successful login flow
- * The new storeRefreshToken requires:
- * 1. COUNT query for session limit check
- * 2. INSERT RETURNING for session creation
- * 3. UPDATE for token hash
+ * M-26: storeRefreshToken now uses a transaction via client
+ *
+ * mockDbQuery: findUserByEmail, enforceSessionLimit COUNT
+ * mockClientQuery: BEGIN, INSERT session, UPDATE hash, COMMIT
  */
 function mockSuccessfulLoginDbQueries(user: ReturnType<typeof createMockUserRow>) {
   mockDbQuery
     .mockResolvedValueOnce({ rows: [user] })           // findUserByEmail
-    .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // enforceSessionLimit COUNT
+    .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+
+  mockClientQuery
+    .mockResolvedValueOnce({ rows: [] })                      // BEGIN
     .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
-    .mockResolvedValueOnce({ rows: [] });              // UPDATE token hash
+    .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+    .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 }
 
 /**
@@ -191,8 +195,8 @@ describe('AuthService', () => {
           userAgent: 'Chrome/120.0',
         });
 
-        // Verify INSERT session was called with IP and user agent
-        const insertCall = mockDbQuery.mock.calls.find(call =>
+        // M-26: INSERT session now goes through client (transaction)
+        const insertCall = mockClientQuery.mock.calls.find(call =>
           typeof call[0] === 'string' && call[0].includes('INSERT INTO sessions')
         );
         expect(insertCall).toBeDefined();
@@ -314,11 +318,15 @@ describe('AuthService', () => {
 
     it('should not delete sessions when under limit', async () => {
       const user = createMockUserRow({ password_hash: validPasswordHash });
+      // M-26: storeRefreshToken uses client transaction
       mockDbQuery
         .mockResolvedValueOnce({ rows: [user] })           // findUserByEmail
-        .mockResolvedValueOnce({ rows: [{ count: '3' }] }) // enforceSessionLimit COUNT (under limit)
+        .mockResolvedValueOnce({ rows: [{ count: '3' }] }); // enforceSessionLimit COUNT (under limit)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
-        .mockResolvedValueOnce({ rows: [] });              // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
       mockResetFailedAttempts.mockResolvedValueOnce(undefined);
@@ -337,9 +345,12 @@ describe('AuthService', () => {
       mockDbQuery
         .mockResolvedValueOnce({ rows: [user] })           // findUserByEmail
         .mockResolvedValueOnce({ rows: [{ count: '5' }] }) // enforceSessionLimit COUNT (at limit)
-        .mockResolvedValueOnce({ rows: [{ id: 'old-session-1' }] }) // DELETE oldest RETURNING id
+        .mockResolvedValueOnce({ rows: [{ id: 'old-session-1' }] }); // DELETE oldest RETURNING id
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
-        .mockResolvedValueOnce({ rows: [] });              // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
       mockResetFailedAttempts.mockResolvedValueOnce(undefined);
@@ -359,9 +370,12 @@ describe('AuthService', () => {
       mockDbQuery
         .mockResolvedValueOnce({ rows: [user] })           // findUserByEmail
         .mockResolvedValueOnce({ rows: [{ count: '7' }] }) // enforceSessionLimit COUNT (over limit)
-        .mockResolvedValueOnce({ rows: [{ id: 'old-1' }, { id: 'old-2' }, { id: 'old-3' }] }) // DELETE 3 oldest
+        .mockResolvedValueOnce({ rows: [{ id: 'old-1' }, { id: 'old-2' }, { id: 'old-3' }] }); // DELETE 3 oldest
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
         .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
-        .mockResolvedValueOnce({ rows: [] });              // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
       mockResetFailedAttempts.mockResolvedValueOnce(undefined);
@@ -381,8 +395,11 @@ describe('AuthService', () => {
       mockDbQuery
         .mockResolvedValueOnce({ rows: [user] })
         .mockResolvedValueOnce({ rows: [{ count: '5' }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'old-session-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'old-session-1' }] });
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] })
+        .mockResolvedValueOnce({ rows: [] })
         .mockResolvedValueOnce({ rows: [] });
 
       mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
@@ -423,15 +440,25 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(tokenWithSessionId, 10);
 
-        mockDbQuery
+        // CR-2: validateAndRevoke uses client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })  // BEGIN
           .mockResolvedValueOnce({
             rows: [createMockSessionRow({ refresh_token_hash: tokenHash })]
-          }) // O(1) session lookup
-          .mockResolvedValueOnce({ rows: [user] }) // findUserById
-          .mockResolvedValueOnce({ rows: [] })     // DELETE old session
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] }) // enforceSessionLimit COUNT
+          }) // SELECT ... FOR UPDATE
+          .mockResolvedValueOnce({ rows: [] })  // DELETE old session
+          .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+        mockDbQuery
+          .mockResolvedValueOnce({ rows: [user] })           // findUserById
+          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+
+        // M-26: storeRefreshToken via client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })                      // BEGIN
           .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] }) // INSERT new session
-          .mockResolvedValueOnce({ rows: [] });    // UPDATE token hash
+          .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+          .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
         const result = await authService.refreshTokens(tokenWithSessionId);
 
@@ -439,14 +466,14 @@ describe('AuthService', () => {
         expect(result!.accessToken).toBeDefined();
         expect(result!.refreshToken).toBeDefined();
 
-        // Verify O(1) lookup was used (query includes session id)
-        const lookupCall = mockDbQuery.mock.calls[0];
+        // CR-2: Verify FOR UPDATE was used in the SELECT query
+        const lookupCall = mockClientQuery.mock.calls[1]; // 2nd client call (after BEGIN)
         expect(lookupCall).toBeDefined();
-        expect(lookupCall![0]).toContain('WHERE id = $1 AND user_id = $2');
+        expect(lookupCall![0]).toContain('FOR UPDATE');
         expect(lookupCall![1]).toContain('session-123');
       });
 
-      it('should delete old session with O(1) operation', async () => {
+      it('should delete old session atomically within transaction', async () => {
         const user = createMockUserRow();
         const jwt = await import('jsonwebtoken');
         const tokenWithSessionId = jwt.sign(
@@ -456,23 +483,30 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(tokenWithSessionId, 10);
 
-        mockDbQuery
+        // CR-2: validateAndRevoke uses client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })  // BEGIN
           .mockResolvedValueOnce({
             rows: [createMockSessionRow({ id: 'session-to-delete', refresh_token_hash: tokenHash })]
-          })
+          }) // SELECT ... FOR UPDATE
+          .mockResolvedValueOnce({ rows: [] })  // DELETE by id
+          .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+        mockDbQuery
           .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [] })     // DELETE by id
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+          .mockResolvedValueOnce({ rows: [{ count: '0' }] });
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
+          .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [] });
 
         await authService.refreshTokens(tokenWithSessionId);
 
-        // Verify O(1) delete was used
-        const deleteCall = mockDbQuery.mock.calls.find(call =>
-          typeof call[0] === 'string' && call[0].includes('DELETE FROM sessions WHERE id')
-        );
+        // Verify DELETE was used within the transaction (3rd client call)
+        const deleteCall = mockClientQuery.mock.calls[2];
         expect(deleteCall).toBeDefined();
+        expect(typeof deleteCall![0] === 'string' && deleteCall![0].includes('DELETE FROM sessions WHERE id')).toBe(true);
         expect(deleteCall![1]).toContain('session-to-delete');
       });
     });
@@ -490,14 +524,20 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(legacyToken, 10);
 
+        // CR-2: Legacy path uses pool queries for validation + revocation
         mockDbQuery
           .mockResolvedValueOnce({
             rows: [createMockSessionRow({ refresh_token_hash: tokenHash })]
           }) // O(n) legacy lookup (by user_id only)
-          .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] });
+          .mockResolvedValueOnce({ rows: [] })     // DELETE legacy session by id
+          .mockResolvedValueOnce({ rows: [user] }) // findUserById
+          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+        // M-26: storeRefreshToken via client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] }) // INSERT new session
+          .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+          .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
         const result = await authService.refreshTokens(legacyToken);
 
@@ -510,7 +550,7 @@ describe('AuthService', () => {
         expect(lookupCall![0]).not.toContain('WHERE id = $1');
       });
 
-      it('should not call revokeRefreshToken for legacy tokens', async () => {
+      it('should revoke legacy token session during refresh (CR-2 bug fix)', async () => {
         const user = createMockUserRow();
         const jwt = await import('jsonwebtoken');
 
@@ -521,29 +561,64 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(legacyToken, 10);
 
+        // CR-2: Legacy path now revokes the old session
         mockDbQuery
           .mockResolvedValueOnce({
-            rows: [createMockSessionRow({ refresh_token_hash: tokenHash })]
-          })
-          .mockResolvedValueOnce({ rows: [user] })
-          // No DELETE call for legacy tokens
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+            rows: [createMockSessionRow({ id: 'legacy-session-id', refresh_token_hash: tokenHash })]
+          }) // O(n) legacy lookup
+          .mockResolvedValueOnce({ rows: [] })     // DELETE legacy session by id
+          .mockResolvedValueOnce({ rows: [user] }) // findUserById
+          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
+          .mockResolvedValueOnce({ rows: [] })
           .mockResolvedValueOnce({ rows: [] });
 
         await authService.refreshTokens(legacyToken);
 
-        // Should NOT have DELETE FROM sessions WHERE id = $1 (only user-level delete in logout)
+        // CR-2: Should now DELETE the legacy session by its ID
         const deleteByIdCall = mockDbQuery.mock.calls.find(call =>
           typeof call[0] === 'string' &&
-          call[0].includes('DELETE FROM sessions WHERE id = $1') &&
-          !call[0].includes('WHERE id IN')
+          call[0].includes('DELETE FROM sessions WHERE id = $1')
         );
-        expect(deleteByIdCall).toBeUndefined();
+        expect(deleteByIdCall).toBeDefined();
+        expect(deleteByIdCall![1]).toContain('legacy-session-id');
       });
     });
 
     describe('device binding (HIGH-006)', () => {
+      /**
+       * Helper to set up mocks for a refresh flow with device binding test
+       * CR-2: validateAndRevoke uses client transaction
+       * M-26: storeRefreshToken uses client transaction
+       */
+      function mockRefreshFlowForDeviceTest(
+        user: ReturnType<typeof createMockUserRow>,
+        tokenHash: string,
+        sessionOverrides: Partial<Parameters<typeof createMockSessionRow>[0]> = {}
+      ) {
+        // CR-2: validateAndRevoke via client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })  // BEGIN
+          .mockResolvedValueOnce({
+            rows: [createMockSessionRow({ refresh_token_hash: tokenHash, ...sessionOverrides })]
+          }) // SELECT ... FOR UPDATE
+          .mockResolvedValueOnce({ rows: [] })  // DELETE old session
+          .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+        mockDbQuery
+          .mockResolvedValueOnce({ rows: [user] })           // findUserById
+          .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+
+        // M-26: storeRefreshToken via client transaction
+        mockClientQuery
+          .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] }) // INSERT new session
+          .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+          .mockResolvedValueOnce({ rows: [] });                     // COMMIT
+      }
+
       it('should log SESSION_DEVICE_CHANGE when IP changes', async () => {
         const user = createMockUserRow();
         const jwt = await import('jsonwebtoken');
@@ -554,18 +629,7 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(token, 10);
 
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({
-              refresh_token_hash: tokenHash,
-              ip_address: '192.168.1.1', // Original IP
-            })]
-          })
-          .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] });
+        mockRefreshFlowForDeviceTest(user, tokenHash, { ip_address: '192.168.1.1' });
 
         await authService.refreshTokens(token, {
           ipAddress: '10.0.0.99', // Different IP
@@ -598,19 +662,10 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(token, 10);
 
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({
-              refresh_token_hash: tokenHash,
-              ip_address: '192.168.1.1',
-              user_agent: 'Chrome/120.0', // Original UA
-            })]
-          })
-          .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] });
+        mockRefreshFlowForDeviceTest(user, tokenHash, {
+          ip_address: '192.168.1.1',
+          user_agent: 'Chrome/120.0',
+        });
 
         await authService.refreshTokens(token, {
           ipAddress: '192.168.1.1', // Same IP
@@ -640,19 +695,10 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(token, 10);
 
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({
-              refresh_token_hash: tokenHash,
-              ip_address: '192.168.1.1',
-              user_agent: 'Chrome/120.0',
-            })]
-          })
-          .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] });
+        mockRefreshFlowForDeviceTest(user, tokenHash, {
+          ip_address: '192.168.1.1',
+          user_agent: 'Chrome/120.0',
+        });
 
         await authService.refreshTokens(token, {
           ipAddress: '192.168.1.1', // Same
@@ -677,19 +723,10 @@ describe('AuthService', () => {
         );
         const tokenHash = await bcrypt.hash(token, 10);
 
-        mockDbQuery
-          .mockResolvedValueOnce({
-            rows: [createMockSessionRow({
-              refresh_token_hash: tokenHash,
-              ip_address: '192.168.1.1',
-              user_agent: 'Chrome/120.0',
-            })]
-          })
-          .mockResolvedValueOnce({ rows: [user] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-          .mockResolvedValueOnce({ rows: [{ id: 'new-session' }] })
-          .mockResolvedValueOnce({ rows: [] });
+        mockRefreshFlowForDeviceTest(user, tokenHash, {
+          ip_address: '192.168.1.1',
+          user_agent: 'Chrome/120.0',
+        });
 
         // Completely different device
         const result = await authService.refreshTokens(token, {
@@ -717,8 +754,11 @@ describe('AuthService', () => {
         { algorithm: 'HS256', expiresIn: '7d' }
       );
 
-      // Session not found (expired or deleted)
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // CR-2: Session not found after FOR UPDATE (expired or already revoked)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // SELECT ... FOR UPDATE (no rows)
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
       const result = await authService.refreshTokens(token);
       expect(result).toBeNull();
@@ -786,21 +826,26 @@ describe('AuthService', () => {
       // COMMIT
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
-      // Token creation for email verification (via pool query)
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+      // H-7: Token creation for email verification (via client transaction)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidate existing)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT new token
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       // Mock email sending to succeed
       const { emailService } = await import('./email-service.js');
       const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
         .mockResolvedValueOnce(undefined);
 
-      // Session limit check
+      // Session limit check (via pool)
       mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
-      // Insert session
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
-      // Update token hash
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // M-26: storeRefreshToken via client transaction
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       const result = await authService.register('new@example.com', 'ValidPass123', {
         acceptedLegalTerms: true,
@@ -930,9 +975,12 @@ describe('AuthService', () => {
       // COMMIT
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
-      // Token creation for email verification (via pool query)
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+      // H-7: Token creation for email verification (via client transaction)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidate existing)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT new token
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       // Mock email sending to fail
       const { emailService } = await import('./email-service.js');
@@ -942,12 +990,14 @@ describe('AuthService', () => {
       // Mock console.error for the error logging
       const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-      // Session limit check
+      // Session limit check (via pool)
       mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
-      // Insert session
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
-      // Update token hash
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // M-26: storeRefreshToken via client transaction
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       const result = await authService.register('new@example.com', 'ValidPass123', { acceptedLegalTerms: true });
 
@@ -1022,7 +1072,7 @@ describe('AuthService', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when token hash does not match session hash', async () => {
+    it('should return null and ROLLBACK when token hash does not match (CR-2)', async () => {
       const user = createMockUserRow();
       const jwt = await import('jsonwebtoken');
       const token = jwt.sign(
@@ -1031,19 +1081,78 @@ describe('AuthService', () => {
         { algorithm: 'HS256', expiresIn: '7d' }
       );
 
-      // Session found but hash won't match
-      mockDbQuery.mockResolvedValueOnce({
-        rows: [{
-          id: 'session-123',
-          refresh_token_hash: '$2a$10$completelydifferenthash',
-          ip_address: null,
-          user_agent: null,
-        }],
-      });
+      // CR-2: Session found via FOR UPDATE but hash won't match → ROLLBACK
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({
+          rows: [{
+            id: 'session-123',
+            refresh_token_hash: '$2a$10$completelydifferenthash',
+            ip_address: null,
+            user_agent: null,
+          }],
+        }) // SELECT ... FOR UPDATE (found but hash mismatch)
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
       const result = await authService.refreshTokens(token);
 
       expect(result).toBeNull();
+      // Verify ROLLBACK was called (not COMMIT)
+      expect(mockClientQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+    });
+  });
+
+  describe('storeRefreshToken transaction (M-26)', () => {
+    const validPassword = 'TestPassword123';
+    let validPasswordHash: string;
+
+    beforeEach(async () => {
+      validPasswordHash = await bcrypt.hash(validPassword, 10);
+    });
+
+    it('should rollback if hash UPDATE fails after INSERT', async () => {
+      const user = createMockUserRow({ password_hash: validPasswordHash });
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [user] })           // findUserByEmail
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] }); // enforceSessionLimit COUNT
+
+      mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
+      mockResetFailedAttempts.mockResolvedValueOnce(undefined);
+
+      // storeRefreshToken transaction: INSERT succeeds but UPDATE fails
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session (succeeds)
+        .mockRejectedValueOnce(new Error('UPDATE failed'))        // UPDATE hash (fails)
+        .mockResolvedValueOnce({ rows: [] });                     // ROLLBACK
+
+      await expect(
+        authService.login('test@example.com', validPassword)
+      ).rejects.toThrow('UPDATE failed');
+
+      // Verify ROLLBACK was called
+      expect(mockClientQuery).toHaveBeenNthCalledWith(4, 'ROLLBACK');
+    });
+
+    it('should use BCRYPT_ROUNDS constant for hashing (M-2)', async () => {
+      const user = createMockUserRow({ password_hash: validPasswordHash });
+      mockSuccessfulLoginDbQueries(user);
+
+      mockGetLockoutStatus.mockResolvedValueOnce({ isLocked: false, failedAttempts: 0 });
+      mockResetFailedAttempts.mockResolvedValueOnce(undefined);
+
+      const bcryptHashSpy = vi.spyOn(bcrypt, 'hash');
+
+      await authService.login('test@example.com', validPassword);
+
+      // All bcrypt.hash calls in storeRefreshToken should use the BCRYPT_ROUNDS constant
+      // In test, BCRYPT_ROUNDS is mocked to 10
+      const storeHashCalls = bcryptHashSpy.mock.calls.filter(call =>
+        call[1] === 10  // matches mock BCRYPT_ROUNDS value
+      );
+      expect(storeHashCalls.length).toBeGreaterThan(0);
+
+      bcryptHashSpy.mockRestore();
     });
   });
 
@@ -1094,21 +1203,26 @@ describe('AuthService', () => {
       // COMMIT
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
-      // Token creation for email verification (via pool query)
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidate existing
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert new token
+      // H-7: Token creation for email verification (via client transaction)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidate existing)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT new token
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       // Mock email sending
       const { emailService } = await import('./email-service.js');
       const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
         .mockResolvedValueOnce(undefined);
 
-      // Session limit check
+      // Session limit check (via pool)
       mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
-      // Insert session
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] });
-      // Update token hash
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // M-26: storeRefreshToken via client transaction
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       const result = await authService.register('new@example.com', 'ValidPass123', {
         acceptedLegalTerms: true,
@@ -1259,17 +1373,24 @@ describe('AuthService', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // markCodeAsUsed
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
 
-      // Token creation for email verification
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // H-7: Token creation for email verification (via client transaction)
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidate existing)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT new token
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       const { emailService } = await import('./email-service.js');
       const sendVerificationSpy = vi.spyOn(emailService, 'sendVerificationEmail')
         .mockResolvedValueOnce(undefined);
 
       mockDbQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] }); // session limit
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }); // insert session
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // update token hash
+      // M-26: storeRefreshToken via client transaction
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                      // BEGIN
+        .mockResolvedValueOnce({ rows: [{ id: 'session-123' }] }) // INSERT session
+        .mockResolvedValueOnce({ rows: [] })                      // UPDATE token hash
+        .mockResolvedValueOnce({ rows: [] });                     // COMMIT
 
       const result = await authService.register('new@example.com', 'ValidPass123', {
         acceptedLegalTerms: true,

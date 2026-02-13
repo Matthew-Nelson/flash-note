@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
+import { mockDbQuery, mockClientQuery, resetMocks, TEST_CONFIG_DEFAULTS } from '../test/setup.js';
 import { tokenService } from './token-service.js';
 import crypto from 'crypto';
 
@@ -80,35 +80,40 @@ describe('TokenService', () => {
 
   describe('createToken', () => {
     it('should invalidate existing tokens of same type before creating new one', async () => {
-      // Mock invalidation query
-      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
-      // Mock insert query
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      // H-7: createToken now uses a transaction via client
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })              // BEGIN
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // UPDATE (invalidate)
+        .mockResolvedValueOnce({ rows: [] })              // INSERT
+        .mockResolvedValueOnce({ rows: [] });             // COMMIT
 
       await tokenService.createToken('user-123', 'email_verification');
 
-      // First call should be UPDATE to invalidate existing tokens
-      expect(mockDbQuery).toHaveBeenNthCalledWith(
-        1,
+      // Second client call (after BEGIN) should be UPDATE to invalidate existing tokens
+      expect(mockClientQuery).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('UPDATE email_tokens'),
         expect.arrayContaining(['user-123', 'email_verification'])
       );
-      expect(mockDbQuery).toHaveBeenNthCalledWith(
-        1,
+      expect(mockClientQuery).toHaveBeenNthCalledWith(
+        2,
         expect.stringContaining('SET used_at = NOW()'),
         expect.any(Array)
       );
     });
 
     it('should insert new token with correct parameters', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // invalidation
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // insert
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidation)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       const token = await tokenService.createToken('user-123', 'password_reset');
 
-      // Second call should be INSERT
-      expect(mockDbQuery).toHaveBeenNthCalledWith(
-        2,
+      // Third client call (after BEGIN + UPDATE) should be INSERT
+      expect(mockClientQuery).toHaveBeenNthCalledWith(
+        3,
         expect.stringContaining('INSERT INTO email_tokens'),
         expect.arrayContaining(['user-123', 'password_reset'])
       );
@@ -119,15 +124,18 @@ describe('TokenService', () => {
     });
 
     it('should set correct expiry for email verification (24 hours)', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE
+        .mockResolvedValueOnce({ rows: [] })  // INSERT
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       const beforeCreate = new Date();
       await tokenService.createToken('user-123', 'email_verification');
       const afterCreate = new Date();
 
-      // Extract expires_at from the INSERT call
-      const insertArgs = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      // Extract expires_at from the INSERT call (3rd client call)
+      const insertArgs = mockClientQuery.mock.calls[2] as [string, unknown[]];
       const expiresAt = insertArgs[1][3] as Date;
 
       // Should be approximately 24 hours in the future
@@ -139,14 +147,17 @@ describe('TokenService', () => {
     });
 
     it('should set correct expiry for password reset (15 minutes)', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE
+        .mockResolvedValueOnce({ rows: [] })  // INSERT
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       const beforeCreate = new Date();
       await tokenService.createToken('user-123', 'password_reset');
       const afterCreate = new Date();
 
-      const insertArgs = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      const insertArgs = mockClientQuery.mock.calls[2] as [string, unknown[]];
       const expiresAt = insertArgs[1][3] as Date;
 
       // Should be approximately 15 minutes in the future
@@ -155,6 +166,21 @@ describe('TokenService', () => {
 
       expect(expiresAt.getTime()).toBeGreaterThanOrEqual(expectedMin.getTime());
       expect(expiresAt.getTime()).toBeLessThanOrEqual(expectedMax.getTime());
+    });
+
+    it('should rollback if INSERT fails after invalidation (H-7)', async () => {
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidation succeeds)
+        .mockRejectedValueOnce(new Error('INSERT failed'))  // INSERT fails
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      await expect(
+        tokenService.createToken('user-123', 'email_verification')
+      ).rejects.toThrow('INSERT failed');
+
+      // Verify ROLLBACK was called (4th call after BEGIN, UPDATE, failed INSERT)
+      expect(mockClientQuery).toHaveBeenNthCalledWith(4, 'ROLLBACK');
     });
   });
 
@@ -394,13 +420,16 @@ describe('TokenService', () => {
 
   describe('security properties', () => {
     it('should not store plain tokens in database', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // UPDATE (invalidation)
+        .mockResolvedValueOnce({ rows: [] })  // INSERT
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
       const token = await tokenService.createToken('user-123', 'email_verification');
 
-      // The INSERT query should contain a hash, not the plain token
-      const insertCall = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      // The INSERT query (3rd client call) should contain a hash, not the plain token
+      const insertCall = mockClientQuery.mock.calls[2] as [string, unknown[]];
       const storedValue = insertCall[1][1]; // token_hash parameter
 
       expect(storedValue).not.toBe(token);

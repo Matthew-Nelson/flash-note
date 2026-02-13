@@ -68,21 +68,35 @@ class TokenService {
     const { token, tokenHash } = this.generateToken();
     const expiresAt = this.calculateExpiry(type);
 
-    // SECURITY: Invalidate existing unused tokens of the same type
-    // This prevents multiple valid tokens from existing simultaneously
-    await db.query(
-      `UPDATE email_tokens
-       SET used_at = NOW()
-       WHERE user_id = $1 AND token_type = $2 AND used_at IS NULL`,
-      [userId, type]
-    );
+    // H-7: Wrap invalidate + insert in a transaction to prevent orphaned invalidation
+    // if the INSERT fails after the UPDATE has already marked old tokens as used
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
 
-    // Insert new token
-    await db.query(
-      `INSERT INTO email_tokens (user_id, token_hash, token_type, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-      [userId, tokenHash, type, expiresAt]
-    );
+      // SECURITY: Invalidate existing unused tokens of the same type
+      // This prevents multiple valid tokens from existing simultaneously
+      await client.query(
+        `UPDATE email_tokens
+         SET used_at = NOW()
+         WHERE user_id = $1 AND token_type = $2 AND used_at IS NULL`,
+        [userId, type]
+      );
+
+      // Insert new token
+      await client.query(
+        `INSERT INTO email_tokens (user_id, token_hash, token_type, expires_at)
+         VALUES ($1, $2, $3, $4)`,
+        [userId, tokenHash, type, expiresAt]
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection unusable */ }
+      throw err;
+    } finally {
+      client.release();
+    }
 
     return token;
   }

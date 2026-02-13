@@ -281,22 +281,20 @@ class AuthService {
     const payload = this.verifyRefreshToken(refreshToken);
     if (!payload) return null;
 
-    // Check if refresh token is valid in database (O(1) with sessionId, O(n) for legacy)
-    // HIGH-006: Also checks device binding and logs mismatches
-    const validationResult = await this.validateRefreshToken(
+    // CR-2: Atomically validate and revoke the old refresh token
+    // For tokens with sessionId: SELECT ... FOR UPDATE + DELETE in one transaction
+    // For legacy tokens: O(n) validation + DELETE by session ID
+    const validationResult = await this.validateAndRevokeRefreshToken(
       payload.userId,
       payload.sessionId,
       refreshToken,
       context
     );
-    if (!validationResult.valid) return null;
+    if (!validationResult) return null;
 
     // Get user
     const user = await findUserById(payload.userId);
     if (!user) return null;
-
-    // Revoke old refresh token (O(1) with sessionId)
-    await this.revokeRefreshToken(payload.sessionId);
 
     // Generate new access token
     const newAccessToken = this.generateAccessToken(user.id, user.email, user.tokenVersion);
@@ -372,31 +370,46 @@ class AuthService {
 
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
-    // Step 1: Insert session with placeholder hash to get the ID
-    const insertResult = await db.query<{ id: string }>(
-      `INSERT INTO sessions (user_id, refresh_token_hash, expires_at, ip_address, user_agent)
-       VALUES ($1, 'placeholder', $2, $3, $4)
-       RETURNING id`,
-      [userId, expiresAt, context.ipAddress ?? null, context.userAgent ?? null]
-    );
+    // M-26: Wrap insert-then-update in a transaction to eliminate the window
+    // where a 'placeholder' hash exists in the DB if the process crashes
+    // between INSERT and UPDATE
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
 
-    // INSERT with RETURNING always returns the inserted row
-    if (!insertResult.rows[0]) {
-      throw new Error('Failed to create session');
+      // Step 1: Insert session with placeholder hash to get the ID
+      const insertResult = await client.query<{ id: string }>(
+        `INSERT INTO sessions (user_id, refresh_token_hash, expires_at, ip_address, user_agent)
+         VALUES ($1, 'placeholder', $2, $3, $4)
+         RETURNING id`,
+        [userId, expiresAt, context.ipAddress ?? null, context.userAgent ?? null]
+      );
+
+      // INSERT with RETURNING always returns the inserted row
+      if (!insertResult.rows[0]) {
+        throw new Error('Failed to create session');
+      }
+      const sessionId = insertResult.rows[0].id;
+
+      // Step 2: Generate token with sessionId included
+      const refreshToken = this.generateRefreshToken(userId, sessionId);
+
+      // Step 3: Hash and update the session with the real token hash
+      const hash = await bcrypt.hash(refreshToken, BCRYPT_ROUNDS);
+      await client.query(
+        'UPDATE sessions SET refresh_token_hash = $1 WHERE id = $2',
+        [hash, sessionId]
+      );
+
+      await client.query('COMMIT');
+
+      return { sessionId, refreshToken };
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection unusable */ }
+      throw err;
+    } finally {
+      client.release();
     }
-    const sessionId = insertResult.rows[0].id;
-
-    // Step 2: Generate token with sessionId included
-    const refreshToken = this.generateRefreshToken(userId, sessionId);
-
-    // Step 3: Hash and update the session with the real token hash
-    const hash = await bcrypt.hash(refreshToken, 10);
-    await db.query(
-      'UPDATE sessions SET refresh_token_hash = $1 WHERE id = $2',
-      [hash, sessionId]
-    );
-
-    return { sessionId, refreshToken };
   }
 
   /**
@@ -446,45 +459,83 @@ class AuthService {
   }
 
   /**
-   * MEDIUM-002: O(1) token validation using sessionId from JWT payload.
-   * Falls back to O(n) legacy validation for tokens without sessionId.
+   * CR-2: Atomically validate and revoke a refresh token.
    *
-   * HIGH-006: Checks device binding and logs mismatches (lenient - doesn't block).
+   * For tokens WITH sessionId (current path):
+   * - Uses SELECT ... FOR UPDATE to lock the session row
+   * - Verifies hash in JS (bcrypt can't run in SQL)
+   * - DELETEs the session within the same transaction
+   * - The lock blocks concurrent requests on the same row
+   *
+   * For tokens WITHOUT sessionId (legacy path):
+   * - Falls back to O(n) validateLegacyRefreshToken
+   * - Now also revokes the legacy session (fixes pre-existing bug where
+   *   legacy tokens were never revoked during refresh)
+   *
+   * HIGH-006: Checks device binding and logs mismatches (lenient).
    */
-  private async validateRefreshToken(
+  private async validateAndRevokeRefreshToken(
     userId: string,
     sessionId: string,
     refreshToken: string,
     context: LoginContext = {}
-  ): Promise<{ valid: boolean; session?: SessionValidationRow }> {
+  ): Promise<SessionValidationRow | null> {
     // Backwards compat: Legacy tokens don't have sessionId
     if (!sessionId) {
-      return this.validateLegacyRefreshToken(userId, refreshToken);
+      const legacyResult = await this.validateLegacyRefreshToken(userId, refreshToken);
+      if (!legacyResult.valid) return null;
+
+      // CR-2 bug fix: Revoke legacy session to prevent it from remaining valid
+      // alongside the new session for up to 7 days
+      if (legacyResult.session?.id) {
+        await db.query('DELETE FROM sessions WHERE id = $1', [legacyResult.session.id]);
+      }
+
+      return legacyResult.session ?? null;
     }
 
-    // O(1) lookup by session ID (primary key) + user_id for security
-    const result = await db.query<SessionValidationRow>(
-      `SELECT id, refresh_token_hash, ip_address, user_agent
-       FROM sessions
-       WHERE id = $1 AND user_id = $2 AND expires_at > NOW()`,
-      [sessionId, userId]
-    );
+    // O(1) lookup with row lock inside a transaction
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
 
-    const session = result.rows[0];
-    if (!session) {
-      return { valid: false };
+      // SELECT ... FOR UPDATE locks the row, blocking concurrent refresh attempts
+      const result = await client.query<SessionValidationRow>(
+        `SELECT id, refresh_token_hash, ip_address, user_agent
+         FROM sessions
+         WHERE id = $1 AND user_id = $2 AND expires_at > NOW()
+         FOR UPDATE`,
+        [sessionId, userId]
+      );
+
+      const session = result.rows[0];
+      if (!session) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      // Single bcrypt comparison (must happen in JS, not SQL)
+      const tokenValid = await bcrypt.compare(refreshToken, session.refresh_token_hash);
+      if (!tokenValid) {
+        await client.query('ROLLBACK');
+        return null;
+      }
+
+      // Delete the session atomically — no window for concurrent use
+      await client.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
+
+      await client.query('COMMIT');
+
+      // HIGH-006: Check device binding outside the transaction (non-blocking audit log)
+      await this.checkDeviceBinding(userId, sessionId, session, context);
+
+      return session;
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection unusable */ }
+      throw err;
+    } finally {
+      client.release();
     }
-
-    // Single bcrypt comparison instead of O(n) loop
-    const tokenValid = await bcrypt.compare(refreshToken, session.refresh_token_hash);
-    if (!tokenValid) {
-      return { valid: false };
-    }
-
-    // HIGH-006: Check device binding, log mismatches (lenient - don't block)
-    await this.checkDeviceBinding(userId, sessionId, session, context);
-
-    return { valid: true, session };
   }
 
   /**
@@ -546,18 +597,6 @@ class AuthService {
       }
     }
     return { valid: false };
-  }
-
-  /**
-   * Revokes a refresh token by deleting its session.
-   * O(1) when sessionId is known (new tokens), legacy tokens cleaned up on logout/expiry.
-   */
-  private async revokeRefreshToken(sessionId: string): Promise<void> {
-    if (!sessionId) {
-      // Legacy tokens without sessionId - they'll be cleaned up on logout or expiry
-      return;
-    }
-    await db.query('DELETE FROM sessions WHERE id = $1', [sessionId]);
   }
 
   private sanitizeUser(user: User) {

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import * as Sentry from '@sentry/node';
 import { authService } from '../services/auth-service.js';
 import { auditService } from '../services/audit-service.js';
 import { tokenService } from '../services/token-service.js';
@@ -19,8 +20,8 @@ import { requireAuth } from '../middleware/auth.js';
 import { requireCsrf } from '../middleware/csrf.js';
 import { AuditAction, type AuthenticatedRequest } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
-import { findUserByEmail, findUserById, markEmailVerified, updatePassword, incrementTokenVersion, resetLockout } from '../db/queries/users.js';
-import { deleteSessionsByUserId } from '../db/queries/sessions.js';
+import { findUserByEmail, findUserById, markEmailVerified } from '../db/queries/users.js';
+import { db } from '../db/index.js';
 import { findByCode, validateCodeRedeemable } from '../db/queries/invite-codes.js';
 import { BCRYPT_ROUNDS, config } from '../config.js';
 
@@ -180,7 +181,7 @@ authRouter.post('/login', loginRateLimit, async (req, res, next) => {
         userId: null,
         action: AuditAction.LOGIN_FAILED,
         status: 'FAILURE',
-        metadata: { email },
+        metadata: { emailProvided: true },
         ipAddress,
         userAgent,
       });
@@ -425,28 +426,61 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
     // Hash new password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-    // Update password
-    await updatePassword(userId, passwordHash);
+    // CR-5: Wrap all password reset mutations in a transaction
+    // Prevents partial state (e.g., password changed but sessions still valid)
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
 
-    // SECURITY: Increment token version to immediately invalidate all access tokens
-    // This is critical because access tokens are stateless JWTs that would otherwise
-    // remain valid until expiry (up to 1 hour) even after password reset
-    await incrementTokenVersion(userId);
+      // SECURITY: Update password, increment token version (invalidates all access tokens),
+      // and reset lockout state in a single UPDATE to minimize round-trips and lock duration
+      await client.query(
+        `UPDATE users
+         SET password_hash = $1,
+             token_version = token_version + 1,
+             failed_login_attempts = 0,
+             locked_until = NULL,
+             last_failed_login_at = NULL,
+             updated_at = NOW()
+         WHERE id = $2`,
+        [passwordHash, userId]
+      );
 
-    // SECURITY: Also delete all sessions (refresh tokens) to force re-login
-    await deleteSessionsByUserId(userId);
+      // SECURITY: Delete all sessions (refresh tokens) to force re-login
+      await client.query(
+        'DELETE FROM sessions WHERE user_id = $1',
+        [userId]
+      );
 
-    // SECURITY: Reset lockout counter on password reset
-    await resetLockout(userId);
+      await client.query('COMMIT');
+    } catch (err) {
+      try { await client.query('ROLLBACK'); } catch { /* connection unusable */ }
+      throw err;
+    } finally {
+      client.release();
+    }
 
-    await auditService.log({
-      userId,
-      action: AuditAction.PASSWORD_RESET_SUCCESS,
-      status: 'SUCCESS',
-      metadata: { sessionsInvalidated: true },
-      ipAddress,
-      userAgent,
-    });
+    // Rule 9: Audit log outside transaction — wrap in try/catch with Sentry
+    // so a failed audit write doesn't make the (already committed) password reset
+    // appear to fail to the user
+    try {
+      await auditService.log({
+        userId,
+        action: AuditAction.PASSWORD_RESET_SUCCESS,
+        status: 'SUCCESS',
+        metadata: { sessionsInvalidated: true },
+        ipAddress,
+        userAgent,
+      });
+    } catch (auditError) {
+      Sentry.captureException(auditError, {
+        extra: {
+          source: 'auth_service',
+          errorType: 'password_reset_audit_failed',
+          userId,
+        },
+      });
+    }
 
     res.json({
       success: true,

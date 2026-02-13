@@ -241,6 +241,29 @@ describe('requireAuth middleware', () => {
   });
 
   describe('security edge cases', () => {
+    it('should reject JWT with algorithm: none (unsigned token)', async () => {
+      // Manually construct an unsigned JWT with {"alg":"none"} header
+      const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' }))
+        .toString('base64url');
+      const payload = Buffer.from(JSON.stringify({
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        tokenVersion: 1,
+      })).toString('base64url');
+      const unsignedToken = `${header}.${payload}.`;
+
+      mockReq.headers = { authorization: `Bearer ${unsignedToken}` };
+
+      await requireAuth(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).not.toHaveBeenCalled();
+      expect(statusMock).toHaveBeenCalledWith(401);
+      expect(jsonMock).toHaveBeenCalledWith({
+        success: false,
+        error: { code: 'invalid_token', message: 'Invalid or expired token' },
+      });
+    });
+
     it('should reject token with future version (tampered token)', async () => {
       // If someone tries to tamper with the token to use a higher version
       const token = createValidToken({
