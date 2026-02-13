@@ -367,7 +367,7 @@ These items must be complete before public launch.
 |-------------|--------|-------|
 | Domain purchased | ❌ | flashnote.co |
 | DNS configured | ❌ | |
-| Backend deployed (Render) | ❌ | |
+| Backend deployed (Cloud Run) | ❌ | |
 | Database provisioned | ❌ | |
 | Web deployed (Vercel) | ❌ | |
 | SSL certificates active | ❌ | |

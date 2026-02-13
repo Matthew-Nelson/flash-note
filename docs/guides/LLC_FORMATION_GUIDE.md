@@ -87,7 +87,7 @@ Here's the exact order you should do things (DO NOT skip or reorder):
     └─> See GitHub section below           Timeline: After LLC formed
     └─> Document in writing
 
-11. Update Service Providers ──────────> Render, Vercel, Stripe, etc.
+11. Update Service Providers ──────────> Google Cloud, Vercel, Stripe, etc.
     └─> Change to LLC name                 Timeline: After bank account
     └─> Use business payment method
 
@@ -408,7 +408,7 @@ Services like LegalZoom, ZenBusiness, Incfile will:
 - 4000 - Revenue (subscription income)
 
 **Expenses:**
-- 5000 - Server/Hosting (Render, Vercel)
+- 5000 - Server/Hosting (Google Cloud, Vercel)
 - 5100 - Software/Tools (Stripe fees, domain)
 - 5200 - Marketing/Advertising
 - 5300 - Legal/Professional Fees
@@ -465,15 +465,14 @@ The LLC only protects you if you keep business and personal finances **completel
 **Example:**
 ```
 Personal Account ──$500──> Business Account (Owner Contribution)
-Business Account ──$7───> Render (Server Hosting)
-Business Account ──$7───> Render (Database Hosting)
+Business Account ──$XX──> Google Cloud (Cloud Run + Cloud SQL)
 Business Account ──$12──> Namecheap (Domain)
 ```
 
 ### Paying for Existing Services
 
 **Services you're already using:**
-1. Render (server + database)
+1. Google Cloud (Cloud Run + Cloud SQL)
 2. Vercel (landing page)
 3. Domain registrar
 4. Stripe (payment processing)
@@ -632,7 +631,7 @@ Categorize: Taxes - Franchise Tax
 ### Tax Deductions (Track These!)
 
 **Common business expenses:**
-- Server/hosting: Render, Vercel ($15/month)
+- Server/hosting: Google Cloud, Vercel (~$15-45/month)
 - Domain registration ($12/year)
 - Stripe fees (2.9% + $0.30 per transaction)
 - Google Cloud / LLM API costs
@@ -957,7 +956,7 @@ Date: __________                 Date: __________
 - [ ] Update LICENSE file with LLC copyright
 - [ ] Create IP assignment agreement (self-execute or lawyer)
 - [ ] Transfer domain registration to LLC name
-- [ ] Update service providers (Render, Vercel, Stripe)
+- [ ] Update service providers (Google Cloud, Vercel, Stripe)
 - [ ] Update payment methods to business account
 - [ ] Get business credit card (optional)
 - [ ] Set up receipt scanning (Wave mobile app)

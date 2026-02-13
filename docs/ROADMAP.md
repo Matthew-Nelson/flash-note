@@ -109,7 +109,7 @@ These items are **required for production** with real patient data. They should 
 | Sign Vertex AI BAA with Google Cloud | SUCCESS_METRICS PROD-09 | Not done |
 | Database encryption at rest | SUCCESS_METRICS PROD-07 | Not deployed |
 | TLS 1.2+ enforced on all connections | SUCCESS_METRICS PROD-08 | Not deployed |
-| HIPAA-compliant hosting provider with BAA | PRE_LAUNCH_CHECKLIST §2 | Not done |
+| Sign Google Cloud BAA (covers Cloud Run, Cloud SQL, Vertex AI) | PRE_LAUNCH_CHECKLIST §2 | Not done |
 | Breach notification / incident response procedure | HITECH Act requirement | Not documented |
 | BAA acceptance in signup flow (backend) | PRE_LAUNCH_LEGAL_COMPLIANCE | ✅ Done (legal_acceptances table + recordLegalAcceptances in auth-service) |
 | **Create `/baa` web page** (so users can read the BAA) | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
@@ -292,8 +292,8 @@ See [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) for full details.
 ### Critical Path
 
 1. **Business Formation** - LLC, EIN, bank account
-2. **HIPAA Compliance** - Sign BAAs with Google Cloud, hosting provider
-3. **Infrastructure** - Deploy to HIPAA-compliant hosting
+2. **HIPAA Compliance** - Sign Google Cloud BAA (covers Cloud Run, Cloud SQL, Vertex AI)
+3. **Infrastructure** - Deploy to Google Cloud (Cloud Run + Cloud SQL)
 4. **Payments** - Configure Stripe live mode, webhook cleanup job
 5. **Legal** - Finalize and publish privacy policy, terms of service
 6. **Chrome Store** - Submit extension for review

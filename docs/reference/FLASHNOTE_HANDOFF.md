@@ -225,9 +225,9 @@ Rationale:
 | Extension styling | Tailwind CSS | Rapid development |
 | Extension bundler | Vite | Fast builds, good DX |
 | Payments | Stripe | Industry standard, great docs |
-| Hosting (API) | Render or Railway | Simple, cheap, good DX |
+| Hosting (API) | Google Cloud Run | Managed, scalable, HIPAA-eligible |
 | Hosting (Web) | Vercel | Free tier, great for Next.js |
-| Database hosting | Railway or Render | Managed PostgreSQL |
+| Database hosting | Google Cloud SQL | Managed PostgreSQL, HIPAA-eligible |
 
 ### Project Structure
 
@@ -408,7 +408,7 @@ flashnote/
 
 | Task | Hours | Priority | Notes |
 |------|-------|----------|-------|
-| Production deployment (API) | 3 | P0 | Render/Railway |
+| Production deployment (API) | 3 | P0 | Cloud Run |
 | Production database | 2 | P0 | Managed PostgreSQL |
 | Domain + SSL | 1 | P0 | HTTPS required |
 | Privacy policy | 2 | P0 | Legal requirement |
@@ -2186,12 +2186,12 @@ export function requireActiveSubscription(db: Pool) {
 
 | Component | Service | Cost |
 |-----------|---------|------|
-| Backend API | Render (Web Service) | $7/mo |
-| PostgreSQL | Render (PostgreSQL) | $7/mo |
+| Backend API | Google Cloud Run | Free tier / ~$5-15/mo |
+| PostgreSQL | Google Cloud SQL | ~$10-30/mo |
 | Landing Page | Vercel | Free |
 | Domain | Namecheap | ~$12/yr |
-| SSL | Included with Render/Vercel | Free |
-| **Total** | | **~$15/mo** |
+| SSL | Included with Cloud Run/Vercel | Free |
+| **Total** | | **~$15-45/mo** |
 
 ### Environment Variables
 
@@ -2233,14 +2233,14 @@ Pre-deployment:
 ☐ API endpoints tested locally
 ☐ Extension tested with production API URL
 
-Render Setup:
-☐ Create Web Service (Node.js)
-☐ Connect GitHub repository
-☐ Configure build command: npm run build
-☐ Configure start command: npm start
-☐ Add environment variables
-☐ Create PostgreSQL database
-☐ Note DATABASE_URL connection string
+Google Cloud Setup:
+☐ Create GCP project
+☐ Enable Cloud Run and Cloud SQL APIs
+☐ Create Cloud SQL PostgreSQL instance
+☐ Note DATABASE_URL connection string (Cloud SQL Auth Proxy or private IP)
+☐ Deploy backend to Cloud Run (connect GitHub or use Cloud Build)
+☐ Configure environment variables in Cloud Run
+☐ Map custom domain (api.flashnote.co) to Cloud Run service
 
 Vercel Setup:
 ☐ Connect GitHub repository (web folder)
@@ -2250,7 +2250,7 @@ Vercel Setup:
 
 DNS Setup:
 ☐ Purchase domain (flashnote.co)
-☐ Configure A record for api.flashnote.co → Render
+☐ Configure A record for api.flashnote.co → Cloud Run
 ☐ Configure CNAME for www → Vercel
 ☐ Wait for SSL certificate provisioning
 

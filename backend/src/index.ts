@@ -39,7 +39,7 @@ process.on('unhandledRejection', (reason) => {
 
 const app: Express = express();
 
-// Trust the first proxy hop (Render/Railway/Heroku single reverse proxy).
+// Trust the first proxy hop (Cloud Run single reverse proxy).
 // Required for correct req.ip in rate limiting, audit logs, and security middleware.
 app.set('trust proxy', 1);
 

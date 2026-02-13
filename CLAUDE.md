@@ -97,11 +97,17 @@ FlashNote is an AI-powered browser extension that helps Physical Therapists gene
 
 ## Database Schema
 
-Only 4 tables needed:
-- `users` - User accounts and subscription info
-- `sessions` - Refresh token storage
-- `audit_logs` - HIPAA-required action logging
-- `usage` - Monthly usage tracking for billing
+10 tables:
+- `users` - User accounts, subscription info, org membership, email verification, lockout state
+- `sessions` - Refresh token storage (hashed tokens, device binding)
+- `audit_logs` - HIPAA-required action logging (immutable)
+- `usage` - Monthly usage tracking (input/output token split)
+- `organizations` - Clinic/team management with seat limits
+- `organization_members` - Membership records with soft-delete
+- `legal_acceptances` - Terms of Service / BAA consent tracking (per document version)
+- `invite_codes` - Personal or clinic-based invitation codes with expiry
+- `webhook_events` - Stripe webhook deduplication (idempotency)
+- `migrations` - Migration tracking (auto-managed)
 
 ## Important Patterns
 
