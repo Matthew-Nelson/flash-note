@@ -1,5 +1,14 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import type { Request } from 'express';
+
+const { mockSentry } = vi.hoisted(() => ({
+  mockSentry: {
+    captureException: vi.fn(),
+  },
+}));
+
+vi.mock('@sentry/node', () => mockSentry);
+
 import { getRequestMetadata, safeAuditLog, sanitizeIpAddress } from './request-utils.js';
 
 describe('request-utils', () => {
@@ -118,6 +127,10 @@ describe('request-utils', () => {
   describe('safeAuditLog', () => {
     let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
+    beforeEach(() => {
+      mockSentry.captureException.mockReset();
+    });
+
     afterEach(() => {
       consoleErrorSpy?.mockRestore();
     });
@@ -189,6 +202,26 @@ describe('request-utils', () => {
 
       // Clean up
       rejectFn!(new Error('Cleanup'));
+    });
+
+    it('should capture audit failure to Sentry (M-6)', async () => {
+      consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const error = new Error('Audit database error');
+      const failedPromise = Promise.reject(error);
+
+      safeAuditLog(failedPromise, 'login-audit');
+
+      // Wait for the catch handler to run
+      await new Promise((resolve) => setTimeout(resolve, 10));
+
+      expect(mockSentry.captureException).toHaveBeenCalledWith(error, {
+        extra: {
+          source: 'audit_service',
+          errorType: 'safe_audit_log_failed',
+          context: 'login-audit',
+        },
+      });
     });
   });
 });

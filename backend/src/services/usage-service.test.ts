@@ -1,6 +1,14 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { mockDbQuery, resetMocks } from '../test/setup.js';
 
+const { mockSentry } = vi.hoisted(() => ({
+  mockSentry: {
+    captureException: vi.fn(),
+  },
+}));
+
+vi.mock('@sentry/node', () => mockSentry);
+
 // Import after mocking
 import { usageService } from './usage-service.js';
 
@@ -9,6 +17,7 @@ describe('UsageService', () => {
 
   beforeEach(() => {
     resetMocks();
+    mockSentry.captureException.mockReset();
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -63,6 +72,20 @@ describe('UsageService', () => {
         'Usage tracking failed:',
         expect.any(Error)
       );
+    });
+
+    it('should capture usage tracking failure to Sentry (M-5)', async () => {
+      const dbError = new Error('Database connection failed');
+      mockDbQuery.mockRejectedValueOnce(dbError);
+
+      await usageService.incrementUsage('user-123', 50, 50);
+
+      expect(mockSentry.captureException).toHaveBeenCalledWith(dbError, {
+        extra: {
+          source: 'usage_service',
+          errorType: 'increment_usage_failed',
+        },
+      });
     });
 
     it('should format month as YYYY-MM', async () => {

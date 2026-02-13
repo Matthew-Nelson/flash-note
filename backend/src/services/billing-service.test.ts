@@ -8,11 +8,15 @@ const {
   mockStripeBillingPortalCreate,
   mockStripeWebhooksConstructEvent,
   mockStripeSubscriptionsRetrieve,
+  mockSentry,
 } = vi.hoisted(() => ({
   mockStripeCheckoutCreate: vi.fn(),
   mockStripeBillingPortalCreate: vi.fn(),
   mockStripeWebhooksConstructEvent: vi.fn(),
   mockStripeSubscriptionsRetrieve: vi.fn(),
+  mockSentry: {
+    captureException: vi.fn(),
+  },
 }));
 
 // Mock Stripe - use a class to work with 'new Stripe()'
@@ -39,6 +43,8 @@ vi.mock('stripe', () => {
   };
 });
 
+vi.mock('@sentry/node', () => mockSentry);
+
 // Mock config
 vi.mock('../config.js', () => ({
   config: {
@@ -61,9 +67,11 @@ vi.mock('../db/queries/users.js', () => ({
 
 // Mock webhook queries for idempotency
 const mockTryMarkWebhookProcessed = vi.fn();
+const mockDeleteProcessedWebhookEvent = vi.fn();
 
 vi.mock('../db/queries/webhooks.js', () => ({
   tryMarkWebhookProcessed: (...args: unknown[]) => mockTryMarkWebhookProcessed(...args),
+  deleteProcessedWebhookEvent: (...args: unknown[]) => mockDeleteProcessedWebhookEvent(...args),
 }));
 
 // Import after mocking
@@ -82,8 +90,11 @@ describe('BillingService', () => {
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
     mockTryMarkWebhookProcessed.mockReset();
+    mockDeleteProcessedWebhookEvent.mockReset();
+    mockSentry.captureException.mockReset();
     // Default: allow all events to be processed (return true = new event)
     mockTryMarkWebhookProcessed.mockResolvedValue(true);
+    mockDeleteProcessedWebhookEvent.mockResolvedValue(undefined);
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
   });
 
@@ -92,6 +103,15 @@ describe('BillingService', () => {
   });
 
   describe('createCheckoutSession', () => {
+    beforeEach(() => {
+      // Default: user exists with trialing status (eligible for checkout)
+      mockFindUserById.mockResolvedValue({
+        id: 'user-123',
+        subscriptionStatus: 'trialing',
+        stripeCustomerId: null,
+      });
+    });
+
     it('should create a Stripe checkout session', async () => {
       mockStripeCheckoutCreate.mockResolvedValueOnce({
         url: 'https://checkout.stripe.com/session123',
@@ -132,6 +152,11 @@ describe('BillingService', () => {
     });
 
     it('should include userId in both session and subscription metadata', async () => {
+      mockFindUserById.mockResolvedValueOnce({
+        id: 'user-abc',
+        subscriptionStatus: 'trialing',
+        stripeCustomerId: null,
+      });
       mockStripeCheckoutCreate.mockResolvedValueOnce({
         url: 'https://checkout.stripe.com/session123',
       });
@@ -160,6 +185,74 @@ describe('BillingService', () => {
       await expect(
         billingService.createCheckoutSession('user-123', 'test@example.com', 'price_123')
       ).rejects.toThrow('Stripe API error');
+    });
+
+    it('should throw 404 when user not found (H-2)', async () => {
+      mockFindUserById.mockResolvedValueOnce(null);
+
+      await expect(
+        billingService.createCheckoutSession('nonexistent', 'test@example.com', 'price_123')
+      ).rejects.toThrow('User not found');
+    });
+
+    it('should throw 409 when user already has active subscription (H-2)', async () => {
+      mockFindUserById.mockResolvedValueOnce({
+        id: 'user-123',
+        subscriptionStatus: 'active',
+        stripeCustomerId: 'cus_existing',
+      });
+
+      await expect(
+        billingService.createCheckoutSession('user-123', 'test@example.com', 'price_123')
+      ).rejects.toThrow('User already has an active subscription');
+    });
+
+    it.each(['canceled', 'past_due', 'trialing', 'unpaid'])('should allow checkout for %s subscription status (H-2)', async (status) => {
+      mockFindUserById.mockResolvedValueOnce({
+        id: 'user-123',
+        subscriptionStatus: status,
+        stripeCustomerId: null,
+      });
+      mockStripeCheckoutCreate.mockResolvedValueOnce({
+        url: 'https://checkout.stripe.com/session123',
+      });
+
+      const url = await billingService.createCheckoutSession(
+        'user-123',
+        'test@example.com',
+        'price_monthly'
+      );
+
+      expect(url).toBe('https://checkout.stripe.com/session123');
+    });
+
+    it('should reuse existing stripeCustomerId instead of customer_email (H-2)', async () => {
+      mockFindUserById.mockResolvedValueOnce({
+        id: 'user-123',
+        subscriptionStatus: 'canceled',
+        stripeCustomerId: 'cus_existing_123',
+      });
+      mockStripeCheckoutCreate.mockResolvedValueOnce({
+        url: 'https://checkout.stripe.com/session123',
+      });
+
+      await billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly');
+
+      const callArgs = mockStripeCheckoutCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(callArgs.customer).toBe('cus_existing_123');
+      expect(callArgs.customer_email).toBeUndefined();
+    });
+
+    it('should use customer_email when no stripeCustomerId exists (H-2)', async () => {
+      mockStripeCheckoutCreate.mockResolvedValueOnce({
+        url: 'https://checkout.stripe.com/session123',
+      });
+
+      await billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly');
+
+      const callArgs = mockStripeCheckoutCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(callArgs.customer_email).toBe('test@example.com');
+      expect(callArgs.customer).toBeUndefined();
     });
   });
 
@@ -471,7 +564,7 @@ describe('BillingService', () => {
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
       });
 
-      it('should update subscription status to active on payment', async () => {
+      it('should update subscription status to active when past_due', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
           id: 'evt_invoice_paid',
           type: 'invoice.paid',
@@ -493,9 +586,177 @@ describe('BillingService', () => {
           metadata: { userId: 'user-123' },
         });
 
+        // H-3: User must be in reactivatable state
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-123',
+          subscriptionStatus: 'past_due',
+        });
+
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      });
+
+      it.each(['past_due', 'trialing', 'unpaid'])('should reactivate %s status to active (H-3)', async (status) => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: `evt_invoice_paid_${status}`,
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_reactivate',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_reactivate',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_reactivate',
+          metadata: { userId: 'user-reactivate' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-reactivate',
+          subscriptionStatus: status,
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-reactivate', 'active');
+      });
+
+      it('should skip update when subscription is canceled and capture to Sentry (H-3)', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_canceled',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_canceled',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_canceled',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_canceled',
+          metadata: { userId: 'user-canceled' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-canceled',
+          subscriptionStatus: 'canceled',
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        // Should NOT create a false audit trail entry
+        expect(mockAuditLog).not.toHaveBeenCalled();
+        // Should capture to Sentry
+        expect(mockSentry.captureException).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              source: 'billing_webhook',
+              errorType: 'invoice_paid_canceled_subscription',
+            }),
+          })
+        );
+        // Should log structured error
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('invoice_paid_skipped_canceled');
+      });
+
+      it('should return early and capture to Sentry when user not found (H-3)', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_no_user_row',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_no_user_row',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_no_user_row',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_no_user_row',
+          metadata: { userId: 'user-deleted' },
+        });
+
+        // User was deleted
+        mockFindUserById.mockResolvedValueOnce(null);
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(mockAuditLog).not.toHaveBeenCalled();
+        // Should capture to Sentry
+        expect(mockSentry.captureException).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              source: 'billing_webhook',
+              errorType: 'user_not_found',
+              userId: 'user-deleted',
+            }),
+          })
+        );
+        // Should log structured error
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('invoice_paid_user_not_found');
+      });
+
+      it('should skip update when subscription is already active (H-3 idempotent)', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_invoice_paid_already_active',
+          type: 'invoice.paid',
+          data: {
+            object: {
+              id: 'inv_already_active',
+              billing_reason: 'subscription_cycle',
+              parent: {
+                subscription_details: {
+                  subscription: 'sub_already_active',
+                },
+              },
+            },
+          },
+        });
+
+        mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
+          id: 'sub_already_active',
+          metadata: { userId: 'user-already-active' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-already-active',
+          subscriptionStatus: 'active',
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        // Should NOT create a false audit trail entry
+        expect(mockAuditLog).not.toHaveBeenCalled();
       });
 
       it('should log audit event for subscription renewal', async () => {
@@ -518,6 +779,11 @@ describe('BillingService', () => {
         mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
           id: 'sub_456',
           metadata: { userId: 'user-456' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-456',
+          subscriptionStatus: 'past_due',
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
@@ -554,6 +820,11 @@ describe('BillingService', () => {
         mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
           id: 'sub_789',
           metadata: { userId: 'user-789' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-789',
+          subscriptionStatus: 'past_due',
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
@@ -621,6 +892,11 @@ describe('BillingService', () => {
         mockStripeSubscriptionsRetrieve.mockResolvedValueOnce({
           id: 'sub_expanded',
           metadata: { userId: 'user-expanded' },
+        });
+
+        mockFindUserById.mockResolvedValueOnce({
+          id: 'user-expanded',
+          subscriptionStatus: 'unpaid',
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
@@ -771,6 +1047,95 @@ describe('BillingService', () => {
         );
 
         consoleLogSpy.mockRestore();
+      });
+    });
+
+    describe('handler failure idempotency recovery (CR-1)', () => {
+      it('should delete idempotency record and re-throw on handler failure', async () => {
+        const handlerError = new Error('Database connection lost');
+        mockUpdateUserSubscription.mockRejectedValueOnce(handlerError);
+
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_handler_fail',
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              customer: 'cus_abc',
+              subscription: 'sub_xyz',
+            },
+          },
+        });
+
+        await expect(
+          billingService.handleWebhook(Buffer.from(''), 'sig')
+        ).rejects.toThrow('Database connection lost');
+
+        // Should have deleted the idempotency record
+        expect(mockDeleteProcessedWebhookEvent).toHaveBeenCalledWith('evt_handler_fail');
+        // Should have captured to Sentry
+        expect(mockSentry.captureException).toHaveBeenCalledWith(handlerError, {
+          extra: {
+            source: 'billing_webhook',
+            errorType: 'handler_failed',
+            eventId: 'evt_handler_fail',
+            eventType: 'checkout.session.completed',
+          },
+        });
+      });
+
+      it('should capture cleanup failure to Sentry when idempotency delete fails', async () => {
+        const handlerError = new Error('Handler failed');
+        const cleanupError = new Error('Cleanup also failed');
+
+        mockUpdateUserSubscription.mockRejectedValueOnce(handlerError);
+        mockDeleteProcessedWebhookEvent.mockRejectedValueOnce(cleanupError);
+
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_double_fail',
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              customer: 'cus_abc',
+              subscription: 'sub_xyz',
+            },
+          },
+        });
+
+        await expect(
+          billingService.handleWebhook(Buffer.from(''), 'sig')
+        ).rejects.toThrow('Handler failed');
+
+        // Should capture both errors to Sentry
+        expect(mockSentry.captureException).toHaveBeenCalledWith(handlerError, expect.objectContaining({
+          extra: expect.objectContaining({ errorType: 'handler_failed' }),
+        }));
+        expect(mockSentry.captureException).toHaveBeenCalledWith(cleanupError, expect.objectContaining({
+          extra: expect.objectContaining({ errorType: 'idempotency_cleanup_failed' }),
+        }));
+      });
+
+      it('should re-throw the original handler error even when cleanup fails', async () => {
+        const handlerError = new Error('Original error');
+        mockUpdateUserSubscription.mockRejectedValueOnce(handlerError);
+        mockDeleteProcessedWebhookEvent.mockRejectedValueOnce(new Error('Cleanup failed'));
+
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_rethrow',
+          type: 'checkout.session.completed',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              customer: 'cus_abc',
+              subscription: 'sub_xyz',
+            },
+          },
+        });
+
+        await expect(
+          billingService.handleWebhook(Buffer.from(''), 'sig')
+        ).rejects.toThrow('Original error');
       });
     });
   });

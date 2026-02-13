@@ -24,6 +24,15 @@ export async function tryMarkWebhookProcessed(
 }
 
 /**
+ * Delete a processed webhook event record to allow Stripe retry.
+ * Used when a handler fails after idempotency mark — removes the record
+ * so the next Stripe delivery attempt will be processed.
+ */
+export async function deleteProcessedWebhookEvent(eventId: string): Promise<void> {
+  await db.query('DELETE FROM processed_webhook_events WHERE event_id = $1', [eventId]);
+}
+
+/**
  * Clean up old webhook events.
  * Call periodically to prevent table bloat.
  * Stripe guarantees event delivery for up to 72 hours,

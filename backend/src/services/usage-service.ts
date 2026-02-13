@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import { db } from '../db/index.js';
 import type { UsageStatsRow } from '../types/database.js';
 import type { MonthlyUsageStats } from '../types/index.js';
@@ -20,6 +21,12 @@ class UsageService {
       );
     } catch (error) {
       // Don't throw - usage tracking failures shouldn't break the app
+      Sentry.captureException(error, {
+        extra: {
+          source: 'usage_service',
+          errorType: 'increment_usage_failed',
+        },
+      });
       console.error('Usage tracking failed:', error);
     }
   }
