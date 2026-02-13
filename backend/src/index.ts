@@ -103,14 +103,15 @@ function gracefulShutdown() {
   });
 }
 
-process.on('SIGTERM', gracefulShutdown);
-process.on('SIGINT', gracefulShutdown);
-
 // Start server
 const PORT = config.PORT;
 const server = app.listen(PORT, () => {
   console.log(`FlashNote API running on port ${PORT}`);
   console.log(`Environment: ${config.NODE_ENV}`);
 });
+
+// Register shutdown handlers after server is assigned to avoid TDZ reference
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);
 
 export default app;
