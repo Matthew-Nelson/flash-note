@@ -170,7 +170,7 @@ class BillingService {
   private async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
     const userId = session.metadata?.userId;
     if (!userId) {
-      await this.logMissingUserIdError('checkout.session.completed', {
+      this.logMissingUserIdError('checkout.session.completed', {
         sessionId: session.id,
         customerId: session.customer,
       });
@@ -203,7 +203,7 @@ class BillingService {
   private async handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
     const userId = subscription.metadata.userId;
     if (!userId) {
-      await this.logMissingUserIdError('customer.subscription.updated', {
+      this.logMissingUserIdError('customer.subscription.updated', {
         subscriptionId: subscription.id,
       });
       return;
@@ -240,7 +240,7 @@ class BillingService {
   private async handleSubscriptionDelete(subscription: Stripe.Subscription): Promise<void> {
     const userId = subscription.metadata.userId;
     if (!userId) {
-      await this.logMissingUserIdError('customer.subscription.deleted', {
+      this.logMissingUserIdError('customer.subscription.deleted', {
         subscriptionId: subscription.id,
       });
       return;
@@ -271,7 +271,7 @@ class BillingService {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const userId = subscription.metadata.userId;
     if (!userId) {
-      await this.logMissingUserIdError('invoice.paid', {
+      this.logMissingUserIdError('invoice.paid', {
         subscriptionId: subscription.id,
         invoiceId: invoice.id,
       });
@@ -395,7 +395,7 @@ class BillingService {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const userId = subscription.metadata.userId;
     if (!userId) {
-      await this.logMissingUserIdError('invoice.payment_failed', {
+      this.logMissingUserIdError('invoice.payment_failed', {
         subscriptionId: subscription.id,
         invoiceId: invoice.id,
       });
@@ -444,10 +444,10 @@ class BillingService {
    * This happens when a subscription wasn't created through our checkout flow
    * (e.g., created manually in Stripe Dashboard).
    */
-  private async logMissingUserIdError(
+  private logMissingUserIdError(
     eventType: string,
     context: { subscriptionId?: string; customerId?: unknown; sessionId?: string; invoiceId?: string }
-  ): Promise<void> {
+  ): void {
     // Capture to Sentry - revenue-impacting data integrity issue
     // Explicitly pick safe fields to avoid accidentally leaking sensitive data
     Sentry.captureException(new Error('Webhook missing userId in metadata'), {
