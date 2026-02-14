@@ -39,6 +39,9 @@ export interface User {
   tokenVersion: number;
   // Organization membership (PR 1C)
   organizationId: string | null;
+  // Subscription cancellation tracking
+  cancelAtPeriodEnd: boolean;
+  currentPeriodEnd: Date | null;
 }
 
 export type SubscriptionStatus =

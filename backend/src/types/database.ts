@@ -27,6 +27,8 @@ export interface UserRow {
   email_verified_at: Date | null;
   token_version: number;
   organization_id: string | null;
+  cancel_at_period_end: boolean;
+  current_period_end: Date | null;
 }
 
 /**

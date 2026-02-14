@@ -3,11 +3,14 @@ import { render, screen } from '@testing-library/react';
 import { Badge, SubscriptionBadge } from './Badge';
 
 describe('Badge', () => {
-  it.each(['trial', 'active', 'expired'] as const)(
+  it.each(['trial', 'active', 'cancelling', 'expired'] as const)(
     'should apply %s variant class',
     (variant) => {
       render(<Badge variant={variant}>Label</Badge>);
-      expect(screen.getByText('Label').className).toContain(`badge-${variant}`);
+      const className = screen.getByText('Label').className;
+      // 'cancelling' reuses the 'expired' CSS class
+      const expectedClass = variant === 'cancelling' ? 'badge-expired' : `badge-${variant}`;
+      expect(className).toContain(expectedClass);
     }
   );
 
@@ -29,6 +32,16 @@ describe('Badge', () => {
 describe('SubscriptionBadge', () => {
   it('should show "Active" for active status', () => {
     render(<SubscriptionBadge status="active" />);
+    expect(screen.getByText('Active')).toBeInTheDocument();
+  });
+
+  it('should show "Cancelling" for active status with cancelAtPeriodEnd', () => {
+    render(<SubscriptionBadge status="active" cancelAtPeriodEnd={true} />);
+    expect(screen.getByText('Cancelling')).toBeInTheDocument();
+  });
+
+  it('should show "Active" when cancelAtPeriodEnd is false', () => {
+    render(<SubscriptionBadge status="active" cancelAtPeriodEnd={false} />);
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 

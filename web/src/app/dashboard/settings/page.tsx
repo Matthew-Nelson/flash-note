@@ -102,7 +102,11 @@ function SettingsContent() {
                 </div>
                 <div>
                   <span className="block text-sm text-fn-text-secondary mb-1">Subscription</span>
-                  <p className="text-fn-text-primary capitalize">{user?.subscriptionStatus || 'Unknown'}</p>
+                  <p className="text-fn-text-primary capitalize">
+                    {user?.subscriptionStatus === 'active' && user?.cancelAtPeriodEnd
+                      ? `Cancels ${user.currentPeriodEnd ? new Date(user.currentPeriodEnd).toLocaleDateString() : 'at period end'}`
+                      : user?.subscriptionStatus || 'Unknown'}
+                  </p>
                 </div>
               </div>
             </CardContent>

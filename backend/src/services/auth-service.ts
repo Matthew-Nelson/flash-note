@@ -574,6 +574,8 @@ export function sanitizeUser(user: User) {
     trialEndsAt: user.trialEndsAt,
     emailVerified: user.emailVerified,
     organizationId: user.organizationId,
+    cancelAtPeriodEnd: user.cancelAtPeriodEnd,
+    currentPeriodEnd: user.currentPeriodEnd,
   };
 }
 

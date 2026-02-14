@@ -1387,6 +1387,8 @@ describe('AuthService', () => {
         emailVerifiedAt: new Date(),
         tokenVersion: 1,
         organizationId: 'org-456',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
       };
 
       const sanitized = sanitizeUser(user);
@@ -1413,11 +1415,42 @@ describe('AuthService', () => {
         emailVerifiedAt: new Date(),
         tokenVersion: 1,
         organizationId: null,
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: null,
       };
 
       const sanitized = sanitizeUser(user);
 
       expect(sanitized.organizationId).toBeNull();
+    });
+
+    it('should include cancellation fields in sanitized output', () => {
+      const periodEnd = new Date('2026-03-15');
+      const user = {
+        id: 'user-123',
+        email: 'test@example.com',
+        passwordHash: 'hash',
+        stripeCustomerId: 'cus_123',
+        subscriptionId: 'sub_123',
+        subscriptionStatus: 'active' as const,
+        trialEndsAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+        lastFailedLoginAt: null,
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        tokenVersion: 1,
+        organizationId: null,
+        cancelAtPeriodEnd: true,
+        currentPeriodEnd: periodEnd,
+      };
+
+      const sanitized = sanitizeUser(user);
+
+      expect(sanitized.cancelAtPeriodEnd).toBe(true);
+      expect(sanitized.currentPeriodEnd).toEqual(periodEnd);
     });
   });
 });

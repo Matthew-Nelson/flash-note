@@ -1,7 +1,7 @@
 import Stripe from 'stripe';
 import * as Sentry from '@sentry/node';
 import { config } from '../config.js';
-import { findUserById, updateUserSubscription, updateSubscriptionStatus } from '../db/queries/users.js';
+import { findUserById, updateUserSubscription, updateSubscriptionStatus, updateSubscriptionCancellation } from '../db/queries/users.js';
 import { tryMarkWebhookProcessed, deleteProcessedWebhookEvent } from '../db/queries/webhooks.js';
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
@@ -234,7 +234,19 @@ class BillingService {
       return;
     }
 
-    await updateSubscriptionStatus(userId, subscription.status);
+    // Capture cancel_at_period_end and current_period_end from Stripe.
+    // When a user cancels via the billing portal, Stripe keeps the status as 'active'
+    // but sets cancel_at_period_end=true until the period ends.
+    const currentPeriodEnd = subscription.current_period_end
+      ? new Date(subscription.current_period_end * 1000)
+      : null;
+
+    await updateSubscriptionCancellation(
+      userId,
+      subscription.status,
+      subscription.cancel_at_period_end,
+      currentPeriodEnd
+    );
   }
 
   private async handleSubscriptionDelete(subscription: Stripe.Subscription): Promise<void> {
@@ -246,7 +258,8 @@ class BillingService {
       return;
     }
 
-    await updateSubscriptionStatus(userId, 'canceled');
+    // Subscription fully deleted — clear cancellation tracking fields
+    await updateSubscriptionCancellation(userId, 'canceled', false, null);
 
     safeAuditLog(
       auditService.log({

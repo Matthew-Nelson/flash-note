@@ -58,11 +58,13 @@ vi.mock('../config.js', () => ({
 const mockFindUserById = vi.fn();
 const mockUpdateUserSubscription = vi.fn();
 const mockUpdateSubscriptionStatus = vi.fn();
+const mockUpdateSubscriptionCancellation = vi.fn();
 
 vi.mock('../db/queries/users.js', () => ({
   findUserById: (...args: unknown[]) => mockFindUserById(...args),
   updateUserSubscription: (...args: unknown[]) => mockUpdateUserSubscription(...args),
   updateSubscriptionStatus: (...args: unknown[]) => mockUpdateSubscriptionStatus(...args),
+  updateSubscriptionCancellation: (...args: unknown[]) => mockUpdateSubscriptionCancellation(...args),
 }));
 
 // Mock webhook queries for idempotency
@@ -89,6 +91,7 @@ describe('BillingService', () => {
     mockFindUserById.mockReset();
     mockUpdateUserSubscription.mockReset();
     mockUpdateSubscriptionStatus.mockReset();
+    mockUpdateSubscriptionCancellation.mockReset();
     mockTryMarkWebhookProcessed.mockReset();
     mockDeleteProcessedWebhookEvent.mockReset();
     mockSentry.captureException.mockReset();
@@ -405,7 +408,7 @@ describe('BillingService', () => {
     });
 
     describe('customer.subscription.updated', () => {
-      it('should update subscription status', async () => {
+      it('should update subscription status with cancellation fields', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
           id: 'evt_sub_updated',
           type: 'customer.subscription.updated',
@@ -413,13 +416,44 @@ describe('BillingService', () => {
             object: {
               metadata: { userId: 'user-123' },
               status: 'past_due',
+              cancel_at_period_end: false,
+              current_period_end: 1700000000,
             },
           },
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'past_due');
+        expect(mockUpdateSubscriptionCancellation).toHaveBeenCalledWith(
+          'user-123',
+          'past_due',
+          false,
+          new Date(1700000000 * 1000)
+        );
+      });
+
+      it('should capture cancel_at_period_end when user cancels', async () => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: 'evt_sub_cancel_pending',
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              status: 'active',
+              cancel_at_period_end: true,
+              current_period_end: 1700000000,
+            },
+          },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionCancellation).toHaveBeenCalledWith(
+          'user-123',
+          'active',
+          true,
+          new Date(1700000000 * 1000)
+        );
       });
 
       it('should handle missing userId gracefully', async () => {
@@ -431,13 +465,15 @@ describe('BillingService', () => {
               id: 'sub_123',
               metadata: {},
               status: 'active',
+              cancel_at_period_end: false,
+              current_period_end: 1700000000,
             },
           },
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(mockUpdateSubscriptionCancellation).not.toHaveBeenCalled();
         // Verify structured logging was called
         expect(consoleErrorSpy).toHaveBeenCalled();
         const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
@@ -454,13 +490,20 @@ describe('BillingService', () => {
             object: {
               metadata: { userId: 'user-123' },
               status,
+              cancel_at_period_end: false,
+              current_period_end: 1700000000,
             },
           },
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', status);
+        expect(mockUpdateSubscriptionCancellation).toHaveBeenCalledWith(
+          'user-123',
+          status,
+          false,
+          new Date(1700000000 * 1000)
+        );
       });
 
       it.each(['incomplete', 'incomplete_expired', 'paused'])('should reject unknown Stripe status "%s" and alert via Sentry', async (status) => {
@@ -472,13 +515,15 @@ describe('BillingService', () => {
               id: 'sub_unknown',
               metadata: { userId: 'user-123' },
               status,
+              cancel_at_period_end: false,
+              current_period_end: 1700000000,
             },
           },
         });
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(mockUpdateSubscriptionCancellation).not.toHaveBeenCalled();
         expect(mockSentry.captureException).toHaveBeenCalledWith(
           expect.any(Error),
           expect.objectContaining({
@@ -498,7 +543,7 @@ describe('BillingService', () => {
     });
 
     describe('customer.subscription.deleted', () => {
-      it('should set subscription status to canceled', async () => {
+      it('should set subscription status to canceled and clear cancellation fields', async () => {
         mockStripeWebhooksConstructEvent.mockReturnValueOnce({
           id: 'evt_sub_deleted',
           type: 'customer.subscription.deleted',
@@ -512,7 +557,7 @@ describe('BillingService', () => {
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'canceled');
+        expect(mockUpdateSubscriptionCancellation).toHaveBeenCalledWith('user-123', 'canceled', false, null);
       });
 
       it('should log subscription cancelled audit event', async () => {
@@ -551,7 +596,7 @@ describe('BillingService', () => {
 
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(mockUpdateSubscriptionCancellation).not.toHaveBeenCalled();
         // Verify structured logging was called
         expect(consoleErrorSpy).toHaveBeenCalled();
         const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;

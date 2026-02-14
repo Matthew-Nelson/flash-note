@@ -13,6 +13,8 @@ export interface User {
   subscriptionStatus: string;
   trialEndsAt: string | null;
   emailVerified?: boolean;
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: string | null;
 }
 
 /**

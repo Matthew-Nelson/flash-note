@@ -6,6 +6,8 @@ interface User {
   email: string;
   subscriptionStatus: string;
   trialEndsAt?: string | null;
+  cancelAtPeriodEnd?: boolean;
+  currentPeriodEnd?: string | null;
 }
 
 interface SettingsProps {
@@ -45,6 +47,7 @@ export default function Settings({ user, onLogout }: SettingsProps) {
   };
 
   const isTrialing = user.subscriptionStatus === 'trialing';
+  const isCancelling = user.subscriptionStatus === 'active' && user.cancelAtPeriodEnd === true;
   const trialEndsAt = user.trialEndsAt ? new Date(user.trialEndsAt) : null;
   const daysLeft = trialEndsAt
     ? Math.max(0, Math.ceil((trialEndsAt.getTime() - mountTime) / (1000 * 60 * 60 * 24)))
@@ -63,17 +66,21 @@ export default function Settings({ user, onLogout }: SettingsProps) {
           <div className="flex justify-between text-sm">
             <span className="opacity-60">Status</span>
             <span className={`font-medium ${
-              user.subscriptionStatus === 'active'
-                ? 'status-active'
-                : isTrialing
-                  ? 'status-trial'
-                  : 'status-expired'
+              isCancelling
+                ? 'status-expired'
+                : user.subscriptionStatus === 'active'
+                  ? 'status-active'
+                  : isTrialing
+                    ? 'status-trial'
+                    : 'status-expired'
             }`}>
-              {user.subscriptionStatus === 'active'
-                ? 'Active'
-                : isTrialing
-                  ? `Trial (${daysLeft} days left)`
-                  : user.subscriptionStatus}
+              {isCancelling
+                ? `Cancels ${user.currentPeriodEnd ? new Date(user.currentPeriodEnd).toLocaleDateString() : 'at period end'}`
+                : user.subscriptionStatus === 'active'
+                  ? 'Active'
+                  : isTrialing
+                    ? `Trial (${daysLeft} days left)`
+                    : user.subscriptionStatus}
             </span>
           </div>
         </div>
@@ -136,13 +143,22 @@ export default function Settings({ user, onLogout }: SettingsProps) {
         <div className="animate-fade-in-up stagger-3">
           <h2 className="text-sm font-semibold mb-3">Subscription</h2>
           <div className="card p-4">
+            {isCancelling && (
+              <p className="text-sm opacity-60 mb-3">
+                Your subscription is active until{' '}
+                {user.currentPeriodEnd
+                  ? new Date(user.currentPeriodEnd).toLocaleDateString()
+                  : 'the end of your billing period'}
+                . You won&apos;t be charged again.
+              </p>
+            )}
             <a
               href="https://flashnote.co/dashboard"
               target="_blank"
               rel="noopener noreferrer"
               className="link text-sm"
             >
-              Manage subscription
+              {isCancelling ? 'Resubscribe' : 'Manage subscription'}
             </a>
           </div>
         </div>

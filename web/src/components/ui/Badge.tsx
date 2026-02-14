@@ -1,6 +1,6 @@
 import { type HTMLAttributes, type ReactNode } from 'react';
 
-type BadgeVariant = 'trial' | 'active' | 'expired';
+type BadgeVariant = 'trial' | 'active' | 'cancelling' | 'expired';
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   variant: BadgeVariant;
@@ -10,12 +10,14 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 const variantClasses: Record<BadgeVariant, string> = {
   trial: 'badge-trial',
   active: 'badge-active',
+  cancelling: 'badge-expired',
   expired: 'badge-expired',
 };
 
 const defaultLabels: Record<BadgeVariant, string> = {
   trial: 'Free Trial',
   active: 'Active',
+  cancelling: 'Cancelling',
   expired: 'Expired',
 };
 
@@ -27,8 +29,9 @@ export function Badge({ variant, children, className = '', ...props }: BadgeProp
   );
 }
 
-export function SubscriptionBadge({ status }: { status: string }) {
+export function SubscriptionBadge({ status, cancelAtPeriodEnd }: { status: string; cancelAtPeriodEnd?: boolean }) {
   const variant: BadgeVariant =
+    status === 'active' && cancelAtPeriodEnd ? 'cancelling' :
     status === 'active' ? 'active' :
     status === 'trialing' ? 'trial' :
     'expired';

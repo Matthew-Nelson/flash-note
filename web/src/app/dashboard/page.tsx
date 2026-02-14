@@ -266,7 +266,7 @@ function DashboardContent() {
                 Subscription
               </h2>
               <div className="mb-4">
-                <SubscriptionBadge status={user?.subscriptionStatus || 'trialing'} />
+                <SubscriptionBadge status={user?.subscriptionStatus || 'trialing'} cancelAtPeriodEnd={user?.cancelAtPeriodEnd} />
               </div>
               {user?.subscriptionStatus === 'trialing' && user?.trialEndsAt ? (
                 <>
@@ -277,6 +277,25 @@ function DashboardContent() {
                   <Link href="/pricing">
                     <Button>Upgrade Now</Button>
                   </Link>
+                </>
+              ) : user?.subscriptionStatus === 'active' && user?.cancelAtPeriodEnd ? (
+                <>
+                  <p className="text-fn-text-secondary mb-4">
+                    Your subscription is active until{' '}
+                    {user.currentPeriodEnd
+                      ? new Date(user.currentPeriodEnd).toLocaleDateString()
+                      : 'the end of your billing period'}
+                    . You won&apos;t be charged again.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={handleManageSubscription}
+                      disabled={portalLoading}
+                      className="link text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {portalLoading ? 'Opening billing portal...' : 'Resubscribe'}
+                    </button>
+                  </div>
                 </>
               ) : user?.subscriptionStatus === 'active' ? (
                 <>

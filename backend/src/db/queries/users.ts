@@ -8,7 +8,8 @@ const USER_COLUMNS = `
   id, email, password_hash, stripe_customer_id, subscription_id,
   subscription_status, trial_ends_at, created_at, updated_at,
   failed_login_attempts, locked_until, last_failed_login_at,
-  email_verified, email_verified_at, token_version, organization_id
+  email_verified, email_verified_at, token_version, organization_id,
+  cancel_at_period_end, current_period_end
 `;
 
 /**
@@ -32,6 +33,8 @@ function rowToUser(row: UserRow): User {
     emailVerifiedAt: row.email_verified_at,
     tokenVersion: row.token_version ?? 1,
     organizationId: row.organization_id ?? null,
+    cancelAtPeriodEnd: row.cancel_at_period_end ?? false,
+    currentPeriodEnd: row.current_period_end ?? null,
   };
 }
 
@@ -113,6 +116,23 @@ export async function updateSubscriptionStatus(
     `UPDATE users SET subscription_status = $1, updated_at = NOW()
      WHERE id = $2`,
     [status, userId]
+  );
+}
+
+export async function updateSubscriptionCancellation(
+  userId: string,
+  status: string,
+  cancelAtPeriodEnd: boolean,
+  currentPeriodEnd: Date | null
+): Promise<void> {
+  await db.query(
+    `UPDATE users SET
+       subscription_status = $1,
+       cancel_at_period_end = $2,
+       current_period_end = $3,
+       updated_at = NOW()
+     WHERE id = $4`,
+    [status, cancelAtPeriodEnd, currentPeriodEnd, userId]
   );
 }
 
