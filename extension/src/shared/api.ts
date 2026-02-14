@@ -247,13 +247,14 @@ class ApiClient {
   }
 
   async register(email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string): Promise<AuthResponse> {
-    const body: Record<string, unknown> = { email, password, acceptedLegalTerms };
-    if (inviteCode) {
-      body.inviteCode = inviteCode;
-    }
     const data = await this.request<AuthResponse>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        email,
+        password,
+        acceptedLegalTerms,
+        ...(inviteCode && { inviteCode }),
+      }),
     });
 
     await storage.setAuth({

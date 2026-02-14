@@ -245,10 +245,104 @@ describe('LoginForm', () => {
       expect(screen.queryByText('Min 8 characters, 1 uppercase, 1 lowercase, 1 number')).not.toBeInTheDocument();
     });
 
-    it('should not show confirm password or checkbox in login mode', () => {
+    it('should not show confirm password, invite code, or checkbox in login mode', () => {
       renderForm();
       expect(screen.queryByLabelText('Confirm Password')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Invite Code')).not.toBeInTheDocument();
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    });
+
+    it('should show invite code field in signup mode', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      expect(screen.getByLabelText('Invite Code')).toBeInTheDocument();
+    });
+
+    it('should pass invite code to onRegister', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      await user.type(screen.getByLabelText('Invite Code'), 'ABCD-1234');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByText('Create account'));
+
+      await waitFor(() => {
+        expect(onRegister).toHaveBeenCalledWith('new@example.com', 'Password1', true, 'ABCD-1234');
+      });
+    });
+
+    it('should show curated error for invite_code_required', async () => {
+      onRegister.mockRejectedValue(new ApiError(400, 'invite_code_required', 'Backend message'));
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByText('Create account'));
+
+      await waitFor(() => {
+        expect(screen.getByText('An invite code is required to register.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Invite Code').className).toContain('input-field-error');
+      });
+    });
+
+    it('should show curated error for invalid_invite_code', async () => {
+      onRegister.mockRejectedValue(new ApiError(400, 'invalid_invite_code', 'Backend message'));
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      await user.type(screen.getByLabelText('Invite Code'), 'BAD-CODE');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByText('Create account'));
+
+      await waitFor(() => {
+        expect(screen.getByText('This invite code is invalid or has expired.')).toBeInTheDocument();
+        expect(screen.getByLabelText('Invite Code').className).toContain('input-field-error');
+      });
+    });
+
+    it('should show curated error for no_seats_available', async () => {
+      onRegister.mockRejectedValue(new ApiError(409, 'no_seats_available', 'Backend message'));
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Email address'), 'new@example.com');
+      await user.type(screen.getByLabelText('Password'), 'Password1');
+      await user.type(screen.getByLabelText('Confirm Password'), 'Password1');
+      await user.type(screen.getByLabelText('Invite Code'), 'GOOD-CODE');
+      await user.click(screen.getByRole('checkbox'));
+      await user.click(screen.getByText('Create account'));
+
+      await waitFor(() => {
+        expect(screen.getByText('This clinic has reached its maximum number of users. Contact your administrator.')).toBeInTheDocument();
+      });
+    });
+
+    it('should clear invite code when toggling back to login', async () => {
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText(/sign up/i));
+      await user.type(screen.getByLabelText('Invite Code'), 'ABCD-1234');
+
+      await user.click(screen.getByText(/sign in/i));
+      await user.click(screen.getByText(/sign up/i));
+
+      expect(screen.getByLabelText('Invite Code')).toHaveValue('');
     });
 
     it('should toggle back to login', async () => {
@@ -315,7 +409,7 @@ describe('LoginForm', () => {
 
     it('should show rate limit error', async () => {
       vi.mocked(api.requestPasswordReset).mockRejectedValue(
-        new Error('Too many attempts. Please try again later.')
+        new ApiError(429, 'rate_limit_exceeded', 'Backend rate limit message')
       );
       const user = userEvent.setup();
       renderForm();
@@ -325,7 +419,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
-        expect(screen.getByText(/Too many attempts/i)).toBeInTheDocument();
+        expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
       });
     });
 

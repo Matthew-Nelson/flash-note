@@ -80,6 +80,9 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
             setErrors(['This invite code is invalid or has expired.']);
             setInvalidFields(new Set(['inviteCode']));
             break;
+          case 'no_seats_available':
+            setErrors(['This clinic has reached its maximum number of users. Contact your administrator.']);
+            break;
           case 'rate_limit_exceeded':
             setErrors(['Too many attempts. Please try again later.']);
             break;
@@ -114,8 +117,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     } catch (err) {
       // Always show success to prevent email enumeration
       // Only show error for rate limiting
-      if (err instanceof Error && err.message.includes('Too many')) {
-        setErrors([err.message]);
+      if (err instanceof ApiError && err.code === 'rate_limit_exceeded') {
+        setErrors(['Too many attempts. Please try again later.']);
       } else {
         setResetEmailSent(true);
       }
