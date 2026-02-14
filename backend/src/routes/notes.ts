@@ -55,8 +55,8 @@ notesRouter.post('/generate', async (req, res, next) => {
           outputTokens: result.metadata.outputTokens,
           generationTimeMs: result.metadata.generationTimeMs,
           // Security monitoring - does NOT include PHI, only detection flags
-          suspiciousPatternDetected: result.securityMetadata?.suspiciousPatternDetected ?? false,
-          suspiciousPatternCount: result.securityMetadata?.suspiciousPatternCount ?? 0,
+          suspiciousPatternDetected: result.securityMetadata.suspiciousPatternDetected,
+          suspiciousPatternCount: result.securityMetadata.suspiciousPatternCount,
         },
         ipAddress,
         userAgent,

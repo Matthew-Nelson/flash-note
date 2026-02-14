@@ -1,5 +1,5 @@
 /* eslint-disable no-console -- Mock AI logging is intentional for dev mode */
-import type { GeneratedNote, NoteType, BillingSummary, GoalsTracking } from '../types/index.js';
+import type { GeneratedNote, NoteType, BillingSummary, GoalsTracking, PromptSecurityMetadata } from '../types/index.js';
 
 /**
  * Mock response structure including optional enhanced fields.
@@ -224,6 +224,12 @@ export async function generateMockSOAPNote(
 
   console.log(`[MockAI] Generated mock ${noteType} (${generationTimeMs}ms)`);
 
+  // Mock always returns no suspicious patterns (real detection runs in ai-service.ts)
+  const securityMetadata: PromptSecurityMetadata = {
+    suspiciousPatternDetected: false,
+    suspiciousPatternCount: 0,
+  };
+
   return {
     subjective: mockResponse.subjective,
     objective: mockResponse.objective,
@@ -239,5 +245,6 @@ export async function generateMockSOAPNote(
       totalTokens: inputTokens + outputTokens,
       generationTimeMs,
     },
+    securityMetadata,
   };
 }

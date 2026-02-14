@@ -120,8 +120,7 @@ export interface GeneratedNote {
   };
 
   // Security metadata for audit purposes (MEDIUM-005)
-  // Optional for backwards compatibility with mock service
-  securityMetadata?: PromptSecurityMetadata;
+  securityMetadata: PromptSecurityMetadata;
 }
 
 // Usage types

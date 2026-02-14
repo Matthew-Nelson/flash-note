@@ -239,6 +239,7 @@ describe('Extension Validation Schemas', () => {
         id: 'user-1',
         email: 'test@example.com',
         subscriptionStatus: 'trialing',
+        organizationId: null,
       },
       expiresAt: Date.now() + 60000,
     };
@@ -284,9 +285,14 @@ describe('Extension Validation Schemas', () => {
       ).toBe(true);
     });
 
-    it('should accept user without organizationId (backward compatibility)', () => {
-      // The validAuth fixture doesn't include organizationId — should still pass
-      expect(storedAuthSchema.safeParse(validAuth).success).toBe(true);
+    it('should reject user without organizationId', () => {
+      const { organizationId: _, ...userWithoutOrgId } = validAuth.user;
+      expect(
+        storedAuthSchema.safeParse({
+          ...validAuth,
+          user: userWithoutOrgId,
+        }).success
+      ).toBe(false);
     });
 
     it('should reject missing accessToken', () => {
