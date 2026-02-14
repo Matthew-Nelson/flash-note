@@ -10,7 +10,7 @@ import type { AuthenticatedRequest } from '../types/index.js';
 export const billingRouter: Router = Router();
 
 // SECURITY: Only allow configured Stripe price IDs to prevent arbitrary price attacks
-// If price env vars aren't configured, validation is skipped (development mode)
+// H-1: When price env vars are missing, reject ALL price IDs (fail closed)
 const allowedPriceIds: string[] = [
   config.STRIPE_PRICE_MONTHLY,
   config.STRIPE_PRICE_ANNUAL,
@@ -20,9 +20,9 @@ const allowedPriceIds: string[] = [
 const checkoutSchema = z.object({
   priceId: z.string().min(1).refine(
     (id) => {
-      // If no valid price IDs configured, allow any (development mode)
+      // H-1: If no valid price IDs configured, reject all (fail closed)
       if (allowedPriceIds.length === 0) {
-        return true;
+        return false;
       }
       return allowedPriceIds.includes(id);
     },

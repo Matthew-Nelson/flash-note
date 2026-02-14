@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { mockDbQuery, resetMocks } from '../../test/setup.js';
-import { tryMarkWebhookProcessed, cleanupOldWebhookEvents } from './webhooks.js';
+import { tryMarkWebhookProcessed, cleanupOldWebhookEvents, deleteProcessedWebhookEvent } from './webhooks.js';
 
 describe('Webhook Queries', () => {
   beforeEach(() => {
@@ -57,6 +57,25 @@ describe('Webhook Queries', () => {
       expect(query).toContain('event_type');
       expect(params).toContain('evt_abc');
       expect(params).toContain('customer.subscription.updated');
+    });
+  });
+
+  describe('deleteProcessedWebhookEvent', () => {
+    it('should delete event by event_id', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
+
+      await deleteProcessedWebhookEvent('evt_to_delete');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        'DELETE FROM processed_webhook_events WHERE event_id = $1',
+        ['evt_to_delete']
+      );
+    });
+
+    it('should not throw when event does not exist', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+
+      await expect(deleteProcessedWebhookEvent('evt_nonexistent')).resolves.toBeUndefined();
     });
   });
 

@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { isIP } from 'node:net';
+import * as Sentry from '@sentry/node';
 
 /**
  * Validates an IP address string for safe insertion into PostgreSQL INET columns.
@@ -35,6 +36,13 @@ export function safeAuditLog(
   context: string
 ): void {
   auditPromise.catch((err) => {
+    Sentry.captureException(err, {
+      extra: {
+        source: 'audit_service',
+        errorType: 'safe_audit_log_failed',
+        context,
+      },
+    });
     console.error(`Audit log failed (${context}):`, err);
   });
 }
