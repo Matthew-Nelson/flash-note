@@ -25,7 +25,7 @@
  *   3. Code defaults (in config.ts Zod schema)
  *
  * Production note: In production, env vars are set directly by the platform
- * (Render, etc.), so no .env file is needed or used.
+ * (Cloud Run, etc.), so no .env file is needed or used.
  */
 
 import { config as dotenvConfig } from 'dotenv';
