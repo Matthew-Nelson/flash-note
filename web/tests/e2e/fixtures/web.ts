@@ -105,3 +105,52 @@ export async function isAuthenticated(page: Page): Promise<boolean> {
     return !!sessionStorage.getItem('flashnote:auth');
   });
 }
+
+/**
+ * Helper to authenticate as any seeded test user via the backend API.
+ * Returns the auth tokens and user data (does NOT inject into sessionStorage).
+ * Use this when you need tokens for direct API calls or custom injection.
+ */
+export async function loginViaAPI(
+  page: Page,
+  credentials: { email: string; password: string }
+): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  csrfToken: string;
+  user: Record<string, unknown>;
+}> {
+  const response = await page.request.post(`${API_URL}/auth/login`, {
+    data: { email: credentials.email, password: credentials.password },
+  });
+
+  const body = await response.json();
+  if (!body.success) {
+    throw new Error(`API login failed for ${credentials.email}: ${JSON.stringify(body.error)}`);
+  }
+
+  return body.data;
+}
+
+/**
+ * Helper to inject auth tokens into sessionStorage for a given user.
+ * Combines loginViaAPI + sessionStorage injection.
+ * Use this when you need an authenticated page for a non-primary user.
+ */
+export async function authenticateAs(
+  page: Page,
+  credentials: { email: string; password: string }
+): Promise<void> {
+  const { accessToken, refreshToken, csrfToken, user } = await loginViaAPI(page, credentials);
+  const expiresAt = Date.now() + 55 * 60 * 1000;
+
+  const baseURL = process.env.WEB_URL || 'http://localhost:3000';
+  await page.goto(baseURL);
+
+  await page.evaluate(
+    (authData) => {
+      sessionStorage.setItem('flashnote:auth', JSON.stringify(authData));
+    },
+    { accessToken, refreshToken, csrfToken, user, expiresAt }
+  );
+}

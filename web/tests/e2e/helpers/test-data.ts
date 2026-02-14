@@ -55,3 +55,42 @@ export const validCredentials = {
   password: 'ValidPass123',
   confirmPassword: 'ValidPass123',
 };
+
+// ─── Seeded test users ───────────────────────────────────────────────────────
+// These must match the credentials in backend/src/db/seed-test-users.ts.
+// All users share the same password.
+
+const SHARED_PASSWORD = 'TestPassword123';
+
+/**
+ * Seeded test users for E2E tests requiring specific account states.
+ * Each user is created by `pnpm db:seed:test` with the described state.
+ */
+export const TEST_USERS = {
+  /** Verified, active trial, clean state. Used by all happy-path tests. */
+  PRIMARY: { email: 'test@example.com', password: SHARED_PASSWORD },
+
+  /** Verified, trial expired yesterday. Should get 402 on protected endpoints. */
+  EXPIRED_TRIAL: { email: 'expired-trial@test.example.com', password: SHARED_PASSWORD },
+
+  /** Email not verified. Active trial. Should be blocked from note gen and checkout. */
+  UNVERIFIED: { email: 'unverified@test.example.com', password: SHARED_PASSWORD },
+
+  /** Verified, locked (5 failed attempts, locked_until in future). */
+  LOCKED: { email: 'locked@test.example.com', password: SHARED_PASSWORD },
+
+  /** Verified, subscription_status='canceled', no trial. */
+  CANCELED_SUB: { email: 'canceled@test.example.com', password: SHARED_PASSWORD },
+
+  /** Verified, org owner of Test PT Clinic. */
+  ORG_OWNER: { email: 'org-owner@test.example.com', password: SHARED_PASSWORD },
+
+  /** Verified, org member of Test PT Clinic. Personal trial expired, org has active sub. */
+  ORG_MEMBER: { email: 'org-member@test.example.com', password: SHARED_PASSWORD },
+} as const;
+
+/** Active clinic invite code for org join tests. */
+export const TEST_INVITE_CODE = 'TESTCLINIC';
+
+/** Deterministic password reset token. Matches what seed-test.ts inserts into email_tokens. */
+export const TEST_RESET_TOKEN = 'e2e-test-reset-token-do-not-use-in-production';
