@@ -6,6 +6,7 @@ import { tryMarkWebhookProcessed, deleteProcessedWebhookEvent } from '../db/quer
 import { auditService } from './audit-service.js';
 import { AuditAction } from '../types/index.js';
 import { AppError } from '../middleware/error-handler.js';
+import { safeAuditLog } from '../utils/request-utils.js';
 
 const stripe = new Stripe(config.STRIPE_SECRET_KEY, {
   // IMPORTANT: Pin API version to match Dashboard webhook endpoint (cannot be changed after creation)
@@ -183,15 +184,20 @@ class BillingService {
       'active'
     );
 
-    await auditService.log({
-      userId,
-      action: AuditAction.SUBSCRIPTION_CREATED,
-      status: 'SUCCESS',
-      metadata: {
-        subscriptionId: session.subscription,
-        customerId: session.customer,
-      },
-    });
+    // Rule 9: Audit log is not transactional with the update above, so use
+    // safeAuditLog to prevent audit failures from triggering CR-1 retry logic.
+    safeAuditLog(
+      auditService.log({
+        userId,
+        action: AuditAction.SUBSCRIPTION_CREATED,
+        status: 'SUCCESS',
+        metadata: {
+          subscriptionId: session.subscription,
+          customerId: session.customer,
+        },
+      }),
+      'checkout_complete'
+    );
   }
 
   private async handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
@@ -242,12 +248,15 @@ class BillingService {
 
     await updateSubscriptionStatus(userId, 'canceled');
 
-    await auditService.log({
-      userId,
-      action: AuditAction.SUBSCRIPTION_CANCELLED,
-      status: 'SUCCESS',
-      metadata: { subscriptionId: subscription.id },
-    });
+    safeAuditLog(
+      auditService.log({
+        userId,
+        action: AuditAction.SUBSCRIPTION_CANCELLED,
+        status: 'SUCCESS',
+        metadata: { subscriptionId: subscription.id },
+      }),
+      'subscription_deleted'
+    );
   }
 
   private async handleInvoicePaid(invoice: Stripe.Invoice): Promise<void> {
@@ -293,17 +302,20 @@ class BillingService {
         timestamp: new Date().toISOString(),
       }));
       // Audit trail for HIPAA compliance
-      await auditService.log({
-        userId,
-        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-        status: 'FAILURE',
-        metadata: {
-          reason: 'user_not_found',
-          eventType: 'invoice.paid',
-          subscriptionId: subscription.id,
-          invoiceId: invoice.id,
-        },
-      });
+      safeAuditLog(
+        auditService.log({
+          userId,
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          status: 'FAILURE',
+          metadata: {
+            reason: 'user_not_found',
+            eventType: 'invoice.paid',
+            subscriptionId: subscription.id,
+            invoiceId: invoice.id,
+          },
+        }),
+        'invoice_paid_user_not_found'
+      );
       return;
     }
 
@@ -331,17 +343,20 @@ class BillingService {
         timestamp: new Date().toISOString(),
       }));
       // Audit trail for HIPAA compliance
-      await auditService.log({
-        userId,
-        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-        status: 'FAILURE',
-        metadata: {
-          reason: 'invoice_paid_canceled_subscription',
-          eventType: 'invoice.paid',
-          subscriptionId: subscription.id,
-          invoiceId: invoice.id,
-        },
-      });
+      safeAuditLog(
+        auditService.log({
+          userId,
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          status: 'FAILURE',
+          metadata: {
+            reason: 'invoice_paid_canceled_subscription',
+            eventType: 'invoice.paid',
+            subscriptionId: subscription.id,
+            invoiceId: invoice.id,
+          },
+        }),
+        'invoice_paid_canceled'
+      );
       return;
     }
 
@@ -354,16 +369,19 @@ class BillingService {
 
     // Log successful renewal (not initial payment, which is handled by checkout.session.completed)
     if (invoice.billing_reason === 'subscription_cycle') {
-      await auditService.log({
-        userId,
-        action: AuditAction.SUBSCRIPTION_CREATED, // Reusing for renewal - consider adding SUBSCRIPTION_RENEWED
-        status: 'SUCCESS',
-        metadata: {
-          subscriptionId: subscription.id,
-          invoiceId: invoice.id,
-          billingReason: 'renewal',
-        },
-      });
+      safeAuditLog(
+        auditService.log({
+          userId,
+          action: AuditAction.SUBSCRIPTION_CREATED, // Reusing for renewal - consider adding SUBSCRIPTION_RENEWED
+          status: 'SUCCESS',
+          metadata: {
+            subscriptionId: subscription.id,
+            invoiceId: invoice.id,
+            billingReason: 'renewal',
+          },
+        }),
+        'invoice_paid_renewal'
+      );
     }
   }
 
@@ -387,16 +405,19 @@ class BillingService {
     // Update status to past_due - Stripe handles retries automatically
     await updateSubscriptionStatus(userId, 'past_due');
 
-    await auditService.log({
-      userId,
-      action: AuditAction.SUBSCRIPTION_CANCELLED, // Reusing - consider adding PAYMENT_FAILED
-      status: 'FAILURE',
-      metadata: {
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-        reason: 'payment_failed',
-      },
-    });
+    safeAuditLog(
+      auditService.log({
+        userId,
+        action: AuditAction.SUBSCRIPTION_CANCELLED, // Reusing - consider adding PAYMENT_FAILED
+        status: 'FAILURE',
+        metadata: {
+          subscriptionId: subscription.id,
+          invoiceId: invoice.id,
+          reason: 'payment_failed',
+        },
+      }),
+      'invoice_payment_failed'
+    );
 
     // TODO: Send email notification to user about failed payment
     // This would integrate with your email service (Resend)
@@ -450,16 +471,19 @@ class BillingService {
     }));
 
     // Audit trail for HIPAA compliance (userId null for system-level events)
-    await auditService.log({
-      userId: null,
-      action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-      status: 'FAILURE',
-      metadata: {
-        reason: 'missing_user_metadata',
-        eventType,
-        ...context,
-      },
-    });
+    safeAuditLog(
+      auditService.log({
+        userId: null,
+        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+        status: 'FAILURE',
+        metadata: {
+          reason: 'missing_user_metadata',
+          eventType,
+          ...context,
+        },
+      }),
+      `webhook_missing_user_id_${eventType}`
+    );
   }
 }
 
