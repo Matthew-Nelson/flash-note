@@ -112,7 +112,7 @@ describe('useAuth', () => {
         await result.current.register('new@example.com', 'Password1', true);
       });
 
-      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true);
+      expect(api.register).toHaveBeenCalledWith('new@example.com', 'Password1', true, undefined);
       expect(result.current.user).not.toBeNull();
     });
   });

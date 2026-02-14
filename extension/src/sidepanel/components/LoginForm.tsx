@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { validateLogin, validateRegister, validateEmail } from '@/shared/schemas';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 import SessionAlert from './SessionAlert';
 
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<unknown>;
-  onRegister: (email: string, password: string, acceptedLegalTerms: boolean) => Promise<unknown>;
+  onRegister: (email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string) => Promise<unknown>;
 }
 
 type ViewMode = 'login' | 'signup' | 'forgotPassword';
@@ -15,6 +15,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [acceptedLegalTerms, setAcceptedLegalTerms] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
@@ -28,7 +29,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     // Validate input with Zod
     const validation = viewMode === 'signup'
-      ? validateRegister({ email, password, confirmPassword, acceptedLegalTerms })
+      ? validateRegister({ email, password, confirmPassword, acceptedLegalTerms, inviteCode: inviteCode || undefined })
       : validateLogin({ email, password });
 
     if (!validation.success) {
@@ -41,15 +42,52 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
     try {
       if (viewMode === 'signup') {
-        await onRegister(email, password, acceptedLegalTerms);
+        await onRegister(email, password, acceptedLegalTerms, inviteCode || undefined);
       } else {
         await onLogin(email, password);
       }
     } catch (err) {
-      if (err instanceof Error) {
-        setErrors([err.message]);
+      if (err instanceof ApiError) {
+        switch (err.code) {
+          // Login errors
+          case 'invalid_credentials':
+            setErrors(['Invalid email or password.']);
+            setInvalidFields(new Set(['email', 'password']));
+            break;
+          case 'account_locked':
+            setErrors(['Account locked due to too many failed attempts. Try again later.']);
+            break;
+          case 'email_not_verified':
+            setErrors(['Please verify your email before signing in.']);
+            break;
+          // Registration errors
+          case 'email_exists':
+            setErrors(['An account with this email already exists.']);
+            setInvalidFields(new Set(['email']));
+            break;
+          case 'weak_password':
+            setErrors(['Password does not meet requirements.']);
+            setInvalidFields(new Set(['password']));
+            break;
+          case 'registration_closed':
+            setErrors(['Registration is not available at this time.']);
+            break;
+          case 'invite_code_required':
+            setErrors(['An invite code is required to register.']);
+            setInvalidFields(new Set(['inviteCode']));
+            break;
+          case 'invalid_invite_code':
+            setErrors(['This invite code is invalid or has expired.']);
+            setInvalidFields(new Set(['inviteCode']));
+            break;
+          case 'rate_limit_exceeded':
+            setErrors(['Too many attempts. Please try again later.']);
+            break;
+          default:
+            setErrors(['Something went wrong. Please try again.']);
+        }
       } else {
-        setErrors(['An unexpected error occurred']);
+        setErrors(['Something went wrong. Please try again.']);
       }
     } finally {
       setIsLoading(false);
@@ -273,6 +311,23 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
 
         {viewMode === 'signup' && (
           <div>
+            <label htmlFor="inviteCode" className="label block text-sm mb-1">
+              Invite Code
+            </label>
+            <input
+              id="inviteCode"
+              type="text"
+              autoComplete="off"
+              value={inviteCode}
+              onChange={(e) => setInviteCode(e.target.value)}
+              className={`input-field w-full px-3 py-2${invalidFields.has('inviteCode') ? ' input-field-error' : ''}`}
+              placeholder="Format: XXXX-XXXX"
+            />
+          </div>
+        )}
+
+        {viewMode === 'signup' && (
+          <div>
             <label className="flex items-start gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -339,6 +394,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
           onClick={() => {
             setViewMode(viewMode === 'signup' ? 'login' : 'signup');
             setConfirmPassword('');
+            setInviteCode('');
             setAcceptedLegalTerms(false);
             setErrors([]);
             setInvalidFields(new Set());

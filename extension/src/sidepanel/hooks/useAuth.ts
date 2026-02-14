@@ -120,8 +120,8 @@ export function useAuth() {
     return response;
   }, []);
 
-  const register = useCallback(async (email: string, password: string, acceptedLegalTerms: boolean) => {
-    const response = await api.register(email, password, acceptedLegalTerms);
+  const register = useCallback(async (email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string) => {
+    const response = await api.register(email, password, acceptedLegalTerms, inviteCode);
     setUser(response.user);
     lastFetchTime.current = Date.now();
     return response;
