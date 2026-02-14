@@ -11,6 +11,7 @@ export function createMockUser(overrides: Partial<StoredUser> = {}): StoredUser 
     subscriptionStatus: 'trialing',
     trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     emailVerified: true,
+    organizationId: null,
     ...overrides,
   };
 }
