@@ -1,9 +1,9 @@
 # Pre-Launch Legal Compliance Requirements
 
-**Status:** 🟡 **SUBSTANTIALLY IMPLEMENTED** (legal review + /baa page still needed)
 **Created:** 2026-02-02
-**Last Updated:** 2026-02-08
-**Priority:** P0 - Must complete before any user signups
+**Last Updated:** 2026-02-14
+
+> **This is a reference document** — legal background, HIPAA/HITECH context, and compliance requirements. For remaining task status, see [ROADMAP.md](./docs/ROADMAP.md) (create `/baa` page) and [PRE_LAUNCH_CHECKLIST.md](./docs/PRE_LAUNCH_CHECKLIST.md) (attorney review, LLC formation).
 
 ---
 
@@ -260,55 +260,14 @@ ALTER TABLE users ADD COLUMN baa_version VARCHAR(50); -- e.g., "1.0-2026-02-02"
 
 ---
 
-## Implementation Plan
+## Implementation Status
 
-### Phase 1: Legal Documents (1-2 hours)
+Technical implementation is **substantially complete**. Both signup flows (web and extension) include BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records (`legal_acceptances` table, migration 008).
 
-- [x] Merge BAA template into Terms of Service as Section 9
-- [ ] Customize all placeholders (LLC name, addresses, dates) — **blocked on LLC formation**
-- [ ] Have lawyer review combined document ($500 budget)
-- [ ] Deploy updated legal pages to web app
-- [ ] **Create `/baa` web page** — both signup forms link to it, currently 404
-
-**Owner:** Matthew
-**Deadline:** Before any code changes
-
-### Phase 2: Web Signup (2-3 hours) — ✅ COMPLETE
-
-- [x] Add state for `acceptedTerms`
-- [x] Add checkbox with proper label
-- [x] Update validation to require checkbox (Zod schema)
-- [x] Update error messages
-- [x] Test flow end-to-end
-
-### Phase 3: Extension Signup (3-4 hours) — ✅ COMPLETE
-
-- [x] Update shared schemas to include confirmPassword in register
-- [x] Add confirm password field to LoginForm
-- [x] Add Terms/Privacy/BAA checkbox
-- [x] Link to web-hosted legal pages (open in new tab)
-- [x] Match web styling and behavior
-- [x] Test flow end-to-end
-
-### Phase 4: Backend Updates (2 hours) — ✅ COMPLETE
-
-- [x] Add `legal_acceptances` table (migration 008)
-- [x] Update register endpoint to validate and store acceptance
-- [x] Add audit log entry for BAA acceptance
-- [x] Update API error responses
-- [x] Test with both web and extension clients
-
-### Phase 5: Testing & Verification (1 hour)
-
-- [x] Test web signup with all validations
-- [x] Test extension signup with all validations
-- [x] Verify acceptance data stored in database
-- [x] Verify audit logs captured
-- [ ] Test with lawyer-reviewed documents — **blocked on legal review**
-- [ ] Get final sign-off — **blocked on legal review**
-
-**Owner:** Matthew + Claude
-**Deadline:** Before beta launch
+**Remaining items** (tracked elsewhere):
+- Create `/baa` web page → [ROADMAP.md](./docs/ROADMAP.md) launch blockers
+- Customize legal doc placeholders (blocked on LLC formation) → [PRE_LAUNCH_CHECKLIST.md](./docs/PRE_LAUNCH_CHECKLIST.md) §1-2
+- Attorney review ($500 budget) → [PRE_LAUNCH_CHECKLIST.md](./docs/PRE_LAUNCH_CHECKLIST.md) §2
 
 ---
 
@@ -419,22 +378,6 @@ The 2021 HITECH Safe Harbor amendment gives HHS discretion to **reduce penalties
 
 ---
 
-## Success Criteria
-
-This issue is resolved when:
-
-1. ✅ ~~Terms of Service includes embedded BAA (Section 9)~~ — Done
-2. ❌ Lawyer has reviewed and approved legal documents — Pending
-3. ✅ ~~Web signup requires explicit BAA checkbox acceptance~~ — Done
-4. ✅ ~~Extension signup requires explicit BAA checkbox acceptance~~ — Done
-5. ✅ ~~Both signup forms are functionally identical (same fields, same validation)~~ — Done (PR #47)
-6. ✅ ~~Backend stores BAA acceptance timestamp and version~~ — Done (legal_acceptances table)
-7. ✅ ~~Audit logs capture BAA acceptance events~~ — Done
-8. ❌ Standalone BAA PDF available for enterprise customers — Post-launch
-9. ✅ ~~All changes tested end-to-end~~ — Done
-10. ❌ Matthew signs off on legal compliance — Pending
-11. ❌ `/baa` web page exists and is accessible — **New: not yet created**
-
 ---
 
 ## References
@@ -450,26 +393,4 @@ This issue is resolved when:
 
 ---
 
-## Questions for Matthew
-
-Before implementing:
-
-1. **LLC Name:** What is the exact legal name of your LLC? (for BAA signature block)
-2. **Business Address:** What address should appear on legal documents?
-3. **Lawyer:** Do you have a healthcare/tech lawyer identified for review? Need recommendation?
-4. **Timeline:** Can we delay beta until this is complete? (RECOMMENDED)
-5. **Standalone BAA:** Do you anticipate enterprise customers needing separate BAA PDFs soon?
-
----
-
-**Next Steps:**
-1. Matthew reviews this document
-2. Matthew approves approach (Option A: Embedded BAA)
-3. Matthew provides LLC details for legal docs
-4. Matthew arranges lawyer review ($500)
-5. Claude implements technical changes
-6. Launch blocked until complete
-
----
-
-*This document was created as part of pre-launch compliance review. All changes must be completed before accepting any user signups to avoid HIPAA violations.*
+*This document provides legal context for FlashNote's HIPAA/HITECH compliance obligations. For actionable tasks, see [ROADMAP.md](./docs/ROADMAP.md) and [PRE_LAUNCH_CHECKLIST.md](./docs/PRE_LAUNCH_CHECKLIST.md).*

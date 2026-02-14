@@ -1,32 +1,23 @@
 # FlashNote Success Metrics & Quality Gates
 
 **Created:** January 2025
-**Purpose:** Define measurable criteria for production readiness
-**Status:** Living document - update as requirements evolve
+**Purpose:** Define measurable pass/fail criteria for production readiness
+
+> **Note:** This document defines *what must be true* (quality gates). For *what to work on next* (task tracking), see [ROADMAP.md](./ROADMAP.md). For business/ops tasks, see [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md).
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
+1. [Success Criteria Summary](#success-criteria-summary)
 2. [Quality Gates by Phase](#quality-gates-by-phase)
 3. [Domain-Specific Requirements](#domain-specific-requirements)
 4. [Security & HIPAA Checklist](#security--hipaa-checklist)
 5. [Testing Requirements](#testing-requirements)
-6. [Pre-Launch Checklist](#pre-launch-checklist)
-7. [Progress Tracker](#progress-tracker)
 
 ---
 
-## Overview
-
-This document defines the **minimum requirements** that must be met before FlashNote can be considered production-ready. Requirements are organized by:
-
-- **Phase** (MVP, Beta, Production)
-- **Domain** (Backend, Extension, Web, Infrastructure)
-- **Priority** (P0 = Blocker, P1 = Required, P2 = Nice-to-have)
-
-### Success Criteria Summary
+## Success Criteria Summary
 
 | Metric | Target | Current |
 |--------|--------|---------|
@@ -129,7 +120,7 @@ These items must be complete before public launch.
 | **API** | Standard error codes | CLAUDE.md | ✅ Done |
 | **API** | Zod validation all inputs | CLAUDE.md | ✅ Done |
 | **API** | Health endpoint | Handoff §8 | ✅ Done |
-| **DB** | 6 tables (users, sessions, audit_logs, usage, email_tokens, processed_webhook_events) | Handoff §7 | ✅ Done |
+| **DB** | 10 tables (users, sessions, audit_logs, usage, organizations, organization_members, legal_acceptances, invite_codes, webhook_events, migrations) | Handoff §7 | ✅ Done |
 | **DB** | UUID primary keys | Handoff §7 | ✅ Done |
 | **DB** | Audit logs table | HIPAA | ✅ Done |
 | **DB** | No PHI stored | HIPAA | ✅ Done |
@@ -264,18 +255,6 @@ These items must be complete before public launch.
 | Billing routes | 80% | ⚠️ Partial | P0 |
 | **Overall** | **≥80%** | **31 test files, ~683 tests** | **P0** |
 
-### Extension Test Coverage Targets
-
-| Module | Target | Current | Priority |
-|--------|--------|---------|----------|
-| `api.ts` | 85% | 0% | P0 |
-| `storage.ts` | 80% | 0% | P0 |
-| `useAuth.ts` | 80% | 0% | P0 |
-| `LoginForm.tsx` | 70% | 0% | P1 |
-| `NoteGenerator.tsx` | 70% | 0% | P1 |
-| `ResultDisplay.tsx` | 60% | 0% | P2 |
-| **Overall** | **≥70%** | **0%** | **P0** |
-
 ### Required Test Scenarios
 
 #### Authentication Tests
@@ -335,87 +314,6 @@ These items must be complete before public launch.
 - [ ] Webhook handles subscription.updated
 - [ ] Webhook handles subscription.deleted
 - [ ] Webhook rejects invalid signature
-
----
-
-## Pre-Launch Checklist
-
-### Chrome Web Store Submission
-
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| Developer account ($5 fee) | ❌ | |
-| Extension icons (all 4 sizes) | ❌ | |
-| Privacy policy URL | ❌ | |
-| Screenshots (1280x800 or 640x400) | ❌ | |
-| Store description | ❌ | Draft in Handoff §15 |
-| Promotional images | ❌ | Optional |
-| Test with production API | ❌ | |
-
-### Legal Requirements
-
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| Privacy policy | ✅ | Published at /privacy |
-| Terms of service | ✅ | Published at /terms |
-| BAA template for customers | ⚠️ | Template ready with pass-through model language, needs legal review |
-| HIPAA compliance documentation | ❌ | |
-
-### Infrastructure
-
-| Requirement | Status | Notes |
-|-------------|--------|-------|
-| Domain purchased | ❌ | flashnote.co |
-| DNS configured | ❌ | |
-| Backend deployed (Cloud Run) | ❌ | |
-| Database provisioned | ❌ | |
-| Web deployed (Vercel) | ❌ | |
-| SSL certificates active | ❌ | |
-| Stripe products created | ❌ | |
-| Stripe webhook configured | ❌ | |
-| Vertex AI BAA signed | ❌ | For HIPAA production |
-
----
-
-## Progress Tracker
-
-### Current Sprint Focus
-
-**Objective:** Complete MVP Foundation (Phase 1)
-
-| Task | Assigned | Status | Blocked By |
-|------|----------|--------|------------|
-| Create extension icons | - | ⚠️ Placeholders exist, need production icons | - |
-| Install Zod in extension | - | ✅ Done | - |
-| Add Error Boundary to extension | - | ✅ Done | - |
-| Add Error Boundary to web | - | ✅ Done | - |
-| Implement web auth integration | - | ✅ Done | - |
-| Add ESLint configs | - | ✅ Done | - |
-| Test extension auth flow | - | Not started | - |
-| Test note generation end-to-end | - | Not started | - |
-
-### Completion Summary
-
-> **Note:** This table tracks the 43 quality gates (MVP + Beta + Production phases). For all work items including UI audit and HIPAA compliance (84 total), see [ROADMAP.md](../ROADMAP.md).
-
-| Phase | Total Items | Completed | Percentage |
-|-------|-------------|-----------|------------|
-| MVP Foundation | 15 | 15 | 100% |
-| Beta Ready | 12 | 9 | 75% |
-| Production Ready | 16 | 5 | 31% |
-| **Overall** | **43** | **29** | **67%** |
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.4 | 2026-02-05 | PROD-11 Sentry error tracking complete: fixed all 12 logging gaps across backend, web, and extension |
-| 1.3 | 2026-02-02 | Web app buildout complete: auth integration, Stripe checkout/portal, privacy/terms pages, UI components, dashboard settings |
-| 1.2 | 2026-02-01 | Audit update: icons, Zod schemas, Error Boundaries, ESLint now done; updated DB to 6 tables; revised completion percentages |
-| 1.1 | 2026-01-28 | Added PROD-16 for audit logging workflow completion |
-| 1.0 | 2026-01-22 | Initial document based on audit findings |
 
 ---
 

@@ -4,14 +4,18 @@ This folder contains all project documentation organized by purpose.
 
 ---
 
-## Quick Reference
+## Status Tracking Convention
 
-| Document | Purpose |
-|----------|---------|
-| [ROADMAP.md](./ROADMAP.md) | **Start here** - Consolidated view of all pending work |
-| [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) | Quality gates and progress tracking |
-| [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Business, legal, and operational launch requirements |
-| [STRIPE_TODOS.md](./STRIPE_TODOS.md) | Stripe payment integration tasks |
+Each task is tracked in **exactly one file**. No duplication.
+
+| What | Where | Role |
+|------|-------|------|
+| **Technical work** (code changes) | [ROADMAP.md](./ROADMAP.md) | **Start here** — dashboard + all tech task status |
+| **Business / legal / ops** (non-code) | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | LLC, BAAs, domain, infrastructure, Chrome Store |
+| **Quality gates** (pass/fail criteria) | [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) | Defines *what must be true* — not task tracking |
+| **Stripe reference** (architecture) | [STRIPE_TODOS.md](./STRIPE_TODOS.md) | Reference doc — task status lives in ROADMAP |
+
+**Planning and reference docs never track status.** They describe *what* to build. ROADMAP tracks *is it done*.
 
 ---
 
@@ -110,17 +114,15 @@ Historical documentation for completed work. Kept for reference.
 
 ---
 
-## Documentation Principles
+## Documentation Rules
 
-1. **Keep it current** - Update docs when code changes
-2. **Don't over-document** - Only document what provides value
-3. **Single source of truth** - Each piece of info lives in one place
-4. **Active vs. Archive** - Move completed work to `/archive`
+1. **Status in one place** — Each task tracked in exactly one file (ROADMAP or PRE_LAUNCH_CHECKLIST)
+2. **Planning docs don't track status** — They describe what to build, not whether it's done
+3. **Keep it current** — Update the status file when completing work
+4. **Archive completed work** — Move fully-implemented planning docs to `/archive`
 
 ---
 
 ## What to Work on Next?
 
-1. Check [ROADMAP.md](./ROADMAP.md) for prioritized work items
-2. Review [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) for current phase progress
-3. See [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) for launch blockers
+Open [ROADMAP.md](./ROADMAP.md) — the Dashboard table at the top shows every track with its next action.
