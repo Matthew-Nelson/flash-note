@@ -175,7 +175,7 @@ describe('Extension API Client', () => {
       window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
     });
 
-    it('should NOT dispatch event on 401 with different error code', async () => {
+    it('should dispatch auth-invalidated event with session_expired on 401 + missing_token', async () => {
       const eventHandler = vi.fn();
       window.addEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
 
@@ -189,6 +189,48 @@ describe('Extension API Client', () => {
       });
 
       await expect(api.fetchUser()).resolves.toBeNull();
+      expect(eventHandler).toHaveBeenCalled();
+      const event = eventHandler.mock.calls[0][0] as CustomEvent<{ reason: string }>;
+      expect(event.detail.reason).toBe('session_expired');
+      expect(storage.clearAuth).toHaveBeenCalled();
+
+      window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+    });
+
+    it('should dispatch with session_invalidated reason on 401 + invalid_token', async () => {
+      const eventHandler = vi.fn();
+      window.addEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token invalidated')
+          ),
+      });
+
+      await expect(api.fetchUser()).resolves.toBeNull();
+      const event = eventHandler.mock.calls[0][0] as CustomEvent<{ reason: string }>;
+      expect(event.detail.reason).toBe('session_invalidated');
+
+      window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+    });
+
+    it('should NOT dispatch event on 401 with unrelated error code', async () => {
+      const eventHandler = vi.fn();
+      window.addEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_credentials', 'Wrong password')
+          ),
+      });
+
+      await expect(api.login('test@example.com', 'wrong')).rejects.toThrow(ApiError);
       expect(eventHandler).not.toHaveBeenCalled();
 
       window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);

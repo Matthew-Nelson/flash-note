@@ -155,11 +155,14 @@ class ApiClient {
       const errorCode = result.success === false ? result.error.code : 'unknown_error';
       const errorMessage = result.success === false ? result.error.message : 'An error occurred';
 
-      // SECURITY: Auto-logout on invalid token (password was reset, session invalidated, etc.)
-      if (response.status === 401 && errorCode === 'invalid_token') {
+      // SECURITY: Auto-logout on any 401 auth failure
+      // - invalid_token: password was reset, session invalidated, token version mismatch
+      // - missing_token: refresh failed (expired session), auth storage cleared
+      if (response.status === 401 && (errorCode === 'invalid_token' || errorCode === 'missing_token')) {
+        const reason: SessionEndReason = errorCode === 'missing_token' ? 'session_expired' : 'session_invalidated';
         // Dispatch event FIRST to ensure UI updates regardless of storage errors
         window.dispatchEvent(new CustomEvent(AUTH_INVALIDATED_EVENT, {
-          detail: { reason: 'session_invalidated' }
+          detail: { reason }
         }));
 
         // Then clear storage (non-critical if this fails - user will see login prompt anyway)
