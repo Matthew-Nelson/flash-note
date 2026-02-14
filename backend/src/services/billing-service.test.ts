@@ -445,6 +445,56 @@ describe('BillingService', () => {
         expect(parsed.event).toBe('webhook_missing_user_id');
         expect(parsed.eventType).toBe('customer.subscription.updated');
       });
+
+      it.each(['trialing', 'active', 'canceled', 'past_due', 'unpaid'])('should accept valid status "%s"', async (status) => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: `evt_sub_updated_${status}`,
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              metadata: { userId: 'user-123' },
+              status,
+            },
+          },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', status);
+      });
+
+      it.each(['incomplete', 'incomplete_expired', 'paused'])('should reject unknown Stripe status "%s" and alert via Sentry', async (status) => {
+        mockStripeWebhooksConstructEvent.mockReturnValueOnce({
+          id: `evt_sub_updated_${status}`,
+          type: 'customer.subscription.updated',
+          data: {
+            object: {
+              id: 'sub_unknown',
+              metadata: { userId: 'user-123' },
+              status,
+            },
+          },
+        });
+
+        await billingService.handleWebhook(Buffer.from(''), 'sig');
+
+        expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+        expect(mockSentry.captureException).toHaveBeenCalledWith(
+          expect.any(Error),
+          expect.objectContaining({
+            extra: expect.objectContaining({
+              source: 'billing_webhook',
+              errorType: 'unknown_subscription_status',
+              stripeStatus: status,
+            }),
+          })
+        );
+        expect(consoleErrorSpy).toHaveBeenCalled();
+        const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
+        const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
+        expect(parsed.event).toBe('unknown_subscription_status');
+        expect(parsed.stripeStatus).toBe(status);
+      });
     });
 
     describe('customer.subscription.deleted', () => {
@@ -659,8 +709,6 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        // Should NOT create a false audit trail entry
-        expect(mockAuditLog).not.toHaveBeenCalled();
         // Should capture to Sentry
         expect(mockSentry.captureException).toHaveBeenCalledWith(
           expect.any(Error),
@@ -676,6 +724,18 @@ describe('BillingService', () => {
         const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
         const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
         expect(parsed.event).toBe('invoice_paid_skipped_canceled');
+        // Should create audit trail entry for HIPAA compliance
+        expect(mockAuditLog).toHaveBeenCalledWith({
+          userId: 'user-canceled',
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          status: 'FAILURE',
+          metadata: {
+            reason: 'invoice_paid_canceled_subscription',
+            eventType: 'invoice.paid',
+            subscriptionId: 'sub_canceled',
+            invoiceId: 'inv_canceled',
+          },
+        });
       });
 
       it('should return early and capture to Sentry when user not found (H-3)', async () => {
@@ -706,7 +766,6 @@ describe('BillingService', () => {
         await billingService.handleWebhook(Buffer.from(''), 'sig');
 
         expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-        expect(mockAuditLog).not.toHaveBeenCalled();
         // Should capture to Sentry
         expect(mockSentry.captureException).toHaveBeenCalledWith(
           expect.any(Error),
@@ -723,6 +782,18 @@ describe('BillingService', () => {
         const loggedMessage = consoleErrorSpy.mock.calls[0]?.[0] as string;
         const parsed = JSON.parse(loggedMessage) as Record<string, unknown>;
         expect(parsed.event).toBe('invoice_paid_user_not_found');
+        // Should create audit trail entry for HIPAA compliance
+        expect(mockAuditLog).toHaveBeenCalledWith({
+          userId: 'user-deleted',
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          status: 'FAILURE',
+          metadata: {
+            reason: 'user_not_found',
+            eventType: 'invoice.paid',
+            subscriptionId: 'sub_no_user_row',
+            invoiceId: 'inv_no_user_row',
+          },
+        });
       });
 
       it('should skip update when subscription is already active (H-3 idempotent)', async () => {

@@ -203,6 +203,31 @@ class BillingService {
       return;
     }
 
+    // Validate Stripe status against known application statuses.
+    // Stripe can send statuses (e.g., 'incomplete', 'incomplete_expired', 'paused')
+    // that our schema doesn't support. Skip unknown statuses with Sentry alerting.
+    const validStatuses = new Set(['trialing', 'active', 'canceled', 'past_due', 'unpaid']);
+    if (!validStatuses.has(subscription.status)) {
+      Sentry.captureException(new Error('Unknown Stripe subscription status received'), {
+        extra: {
+          source: 'billing_webhook',
+          errorType: 'unknown_subscription_status',
+          userId,
+          subscriptionId: subscription.id,
+          stripeStatus: subscription.status,
+        },
+      });
+      console.error(JSON.stringify({
+        level: 'error',
+        event: 'unknown_subscription_status',
+        userId,
+        subscriptionId: subscription.id,
+        stripeStatus: subscription.status,
+        timestamp: new Date().toISOString(),
+      }));
+      return;
+    }
+
     await updateSubscriptionStatus(userId, subscription.status);
   }
 
@@ -267,6 +292,18 @@ class BillingService {
         invoiceId: invoice.id,
         timestamp: new Date().toISOString(),
       }));
+      // Audit trail for HIPAA compliance
+      await auditService.log({
+        userId,
+        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+        status: 'FAILURE',
+        metadata: {
+          reason: 'user_not_found',
+          eventType: 'invoice.paid',
+          subscriptionId: subscription.id,
+          invoiceId: invoice.id,
+        },
+      });
       return;
     }
 
@@ -293,6 +330,18 @@ class BillingService {
         reason: 'Subscription is canceled — invoice.paid does not reactivate',
         timestamp: new Date().toISOString(),
       }));
+      // Audit trail for HIPAA compliance
+      await auditService.log({
+        userId,
+        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+        status: 'FAILURE',
+        metadata: {
+          reason: 'invoice_paid_canceled_subscription',
+          eventType: 'invoice.paid',
+          subscriptionId: subscription.id,
+          invoiceId: invoice.id,
+        },
+      });
       return;
     }
 
