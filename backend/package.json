@@ -6,7 +6,7 @@
   "description": "FlashNote Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch --import @sentry/node/preload src/index.ts",
+    "dev": "NODE_ENV=development tsx watch --import @sentry/node/preload src/index.ts",
     "dev:test": "NODE_ENV=test tsx watch --import @sentry/node/preload src/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node --import @sentry/node/preload dist/index.js",
