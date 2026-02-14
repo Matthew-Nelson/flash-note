@@ -156,15 +156,7 @@
 
 .input-field:focus {
   outline: none;
-  border-color: transparent;
-  background-image: linear-gradient(var(--fn-input-bg, #ffffff), var(--fn-input-bg, #ffffff)),
-    linear-gradient(
-      135deg,
-      var(--fn-accent-primary),
-      var(--fn-accent-secondary)
-    );
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
+  border-color: var(--fn-accent-primary);
   box-shadow: var(--fn-focus-ring);
 }
 
@@ -177,7 +169,8 @@
 }
 
 .input-field-error:focus {
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+  border-color: var(--fn-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
 }
 
 .label {

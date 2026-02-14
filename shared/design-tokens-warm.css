@@ -211,7 +211,7 @@
 
   /* Glow Effects - Green-based (updated to match emerald-700 / teal-700) */
   --fn-accent-glow: rgba(4, 120, 87, 0.35);
-  --fn-accent-glow-light: rgba(4, 120, 87, 0.12);
+  --fn-accent-glow-light: rgba(4, 120, 87, 0.18);
   --fn-accent-glow-teal: rgba(15, 118, 110, 0.35);
 
   /* Interactive States */
