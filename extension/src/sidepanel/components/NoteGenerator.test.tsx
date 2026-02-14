@@ -2,14 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NoteGenerator from './NoteGenerator';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 import { createMockGeneratedNote } from '@/test/helpers';
 
-vi.mock('@/shared/api', () => ({
-  api: {
-    generateNote: vi.fn(),
-  },
-}));
+vi.mock('@/shared/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/api')>();
+  return {
+    ...actual,
+    api: {
+      generateNote: vi.fn(),
+    },
+  };
+});
 
 describe('NoteGenerator', () => {
   const onNoteGenerated = vi.fn();
@@ -139,9 +143,9 @@ describe('NoteGenerator', () => {
     );
   });
 
-  it('should show error state on API failure', async () => {
+  it('should show curated error for known ApiError code', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(api.generateNote).mockRejectedValue(new Error('Server error'));
+    vi.mocked(api.generateNote).mockRejectedValue(new ApiError(403, 'trial_expired', 'Backend msg'));
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderGenerator();
@@ -156,7 +160,27 @@ describe('NoteGenerator', () => {
     await vi.advanceTimersByTimeAsync(1500);
 
     await waitFor(() => {
-      expect(screen.getByText('Server error')).toBeInTheDocument();
+      expect(screen.getByText('Your free trial has ended. Please subscribe to continue.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show generic error for unknown ApiError code', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(api.generateNote).mockRejectedValue(new ApiError(500, 'internal_error', 'Backend msg'));
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderGenerator();
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+    await user.click(screen.getByText('Generate Note'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
+
+    await vi.advanceTimersByTimeAsync(1500);
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     });
   });
 
@@ -176,7 +200,7 @@ describe('NoteGenerator', () => {
     await vi.advanceTimersByTimeAsync(1500);
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to generate note')).toBeInTheDocument();
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     });
   });
 
@@ -271,7 +295,7 @@ describe('NoteGenerator', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
     // Generate 2 errors by triggering a non-Error rejection and then submitting again with validation error
-    vi.mocked(api.generateNote).mockRejectedValueOnce(new Error('Error 1'));
+    vi.mocked(api.generateNote).mockRejectedValueOnce(new ApiError(500, 'internal_error', 'Backend msg'));
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderGenerator();
@@ -284,9 +308,9 @@ describe('NoteGenerator', () => {
     });
     await vi.advanceTimersByTimeAsync(1500);
 
-    // After error animation, the single error message should show
+    // After error animation, the curated error message should show
     await waitFor(() => {
-      expect(screen.getByText('Error 1')).toBeInTheDocument();
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     });
   });
 });

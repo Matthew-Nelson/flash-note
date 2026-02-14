@@ -138,27 +138,12 @@ export function useAuth() {
     setUser(null);
   }, []);
 
-  const refreshUser = useCallback(async () => {
-    try {
-      const response = await api.refreshUser();
-      if (response?.user) {
-        setUser(response.user);
-        lastFetchTime.current = Date.now();
-        return response.user;
-      }
-    } catch (error) {
-      console.error('Failed to refresh user:', error);
-    }
-    return null;
-  }, []);
-
   return {
     user,
     isLoading,
     login,
     register,
     logout,
-    refreshUser,
     fetchUser,
   };
 }

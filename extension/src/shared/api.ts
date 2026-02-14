@@ -54,6 +54,9 @@ const RETRY_CONFIG = {
 };
 
 class ApiClient {
+  // Mutex: prevents concurrent refresh token calls from racing
+  private refreshPromise: Promise<string | null> | null = null;
+
   /**
    * Determines if an error is retryable (network failure or 5xx server error)
    */
@@ -82,7 +85,15 @@ class ApiClient {
 
     // Check if token is expired (with 60s buffer)
     if (Date.now() > auth.expiresAt - 60000) {
-      return this.refreshToken(auth.refreshToken);
+      // Deduplicate: if a refresh is already in-flight, await it instead of
+      // starting a second one (which would fail and clear the valid tokens
+      // the first call stored)
+      if (this.refreshPromise) {
+        return this.refreshPromise;
+      }
+      this.refreshPromise = this.refreshToken(auth.refreshToken)
+        .finally(() => { this.refreshPromise = null; });
+      return this.refreshPromise;
     }
 
     return auth.accessToken;
@@ -295,8 +306,8 @@ class ApiClient {
 
   /**
    * Fetch fresh user data from GET /user/me without rotating tokens.
-   * Lightweight alternative to refreshUser() for polling state changes
-   * (subscription status, email verification) without session churn.
+   * Used for polling state changes (subscription status, email verification)
+   * without session churn.
    */
   async fetchUser(): Promise<{ user: AuthResponse['user'] } | null> {
     try {
@@ -317,45 +328,6 @@ class ApiClient {
     }
   }
 
-  /**
-   * Force refresh the access token and get updated user data.
-   * Rotates tokens and creates a new session - use fetchUser() for
-   * lightweight status checks that don't need token rotation.
-   */
-  async refreshUser(): Promise<AuthResponse | null> {
-    const auth = await storage.getAuth();
-    if (!auth?.refreshToken) return null;
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: auth.refreshToken }),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const result = (await response.json()) as ApiResponse<AuthResponse>;
-      if (!result.success) {
-        return null;
-      }
-
-      const data = result.data;
-      await storage.setAuth({
-        user: data.user,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        csrfToken: data.csrfToken,
-        expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
-      });
-
-      return data;
-    } catch {
-      return null;
-    }
-  }
 }
 
 export const api = new ApiClient();

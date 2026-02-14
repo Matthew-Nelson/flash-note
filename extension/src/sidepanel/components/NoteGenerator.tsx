@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 import { validateGenerateNote, type NoteType, type GeneratedNote } from '@/shared/schemas';
 
 interface NoteGeneratorProps {
@@ -108,11 +108,27 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
       generatedNoteRef.current = result;
       setPhase('success');
     } catch (err) {
-      // Store error and transition to error phase for animation
-      if (err instanceof Error) {
-        errorMessageRef.current = err.message;
+      // Store curated error and transition to error phase for animation
+      // Rule 2: Never display backend error messages to users
+      if (err instanceof ApiError) {
+        switch (err.code) {
+          case 'trial_expired':
+            errorMessageRef.current = 'Your free trial has ended. Please subscribe to continue.';
+            break;
+          case 'subscription_required':
+            errorMessageRef.current = 'A subscription is required to generate notes.';
+            break;
+          case 'rate_limit_exceeded':
+            errorMessageRef.current = 'Too many requests. Please wait a moment and try again.';
+            break;
+          case 'email_not_verified':
+            errorMessageRef.current = 'Please verify your email before generating notes.';
+            break;
+          default:
+            errorMessageRef.current = 'Something went wrong. Please try again.';
+        }
       } else {
-        errorMessageRef.current = 'Failed to generate note';
+        errorMessageRef.current = 'Something went wrong. Please try again.';
       }
       setPhase('error');
     }

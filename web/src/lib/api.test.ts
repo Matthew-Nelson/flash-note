@@ -202,7 +202,7 @@ describe('Web API Client', () => {
       window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
     });
 
-    it('should NOT dispatch event on 401 with different error code', async () => {
+    it('should dispatch auth-invalidated event on 401 + missing_token', async () => {
       const eventHandler = vi.fn();
       window.addEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
 
@@ -212,6 +212,26 @@ describe('Web API Client', () => {
         json: () =>
           Promise.resolve(
             createMockApiErrorResponse('missing_token', 'No token provided')
+          ),
+      });
+
+      await expect(api.fetchUser()).resolves.toBeNull();
+      expect(eventHandler).toHaveBeenCalled();
+      expect(storage.clearAuth).toHaveBeenCalled();
+
+      window.removeEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+    });
+
+    it('should NOT dispatch event on 401 with different error code', async () => {
+      const eventHandler = vi.fn();
+      window.addEventListener(AUTH_INVALIDATED_EVENT, eventHandler);
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_credentials', 'Bad creds')
           ),
       });
 
@@ -359,52 +379,6 @@ describe('Web API Client', () => {
     it('should return null on error', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network'));
       const result = await api.fetchUser();
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('refreshUser', () => {
-    it('should refresh and update stored auth', async () => {
-      const mockResponse = createMockAuthResponse({ accessToken: 'refreshed-token' });
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(createMockApiResponse(mockResponse)),
-      });
-
-      const result = await api.refreshUser();
-      expect(result).not.toBeNull();
-      expect(result!.accessToken).toBe('refreshed-token');
-      expect(storage.setAuth).toHaveBeenCalled();
-    });
-
-    it('should return null when no refresh token', async () => {
-      vi.mocked(storage.getAuth).mockReturnValue(null);
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null on server error', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null when response is not successful', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve(
-            createMockApiErrorResponse('invalid_token', 'Token expired')
-          ),
-      });
-
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null on network error', async () => {
-      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
-      const result = await api.refreshUser();
       expect(result).toBeNull();
     });
   });

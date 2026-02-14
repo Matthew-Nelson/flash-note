@@ -6,19 +6,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { Button, Input, Alert, LoadingSpinner } from '@/components/ui';
 import { resetPasswordSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-interface ValidateTokenResponse {
-  success: boolean;
-  data?: { valid: boolean };
-  error?: { message: string };
-}
-
-interface ResetPasswordResponse {
-  success: boolean;
-  error?: { message: string };
-}
+import { api, ApiError } from '@/lib/api';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -33,10 +21,8 @@ function ResetPasswordContent() {
 
   const validateToken = useCallback(async (resetToken: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/validate-reset-token?token=${encodeURIComponent(resetToken)}`);
-      const result = (await response.json()) as ValidateTokenResponse;
-
-      if (response.ok && result.success && result.data?.valid) {
+      const result = await api.validateResetToken(resetToken);
+      if (result.valid) {
         setStatus('ready');
       } else {
         setStatus('invalid');
@@ -76,23 +62,15 @@ function ResetPasswordContent() {
     setStatus('submitting');
 
     try {
-      const response = await fetch(`${API_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
-      });
-
-      const apiResult = (await response.json()) as ResetPasswordResponse;
-
-      if (response.ok && apiResult.success) {
-        setStatus('success');
-      } else {
-        setStatus('ready');
-        setErrors([apiResult.error?.message ?? 'Failed to reset password']);
-      }
-    } catch {
+      await api.resetPassword(token!, password);
+      setStatus('success');
+    } catch (err) {
       setStatus('ready');
-      setErrors(['An error occurred. Please try again.']);
+      if (err instanceof ApiError && err.code === 'invalid_token') {
+        setStatus('invalid');
+      } else {
+        setErrors(['Something went wrong. Please try again.']);
+      }
     }
   };
 

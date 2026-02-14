@@ -25,7 +25,6 @@ vi.mock('./api', () => ({
     register: vi.fn(),
     logout: vi.fn(),
     fetchUser: vi.fn(),
-    refreshUser: vi.fn(),
   },
   ApiError: class ApiError extends Error {
     constructor(
@@ -221,38 +220,6 @@ describe('AuthContext', () => {
       });
 
       expect(result).not.toBeNull();
-    });
-  });
-
-  describe('refreshUser', () => {
-    it('should update user from api.refreshUser', async () => {
-      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
-      const refreshed = createMockAuthResponse({
-        user: createMockUser({ subscriptionStatus: 'active' }),
-      });
-      vi.mocked(api.refreshUser).mockResolvedValue(refreshed);
-
-      renderWithProvider();
-      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
-
-      await act(async () => {
-        await captured.refreshUser();
-      });
-    });
-
-    it('should not update user when api.refreshUser returns null', async () => {
-      vi.mocked(storage.getAuth).mockReturnValue(createMockStoredAuth());
-      vi.mocked(api.refreshUser).mockResolvedValue(null);
-
-      renderWithProvider();
-      await waitFor(() => expect(captured.isAuthenticated).toBe(true));
-
-      await act(async () => {
-        await captured.refreshUser();
-      });
-
-      // User should still be the original user from storage
-      expect(screen.getByTestId('user').textContent).toBe('test@example.com');
     });
   });
 

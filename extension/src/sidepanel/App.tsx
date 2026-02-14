@@ -5,7 +5,7 @@ import NoteGenerator from './components/NoteGenerator';
 import ResultDisplay from './components/ResultDisplay';
 import Settings from './components/Settings';
 import { type GeneratedNote } from '@/shared/schemas';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 
 type View = 'generator' | 'result' | 'settings';
 type ResendStatus = 'idle' | 'sending' | 'sent' | 'error';
@@ -130,7 +130,7 @@ function AuthenticatedApp({
       setResendStatus('sent');
     } catch (err) {
       // Show sent even on most errors to prevent enumeration
-      if (err instanceof Error && err.message.includes('Too many')) {
+      if (err instanceof ApiError && err.code === 'too_many_attempts') {
         setResendStatus('error');
       } else {
         setResendStatus('sent');

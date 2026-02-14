@@ -26,10 +26,10 @@ function SettingsContent() {
       await api.requestPasswordReset(user.email);
       setPasswordResetSent(true);
     } catch (err) {
-      if (err instanceof ApiError) {
-        setPasswordResetError(err.message || 'Failed to send password reset email.');
+      if (err instanceof ApiError && err.code === 'too_many_attempts') {
+        setPasswordResetError('Too many requests. Please try again later.');
       } else {
-        setPasswordResetError('An unexpected error occurred.');
+        setPasswordResetError('Something went wrong. Please try again.');
       }
     } finally {
       setPasswordResetLoading(false);

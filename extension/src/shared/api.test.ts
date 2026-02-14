@@ -548,49 +548,4 @@ describe('Extension API Client', () => {
     });
   });
 
-  describe('refreshUser', () => {
-    it('should refresh and update stored auth', async () => {
-      const mockResponse = createMockAuthResponse({ accessToken: 'refreshed-token' });
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(createMockApiResponse(mockResponse)),
-      });
-
-      const result = await api.refreshUser();
-      expect(result).not.toBeNull();
-      expect(result!.accessToken).toBe('refreshed-token');
-      expect(storage.setAuth).toHaveBeenCalled();
-    });
-
-    it('should return null when no refresh token', async () => {
-      vi.mocked(storage.getAuth).mockResolvedValue(null);
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null on server error', async () => {
-      mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null when response is not successful', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () =>
-          Promise.resolve(
-            createMockApiErrorResponse('invalid_token', 'Token expired')
-          ),
-      });
-
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-
-    it('should return null on network error', async () => {
-      mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
-      const result = await api.refreshUser();
-      expect(result).toBeNull();
-    });
-  });
 });

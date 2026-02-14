@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { validateLogin, validateRegister, validateEmail } from '@/shared/schemas';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 import SessionAlert from './SessionAlert';
 
 interface LoginFormProps {
@@ -46,10 +46,37 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         await onLogin(email, password);
       }
     } catch (err) {
-      if (err instanceof Error) {
-        setErrors([err.message]);
+      if (err instanceof ApiError) {
+        switch (err.code) {
+          case 'invalid_credentials':
+            setErrors(['Invalid email or password.']);
+            break;
+          case 'account_locked':
+            setErrors(['Account temporarily locked. Please try again later.']);
+            break;
+          case 'email_not_verified':
+            setErrors(['Please verify your email before signing in.']);
+            break;
+          case 'email_exists':
+            setErrors(['An account with this email already exists.']);
+            break;
+          case 'weak_password':
+            setErrors(['Password does not meet requirements.']);
+            break;
+          case 'registration_closed':
+            setErrors(['Registration is not available at this time.']);
+            break;
+          case 'invite_code_required':
+            setErrors(['An invite code is required to register.']);
+            break;
+          case 'invalid_invite_code':
+            setErrors(['This invite code is invalid or has expired.']);
+            break;
+          default:
+            setErrors(['Something went wrong. Please try again.']);
+        }
       } else {
-        setErrors(['An unexpected error occurred']);
+        setErrors(['Something went wrong. Please try again.']);
       }
     } finally {
       setIsLoading(false);
@@ -76,8 +103,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     } catch (err) {
       // Always show success to prevent email enumeration
       // Only show error for rate limiting
-      if (err instanceof Error && err.message.includes('Too many')) {
-        setErrors([err.message]);
+      if (err instanceof ApiError && err.code === 'too_many_attempts') {
+        setErrors(['Too many requests. Please try again later.']);
       } else {
         setResetEmailSent(true);
       }

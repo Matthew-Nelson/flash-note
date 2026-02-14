@@ -21,7 +21,6 @@ vi.mock('@/shared/api', () => ({
     register: vi.fn(),
     logout: vi.fn(),
     fetchUser: vi.fn(),
-    refreshUser: vi.fn(),
   },
   AUTH_INVALIDATED_EVENT: 'flashnote:auth-invalidated',
 }));
@@ -190,55 +189,6 @@ describe('useAuth', () => {
       let returned: unknown;
       await act(async () => {
         returned = await result.current.fetchUser();
-      });
-
-      expect(returned).toBeNull();
-    });
-  });
-
-  describe('refreshUser', () => {
-    it('should refresh and update user', async () => {
-      vi.mocked(storage.getAuth).mockResolvedValue(createMockStoredAuth());
-      const refreshed = createMockAuthResponse({
-        user: createMockUser({ subscriptionStatus: 'active' }),
-      });
-      vi.mocked(api.refreshUser).mockResolvedValue(refreshed);
-
-      const { result } = renderHook(() => useAuth());
-      await waitFor(() => expect(result.current.user).not.toBeNull());
-
-      await act(async () => {
-        await result.current.refreshUser();
-      });
-
-      expect(result.current.user!.subscriptionStatus).toBe('active');
-    });
-
-    it('should return null on failure', async () => {
-      vi.mocked(storage.getAuth).mockResolvedValue(createMockStoredAuth());
-      vi.mocked(api.refreshUser).mockRejectedValue(new Error('Network'));
-
-      const { result } = renderHook(() => useAuth());
-      await waitFor(() => expect(result.current.user).not.toBeNull());
-
-      let returned: unknown;
-      await act(async () => {
-        returned = await result.current.refreshUser();
-      });
-
-      expect(returned).toBeNull();
-    });
-
-    it('should return null when response has no user', async () => {
-      vi.mocked(storage.getAuth).mockResolvedValue(createMockStoredAuth());
-      vi.mocked(api.refreshUser).mockResolvedValue(null);
-
-      const { result } = renderHook(() => useAuth());
-      await waitFor(() => expect(result.current.user).not.toBeNull());
-
-      let returned: unknown;
-      await act(async () => {
-        returned = await result.current.refreshUser();
       });
 
       expect(returned).toBeNull();

@@ -29,7 +29,6 @@ interface AuthContextValue {
   login: (email: string, password: string) => Promise<AuthResponse>;
   register: (email: string, password: string, acceptedLegalTerms: boolean, inviteCode?: string) => Promise<AuthResponse>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
   fetchUser: () => Promise<User | null>;
   clearSessionEndReason: () => void;
 }
@@ -145,18 +144,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
       throw error;
     } finally {
       setUser(null);
+      setSessionEndReason(null);
       Sentry.setUser(null);
       router.push('/login');
     }
   }, [router]);
-
-  const refreshUser = useCallback(async () => {
-    const response = await api.refreshUser();
-    if (response?.user) {
-      setUser(response.user);
-      lastFetchTime.current = Date.now();
-    }
-  }, []);
 
   const clearSessionEndReason = useCallback(() => {
     setSessionEndReason(null);
@@ -170,7 +162,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
-    refreshUser,
     fetchUser,
     clearSessionEndReason,
   };

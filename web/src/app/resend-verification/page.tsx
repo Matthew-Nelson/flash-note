@@ -5,13 +5,7 @@ import { useState } from 'react';
 import { Button, Input, Alert } from '@/components/ui';
 import { emailSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-interface ResendVerificationResponse {
-  success: boolean;
-  error?: { code: string; message: string };
-}
+import { api, ApiError } from '@/lib/api';
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
@@ -34,26 +28,17 @@ export default function ResendVerificationPage() {
     setStatus('submitting');
 
     try {
-      const response = await fetch(`${API_URL}/auth/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
-        setStatus('success');
+      await api.resendVerificationEmail(email);
+      setStatus('success');
+    } catch (err) {
+      // Show success on most errors to prevent email enumeration
+      // Only show error for rate limiting
+      if (err instanceof ApiError && err.code === 'too_many_attempts') {
+        setStatus('error');
+        setErrors(['Too many requests. Please try again later.']);
       } else {
-        const result = (await response.json()) as ResendVerificationResponse;
-        if (result.error?.code === 'too_many_attempts') {
-          setStatus('error');
-          setErrors([result.error.message]);
-        } else {
-          setStatus('success');
-        }
+        setStatus('success');
       }
-    } catch {
-      setStatus('error');
-      setErrors(['An error occurred. Please try again.']);
     }
   };
 

@@ -82,6 +82,9 @@ function isRetryableError(error: unknown): boolean {
   return false;
 }
 
+// Mutex: prevents concurrent refresh token calls from racing
+let refreshPromise: Promise<string | null> | null = null;
+
 /**
  * Get current access token, refreshing if needed
  */
@@ -91,7 +94,15 @@ async function getToken(): Promise<string | null> {
 
   // Check if token is expired (with 60s buffer)
   if (Date.now() > auth.expiresAt - 60000) {
-    return refreshToken(auth.refreshToken);
+    // Deduplicate: if a refresh is already in-flight, await it instead of
+    // starting a second one (which would fail and clear the valid tokens
+    // the first call stored)
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+    refreshPromise = refreshToken(auth.refreshToken)
+      .finally(() => { refreshPromise = null; });
+    return refreshPromise;
   }
 
   return auth.accessToken;
@@ -172,9 +183,12 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     const errorCode = result.success === false ? result.error.code : 'unknown_error';
     const errorMessage = result.success === false ? result.error.message : 'An error occurred';
 
-    // SECURITY: Auto-logout on invalid token
-    if (response.status === 401 && errorCode === 'invalid_token') {
-      dispatchAuthInvalidated('session_invalidated');
+    // SECURITY: Auto-logout on any 401 auth failure
+    // - invalid_token: password was reset, session invalidated, token version mismatch
+    // - missing_token: refresh failed (expired session), auth storage cleared
+    if (response.status === 401 && (errorCode === 'invalid_token' || errorCode === 'missing_token')) {
+      const reason: SessionEndReason = errorCode === 'missing_token' ? 'session_expired' : 'session_invalidated';
+      dispatchAuthInvalidated(reason);
       storage.clearAuth();
     }
 
@@ -287,8 +301,8 @@ export const api = {
 
   /**
    * Fetch fresh user data from GET /user/me without rotating tokens.
-   * Lightweight alternative to refreshUser() for polling state changes
-   * (subscription status, email verification) without session churn.
+   * Used for polling state changes (subscription status, email verification)
+   * without session churn.
    */
   async fetchUser(): Promise<{ user: User } | null> {
     try {
@@ -302,45 +316,6 @@ export const api = {
           user: data.user,
         });
       }
-
-      return data;
-    } catch {
-      return null;
-    }
-  },
-
-  /**
-   * Force refresh user data by rotating tokens.
-   * Creates a new session - use fetchUser() for lightweight status checks.
-   */
-  async refreshUser(): Promise<AuthResponse | null> {
-    const auth = storage.getAuth();
-    if (!auth?.refreshToken) return null;
-
-    try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: auth.refreshToken }),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const result = (await response.json()) as ApiResponse<AuthResponse>;
-      if (!result.success) {
-        return null;
-      }
-
-      const data = result.data;
-      storage.setAuth({
-        user: data.user,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        csrfToken: data.csrfToken,
-        expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
-      });
 
       return data;
     } catch {
@@ -394,5 +369,32 @@ export const api = {
    */
   async getUsage(): Promise<UsageResponse> {
     return request<UsageResponse>('/usage/me');
+  },
+
+  /**
+   * Validate a password reset token
+   */
+  async validateResetToken(token: string): Promise<{ valid: boolean }> {
+    return request<{ valid: boolean }>(`/auth/validate-reset-token?token=${encodeURIComponent(token)}`);
+  },
+
+  /**
+   * Reset password using a valid reset token
+   */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  /**
+   * Verify email address using a verification token
+   */
+  async verifyEmail(token: string): Promise<{ alreadyVerified?: boolean }> {
+    return request<{ alreadyVerified?: boolean }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
   },
 };
