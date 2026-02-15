@@ -31,6 +31,8 @@ Research and planning docs for features not yet implemented.
 | Document | Description |
 |----------|-------------|
 | [MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) | **Critical** - Sentry, UptimeRobot, Axiom setup plan |
+| [AUTH_ARCHITECTURE.md](./planning/AUTH_ARCHITECTURE.md) | **Critical** - Auth hardening plan: httpOnly cookies, TOTP MFA, idle timeout, shared sessions |
+| [CLERK_ANALYSIS.md](./planning/CLERK_ANALYSIS.md) | Clerk auth platform evaluation (decision: don't adopt) |
 | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | OAuth/social login implementation analysis |
 | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | Product strategy for clinician trust (conversational mode, review mode) |
 | [UNIFIED_STYLING_PLAN.md](./planning/UNIFIED_STYLING_PLAN.md) | CSS consolidation plan for extension + web |
@@ -41,6 +43,7 @@ Testing, security, and compliance requirements.
 | Document | Description |
 |----------|-------------|
 | [AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md) | HIPAA audit logging specification |
+| [HIPAA_SECURITY_REQUIREMENTS_2026.md](./compliance/HIPAA_SECURITY_REQUIREMENTS_2026.md) | **Critical** - Full HIPAA Security Rule research + 2025 NPRM changes + BAA requirements |
 | [SECURITY_AUDIT.md](./compliance/SECURITY_AUDIT.md) | Security audit findings and remediation status |
 | [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) | Test coverage targets and CI/CD requirements |
 

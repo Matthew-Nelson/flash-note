@@ -1,7 +1,7 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 10, 2026
-**Overall Progress:** 36% (41/114 items complete)
+**Last Updated:** February 15, 2026
+**Overall Progress:** 30% (41/135 items complete)
 
 This document consolidates all pending work from across the project. Use this as your primary reference for what to work on next.
 
@@ -101,21 +101,40 @@ This document consolidates all pending work from across the project. Use this as
 These items are **required for production** with real patient data. They should be completed before or in parallel with Phase 3.
 
 > **Regulatory Context:** The HITECH Act of 2009 makes FlashNote directly liable for HIPAA violations as a Business Associate, subject to direct OCR audits, with penalties up to $2.1M/year per violation category. These items address both HIPAA and HITECH requirements.
+>
+> **See also:** [compliance/HIPAA_SECURITY_REQUIREMENTS_2026.md](./compliance/HIPAA_SECURITY_REQUIREMENTS_2026.md) - Comprehensive research on current HIPAA requirements and 2025 NPRM changes (MFA mandate, encryption requirements, vulnerability scanning, 72-hour recovery, etc.)
 
 | Task | Source | Status |
 |------|--------|--------|
 | Audit log retention automation (6 years) | SUCCESS_METRICS PROD-10 | Not implemented |
-| Audit log immutability protections | SUCCESS_METRICS PROD-16 | Not implemented |
+| Audit log immutability protections (WORM or hashing) | SUCCESS_METRICS PROD-16 | Not implemented |
 | Sign Vertex AI BAA with Google Cloud | SUCCESS_METRICS PROD-09 | Not done |
-| Database encryption at rest | SUCCESS_METRICS PROD-07 | Not deployed |
+| Sign Vercel BAA (Pro/Enterprise plan required) | HIPAA_SECURITY_REQUIREMENTS §3.4 | Not done |
+| Sign database provider BAA | HIPAA_SECURITY_REQUIREMENTS §3.2 | Not done |
+| Sign Sentry BAA (optional - monitoring) | HIPAA_SECURITY_REQUIREMENTS §3.5 | Not done |
+| Database encryption at rest (AES-256) | SUCCESS_METRICS PROD-07 | Not deployed |
 | TLS 1.2+ enforced on all connections | SUCCESS_METRICS PROD-08 | Not deployed |
-| HIPAA-compliant hosting provider with BAA | PRE_LAUNCH_CHECKLIST §2 | Not done |
 | Breach notification / incident response procedure | HITECH Act requirement | Not documented |
+| Formal risk analysis (§164.308(a)(1)(ii)(A)) | HIPAA_SECURITY_REQUIREMENTS §1.6 | Not documented |
 | BAA acceptance in signup flow (backend) | PRE_LAUNCH_LEGAL_COMPLIANCE | ✅ Done (legal_acceptances table + recordLegalAcceptances in auth-service) |
 | **Create `/baa` web page** (so users can read the BAA) | PRE_LAUNCH_LEGAL_COMPLIANCE | ❌ Not started — signup forms link to /baa, currently 404 |
 | **Legal document re-acceptance flow** (compare user's accepted version vs current `LEGAL_DOCUMENT_VERSIONS`, prompt re-consent if stale) | LEGAL_VERSIONING | Not started — P1 prod blocker |
 
 **Note:** Without these items complete, we cannot legally handle real PHI in production. Under the HITECH Act, FlashNote is directly liable for compliance failures — independent of covered entities.
+
+### 2025 NPRM Preparation (Likely Required ~November 2026)
+
+These items are **not yet required** but will likely become mandatory when the HIPAA Security Rule NPRM is finalized (expected May 2026 with 180-day compliance period). See [HIPAA_SECURITY_REQUIREMENTS_2026.md](./compliance/HIPAA_SECURITY_REQUIREMENTS_2026.md) for full details.
+
+| Task | NPRM Section | Status |
+|------|--------------|--------|
+| Implement multi-factor authentication (MFA) | New requirement | Not started |
+| Implement automatic session timeout (15 min inactivity) | §164.312(a)(2)(iii) | ⚠️ Partial (1-hour token expiry, no client-side inactivity detection) |
+| Configure vulnerability scanning (6-month intervals) | New requirement | Not configured |
+| Schedule annual penetration testing | New requirement | Not scheduled |
+| Document 72-hour system recovery procedures | New requirement | Not documented |
+| Implement annual compliance audit process | New requirement | Not documented |
+| Add ePHI integrity verification mechanisms | §164.312(c)(2) | Not implemented |
 
 ---
 
@@ -300,13 +319,35 @@ See [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) for full details.
 
 ---
 
+## Auth Architecture Hardening (Pre-Production)
+
+**Goal:** Close the gap between our current custom auth and what a production healthcare auth system requires. See [planning/AUTH_ARCHITECTURE.md](./planning/AUTH_ARCHITECTURE.md) for full design.
+
+**Decision:** Keep custom JWT auth in-house ([CLERK_ANALYSIS.md](./planning/CLERK_ANALYSIS.md)). Build httpOnly cookie auth, TOTP MFA, idle timeout, and shared extension ↔ web sessions.
+
+| Task | Source | Status |
+|------|--------|--------|
+| httpOnly cookie auth (bridge + persistence) | AUTH_ARCHITECTURE §1 | Not started |
+| "Remember me" checkbox on web login | AUTH_ARCHITECTURE §1 | Not started |
+| Extension cookie reading + fallback | AUTH_ARCHITECTURE §1 | Not started |
+| Session idle timeout (15 min) | AUTH_ARCHITECTURE §3 | Not started |
+| TOTP MFA enrollment + verification | AUTH_ARCHITECTURE §2 | Not started |
+| MFA recovery codes (10 per user, bcrypt-hashed) | AUTH_ARCHITECTURE §2 | Not started |
+| MFA login flow (mfa_required → code input) | AUTH_ARCHITECTURE §2 | Not started |
+| MFA settings UI (web + extension) | AUTH_ARCHITECTURE §4 | Not started |
+| Google OAuth (social login) | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | Not started |
+| In-session change password | AUTH_ARCHITECTURE §4 | Not started |
+| Active sessions list with revoke | AUTH_ARCHITECTURE §4 | Not started |
+
+---
+
 ## Future Features (Not Scheduled)
 
 These are researched but not prioritized for current development.
 
 | Feature | Planning Doc | Notes |
 |---------|--------------|-------|
-| OAuth/Social Login | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | Google OAuth recommended |
+| OAuth/Social Login | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | Google OAuth recommended. Tracked in Auth Architecture above |
 | Conversational Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI asks clarifying questions |
 | Review Mode | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | AI reviews therapist's draft |
 
@@ -333,8 +374,10 @@ These are researched but not prioritized for current development.
 | UI Quality (P0/P1/P2/P3) | 33 | 0 | 0% |
 | Beta Ready (Wave 1 + existing) | 26 | 20 | 77% |
 | Production Ready (Waves 2-4 + existing) | 30 | 5 | 17% |
-| HIPAA/HITECH Critical Path | 10 | 1 | 10% |
-| **Total** | **114** | **41** | **36%** |
+| Auth Architecture Hardening | 11 | 0 | 0% |
+| HIPAA/HITECH Critical Path (Current) | 13 | 1 | 8% |
+| HIPAA/HITECH NPRM Preparation | 7 | 0 | 0% |
+| **Total** | **135** | **41** | **30%** |
 
 ---
 
