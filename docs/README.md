@@ -44,19 +44,24 @@ Operational guides and API documentation for developers.
 | [EXTENSION_DEPLOYMENT.md](./guides/EXTENSION_DEPLOYMENT.md) | Chrome Web Store deployment guide |
 | [LLC_FORMATION_GUIDE.md](./guides/LLC_FORMATION_GUIDE.md) | Business entity formation walkthrough |
 
-### `/planning` - Future Features
-Research and planning docs for features not yet implemented.
+### `/planning` - Planning & Research
+Design specs, research, and competitive analysis.
 
 | Document | Description |
 |----------|-------------|
+| [PHI_STORAGE_PLAN.md](./planning/PHI_STORAGE_PLAN.md) | **Active** — Patient data storage, notes, templates, versioning |
+| [PROMPT_ENGINEERING_RESEARCH.md](./planning/PROMPT_ENGINEERING_RESEARCH.md) | **Active** — LLM prompt optimization (10 action items) |
 | [APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) | Beta rollout, invite codes, clinic seat management (Wave 1 complete) |
+| [ACCESSIBILITY_IMPLEMENTATION.md](./planning/ACCESSIBILITY_IMPLEMENTATION.md) | WCAG AA tooling plan (Phases 1-2 done) |
 | [MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) | Sentry (done), UptimeRobot, Axiom setup plan |
+| [TWOFOLD_DEEP_DIVE.md](./planning/TWOFOLD_DEEP_DIVE.md) | Competitor analysis — Twofold Health |
+| [COMPETITIVE_ANALYSIS.md](./planning/COMPETITIVE_ANALYSIS.md) | Broader competitive landscape |
+| [VOICE_INPUT_ROADMAP.md](./planning/VOICE_INPUT_ROADMAP.md) | Voice-to-note feature research |
 | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | OAuth/social login implementation analysis |
 | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | Product strategy for clinician trust |
-| [ACCESSIBILITY_IMPLEMENTATION.md](./planning/ACCESSIBILITY_IMPLEMENTATION.md) | WCAG AA implementation plan |
-| [SIGNUP_FORM_STANDARDIZATION.md](./planning/SIGNUP_FORM_STANDARDIZATION.md) | Web/extension signup consistency |
-| [PROMPT_ENGINEERING_RESEARCH.md](./planning/PROMPT_ENGINEERING_RESEARCH.md) | LLM prompt optimization research |
 | [RETENTION_STRATEGY.md](./planning/RETENTION_STRATEGY.md) | Churn reduction and switching cost strategy |
+| [SIGNUP_FORM_STANDARDIZATION.md](./planning/SIGNUP_FORM_STANDARDIZATION.md) | Web/extension signup consistency |
+| [IDEA_DUMPING_GROUND.md](./planning/IDEA_DUMPING_GROUND.md) | Unstructured feature ideas and brainstorming |
 
 ### `/compliance` - Security & HIPAA
 Testing, security, and compliance requirements.
