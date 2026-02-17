@@ -58,8 +58,8 @@ Two environments, not three. Beta is production with access controls, not a sepa
 
 | Environment | Purpose | Backend | Web | Extension |
 |-------------|---------|---------|-----|-----------|
-| **Staging** | Internal QA, pre-deploy testing | Render (separate instance) | Vercel preview branch | Chrome developer mode |
-| **Production** | Beta AND general availability | Render (production) | Vercel main branch | Chrome Web Store |
+| **Staging** | Internal QA, pre-deploy testing | Cloud Run (separate service) | Vercel preview branch | Chrome developer mode |
+| **Production** | Beta AND general availability | Cloud Run (production) | Vercel main branch | Chrome Web Store |
 
 Each environment gets its own: PostgreSQL database, Stripe keys (test vs. live mode), Gemini API key, JWT secrets, Sentry environment tag, and `ALLOWED_ORIGINS`.
 

@@ -80,7 +80,7 @@ Additionally, individual event handlers (`handleCheckoutComplete`, `handleSubscr
 **File:** `backend/src/index.ts`
 **Category:** Infrastructure / Security
 
-Express does not call `app.set('trust proxy', ...)`. Behind any reverse proxy or load balancer (standard for production on Render, AWS, etc.):
+Express does not call `app.set('trust proxy', ...)`. Behind any reverse proxy or load balancer (standard for production on Cloud Run, GCP, etc.):
 - `req.ip` returns the proxy IP, not the client's
 - **All rate limit counters are shared across ALL users** (effectively no rate limiting)
 - **All audit log entries record the wrong IP** (HIPAA audit trail integrity compromised)

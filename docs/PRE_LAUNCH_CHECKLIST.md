@@ -53,16 +53,12 @@
   - Free, required for HIPAA-compliant LLM usage
   - Sign at: Google Cloud Console → Compliance → BAA
   - Must use Vertex AI endpoint (not consumer Gemini API)
-- [ ] **Hosting Provider BAA** (Render, Railway, or alternative)
-  - Verify HIPAA compliance and BAA availability
-  - Render: Contact enterprise sales for BAA
-  - Railway: May not offer BAA - consider HIPAA-compliant alternatives:
-    - AWS (free BAA with Business Support)
-    - Google Cloud Run
-    - Azure
+- [ ] **Hosting Provider BAA** (Google Cloud)
+  - Google Cloud offers BAA covering Cloud Run, Cloud SQL, and other services
+  - Sign at: Google Cloud Console → Compliance → BAA
+  - BAA covers HIPAA-eligible services when configured correctly
 - [ ] **Database Provider BAA**
-  - If using managed PostgreSQL, ensure BAA coverage
-  - Cloud SQL (GCP), RDS (AWS), or Azure Database all offer BAAs
+  - Cloud SQL is covered under the Google Cloud BAA (same agreement covers all HIPAA-eligible GCP services)
 
 **BAA You Need to PROVIDE (to customers):**
 - [~] **Customer BAA Template** - Template at `docs/legal/BAA_TEMPLATE.md`
@@ -207,8 +203,8 @@
   - Namecheap, Google Domains, Cloudflare Registrar
   - Consider purchasing variations for protection
 - [ ] **Configure DNS records**
-  - A record for api.flashnote.co → Backend host
-  - CNAME for www → Web host (Vercel)
+  - A record for api.flashnote.co → Cloud Run service
+  - CNAME for www → Vercel
   - MX records for email (if using custom email)
 - [ ] **Enable DNSSEC** (recommended)
 - [ ] **Set up email**
@@ -217,22 +213,22 @@
   - Consider Google Workspace, Zoho, or Fastmail
 
 ### Production Infrastructure
-- [ ] **Deploy Backend API**
-  - [ ] Choose HIPAA-compliant hosting (see BAA requirements above)
-  - [ ] Configure environment variables
-  - [ ] Set up SSL/TLS (automatic with most providers)
+- [ ] **Deploy Backend API (Cloud Run)**
+  - [ ] Create GCP project and enable Cloud Run API
+  - [ ] Configure environment variables (Cloud Run secrets or Secret Manager)
+  - [ ] Set up SSL/TLS (automatic with Cloud Run custom domains)
   - [ ] Configure custom domain (api.flashnote.co)
-  - [ ] Set up auto-scaling if needed
+  - [ ] Configure min/max instances for scaling
 
-- [ ] **Deploy Production Database**
-  - [ ] PostgreSQL with encryption at rest
+- [ ] **Deploy Production Database (Cloud SQL)**
+  - [ ] Create Cloud SQL PostgreSQL instance with encryption at rest
   - [ ] Enable automatic backups
   - [ ] Test backup restoration
-  - [ ] Set up connection pooling
-  - [ ] Document connection string securely
+  - [ ] Configure Cloud SQL Auth Proxy or private IP for Cloud Run connection
+  - [ ] Document connection string securely (use Secret Manager)
 
-- [ ] **Deploy Web/Landing Page**
-  - [ ] Deploy to Vercel (or similar)
+- [ ] **Deploy Web/Landing Page (Vercel)**
+  - [ ] Deploy to Vercel
   - [ ] Configure custom domain
   - [ ] Set environment variables
 
@@ -259,36 +255,15 @@
   - `GCP_PROJECT_ID` - Currently unused, kept for future Vertex AI migration
   - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` - Used for price ID validation in billing routes
 
-**Estimated Monthly Cost:** ~$15-50/month (basic) to $100-300/month (HIPAA-compliant cloud)
+**Estimated Monthly Cost:** ~$15-45/month (basic Cloud Run + Cloud SQL) to $100-300/month (production scale)
 
 ---
 
 ## 5. Security Remediation (Pre-Launch Critical)
 
-Based on `SECURITY_AUDIT.md`, these should be addressed before handling real patient data:
+> The authoritative security audit is [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) (Feb 2026, 69 findings). The original `SECURITY_AUDIT.md` (Jan 2026) has been archived — its findings were resolved, but the consolidated audit found additional issues.
 
-### Resolved ✅
-- [x] **HIGH-013: Query statement timeout** - DoS prevention
-- [x] **HIGH-003: Content Security Policy** - XSS protection
-- [x] **HIGH-005: Account lockout mechanism** - Brute force protection
-- [x] **HIGH-012: Email in failed login audit** - Accepted risk (standard practice)
-- [x] **MEDIUM-012: Sanitize LLM error logging** - PHI leakage prevention
-- [x] **HIGH-001 + HIGH-007: Password reset + email verification**
-- [x] **HIGH-006 + MEDIUM-002 + MEDIUM-011: Session infrastructure** - Device binding, O(1) token validation, session limits
-- [x] **MEDIUM-007 + MEDIUM-015: CORS configuration** - Explicit ALLOWED_ORIGINS env var
-
-### Resolved ✅ (continued)
-- [x] **MEDIUM-005: Prompt injection mitigation** - XML delimiters + detection
-- [x] **MEDIUM-010: Prompt warnings may leak context** - Verified PHI-safe
-- [x] **MEDIUM-013: Webhook idempotency** - Database-backed deduplication
-- [x] **MEDIUM-014: Extension retry logic** - Exponential backoff implemented
-
-### Accepted Risk (Low Priority)
-- [x] MEDIUM-003: Session timeout warning - Silent refresh already implemented
-- [x] MEDIUM-008: Extension token storage separation - Device binding mitigates
-
-### Deferred (Observability Track)
-- [ ] LOW-001: Structured logging - See `docs/planning/MONITORING_SETUP.md`
+**Current status:** 4 CRITICAL + 18 HIGH findings open. See [ROADMAP.md Tier 1: Security Hardening](./ROADMAP.md#tier-1-security-hardening) for task tracking.
 
 ---
 

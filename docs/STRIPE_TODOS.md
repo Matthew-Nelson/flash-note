@@ -1,112 +1,26 @@
-# Stripe Integration TODOs
+# Stripe Integration Reference
 
-**Last Updated:** February 1, 2026
+**Last Updated:** February 14, 2026
 
-This document tracks all outstanding work for the Stripe payment integration before go-live.
+Reference documentation for the Stripe payment integration — architecture, dashboard config, test cards, and security notes.
 
----
-
-## Current Status
-
-### Implemented
-- [x] Checkout session creation with subscription mode
-- [x] Customer billing portal sessions
-- [x] Webhook signature verification
-- [x] Webhook handlers for:
-  - `checkout.session.completed` - Creates subscription
-  - `customer.subscription.updated` - Updates status
-  - `customer.subscription.deleted` - Marks as canceled
-  - `invoice.paid` - Marks as active after renewal
-  - `invoice.payment_failed` - Marks as past_due
-- [x] User metadata propagation (userId in subscription metadata)
-- [x] Audit logging for subscription events
-- [x] Promotion codes support (`allow_promotion_codes: true`)
-- [x] Webhook idempotency (database-backed, atomic INSERT)
-- [x] Raw body parsing for webhook signature verification
-- [x] Price validation (Zod schema validates against allowed price IDs)
-- [x] Structured logging for webhook processing failures
-- [x] Audit trail for missing userId in webhook metadata
-- [x] Subscription enforcement middleware (`requireActiveSubscription`)
-  - Trial users can access notes during trial period
-  - Expired trial users get 402 `trial_expired` error
-  - Active subscribers can access notes
-  - Canceled/past_due/unpaid users get 402 `subscription_required` error
-
-### Not Implemented
-- [ ] Failed payment email notifications
-- [ ] Trial ending soon notifications
-- [ ] Subscription reactivation flow
-- [ ] Customer portal configuration in Stripe Dashboard
-- [ ] Webhook event cleanup job (see Operations section below)
-- [ ] Post-checkout subscription sync for extension
-  - Issue: Users completing checkout cannot immediately use /notes/generate
-  - The webhook updates the database, but the extension's cached user state is stale
-  - Potential solutions: poll for status after checkout, WebSocket notification, or force token refresh
+> **For task status**, see the [Stripe section in ROADMAP.md](./ROADMAP.md#stripe). For Stripe dashboard config tasks, see [PRE_LAUNCH_CHECKLIST.md §3](./PRE_LAUNCH_CHECKLIST.md).
 
 ---
 
-## Pre-Launch Checklist
+## What's Implemented
 
-### Stripe Dashboard Configuration
-
-| Task | Status | Notes |
-|------|--------|-------|
-| Create Stripe account | Done | Flash Note Sandbox |
-| Complete identity verification | TODO | Required for live mode |
-| Create products and prices | Done | Monthly $29, Annual $290 |
-| Configure Customer Portal | TODO | Enable cancel, update payment, view invoices |
-| Add production webhook endpoint | TODO | `https://api.flashnote.co/billing/webhook` |
-| Configure webhook events | TODO | See events list below |
-| Switch to live mode | TODO | After all testing complete |
-
-### Webhook Events to Subscribe
-
-In Stripe Dashboard → Developers → Webhooks, subscribe to:
-
-- `checkout.session.completed`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-- `invoice.paid`
-- `invoice.payment_failed`
-
-> **Note:** `customer.subscription.created` is not needed - `checkout.session.completed` handles new subscriptions created through our checkout flow.
-
----
-
-## Code TODOs
-
-### MEDIUM Priority (Before Launch)
-
-#### 1. Failed Payment Email Notification
-**Location:** `backend/src/services/billing-service.ts` (see TODO comment)
-
-```typescript
-// TODO: Send email notification to user about failed payment
-// This would integrate with your email service (Resend)
-```
-
-**Implementation:**
-- Use existing email service to send payment failed email
-- Include link to update payment method (billing portal)
-- Consider retry schedule information
-
-### LOW Priority (Post-Launch)
-
-#### 2. Trial Ending Soon Notification
-Send email 3 days before trial expires to encourage conversion.
-
-#### 3. Subscription Reactivation Flow
-Allow users to resubscribe after cancellation without creating new checkout session.
-
-#### 4. Add SUBSCRIPTION_RENEWED Audit Action
-**Location:** `backend/src/types/index.ts`
-
-Currently reusing `SUBSCRIPTION_CREATED` for renewals. Consider adding distinct action.
-
-#### 5. Add PAYMENT_FAILED Audit Action
-**Location:** `backend/src/types/index.ts`
-
-Currently reusing `SUBSCRIPTION_CANCELLED` with FAILURE status. Consider adding distinct action.
+- Checkout session creation with subscription mode
+- Customer billing portal sessions
+- Webhook signature verification + handlers (`checkout.session.completed`, `subscription.updated`, `subscription.deleted`, `invoice.paid`, `invoice.payment_failed`)
+- User metadata propagation (userId in subscription metadata)
+- Audit logging for subscription events
+- Promotion codes support (`allow_promotion_codes: true`)
+- Webhook idempotency (database-backed, atomic INSERT)
+- Raw body parsing for webhook signature verification
+- Price validation (Zod schema validates against allowed price IDs)
+- Structured logging for webhook processing failures
+- Subscription enforcement middleware (`requireActiveSubscription`) with trial support
 
 ---
 
@@ -174,24 +88,7 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_xxx
 
 ---
 
-## Testing Checklist
-
-### Local Development
-- [x] Webhook receives events via Stripe CLI
-- [x] Signature verification works
-- [x] checkout.session.completed updates database
-- [x] customer.subscription.deleted updates database
-- [ ] invoice.payment_failed updates database (test with real subscription)
-- [ ] invoice.paid updates database (test with real subscription)
-
-### Staging/Production
-- [ ] Webhook endpoint accessible from internet
-- [ ] Webhook signature verification with production secret
-- [ ] Full checkout flow with test card
-- [ ] Subscription cancellation via portal
-- [ ] Payment failure handling (use card `4000000000000341`)
-
-### Test Cards
+## Test Cards
 | Card Number | Scenario |
 |-------------|----------|
 | 4242 4242 4242 4242 | Success |
@@ -256,7 +153,7 @@ Stripe → webhook endpoint → signature verification → event routing → dat
 
 ## Related Documentation
 
-- [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) - Section 3: Financial & Payment Setup
+- [ROADMAP.md — Stripe section](./ROADMAP.md#stripe) - Remaining task status
+- [PRE_LAUNCH_CHECKLIST.md §3](./PRE_LAUNCH_CHECKLIST.md) - Stripe Dashboard config tasks
 - [API.md](./guides/API.md) - Billing endpoints documentation
 - [BUSINESS_COST_ANALYSIS.md](./reference/BUSINESS_COST_ANALYSIS.md) - Stripe fee analysis
-- [SECURITY_AUDIT.md](./compliance/SECURITY_AUDIT.md) - MEDIUM-013 (webhook idempotency) - ✅ RESOLVED

@@ -32,15 +32,15 @@ FlashNote is a highly capital-efficient SaaS business with **93-94% gross margin
 | Chrome Web Store Developer | $5 (one-time) | Required to publish extension |
 | Stripe Account | $0 | Free to create, pay-as-you-go |
 | Google Cloud Account | $0 | Free tier + pay-as-you-go |
-| Render/Vercel Accounts | $0 | Free to create |
+| Vercel Account | $0 | Free to create |
 | **Total Essential** | **~$20** | |
 
 ### Development Infrastructure (First Month)
 
 | Item | Cost | Notes |
 |------|------|-------|
-| Render Web Service | $7 | Backend API hosting |
-| Render PostgreSQL | $7 | Database hosting |
+| Google Cloud Run | $0-5 | Backend API hosting (free tier covers light dev usage) |
+| Google Cloud SQL (PostgreSQL) | $10-30 | Managed database |
 | Vercel | $0 | Landing page (free tier) |
 | Gemini API | $0-5 | Development testing (free tier available) |
 | **Total First Month Infra** | **~$14-19** | |
@@ -70,11 +70,11 @@ FlashNote is a highly capital-efficient SaaS business with **93-94% gross margin
 
 | Service | Cost/Month | Purpose |
 |---------|------------|---------|
-| Render Web Service | $7 | Backend API |
-| Render PostgreSQL | $7 | Database |
+| Google Cloud Run | $0-15 | Backend API (scales with traffic) |
+| Google Cloud SQL | $10-30 | Managed PostgreSQL |
 | Vercel | $0 | Landing page (free tier) |
 | Domain Renewal | ~$1 | ($12/year amortized) |
-| **Total Fixed** | **~$15/month** | |
+| **Total Fixed** | **~$15-45/month** | |
 
 ### Variable Costs (Scale with Usage)
 
@@ -476,7 +476,7 @@ If we enhance prompts for more creative/detailed output:
 
 ### Cost Containment Recommendations
 
-1. **Stay on free tiers** as long as possible (Vercel, Sentry, etc.)
+1. **Stay on free tiers** as long as possible (Cloud Run free tier, Vercel, Sentry, etc.)
 2. **Avoid premature optimization** of infrastructure
 3. **Use templates** for legal documents initially
 4. **Delay insurance** until you have paying customers

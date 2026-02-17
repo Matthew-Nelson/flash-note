@@ -110,14 +110,14 @@ For E2E tests, the workflow uses:
 
 Most E2E tests work without real secrets because `USE_MOCK_AI=true` in `.env.test`.
 
-### Render Deployment
+### Cloud Run Deployment
 
-Set environment variables in the Render Dashboard for each service. No `.env` files are used in production.
+Set environment variables in the Google Cloud Console (Cloud Run → Service → Edit → Variables & Secrets) or via `gcloud` CLI. For sensitive values, use **Secret Manager** references. No `.env` files are used in production.
 
 **Staging Environment:**
 ```
 NODE_ENV=production
-DATABASE_URL=<render-postgres-internal-url>
+DATABASE_URL=<cloud-sql-connection-string>
 JWT_SECRET=<64-char-random-string>
 JWT_REFRESH_SECRET=<64-char-random-string>
 CSRF_SECRET=<64-char-random-string>
@@ -137,6 +137,7 @@ Same structure as staging, but with:
 - Production URLs
 - Different random secrets (never share between environments)
 - Production extension ID in `ALLOWED_ORIGINS`
+- Use Secret Manager for all secrets (`JWT_SECRET`, `CSRF_SECRET`, API keys)
 
 ## Generating Secure Secrets
 

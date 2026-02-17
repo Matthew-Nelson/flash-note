@@ -36,7 +36,7 @@ import app from './index.js';
 describe('App configuration', () => {
   it('should set trust proxy to 1 (CR-3)', () => {
     // trust proxy = 1 means trust one proxy hop (correct for single reverse proxy
-    // deployments like Render/Railway/Heroku). Without this, req.ip returns the
+    // deployments like Cloud Run). Without this, req.ip returns the
     // proxy IP, breaking rate limiting and audit logs.
     expect(app.get('trust proxy')).toBe(1);
   });

@@ -1,6 +1,6 @@
 # HIPAA Audit Logging Requirements
 
-**Created:** January 2025
+**Created:** January 2026
 **Purpose:** Document HIPAA audit logging requirements and FlashNote's compliance status
 **Regulatory Reference:** 45 CFR § 164.312 (Technical Safeguards), 45 CFR § 164.308 (Administrative Safeguards)
 
@@ -242,36 +242,9 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 
 ---
 
-## Implementation Checklist
+## Implementation Status
 
-### Phase 1: Critical (Pre-Production)
-
-- [ ] Create admin API endpoint: `GET /admin/audit-logs`
-  - Pagination support
-  - Filter by date range
-  - Filter by user ID
-  - Filter by action type
-  - Filter by status (SUCCESS/FAILURE)
-- [ ] Create admin API endpoint: `GET /admin/audit-logs/export`
-  - CSV format support
-  - JSON format support
-  - Date range filtering
-- [ ] Add database triggers to prevent DELETE/UPDATE on audit_logs
-- [ ] Document formal retention policy (6 years minimum)
-
-### Phase 2: High Priority (Post-Launch)
-
-- [ ] Create admin UI for audit log review
-- [ ] Implement anomaly detection alerts (e.g., multiple failed logins)
-- [ ] Document audit log review procedures
-- [x] ~~Write unit tests for audit-service.ts (target: 70% coverage)~~ — DONE: 17 tests in `audit-service.test.ts` (target raised to 90%+)
-
-### Phase 3: Recommended Enhancements
-
-- [ ] Add log checksums for tamper detection
-- [ ] Implement automated archival to cold storage after 1 year
-- [ ] Create audit log analytics dashboard
-- [ ] Set up scheduled reports for compliance officers
+Core audit logging is implemented (audit-service.ts, 17 unit tests). Remaining work — retention automation, immutability protections, admin endpoints — is tracked in [ROADMAP.md Tier 2: HIPAA Infrastructure](../ROADMAP.md#tier-2-hipaa-infrastructure).
 
 ---
 
