@@ -32,7 +32,7 @@ The brand gradient (emerald-500 / teal-500) fails WCAG AA contrast requirements 
 | `.status-trial` gradient text on white | ~2.3:1 | 4.5:1 | Extension settings, dashboard |
 | BETA badge `text-stone-400` on cream bg | ~2.4:1 | 4.5:1 | Nav header across 11+ pages |
 | `.error-message` red on light red bg | ~3.4:1 | 4.5:1 | All form error displays |
-| Focus ring at 12% opacity (`--fn-accent-glow-light`) | Nearly invisible | Clearly visible | `shared/design-tokens-warm.css:218` |
+| ~~Focus ring at 12% opacity (`--fn-accent-glow-light`)~~ | ~~Nearly invisible~~ | ~~Clearly visible~~ | Fixed: opacity bumped to 18% in `shared/design-tokens-warm.css:214` |
 
 **Fix:** Darken text-use variants of brand colors (e.g., emerald-700/teal-700 passes 4.5:1). Keep lighter gradient for backgrounds with white text, but verify the darkest point of the gradient passes. Define separate `--fn-accent-text` tokens for text-on-light usage.
 

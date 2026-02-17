@@ -62,21 +62,6 @@ body {
   background-clip: padding-box, border-box;
 }
 
-/* ============================================
-   FOCUS STATES
-   Accessible focus indicators using brand colors
-   ============================================ */
-
-.focus-ring:focus {
-  outline: none;
-  box-shadow: var(--fn-focus-ring);
-}
-
-.focus-ring:focus-visible {
-  outline: none;
-  box-shadow: var(--fn-focus-ring);
-}
-
 /* Global focus-visible fallback for interactive elements without custom focus styles */
 @layer base {
   :focus-visible {

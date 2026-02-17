@@ -46,6 +46,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         await onLogin(email, password);
       }
     } catch (err) {
+      // TODO: Bug — violates CLAUDE.md Rule 2. Must map error codes to curated
+      // client-side messages instead of displaying err.message directly.
       if (err instanceof Error) {
         setErrors([err.message]);
       } else {
