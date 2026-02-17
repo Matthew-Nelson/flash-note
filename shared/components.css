@@ -154,10 +154,11 @@
   border: 2px solid var(--fn-border-color);
 }
 
-.input-field:focus {
-  outline: none;
+.input-field:focus-visible {
+  outline: 2px solid var(--fn-accent-primary);
+  outline-offset: -1px;
   border-color: var(--fn-accent-primary);
-  box-shadow: var(--fn-focus-ring);
+  box-shadow: none;
 }
 
 .input-field::placeholder {
@@ -168,9 +169,11 @@
   border-color: var(--fn-error);
 }
 
-.input-field-error:focus {
+.input-field-error:focus-visible {
+  outline: 2px solid var(--fn-error);
+  outline-offset: -1px;
   border-color: var(--fn-error);
-  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.18);
+  box-shadow: none;
 }
 
 .label {
