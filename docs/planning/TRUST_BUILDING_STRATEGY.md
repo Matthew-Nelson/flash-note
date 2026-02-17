@@ -388,19 +388,7 @@ This proves the clinician reviewed and approved the content.
 
 ## Part 8: Implementation Status
 
-### Completed
-- [x] Two-tier billing system (charges vs. suggestedCodes)
-- [x] Goal percentage guardrails (omit if not explicit)
-- [x] Measurement guardrails in prompts
-- [x] Updated schemas, types, and tests
-- [x] Mock service demonstrates both scenarios
-
-### Future Work
-- [ ] Prototype conversational/guided mode
-- [ ] Design "Review Mode" for draft analysis
-- [ ] Implement edit-based learning
-- [ ] Add transparency/source indicators in UI
-- [ ] Explore audit trail logging
+Core trust mechanisms are implemented: two-tier billing (charges vs. suggestedCodes), goal percentage guardrails, measurement guardrails, and mock service demonstrations. Conversational Mode and Review Mode are tracked as future features in [ROADMAP.md](../ROADMAP.md#future-features-not-scheduled).
 
 ---
 

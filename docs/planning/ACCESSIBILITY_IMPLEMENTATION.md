@@ -14,8 +14,8 @@ This plan adds WCAG AA accessibility compliance tooling and fixes across the web
 
 ## Current State
 
-- **No accessibility tooling installed** — no `eslint-plugin-jsx-a11y`, no `vitest-axe`, no `@axe-core/*`
-- **No accessibility-specific tests** in unit or E2E suites
+> Written before Phases 1-2. Updated status: `eslint-plugin-jsx-a11y` is installed and configured in both packages (Phase 1 done). Known violations were fixed (Phase 2 done). Remaining: `vitest-axe`, `@axe-core/playwright`, `@axe-core/react`.
+
 - Both packages use: ESLint 9 flat config, Vitest 4 + jsdom, Playwright, React 19, Tailwind CSS 3.4
 - CI runs lint (`ci.yml`) and E2E (`e2e.yml`) separately — both trigger on web/extension changes
 

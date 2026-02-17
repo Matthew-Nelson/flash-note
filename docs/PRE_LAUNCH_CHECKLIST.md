@@ -261,30 +261,9 @@
 
 ## 5. Security Remediation (Pre-Launch Critical)
 
-Based on `SECURITY_AUDIT.md`, these should be addressed before handling real patient data:
+> The authoritative security audit is [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) (Feb 2026, 69 findings). The original `SECURITY_AUDIT.md` (Jan 2026) has been archived — its findings were resolved, but the consolidated audit found additional issues.
 
-### Resolved ✅
-- [x] **HIGH-013: Query statement timeout** - DoS prevention
-- [x] **HIGH-003: Content Security Policy** - XSS protection
-- [x] **HIGH-005: Account lockout mechanism** - Brute force protection
-- [x] **HIGH-012: Email in failed login audit** - Accepted risk (standard practice)
-- [x] **MEDIUM-012: Sanitize LLM error logging** - PHI leakage prevention
-- [x] **HIGH-001 + HIGH-007: Password reset + email verification**
-- [x] **HIGH-006 + MEDIUM-002 + MEDIUM-011: Session infrastructure** - Device binding, O(1) token validation, session limits
-- [x] **MEDIUM-007 + MEDIUM-015: CORS configuration** - Explicit ALLOWED_ORIGINS env var
-
-### Resolved ✅ (continued)
-- [x] **MEDIUM-005: Prompt injection mitigation** - XML delimiters + detection
-- [x] **MEDIUM-010: Prompt warnings may leak context** - Verified PHI-safe
-- [x] **MEDIUM-013: Webhook idempotency** - Database-backed deduplication
-- [x] **MEDIUM-014: Extension retry logic** - Exponential backoff implemented
-
-### Accepted Risk (Low Priority)
-- [x] MEDIUM-003: Session timeout warning - Silent refresh already implemented
-- [x] MEDIUM-008: Extension token storage separation - Device binding mitigates
-
-### Deferred (Observability Track)
-- [ ] LOW-001: Structured logging - See `docs/planning/MONITORING_SETUP.md`
+**Current status:** 4 CRITICAL + 18 HIGH findings open. See [ROADMAP.md Tier 1: Security Hardening](./ROADMAP.md#tier-1-security-hardening) for task tracking.
 
 ---
 

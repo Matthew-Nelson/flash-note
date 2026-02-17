@@ -645,7 +645,9 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 
 ## 7. Database Schema
 
-### Complete Schema (7 tables)
+### Complete Schema (10 tables)
+
+> **Note:** This section was written early in development. The authoritative schema is the migrations directory (`backend/src/db/migrations/`). Table count grew from the original 4 to 10 as invite codes, organizations, organization members, and legal acceptances were added.
 
 ```sql
 -- migrations/001_initial_schema.sql
@@ -720,8 +722,8 @@ CREATE INDEX idx_usage_user_month ON usage(user_id, month);
 
 ### Notes on Schema Design
 
-1. **Minimal tables:** 7 tables total (4 core + email_tokens + processed_webhook_events + legal_acceptances)
-2. **No PHI storage:** We don't store patient notes, only audit metadata
+1. **10 tables:** 4 core (users, sessions, audit_logs, usage) + email_tokens, processed_webhook_events, legal_acceptances, invite_codes, organizations, organization_members
+2. **No PHI storage (current):** We don't store patient notes yet — PHI storage is designed and on the roadmap (see `docs/planning/PHI_STORAGE_PLAN.md`)
 3. **HIPAA audit logs:** Track all significant actions
 4. **Usage tracking:** For billing limits and analytics
 5. **Session management:** Support token refresh and invalidation

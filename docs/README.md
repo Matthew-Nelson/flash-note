@@ -60,7 +60,6 @@ Design specs, research, and competitive analysis.
 | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | OAuth/social login implementation analysis |
 | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | Product strategy for clinician trust |
 | [RETENTION_STRATEGY.md](./planning/RETENTION_STRATEGY.md) | Churn reduction and switching cost strategy |
-| [SIGNUP_FORM_STANDARDIZATION.md](./planning/SIGNUP_FORM_STANDARDIZATION.md) | Web/extension signup consistency |
 | [IDEA_DUMPING_GROUND.md](./planning/IDEA_DUMPING_GROUND.md) | Unstructured feature ideas and brainstorming |
 
 ### `/compliance` - Security & HIPAA
@@ -70,7 +69,6 @@ Testing, security, and compliance requirements.
 |----------|-------------|
 | [CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) | **Latest** - Full security & production readiness audit (Feb 2026) |
 | [AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md) | HIPAA audit logging specification |
-| [SECURITY_AUDIT.md](./compliance/SECURITY_AUDIT.md) | Original security audit findings and remediation status |
 | [TESTING_STRATEGY.md](./compliance/TESTING_STRATEGY.md) | Test coverage targets and CI/CD requirements |
 | [TESTING_GAPS.md](./compliance/TESTING_GAPS.md) | Untested code paths (launch blockers) |
 | [UI_AUDIT.md](./compliance/UI_AUDIT.md) | WCAG accessibility and HIPAA UX compliance audit |
@@ -116,6 +114,8 @@ Historical documentation for completed work. Kept for reference.
 | [WARM_WELLNESS_PREVIEW.md](./archive/WARM_WELLNESS_PREVIEW.md) | Design theme evolution |
 | [WEB_APP_BUILDOUT_PLAN.md](./archive/WEB_APP_BUILDOUT_PLAN.md) | Web app construction plan |
 | [DESIGN_SYSTEM_ANALYSIS.md](./archive/DESIGN_SYSTEM_ANALYSIS.md) | Design system evolution |
+| [SECURITY_AUDIT.md](./archive/SECURITY_AUDIT.md) | Original security audit (superseded by CONSOLIDATED_AUDIT_2026_02) |
+| [SIGNUP_FORM_STANDARDIZATION.md](./archive/SIGNUP_FORM_STANDARDIZATION.md) | Signup form standardization (implemented) |
 
 ---
 

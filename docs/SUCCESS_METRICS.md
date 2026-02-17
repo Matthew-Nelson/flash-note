@@ -22,9 +22,9 @@
 | Metric | Target | Current |
 |--------|--------|---------|
 | Backend test coverage | 95% lines, 90% branches | ✅ Enforced in CI |
-| Extension test coverage | ≥70% | ✅ ~93% (14 files, ~233 tests) |
-| Web test coverage | ≥60% | ✅ ~92% (19 files, ~224 tests) |
-| Security vulnerabilities | 0 critical, 0 high | ✅ All resolved |
+| Extension test coverage | ≥80% | ✅ ~93% (14 files, ~233 tests) |
+| Web test coverage | ≥80% | ✅ ~92% (19 files, ~224 tests) |
+| Security vulnerabilities | 0 critical, 0 high | ❌ 4 CRITICALs open — see [CONSOLIDATED_AUDIT](./compliance/CONSOLIDATED_AUDIT_2026_02.md) |
 | HIPAA checklist complete | 100% | ~80% |
 | Lighthouse performance score | ≥90 | Not measured |
 | API response time (p95) | <500ms | Not measured |
@@ -97,7 +97,7 @@ These items must be complete before public launch.
 | PROD-15 | WCAG 2.1 AA accessibility | Web/Ext | P2 | ❌ Not done |
 | PROD-16 | Audit logging workflow complete | Backend | P0 | ❌ Not done |
 
-> **PROD-16 Details:** Implement admin API for viewing/exporting audit logs, add database-level immutability protections, and document retention policy. See [docs/AUDIT_LOGGING_REQUIREMENTS.md](AUDIT_LOGGING_REQUIREMENTS.md) for full requirements and implementation checklist.
+> **PROD-16 Details:** Implement admin API for viewing/exporting audit logs, add database-level immutability protections, and document retention policy. See [compliance/AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md) for full requirements.
 
 ---
 

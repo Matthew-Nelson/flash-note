@@ -1,7 +1,7 @@
 # FlashNote Testing Strategy & Guidelines
 
-> **Document Status:** Partial Implementation
-> **Last Updated:** February 8, 2026
+> **Document Status:** Substantially Implemented (unit tests done; integration, DAST, secret scanning remain)
+> **Last Updated:** February 16, 2026
 > **Owner:** Engineering Team
 
 ## Overview
@@ -25,7 +25,6 @@ This document defines the testing strategy, guidelines, and requirements for Fla
 9. [Performance Testing](#performance-testing)
 10. [CI/CD Pipeline Requirements](#cicd-pipeline-requirements)
 11. [Code Coverage Standards](#code-coverage-standards)
-12. [Implementation Roadmap](#implementation-roadmap)
 13. [Testing Tools & Frameworks](#testing-tools--frameworks)
 
 ---
@@ -830,8 +829,8 @@ All of these must pass before merge:
 | Dependency audit | Yes | No high/critical | ✅ Configured (continue-on-error) |
 | Unit tests | Yes | All pass | ✅ Backend only |
 | Coverage (backend) | Yes | 95% minimum | ✅ Enforced |
-| Coverage (extension) | Yes | 80% minimum | Not configured |
-| Coverage (web) | Yes | 80% minimum | Not configured |
+| Coverage (extension) | Yes | 80% minimum | ✅ Enforced (~93%) |
+| Coverage (web) | Yes | 80% minimum | ✅ Enforced (~92%) |
 | Integration tests | Yes | All pass | Not configured |
 | E2E tests | Yes | All pass | Not configured |
 | DAST scan | Yes (main only) | No high/critical | Not configured |
@@ -845,8 +844,8 @@ All of these must pass before merge:
 | Package | Line Coverage | Branch Coverage | Function Coverage | Status |
 |---------|--------------|-----------------|-------------------|--------|
 | Backend | 95% | 90% | 95% | ✅ Enforced |
-| Extension | 80% | 75% | 80% | Not configured |
-| Web | 80% | 75% | 80% | Not configured |
+| Extension | 80% | 75% | 80% | ✅ Enforced (~93%) |
+| Web | 80% | 75% | 80% | ✅ Enforced (~92%) |
 
 ### Critical Path Coverage
 
@@ -894,58 +893,9 @@ export default defineConfig({
 
 ---
 
-## Implementation Roadmap
+---
 
-### Phase 1: Foundation (Weeks 1-2)
-
-- [x] Set up GitHub Actions CI pipeline with existing backend tests
-- [ ] Add Vitest to extension package
-- [ ] Add Vitest to web package
-- [x] Configure code coverage reporting (artifact upload configured; Codecov integration pending)
-- [x] Add `pnpm audit` to CI pipeline
-- [ ] Add pre-commit hooks for linting
-
-**Success Criteria:** CI runs on every PR, coverage reported
-**Current Status:** ✅ CI pipeline operational, backend tests running on every PR
-
-### Phase 2: Unit Test Expansion (Weeks 3-4)
-
-- [x] Achieve 85% coverage on backend (exceeded: 95%+ with healthcare-grade thresholds)
-- [ ] Add extension component tests (auth, forms, API client)
-- [ ] Add web page/component tests
-- [ ] Add ESLint security plugins
-
-**Success Criteria:** All coverage thresholds met
-**Current Status:** Backend exceeds targets; extension and web testing not yet started
-
-### Phase 3: Integration & Security (Weeks 5-6)
-
-- [ ] Set up test database for integration tests (currently using mocked DB in unit tests)
-- [ ] Write backend integration test suite
-- [ ] Create HIPAA compliance test suite
-- [ ] Configure OWASP ZAP in CI
-- [ ] Add secret scanning (GitLeaks)
-
-**Success Criteria:** Integration tests in CI, DAST scanning active
-**Current Status:** Not started - security audit (pnpm audit) is in CI but DAST/secret scanning not configured
-
-### Phase 4: E2E Testing (Weeks 7-8)
-
-- [ ] Set up Playwright
-- [ ] Write critical path E2E tests
-- [ ] Add extension E2E tests
-- [ ] Configure E2E in CI pipeline
-
-**Success Criteria:** All critical user journeys have E2E coverage
-
-### Phase 5: Performance & Ongoing (Weeks 9+)
-
-- [ ] Set up k6 performance tests
-- [ ] Schedule first external penetration test
-- [ ] Document and train team on testing practices
-- [ ] Establish quarterly security review cadence
-
-**Success Criteria:** Performance baselines established, pentest scheduled
+> **Implementation status:** Unit testing is complete across all 3 packages (backend 38 files, extension 14 files, web 19 files). E2E foundation exists (37 Playwright tests). Integration tests, DAST, and secret scanning remain. See [ROADMAP.md Tier 4: Testing](../ROADMAP.md#tier-4-testing) for remaining work items.
 
 ---
 
@@ -955,12 +905,12 @@ export default defineConfig({
 
 | Category | Tool | Version | Purpose | Status |
 |----------|------|---------|---------|--------|
-| Unit/Integration | Vitest | 4.x | Fast, TypeScript-native testing | ✅ Backend |
-| React Testing | @testing-library/react | 14.x | Component testing | Not installed |
-| E2E | Playwright | 1.x | Browser automation | Not installed |
-| API Testing | Supertest | 6.x | HTTP assertions | Not installed |
-| Mocking | vitest (built-in) | - | Mocks and spies | ✅ Backend |
-| Coverage | @vitest/coverage-v8 | 4.x | Code coverage | ✅ Backend |
+| Unit/Integration | Vitest | 4.x | Fast, TypeScript-native testing | ✅ All packages |
+| React Testing | @testing-library/react | 16.x | Component testing | ✅ Extension + Web |
+| E2E | Playwright | 1.x | Browser automation | ✅ 37 tests |
+| API Testing | Supertest | 6.x | HTTP assertions | ✅ Backend |
+| Mocking | vitest (built-in) | - | Mocks and spies | ✅ All packages |
+| Coverage | @vitest/coverage-v8 | 4.x | Code coverage | ✅ All packages |
 | Performance | k6 | 0.x | Load testing | Not installed |
 | SAST | ESLint + plugins | 9.x | Static analysis | ✅ Partial |
 | DAST | OWASP ZAP | 2.x | Dynamic scanning | Not configured |

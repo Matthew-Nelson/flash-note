@@ -68,10 +68,10 @@ FlashNote is an AI-powered browser extension that helps Physical Therapists gene
 ## Key Architecture Decisions
 
 - **LLM Provider**: Google Gemini (gemini-2.5-flash) - chosen for cost efficiency
-- **Auth**: Custom JWT implementation (third-party OAuth under review - see [docs/OAUTH_ANALYSIS.md](docs/OAUTH_ANALYSIS.md))
+- **Auth**: Custom JWT implementation (third-party OAuth under review - see [docs/planning/OAUTH_ANALYSIS.md](docs/planning/OAUTH_ANALYSIS.md))
 - **Database**: PostgreSQL with raw SQL queries (no ORM)
 - **EMR Integration**: Copy/paste only (v1) - no direct EMR integrations
-- **PHI Storage**: We do NOT store patient notes - pass-through to LLM only
+- **PHI Storage**: Currently pass-through only (no stored notes). PHI storage for patients, clinical notes, and versioning is designed and on the roadmap — see [docs/planning/PHI_STORAGE_PLAN.md](docs/planning/PHI_STORAGE_PLAN.md)
 
 ## Tech Stack
 
@@ -498,7 +498,7 @@ All components have `beforeSend` hooks that strip PHI-sensitive fields. See `doc
 
 ### Logging Gaps Audit
 
-A comprehensive audit identified all catch blocks in the codebase. See `docs/planning/SENTRY_LOGGING_GAPS.md` for:
+A comprehensive audit identified all catch blocks in the codebase. See `docs/archive/SENTRY_LOGGING_GAPS.md` for:
 - The full list of what's monitored
 - Decisions on what should remain silent
 - The rationale for each monitoring decision
@@ -512,26 +512,44 @@ See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification inc
 - HIPAA compliance checklist
 - Deployment strategy
 
+## Work Priorities
+
+`docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Work is organized into **dependency-ordered tiers**:
+
+- **Tier 1** (do now): Security audit CRITICALs + prompt engineering P0s
+- **Tier 2** (gate for PHI): HIPAA infrastructure (BAA, encryption, audit retention)
+- **Tier 3** (competitive pivot): PHI storage — patients, notes, templates
+- **Tier 4** (interleave): UI quality, testing, accessibility tooling
+- **Tier 5** (defer): Monitoring, clinic features waves 2-4, Stripe polish
+
+When picking up work, start from the lowest incomplete tier. Don't jump to a later tier unless earlier tiers are done or explicitly blocked on non-code dependencies (e.g., BAA signing).
+
 ## Documentation Guidelines
 
+**Status tracking convention:**
+- `docs/ROADMAP.md` — **single source of truth** for all code/technical task status
+- `docs/PRE_LAUNCH_CHECKLIST.md` — business, legal, and ops tasks
+- `docs/SUCCESS_METRICS.md` — quality gate criteria (pass/fail definitions, not task tracking)
+- **Planning docs never track status** — they describe *what* to build; ROADMAP tracks *is it done*
+
 **Before starting a task:**
-1. Check `docs/ROADMAP.md` to understand current priorities
+1. Check `docs/ROADMAP.md` to understand current tier and priorities
 2. Review relevant docs in `docs/` that may inform your approach:
    - `docs/guides/` - API reference and operational procedures
-   - `docs/planning/` - Future feature designs (don't implement unless asked)
+   - `docs/planning/` - Design specs and research (don't implement unless asked)
    - `docs/compliance/` - Security and testing requirements
    - `docs/reference/` - Project specifications
 
 **After completing a task:**
-1. Update documentation that was affected by your changes
-2. Mark completed items in `docs/ROADMAP.md` or `docs/SUCCESS_METRICS.md`
+1. Update `docs/ROADMAP.md` to mark the item done
+2. Update any other docs affected by the changes
 3. Move fully-implemented planning docs to `docs/archive/`
 4. Update `docs/guides/API.md` if you added/changed endpoints
 
 **Documentation principles:**
-- Keep docs current - outdated docs are worse than no docs
-- Don't over-document - only document what provides ongoing value
-- Single source of truth - information should live in one place
+- Keep docs current — outdated docs are worse than no docs
+- Single source of truth — task status lives in ROADMAP.md, not in planning docs
+- Don't over-document — only document what provides ongoing value
 - Prefer updating existing docs over creating new ones
 - Archive completed work rather than deleting (for historical reference)
 
