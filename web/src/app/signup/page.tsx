@@ -83,7 +83,7 @@ export default function SignupPage() {
             setInvalidFields(new Set(['inviteCode']));
             break;
           default:
-            setErrors([err.message || 'Failed to create account']);
+            setErrors(['Something went wrong. Please try again.']);
         }
       } else {
         setErrors(['An unexpected error occurred. Please try again.']);

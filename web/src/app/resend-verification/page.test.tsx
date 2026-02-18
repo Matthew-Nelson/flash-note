@@ -2,9 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResendVerificationPage from './page';
+import { api, ApiError } from '@/lib/api';
 
-const mockFetch = vi.fn();
-globalThis.fetch = mockFetch;
+vi.mock('@/lib/api', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/api')>();
+  return {
+    ...original,
+    api: {
+      resendVerificationEmail: vi.fn(),
+    },
+  };
+});
 
 describe('ResendVerificationPage', () => {
   beforeEach(() => {
@@ -41,7 +49,7 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(api.resendVerificationEmail).not.toHaveBeenCalled();
   });
 
   it('should show validation error for invalid email', async () => {
@@ -54,11 +62,11 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(api.resendVerificationEmail).not.toHaveBeenCalled();
   });
 
   it('should submit and show success for valid email', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    vi.mocked(api.resendVerificationEmail).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
@@ -68,6 +76,36 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
     });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(api.resendVerificationEmail).toHaveBeenCalledWith('test@example.com');
+  });
+
+  it('should show error for too_many_attempts', async () => {
+    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
+      new ApiError(429, 'too_many_attempts', 'Rate limited')
+    );
+    const user = userEvent.setup();
+    render(<ResendVerificationPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send verification email'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show success for non-rate-limit errors (hide account existence)', async () => {
+    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
+      new ApiError(404, 'user_not_found', 'No such user')
+    );
+    const user = userEvent.setup();
+    render(<ResendVerificationPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send verification email'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Check your email')).toBeInTheDocument();
+    });
   });
 });

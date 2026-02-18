@@ -18,7 +18,7 @@ import type { User, AuthResponse, ApiResponse, SessionEndReason, UsageResponse }
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
 
 // 55 minutes in ms (5 min buffer before 1hr backend expiry)
-const ACCESS_TOKEN_EXPIRY_MS = 55 * 60 * 1000;
+export const ACCESS_TOKEN_EXPIRY_MS = 55 * 60 * 1000;
 
 /**
  * Custom error class for API errors
@@ -390,9 +390,57 @@ export const api = {
   },
 
   /**
+   * Validate a password reset token
+   */
+  async validateResetToken(token: string): Promise<{ valid: boolean }> {
+    return request<{ valid: boolean }>(
+      `/auth/validate-reset-token?token=${encodeURIComponent(token)}`
+    );
+  },
+
+  /**
+   * Reset password using a reset token
+   */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await request('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  },
+
+  /**
+   * Verify email using a verification token
+   */
+  async verifyEmail(token: string): Promise<{ alreadyVerified?: boolean }> {
+    return request<{ alreadyVerified?: boolean }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify({ token }),
+    });
+  },
+
+  /**
    * Fetch current month usage stats and organization context
    */
   async getUsage(): Promise<UsageResponse> {
     return request<UsageResponse>('/usage/me');
   },
 };
+
+/**
+ * Allowed redirect hosts for Stripe URLs.
+ * Used to validate redirect URLs from backend responses before navigating.
+ */
+const ALLOWED_REDIRECT_HOSTS = ['checkout.stripe.com', 'billing.stripe.com'];
+
+/**
+ * Validate that a redirect URL points to a trusted host.
+ * Prevents open redirect attacks from compromised/spoofed backend responses.
+ */
+export function isAllowedRedirectUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'https:' && ALLOWED_REDIRECT_HOSTS.includes(parsed.hostname);
+  } catch {
+    return false;
+  }
+}

@@ -40,13 +40,16 @@ export async function POST(request: NextRequest) {
         errorBody = await response.text();
       }
       // Capture to Sentry - critical payment infrastructure failure
+      // SECURITY: Do not include errorBody in Sentry extras — it may contain
+      // Stripe event data with customer info. Status code is sufficient for triage.
       Sentry.captureException(new Error('Backend webhook error'), {
         extra: {
           source: 'stripe_webhook_proxy',
+          errorType: 'backend_webhook_rejection',
           statusCode: response.status,
-          errorBody,
         },
       });
+      // Error body logged server-side only (not sent to Sentry)
       console.error('Backend webhook error:', errorBody);
       return NextResponse.json(
         { error: 'Webhook processing failed' },

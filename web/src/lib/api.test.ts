@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as Sentry from '@sentry/nextjs';
-import { api, ApiError, AUTH_INVALIDATED_EVENT } from './api';
+import { api, ApiError, AUTH_INVALIDATED_EVENT, isAllowedRedirectUrl } from './api';
 import { storage } from './storage';
 import {
   createMockStoredAuth,
@@ -480,5 +480,138 @@ describe('Web API Client', () => {
       const result = await api.createPortalSession();
       expect(result.portalUrl).toBe('https://billing.stripe.com/portal');
     });
+  });
+
+  describe('validateResetToken', () => {
+    it('should call validate endpoint with encoded token', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({ valid: true })),
+      });
+
+      const result = await api.validateResetToken('my-token');
+      expect(result.valid).toBe(true);
+      expect(mockFetch.mock.calls[0][0]).toContain(
+        '/auth/validate-reset-token?token=my-token'
+      );
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token expired')
+          ),
+      });
+
+      await expect(api.validateResetToken('bad')).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should send reset request with token and password', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      await api.resetPassword('reset-token', 'NewPassword1');
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/reset-password');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.token).toBe('reset-token');
+      expect(body.password).toBe('NewPassword1');
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token expired')
+          ),
+      });
+
+      await expect(api.resetPassword('bad', 'Pass1234')).rejects.toThrow(ApiError);
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('should send verification request with token', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({})),
+      });
+
+      const result = await api.verifyEmail('verify-token');
+      expect(result).toEqual({});
+
+      const fetchCall = mockFetch.mock.calls[0];
+      expect(fetchCall[0]).toContain('/auth/verify-email');
+      const body = JSON.parse((fetchCall[1] as RequestInit).body as string) as Record<string, unknown>;
+      expect(body.token).toBe('verify-token');
+    });
+
+    it('should return alreadyVerified when present', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve(createMockApiResponse({ alreadyVerified: true })),
+      });
+
+      const result = await api.verifyEmail('verify-token');
+      expect(result.alreadyVerified).toBe(true);
+    });
+
+    it('should throw ApiError on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () =>
+          Promise.resolve(
+            createMockApiErrorResponse('invalid_token', 'Token expired')
+          ),
+      });
+
+      await expect(api.verifyEmail('bad')).rejects.toThrow(ApiError);
+    });
+  });
+});
+
+describe('isAllowedRedirectUrl', () => {
+  it('should allow checkout.stripe.com', () => {
+    expect(isAllowedRedirectUrl('https://checkout.stripe.com/c/pay/session123')).toBe(true);
+  });
+
+  it('should allow billing.stripe.com', () => {
+    expect(isAllowedRedirectUrl('https://billing.stripe.com/p/session/test')).toBe(true);
+  });
+
+  it('should reject non-Stripe domains', () => {
+    expect(isAllowedRedirectUrl('https://evil.com/steal')).toBe(false);
+  });
+
+  it('should reject http protocol', () => {
+    expect(isAllowedRedirectUrl('http://checkout.stripe.com/session')).toBe(false);
+  });
+
+  it('should reject javascript protocol', () => {
+    expect(isAllowedRedirectUrl('javascript:alert(1)')).toBe(false);
+  });
+
+  it('should reject invalid URLs', () => {
+    expect(isAllowedRedirectUrl('not-a-url')).toBe(false);
+  });
+
+  it('should reject empty string', () => {
+    expect(isAllowedRedirectUrl('')).toBe(false);
+  });
+
+  it('should reject subdomain spoofing', () => {
+    expect(isAllowedRedirectUrl('https://checkout.stripe.com.evil.com/pay')).toBe(false);
   });
 });

@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 16, 2026
+**Last Updated:** February 17, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -16,7 +16,7 @@ Work is organized into tiers by dependency order and competitive priority. Compl
 
 | Tier | Track | Progress | Next Action |
 |------|-------|----------|-------------|
-| **1** | [Security Hardening](#tier-1-security-hardening) | 1/69 findings | Fix 4 remaining CRITICALs (Audit PRs 1-2) |
+| **1** | [Security Hardening](#tier-1-security-hardening) | 7/69 findings | Fix 3 remaining CRITICALs (Audit PRs 1-3) |
 | **1** | [Prompt Engineering](#tier-1-prompt-engineering) | 0/10 items | Lower temperature 0.7 → 0.2 |
 | **2** | [HIPAA Infrastructure](#tier-2-hipaa-infrastructure) | 1/10 | Sign Google Cloud BAA |
 | **3** | [PHI Storage](#tier-3-phi-storage) | Designed, 0/3 PRs | Patients + notes + templates |
@@ -48,14 +48,14 @@ Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED
 | CR-1 | Webhook idempotency marks before processing — failed events permanently lost | CRITICAL | ❌ |
 | CR-2 | Refresh token rotation race condition — token replay | CRITICAL | ❌ |
 | CR-3 | Missing `trust proxy` — all IP-based security broken behind proxy | CRITICAL | ✅ Done |
-| CR-4 | No security headers in web app (CSP, HSTS, X-Frame-Options) | CRITICAL | ❌ |
+| CR-4 | No security headers in web app (CSP, HSTS, X-Frame-Options) | CRITICAL | ✅ Done |
 | CR-5 | No CSRF origin validation on web app mutations | CRITICAL | ❌ |
 
 Plus ~18 HIGH findings (auth, billing, session management). See the full audit for the complete list and PR groupings.
 
 ### Audit PRs 3-7 (Interleave with Tier 4)
 
-28 MEDIUM + 18 LOW findings covering error handling, logging gaps, configuration hardening, and code quality. Real improvements but not urgent vulnerabilities.
+28 MEDIUM + 18 LOW findings covering error handling, logging gaps, configuration hardening, and code quality. Real improvements but not urgent vulnerabilities. **PR 4 (Web App Hardening) completed:** CR-4, M-7, M-8, M-10, M-11, M-23.
 
 ---
 
@@ -152,7 +152,7 @@ Full audit details, affected files, and implementation notes: [compliance/UI_AUD
 | Add skip-to-content link | 1.5 | ❌ |
 | Add `<main>` landmark to 8 web pages | 1.6 | ❌ |
 | Fix focus management (outline, button focus, view transitions) | 1.8 | ❌ |
-| Route web auth pages through API client for retry logic | 2.2 | ❌ |
+| Route web auth pages through API client for retry logic | 2.2 | ✅ Done |
 | Add responsive mobile navigation | 4.1 | ❌ |
 
 ### P2 — UX Quality & Consistency
@@ -199,7 +199,7 @@ Full requirements and coverage targets: [compliance/TESTING_STRATEGY.md](./compl
 |-----------|-----------|-------|----------|
 | Backend | 38 | ~845 | ✅ Enforced 95% lines, 90% branches |
 | Extension | 14 | ~233 | ✅ ~93% |
-| Web | 19 | ~224 | ✅ ~92% |
+| Web | 22 | ~331 | ✅ ~92% |
 
 ### Remaining Work
 
@@ -310,6 +310,7 @@ Post-launch:
 | Item | Notes |
 |------|-------|
 | Wave 1: Registration Gating + Clinic Infrastructure | 4 PRs merged (usage split, invite codes, orgs, usage endpoint) |
+| Web App Hardening (Audit PR 4) | CSP + security headers, API client migration, redirect validation, token expiry check, Rule 2 fixes |
 | Auth Form UX Unification | Shared `AuthLayout`, consistent validation, matching fields |
 | Unified Styling System | "Warm Wellness" theme, shared design tokens |
 | Sentry Monitoring | All 3 components instrumented, 12 logging gaps fixed |
