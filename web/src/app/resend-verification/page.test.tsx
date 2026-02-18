@@ -94,6 +94,23 @@ describe('ResendVerificationPage', () => {
     });
   });
 
+  it('should show network error for TypeError (no internet)', async () => {
+    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
+      new TypeError('Failed to fetch')
+    );
+    const user = userEvent.setup();
+    render(<ResendVerificationPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send verification email'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('A network error occurred. Please check your connection and try again.')
+      ).toBeInTheDocument();
+    });
+  });
+
   it('should show success for non-rate-limit errors (hide account existence)', async () => {
     vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
       new ApiError(404, 'user_not_found', 'No such user')

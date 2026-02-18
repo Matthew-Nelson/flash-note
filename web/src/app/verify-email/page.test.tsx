@@ -43,7 +43,7 @@ describe('VerifyEmailPage', () => {
   });
 
   it('should show verifying state initially', () => {
-    vi.mocked(api.verifyEmail).mockReturnValue(new Promise(() => {}) as Promise<{ alreadyVerified?: boolean }>);
+    vi.mocked(api.verifyEmail).mockReturnValue(new Promise<{ alreadyVerified?: boolean }>(() => {}));
     render(<VerifyEmailPage />);
     expect(screen.getByText('Verifying your email...')).toBeInTheDocument();
   });

@@ -1,10 +1,8 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware, config } from './middleware';
 
 describe('CSP Middleware', () => {
-  const originalEnv = process.env.NODE_ENV;
-
   afterEach(() => {
     vi.unstubAllEnvs();
   });

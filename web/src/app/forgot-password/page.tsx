@@ -31,11 +31,15 @@ export default function ForgotPasswordPage() {
       await api.requestPasswordReset(email);
       setStatus('success');
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'too_many_attempts') {
+      if (err instanceof TypeError) {
+        // Network failure — request never reached the server
+        setStatus('error');
+        setErrors(['A network error occurred. Please check your connection and try again.']);
+      } else if (err instanceof ApiError && err.code === 'too_many_attempts') {
         setStatus('error');
         setErrors(['Too many attempts. Please try again later.']);
       } else {
-        // Always show success for other errors (don't reveal account existence)
+        // Always show success for other API errors (don't reveal account existence)
         setStatus('success');
       }
     }
