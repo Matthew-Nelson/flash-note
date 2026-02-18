@@ -22,10 +22,10 @@
 | Metric | Target | Current |
 |--------|--------|---------|
 | Backend test coverage | 95% lines, 90% branches | ✅ Enforced in CI |
-| Extension test coverage | ≥80% | ✅ ~93% (14 files, ~233 tests) |
-| Web test coverage | ≥80% | ✅ ~92% (19 files, ~224 tests) |
-| Security vulnerabilities | 0 critical, 0 high | ❌ 4 CRITICALs open — see [CONSOLIDATED_AUDIT](./compliance/CONSOLIDATED_AUDIT_2026_02.md) |
-| HIPAA checklist complete | 100% | ~80% |
+| Extension test coverage | ≥80% | ✅ ~93% (14 files, ~288 tests) |
+| Web test coverage | ≥80% | ✅ ~92% (22 files, ~331 tests) |
+| Security vulnerabilities | 0 critical, 0 high | ✅ 0 CRITICALs; ❌ 10 HIGHs open — see [CONSOLIDATED_AUDIT](./compliance/CONSOLIDATED_AUDIT_2026_02.md) |
+| HIPAA checklist complete | 100% | ~85% (infra items pending deployment) |
 | Lighthouse performance score | ≥90 | Not measured |
 | API response time (p95) | <500ms | Not measured |
 
@@ -61,7 +61,7 @@ These items must be complete before beta testing with real PTs.
 
 | ID | Requirement | Domain | Priority | Status |
 |----|-------------|--------|----------|--------|
-| BETA-01 | Backend unit tests ≥60% coverage | Backend | P0 | ✅ 31 test files, ~683 tests |
+| BETA-01 | Backend unit tests ≥60% coverage | Backend | P0 | ✅ 39 test files, ~883 tests |
 | BETA-02 | Auth flow fully tested (manual) | All | P0 | ✅ Done (manually verified) |
 | BETA-03 | Stripe checkout flow works end-to-end | All | P0 | ✅ Done (local override; live Stripe deferred to post-beta) |
 | BETA-04 | Trial expiration enforced | Backend | P0 | ✅ Done (manually verified) |
@@ -80,7 +80,7 @@ These items must be complete before public launch.
 
 | ID | Requirement | Domain | Priority | Status |
 |----|-------------|--------|----------|--------|
-| PROD-01 | Backend unit tests ≥80% coverage | Backend | P0 | ✅ 31 test files, ~683 tests |
+| PROD-01 | Backend unit tests ≥80% coverage | Backend | P0 | ✅ 39 test files, ~883 tests |
 | PROD-02 | Extension unit tests ≥70% coverage | Extension | P0 | ✅ Done |
 | PROD-03 | Web unit tests ≥60% coverage | Web | P1 | ✅ Done |
 | PROD-04 | Security headers configured | All | P0 | ✅ Done |
@@ -180,7 +180,7 @@ These items must be complete before public launch.
 | **Components** | Reusable input | Best practice | ✅ Done |
 | **Components** | Navigation | Best practice | ✅ Done |
 | **Config** | .env.example | Best practice | ✅ Done |
-| **Config** | Security headers | Best practice | ❌ Missing |
+| **Config** | Security headers | Best practice | ✅ Done (next.config.ts + CSP middleware) |
 | **Error** | Error boundary | Best practice | ✅ Done |
 
 ---
@@ -199,7 +199,7 @@ These items must be complete before public launch.
 | Rate limiting on login | ✅ | ❌ | 5 attempts/15 min |
 | Rate limiting on register | ✅ | ❌ | 3 attempts/hour |
 | Session invalidation on logout | ✅ | ❌ | |
-| Password complexity enforced | ⚠️ | ❌ | Backend only |
+| Password complexity enforced | ✅ | ❌ | Backend + Extension (web validates via Zod schemas) |
 
 ### Data Protection
 
@@ -228,7 +228,7 @@ These items must be complete before public launch.
 | Requirement | Implemented | Tested | Notes |
 |-------------|-------------|--------|-------|
 | HTTPS enforced | ❌ | ❌ | Pending deployment |
-| Security headers (Helmet) | ✅ | ❌ | CSP + HSTS configured |
+| Security headers (Helmet) | ✅ | ❌ | Backend: Helmet; Web: next.config.ts + CSP middleware |
 | CORS restricted to known origins | ✅ | ❌ | ALLOWED_ORIGINS env var |
 | Stripe webhook signature verification | ✅ | ❌ | |
 | Environment variables for secrets | ✅ | ❌ | |
@@ -253,7 +253,7 @@ These items must be complete before public launch.
 | Auth routes | 85% | ⚠️ Partial | P0 |
 | Notes routes | 80% | ⚠️ Partial | P0 |
 | Billing routes | 80% | ⚠️ Partial | P0 |
-| **Overall** | **≥80%** | **31 test files, ~683 tests** | **P0** |
+| **Overall** | **≥80%** | **39 test files, ~883 tests** | **P0** |
 
 ### Required Test Scenarios
 

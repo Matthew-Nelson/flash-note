@@ -263,7 +263,7 @@
 
 > The authoritative security audit is [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) (Feb 2026, 69 findings). The original `SECURITY_AUDIT.md` (Jan 2026) has been archived — its findings were resolved, but the consolidated audit found additional issues.
 
-**Current status:** 4 CRITICAL + 18 HIGH findings open. See [ROADMAP.md Tier 1: Security Hardening](./ROADMAP.md#tier-1-security-hardening) for task tracking.
+**Current status:** All 5 CRITICALs resolved; 10 of 18 HIGH findings open. 23 of 69 total findings remediated. See [ROADMAP.md Tier 1: Security Hardening](./ROADMAP.md#tier-1-security-hardening) for task tracking.
 
 ---
 

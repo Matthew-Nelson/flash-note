@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 17, 2026
+**Last Updated:** February 18, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -16,11 +16,11 @@ Work is organized into tiers by dependency order and competitive priority. Compl
 
 | Tier | Track | Progress | Next Action |
 |------|-------|----------|-------------|
-| **1** | [Security Hardening](#tier-1-security-hardening) | 7/69 findings | Fix 3 remaining CRITICALs (Audit PRs 1-3) |
+| **1** | [Security Hardening](#tier-1-security-hardening) | 23/69 findings | Remaining HIGHs + MEDIUM/LOW cleanup |
 | **1** | [Prompt Engineering](#tier-1-prompt-engineering) | 0/10 items | Lower temperature 0.7 → 0.2 |
 | **2** | [HIPAA Infrastructure](#tier-2-hipaa-infrastructure) | 1/10 | Sign Google Cloud BAA |
 | **3** | [PHI Storage](#tier-3-phi-storage) | Designed, 0/3 PRs | Patients + notes + templates |
-| **4** | [UI Quality](#tier-4-ui-quality) | 0/32 | Fix clipboard + contrast |
+| **4** | [UI Quality](#tier-4-ui-quality) | 1/32 | Fix clipboard + contrast |
 | **4** | [Testing](#tier-4-testing) | Foundation done | Backend integration tests |
 | **4** | [Accessibility Tooling](#tier-4-accessibility-tooling) | 2/5 phases | vitest-axe unit assertions |
 | **5** | [Monitoring](#tier-5-monitoring) | ~75% | UptimeRobot setup |
@@ -41,21 +41,23 @@ Work is organized into tiers by dependency order and competitive priority. Compl
 
 Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) — 69 findings across 7 planned remediation PRs.
 
-### Audit PRs 1-2 (Do Now — CRITICALs + HIGH auth/billing)
+### CRITICALs (All Resolved)
 
 | ID | Finding | Severity | Status |
 |----|---------|----------|--------|
-| CR-1 | Webhook idempotency marks before processing — failed events permanently lost | CRITICAL | ❌ |
-| CR-2 | Refresh token rotation race condition — token replay | CRITICAL | ❌ |
-| CR-3 | Missing `trust proxy` — all IP-based security broken behind proxy | CRITICAL | ✅ Done |
-| CR-4 | No security headers in web app (CSP, HSTS, X-Frame-Options) | CRITICAL | ✅ Done |
-| CR-5 | No CSRF origin validation on web app mutations | CRITICAL | ❌ |
+| CR-1 | Webhook idempotency marks before processing — failed events permanently lost | CRITICAL | ✅ Done (`63b3d10`) |
+| CR-2 | Refresh token rotation race condition — token replay | CRITICAL | ✅ Done (`af50b29`) |
+| CR-3 | Missing `trust proxy` — all IP-based security broken behind proxy | CRITICAL | ✅ Done (`44319a8`) |
+| CR-4 | No security headers in web app (CSP, HSTS, X-Frame-Options) | CRITICAL | ✅ Done (`81e6988`) |
+| CR-5 | Password reset not atomic — crash creates inconsistent security state | CRITICAL | ✅ Done (`af50b29`) |
 
-Plus ~18 HIGH findings (auth, billing, session management). See the full audit for the complete list and PR groupings.
+### HIGH Findings (8 of 18 Resolved)
 
-### Audit PRs 3-7 (Interleave with Tier 4)
+Resolved: H-1, H-2, H-3 (`63b3d10`), H-4, H-7 (`af50b29`), H-10, H-14, H-15 (`44319a8`). Remaining 10 HIGHs (H-5, H-6, H-8, H-9, H-11, H-12, H-13, H-16, H-17, H-18) cover storage validation, extension PHI cleanup, prompt injection, and DB constraints. See the full audit for details.
 
-28 MEDIUM + 18 LOW findings covering error handling, logging gaps, configuration hardening, and code quality. Real improvements but not urgent vulnerabilities. **PR 4 (Web App Hardening) completed:** CR-4, M-7, M-8, M-10, M-11, M-23.
+### MEDIUM/LOW Findings (10 of 46 Resolved)
+
+Resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`), M-7, M-8, M-10, M-11, M-23 (`81e6988`). Remaining 18 MEDIUM + 18 LOW findings cover error handling, logging gaps, configuration hardening, and code quality.
 
 ---
 
@@ -197,8 +199,8 @@ Full requirements and coverage targets: [compliance/TESTING_STRATEGY.md](./compl
 
 | Component | Test Files | Tests | Coverage |
 |-----------|-----------|-------|----------|
-| Backend | 38 | ~845 | ✅ Enforced 95% lines, 90% branches |
-| Extension | 14 | ~233 | ✅ ~93% |
+| Backend | 39 | ~883 | ✅ Enforced 95% lines, 90% branches |
+| Extension | 14 | ~288 | ✅ ~93% |
 | Web | 22 | ~331 | ✅ ~92% |
 
 ### Remaining Work
@@ -309,8 +311,12 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| All 5 CRITICALs Resolved | CR-1 webhook idempotency, CR-2 token race condition, CR-3 trust proxy, CR-4 security headers, CR-5 password reset atomicity |
+| Backend Infrastructure & Safety (Audit PR 1) | CR-3, H-10, H-14, H-15, M-3 — trust proxy, error handling, graceful shutdown, process handlers |
+| Billing & Webhook Safety (Audit PR 2) | CR-1, H-1, H-2, H-3, M-5, M-6 — idempotency rollback, price validation, duplicate sub check, audit safety |
+| Auth & Token Atomicity (Audit PR 3) | CR-2, CR-5, H-4, H-7, M-2, M-26 — token rotation locking, password reset transaction, bcrypt rounds |
+| Web App Hardening (Audit PR 4) | CR-4, M-7, M-8, M-10, M-11, M-23 — CSP + security headers, API client migration, redirect validation |
 | Wave 1: Registration Gating + Clinic Infrastructure | 4 PRs merged (usage split, invite codes, orgs, usage endpoint) |
-| Web App Hardening (Audit PR 4) | CSP + security headers, API client migration, redirect validation, token expiry check, Rule 2 fixes |
 | Auth Form UX Unification | Shared `AuthLayout`, consistent validation, matching fields |
 | Unified Styling System | "Warm Wellness" theme, shared design tokens |
 | Sentry Monitoring | All 3 components instrumented, 12 logging gaps fixed |
