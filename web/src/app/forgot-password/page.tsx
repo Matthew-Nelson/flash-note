@@ -38,9 +38,17 @@ export default function ForgotPasswordPage() {
       } else if (err instanceof ApiError && err.code === 'too_many_attempts') {
         setStatus('error');
         setErrors(['Too many attempts. Please try again later.']);
-      } else {
-        // Always show success for other API errors (don't reveal account existence)
+      } else if (err instanceof ApiError && err.status >= 500) {
+        // Server error — the request failed, user should retry
+        setStatus('error');
+        setErrors(['Something went wrong. Please try again later.']);
+      } else if (err instanceof ApiError) {
+        // Expected client error (4xx) — show success to avoid revealing account existence
         setStatus('success');
+      } else {
+        // Unexpected error (malformed response, etc.) — show generic error
+        setStatus('error');
+        setErrors(['Something went wrong. Please try again later.']);
       }
     }
   };

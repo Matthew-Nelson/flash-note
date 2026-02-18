@@ -111,7 +111,7 @@ describe('ForgotPasswordPage', () => {
     });
   });
 
-  it('should show success for non-rate-limit errors (hide account existence)', async () => {
+  it('should show success for 4xx errors (hide account existence)', async () => {
     vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
       new ApiError(404, 'user_not_found', 'No such user')
     );
@@ -123,6 +123,36 @@ describe('ForgotPasswordPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error for 5xx server errors', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new ApiError(500, 'internal_error', 'Internal server error')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error for unexpected non-ApiError exceptions', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new SyntaxError('Unexpected token < in JSON')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
     });
   });
 
