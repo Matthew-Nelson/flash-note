@@ -6,6 +6,7 @@ import { Button, Input, Alert } from '@/components/ui';
 import { emailSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
 import { api, ApiError } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
@@ -40,6 +41,9 @@ export default function ResendVerificationPage() {
         setErrors(['Too many attempts. Please try again later.']);
       } else if (err instanceof ApiError && err.status >= 500) {
         // Server error — the request failed, user should retry
+        Sentry.captureException(err, {
+          extra: { source: 'resend_verification_page', errorType: 'server_error', statusCode: err.status },
+        });
         setStatus('error');
         setErrors(['Something went wrong. Please try again later.']);
       } else if (err instanceof ApiError) {
@@ -47,6 +51,9 @@ export default function ResendVerificationPage() {
         setStatus('success');
       } else {
         // Unexpected error (malformed response, etc.) — show generic error
+        Sentry.captureException(err, {
+          extra: { source: 'resend_verification_page', errorType: 'unexpected_error' },
+        });
         setStatus('error');
         setErrors(['Something went wrong. Please try again later.']);
       }

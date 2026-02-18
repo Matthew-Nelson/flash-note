@@ -7,6 +7,7 @@ import { Button, Input, Alert, LoadingSpinner } from '@/components/ui';
 import { resetPasswordSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
 import { api } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -27,7 +28,10 @@ function ResetPasswordContent() {
       } else {
         setStatus('invalid');
       }
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, {
+        extra: { source: 'reset_password_page', errorType: 'token_validation_failed' },
+      });
       setStatus('invalid');
     }
   }, []);
@@ -69,7 +73,10 @@ function ResetPasswordContent() {
     try {
       await api.resetPassword(token, password);
       setStatus('success');
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, {
+        extra: { source: 'reset_password_page', errorType: 'password_reset_failed' },
+      });
       setStatus('ready');
       setErrors(['Failed to reset password. The link may have expired.']);
     }

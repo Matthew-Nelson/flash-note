@@ -6,6 +6,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -37,7 +38,10 @@ function VerifyEmailContent() {
         setStatus('success');
         setMessage('Your email has been verified successfully!');
       }
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, {
+        extra: { source: 'verify_email_page', errorType: 'verification_failed' },
+      });
       setStatus('error');
       setMessage('Invalid or expired verification link. Please request a new one.');
     }
