@@ -410,5 +410,35 @@ describe('NoteGenerator', () => {
       expect(screen.getByLabelText(/patient context/i)).toHaveValue('');
       expect(screen.getByLabelText(/session notes/i)).toHaveValue('');
     });
+
+    it('should abort in-flight generation when CLEAR_PHI_EVENT fires', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      let rejectGenerate: (err: Error) => void;
+      vi.mocked(api.generateNote).mockReturnValue(
+        new Promise((_resolve, reject) => { rejectGenerate = reject; })
+      );
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      renderGenerator();
+      await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+      await user.click(screen.getByText('Generate Note'));
+
+      // Should be in loading state
+      await waitFor(() => {
+        expect(screen.getByText('Analyzing your notes...')).toBeInTheDocument();
+      });
+
+      // Dispatch CLEAR_PHI_EVENT (simulating logout during generation)
+      act(() => {
+        window.dispatchEvent(new Event(CLEAR_PHI_EVENT));
+      });
+
+      // Should return to idle form state, not remain in loading
+      expect(screen.getByLabelText(/session notes/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/session notes/i)).toHaveValue('');
+
+      // Resolve the pending promise to avoid unhandled rejection
+      rejectGenerate!(new DOMException('The operation was aborted.', 'AbortError'));
+    });
   });
 });

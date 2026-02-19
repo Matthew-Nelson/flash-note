@@ -52,9 +52,11 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   // Clear PHI fields on logout (Rule 4: explicitly clear quickNotes, patientContext)
   useEffect(() => {
     const handleClearPhi = () => {
+      abortControllerRef.current?.abort();
       setPatientContext('');
       setQuickNotes('');
       setErrors([]);
+      setPhase('idle');
       generatedNoteRef.current = null;
       errorMessageRef.current = null;
     };
