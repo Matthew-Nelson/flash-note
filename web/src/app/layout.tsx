@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { Inter } from 'next/font/google';
 import Providers from '@/components/Providers';
 import './globals.css';
@@ -19,11 +20,16 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Reading headers forces dynamic rendering, which is required for per-request
+  // CSP nonces. Next.js reads x-nonce from request headers and automatically
+  // applies it to all script tags it generates.
+  await headers();
+
   return (
     <html lang="en">
       <body className={inter.className}>
