@@ -563,6 +563,24 @@ describe('Extension API Client', () => {
       const result = await api.refreshUser();
       expect(result).toBeNull();
     });
+
+    it('should return null when /user/me call fails after successful refresh', async () => {
+      const refreshResponse = createMockAuthResponse({ accessToken: 'new-token' });
+      // Refresh succeeds
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(refreshResponse)),
+      });
+      // /user/me fails
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve(createMockApiErrorResponse('server_error', 'Internal error')),
+      });
+
+      const result = await api.refreshUser();
+      expect(result).toBeNull();
+    });
+
   });
 
   describe('refresh mutex (H-9)', () => {

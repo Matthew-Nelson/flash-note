@@ -3,6 +3,7 @@ import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import NoteGenerator from './NoteGenerator';
 import { api, ApiError } from '@/shared/api';
+import * as schemas from '@/shared/schemas';
 import { createMockGeneratedNote } from '@/test/helpers';
 
 vi.mock('@/shared/api', () => ({
@@ -294,6 +295,73 @@ describe('NoteGenerator', () => {
         expect.any(AbortSignal),
       );
     });
+  });
+
+  it('should silently ignore AbortError during generation', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(api.generateNote).mockRejectedValueOnce(
+      new DOMException('The operation was aborted.', 'AbortError')
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderGenerator();
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+    await user.click(screen.getByText('Generate Note'));
+
+    // Should NOT transition to error phase — abort is silently ignored
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(screen.queryByText('Something went wrong')).not.toBeInTheDocument();
+    expect(screen.queryByText(/went wrong/)).not.toBeInTheDocument();
+  });
+
+  it('should show validation errors when Zod schema rejects input', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderGenerator();
+
+    // Type enough text to enable the button
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+
+    // Change select to an invalid value via fireEvent to bypass React controlled state
+    const select = screen.getByLabelText('Note Type');
+    fireEvent.change(select, { target: { value: 'invalid_type' } });
+
+    await user.click(screen.getByText('Generate Note'));
+
+    // Zod validation should reject invalid noteType and display errors
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+    });
+
+    // generateNote should NOT have been called
+    expect(api.generateNote).not.toHaveBeenCalled();
+  });
+
+  it('should render multiple validation errors as a list', async () => {
+    // Mock validateGenerateNote to return multiple errors
+    vi.spyOn(schemas, 'validateGenerateNote').mockReturnValueOnce({
+      success: false,
+      errors: ['Note type is required', 'Notes must be at least 10 characters'],
+    });
+
+    const user = userEvent.setup();
+    renderGenerator();
+
+    // Type enough text to enable the button
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+    await user.click(screen.getByText('Generate Note'));
+
+    // Should display both errors in a list
+    await waitFor(() => {
+      expect(screen.getByText('Note type is required')).toBeInTheDocument();
+      expect(screen.getByText('Notes must be at least 10 characters')).toBeInTheDocument();
+    });
+
+    // Should render as list items
+    const listItems = screen.getByRole('alert').querySelectorAll('li');
+    expect(listItems).toHaveLength(2);
+
+    expect(api.generateNote).not.toHaveBeenCalled();
   });
 
   it('should render error as single message after error animation', async () => {

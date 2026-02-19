@@ -100,6 +100,30 @@ describe('ResultDisplay', () => {
     expect(screen.queryByText('Copied!')).not.toBeInTheDocument();
   });
 
+  it('should handle non-Error clipboard failures gracefully', async () => {
+    // Mock clipboard to reject with a non-Error value (covers Sentry wrapping branch)
+    if (!navigator.clipboard) {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: vi.fn().mockRejectedValue('string rejection') },
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      vi.spyOn(navigator.clipboard, 'writeText').mockRejectedValue('string rejection');
+    }
+
+    const user = userEvent.setup();
+    render(<ResultDisplay note={createMockGeneratedNote()} onBack={onBack} />);
+
+    await user.click(screen.getByText('Copy All'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('Failed to copy — please try again or manually select the text')
+      ).toBeInTheDocument();
+    });
+  });
+
   it('should auto-dismiss copy error after 3 seconds', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
