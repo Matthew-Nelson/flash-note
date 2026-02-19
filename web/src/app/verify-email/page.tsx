@@ -5,14 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { useAuth } from '@/lib/auth-context';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-interface VerifyEmailResponse {
-  success: boolean;
-  data?: { alreadyVerified?: boolean };
-  error?: { message: string };
-}
+import { api } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -26,38 +20,30 @@ function VerifyEmailContent() {
 
   const verifyEmail = useCallback(async (verificationToken: string) => {
     try {
-      const response = await fetch(`${API_URL}/auth/verify-email`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: verificationToken }),
-      });
+      const result = await api.verifyEmail(verificationToken);
 
-      const result = (await response.json()) as VerifyEmailResponse;
-
-      if (response.ok && result.success) {
-        // If user is logged in, fetch fresh data to get updated emailVerified status
-        if (isAuthenticated) {
-          try {
-            await fetchUser();
-          } catch {
-            // Fetch failed, but verification still succeeded - user can continue
-          }
+      // If user is logged in, fetch fresh data to get updated emailVerified status
+      if (isAuthenticated) {
+        try {
+          await fetchUser();
+        } catch {
+          // Fetch failed, but verification still succeeded - user can continue
         }
-
-        if (result.data?.alreadyVerified) {
-          setStatus('already_verified');
-          setMessage('Your email was already verified.');
-        } else {
-          setStatus('success');
-          setMessage('Your email has been verified successfully!');
-        }
-      } else {
-        setStatus('error');
-        setMessage(result.error?.message ?? 'Invalid or expired verification link');
       }
-    } catch {
+
+      if (result.alreadyVerified) {
+        setStatus('already_verified');
+        setMessage('Your email was already verified.');
+      } else {
+        setStatus('success');
+        setMessage('Your email has been verified successfully!');
+      }
+    } catch (err) {
+      Sentry.captureException(err, {
+        extra: { source: 'verify_email_page', errorType: 'verification_failed' },
+      });
       setStatus('error');
-      setMessage('An error occurred while verifying your email');
+      setMessage('Invalid or expired verification link. Please request a new one.');
     }
   }, [isAuthenticated, fetchUser]);
 

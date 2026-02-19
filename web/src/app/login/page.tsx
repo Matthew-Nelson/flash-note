@@ -70,7 +70,7 @@ export default function LoginPage() {
             setErrors(['Please verify your email before signing in.']);
             break;
           default:
-            setErrors([err.message || 'Failed to sign in']);
+            setErrors(['Something went wrong. Please try again.']);
         }
       } else {
         setErrors(['An unexpected error occurred. Please try again.']);

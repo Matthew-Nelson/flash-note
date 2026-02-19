@@ -27,3 +27,5 @@
 - "cancelled" status in BE still has "active" => we need ends on verbiage on the FE or something
 - No manage sub when status is cancelled
 - links in extension are full width - bad experience
+- Expose API to external consumers via API keys with per-token usage billing
+- Migrate web app auth from sessionStorage to httpOnly cookies — this is the Next.js-recommended pattern. Enables server-side route protection via middleware, eliminates XSS token theft risk, and removes the brief authenticated-UI flash for logged-out users. Moderate effort: touches auth flow, api client, storage, backend (must accept auth from cookies), and CSRF strategy (sameSite + tokens). Not urgent — backend already enforces auth on all API calls, so current approach is secure.

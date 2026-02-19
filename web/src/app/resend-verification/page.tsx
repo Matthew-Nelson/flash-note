@@ -5,13 +5,8 @@ import { useState } from 'react';
 import { Button, Input, Alert } from '@/components/ui';
 import { emailSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000';
-
-interface ResendVerificationResponse {
-  success: boolean;
-  error?: { code: string; message: string };
-}
+import { api, ApiError } from '@/lib/api';
+import * as Sentry from '@sentry/nextjs';
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
@@ -34,26 +29,34 @@ export default function ResendVerificationPage() {
     setStatus('submitting');
 
     try {
-      const response = await fetch(`${API_URL}/auth/resend-verification`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
+      await api.resendVerificationEmail(email);
+      setStatus('success');
+    } catch (err) {
+      if (err instanceof TypeError) {
+        // Network failure — request never reached the server
+        setStatus('error');
+        setErrors(['A network error occurred. Please check your connection and try again.']);
+      } else if (err instanceof ApiError && err.code === 'too_many_attempts') {
+        setStatus('error');
+        setErrors(['Too many attempts. Please try again later.']);
+      } else if (err instanceof ApiError && err.status >= 500) {
+        // Server error — the request failed, user should retry
+        Sentry.captureException(err, {
+          extra: { source: 'resend_verification_page', errorType: 'server_error', statusCode: err.status },
+        });
+        setStatus('error');
+        setErrors(['Something went wrong. Please try again later.']);
+      } else if (err instanceof ApiError) {
+        // Expected client error (4xx) — show success to avoid revealing account existence
         setStatus('success');
       } else {
-        const result = (await response.json()) as ResendVerificationResponse;
-        if (result.error?.code === 'too_many_attempts') {
-          setStatus('error');
-          setErrors([result.error.message]);
-        } else {
-          setStatus('success');
-        }
+        // Unexpected error (malformed response, etc.) — show generic error
+        Sentry.captureException(err, {
+          extra: { source: 'resend_verification_page', errorType: 'unexpected_error' },
+        });
+        setStatus('error');
+        setErrors(['Something went wrong. Please try again later.']);
       }
-    } catch {
-      setStatus('error');
-      setErrors(['An error occurred. Please try again.']);
     }
   };
 

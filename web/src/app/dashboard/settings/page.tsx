@@ -27,7 +27,7 @@ function SettingsContent() {
       setPasswordResetSent(true);
     } catch (err) {
       if (err instanceof ApiError) {
-        setPasswordResetError(err.message || 'Failed to send password reset email.');
+        setPasswordResetError('Failed to send password reset email. Please try again.');
       } else {
         setPasswordResetError('An unexpected error occurred.');
       }

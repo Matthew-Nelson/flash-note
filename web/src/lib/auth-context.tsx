@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { storage } from './storage';
-import { api, ApiError, AUTH_INVALIDATED_EVENT } from './api';
+import { api, ApiError, AUTH_INVALIDATED_EVENT, ACCESS_TOKEN_EXPIRY_MS } from './api';
 import type { User, AuthResponse, SessionEndReason } from './types';
 
 // Minimum time between focus-triggered refreshes (30 seconds)
@@ -47,12 +47,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [sessionEndReason, setSessionEndReason] = useState<SessionEndReason | null>(null);
   const lastFetchTime = useRef(0);
 
-  // Initialize auth state from storage and set Sentry user context
+  // Initialize auth state from storage and set Sentry user context.
+  // Checks whether the refresh token is still plausibly valid by estimating
+  // its issue time from the stored access token expiry.
   useEffect(() => {
     const auth = storage.getAuth();
     if (auth?.user) {
-      setUser(auth.user);
-      Sentry.setUser({ id: auth.user.id });
+      const REFRESH_TOKEN_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+      const tokenIssuedAt = auth.expiresAt - ACCESS_TOKEN_EXPIRY_MS;
+      const refreshExpiry = tokenIssuedAt + REFRESH_TOKEN_MAX_AGE_MS;
+
+      if (Date.now() > refreshExpiry) {
+        // Both tokens definitely expired — clear stale auth
+        storage.clearAuth();
+      } else {
+        // Refresh token may still be valid — let normal flow handle access token refresh
+        setUser(auth.user);
+        Sentry.setUser({ id: auth.user.id });
+      }
     }
     setIsLoading(false);
   }, []);

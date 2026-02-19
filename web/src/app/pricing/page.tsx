@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { useAuth, ApiError } from '@/lib/auth-context';
-import { api } from '@/lib/api';
+import { api, isAllowedRedirectUrl } from '@/lib/api';
 import { Button, Alert } from '@/components/ui';
 
 // Stripe price IDs from environment
@@ -72,7 +72,17 @@ function PricingContent() {
 
     try {
       const { checkoutUrl } = await api.createCheckoutSession(priceId);
-      // Redirect to Stripe Checkout
+      if (!isAllowedRedirectUrl(checkoutUrl)) {
+        Sentry.captureException(new Error('Invalid checkout redirect URL'), {
+          extra: {
+            source: 'pricing_page',
+            errorType: 'invalid_redirect_url',
+          },
+        });
+        setError('Failed to start checkout. Please try again.');
+        setLoadingPlan(null);
+        return;
+      }
       window.location.href = checkoutUrl;
     } catch (err) {
       // Capture to Sentry - revenue-impacting checkout failures
@@ -87,7 +97,7 @@ function PricingContent() {
         if (err.code === 'email_not_verified') {
           setError('Please verify your email before subscribing. Check your inbox for a verification link.');
         } else {
-          setError(err.message || 'Failed to start checkout. Please try again.');
+          setError('Failed to start checkout. Please try again.');
         }
       } else {
         setError('An unexpected error occurred. Please try again.');

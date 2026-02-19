@@ -2,9 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ForgotPasswordPage from './page';
+import { api, ApiError } from '@/lib/api';
 
-const mockFetch = vi.fn();
-globalThis.fetch = mockFetch;
+vi.mock('@/lib/api', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/api')>();
+  return {
+    ...original,
+    api: {
+      requestPasswordReset: vi.fn(),
+    },
+  };
+});
 
 describe('ForgotPasswordPage', () => {
   beforeEach(() => {
@@ -41,7 +49,7 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(api.requestPasswordReset).not.toHaveBeenCalled();
   });
 
   it('should show validation error for invalid email', async () => {
@@ -54,11 +62,11 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(api.requestPasswordReset).not.toHaveBeenCalled();
   });
 
   it('should submit and show success for valid email', async () => {
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    vi.mocked(api.requestPasswordReset).mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
@@ -68,7 +76,84 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
     });
-    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(api.requestPasswordReset).toHaveBeenCalledWith('test@example.com');
+  });
+
+  it('should show error for too_many_attempts', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new ApiError(429, 'too_many_attempts', 'Rate limited')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show network error for TypeError (no internet)', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new TypeError('Failed to fetch')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('A network error occurred. Please check your connection and try again.')
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('should show success for 4xx errors (hide account existence)', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new ApiError(404, 'user_not_found', 'No such user')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Check your email')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error for 5xx server errors', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new ApiError(500, 'internal_error', 'Internal server error')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show error for unexpected non-ApiError exceptions', async () => {
+    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
+      new SyntaxError('Unexpected token < in JSON')
+    );
+    const user = userEvent.setup();
+    render(<ForgotPasswordPage />);
+
+    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+    await user.click(screen.getByText('Send reset link'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
+    });
   });
 
   it('should clear errors when resubmitting', async () => {
@@ -82,7 +167,7 @@ describe('ForgotPasswordPage', () => {
     });
 
     // Type valid email and resubmit
-    mockFetch.mockResolvedValueOnce({ ok: true });
+    vi.mocked(api.requestPasswordReset).mockResolvedValueOnce(undefined);
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
     await user.click(screen.getByText('Send reset link'));
 

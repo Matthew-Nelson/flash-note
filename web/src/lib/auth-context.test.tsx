@@ -38,6 +38,7 @@ vi.mock('./api', () => ({
     }
   },
   AUTH_INVALIDATED_EVENT: 'flashnote:auth-invalidated',
+  ACCESS_TOKEN_EXPIRY_MS: 55 * 60 * 1000,
 }));
 
 const mockPush = vi.fn();
@@ -124,6 +125,41 @@ describe('AuthContext', () => {
         expect(screen.getByTestId('user').textContent).toBe('none');
         expect(screen.getByTestId('authenticated').textContent).toBe('false');
       });
+    });
+
+    it('should clear auth when refresh token is expired (>7 days since issue)', async () => {
+      // Simulate tokens issued 8 days ago (refresh token definitely expired)
+      const issuedAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
+      const expiresAt = issuedAt + 55 * 60 * 1000;
+
+      vi.mocked(storage.getAuth).mockReturnValue(
+        createMockStoredAuth({ expiresAt })
+      );
+
+      renderWithProvider();
+      await waitFor(() => {
+        expect(screen.getByTestId('user').textContent).toBe('none');
+        expect(screen.getByTestId('authenticated').textContent).toBe('false');
+      });
+      expect(storage.clearAuth).toHaveBeenCalled();
+      expect(Sentry.setUser).not.toHaveBeenCalled();
+    });
+
+    it('should keep user when refresh token is still valid', async () => {
+      // Simulate tokens issued 2 days ago (refresh token still valid)
+      const issuedAt = Date.now() - 2 * 24 * 60 * 60 * 1000;
+      const expiresAt = issuedAt + 55 * 60 * 1000;
+
+      vi.mocked(storage.getAuth).mockReturnValue(
+        createMockStoredAuth({ expiresAt })
+      );
+
+      renderWithProvider();
+      await waitFor(() => {
+        expect(screen.getByTestId('user').textContent).toBe('test@example.com');
+        expect(screen.getByTestId('authenticated').textContent).toBe('true');
+      });
+      expect(storage.clearAuth).not.toHaveBeenCalled();
     });
   });
 
