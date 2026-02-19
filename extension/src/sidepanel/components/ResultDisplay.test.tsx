@@ -148,4 +148,81 @@ describe('ResultDisplay', () => {
 
     expect(screen.queryByText(/Generated in/)).not.toBeInTheDocument();
   });
+
+  describe('clipboard auto-clear (M-12)', () => {
+    it('should schedule clipboard clear 60s after copy', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      if (!navigator.clipboard) {
+        Object.defineProperty(navigator, 'clipboard', {
+          value: { writeText: writeTextMock },
+          writable: true,
+          configurable: true,
+        });
+      } else {
+        vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+      }
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ResultDisplay note={createMockGeneratedNote()} onBack={onBack} />);
+
+      await user.click(screen.getByText('Copy All'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copied!')).toBeInTheDocument();
+      });
+
+      const clipboardSpy = vi.mocked(navigator.clipboard.writeText);
+      const callCountAfterCopy = clipboardSpy.mock.calls.length;
+
+      // Advance 60 seconds
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      // Should have been called again to clear clipboard
+      expect(clipboardSpy.mock.calls.length).toBeGreaterThan(callCountAfterCopy);
+      // The clear call should pass empty string
+      const lastCall = clipboardSpy.mock.calls[clipboardSpy.mock.calls.length - 1];
+      expect(lastCall[0]).toBe('');
+    });
+
+    it('should cancel clipboard clear timer on unmount', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const writeTextMock = vi.fn().mockResolvedValue(undefined);
+      if (!navigator.clipboard) {
+        Object.defineProperty(navigator, 'clipboard', {
+          value: { writeText: writeTextMock },
+          writable: true,
+          configurable: true,
+        });
+      } else {
+        vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+      }
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { unmount } = render(<ResultDisplay note={createMockGeneratedNote()} onBack={onBack} />);
+
+      await user.click(screen.getByText('Copy All'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Copied!')).toBeInTheDocument();
+      });
+
+      const clipboardSpy = vi.mocked(navigator.clipboard.writeText);
+      const callCountAfterCopy = clipboardSpy.mock.calls.length;
+
+      unmount();
+
+      // Advance 60 seconds — timer should have been cleared
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      // No additional clipboard calls should have been made
+      expect(clipboardSpy.mock.calls.length).toBe(callCountAfterCopy);
+    });
+  });
 });

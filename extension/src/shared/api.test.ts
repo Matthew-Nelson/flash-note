@@ -507,16 +507,22 @@ describe('Extension API Client', () => {
   });
 
   describe('refreshUser', () => {
-    it('should refresh and update stored auth', async () => {
+    it('should refresh and return user data', async () => {
       const mockResponse = createMockAuthResponse({ accessToken: 'refreshed-token' });
+      // First call: refresh endpoint
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: () => Promise.resolve(createMockApiResponse(mockResponse)),
       });
+      // Second call: GET /user/me
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({ user: mockResponse.user })),
+      });
 
       const result = await api.refreshUser();
       expect(result).not.toBeNull();
-      expect(result!.accessToken).toBe('refreshed-token');
+      expect(result!.user).toBeDefined();
       expect(storage.setAuth).toHaveBeenCalled();
     });
 
@@ -526,10 +532,17 @@ describe('Extension API Client', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null on server error', async () => {
+    it('should return null on server error without calling /user/me', async () => {
+      vi.mocked(storage.getAuth).mockResolvedValue(
+        createMockStoredAuth({ expiresAt: Date.now() + 60 * 60 * 1000 })
+      );
+      // Refresh endpoint fails
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
       const result = await api.refreshUser();
       expect(result).toBeNull();
+      // Should only have called refresh, not /user/me (bug 1 fix)
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0][0]).toContain('/auth/refresh');
     });
 
     it('should return null when response is not successful', async () => {
@@ -549,6 +562,122 @@ describe('Extension API Client', () => {
       mockFetch.mockRejectedValueOnce(new TypeError('Network error'));
       const result = await api.refreshUser();
       expect(result).toBeNull();
+    });
+  });
+
+  describe('refresh mutex (H-9)', () => {
+    it('should share one refresh call between concurrent getToken requests', async () => {
+      // Both calls will see expired token
+      vi.mocked(storage.getAuth).mockResolvedValue(
+        createMockStoredAuth({ expiresAt: Date.now() - 1000 })
+      );
+
+      const refreshResponse = createMockAuthResponse({ accessToken: 'new-token' });
+      // Only one refresh call should happen
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(createMockApiResponse(refreshResponse)),
+        })
+        // Two subsequent requests using the fresh token
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(createMockApiResponse({ user: refreshResponse.user })),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(createMockApiResponse({ user: refreshResponse.user })),
+        });
+
+      // Fire two requests concurrently
+      const [result1, result2] = await Promise.all([
+        api.fetchUser(),
+        api.fetchUser(),
+      ]);
+
+      // Both should succeed
+      expect(result1).not.toBeNull();
+      expect(result2).not.toBeNull();
+
+      // Should have called refresh only once (1 refresh + 2 fetchUser = 3 total)
+      const refreshCalls = mockFetch.mock.calls.filter(
+        (call) => (call[0] as string).includes('/auth/refresh')
+      );
+      expect(refreshCalls.length).toBe(1);
+    });
+  });
+
+  describe('AbortController (M-18)', () => {
+    it('should abort pending requests when abortAll is called', async () => {
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal;
+        return new Promise((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+            return;
+          }
+          const timer = setTimeout(() => reject(new Error('timeout')), 5000);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+      });
+
+      const promise = api.fetchUser();
+      // Give the promise time to hit the fetch call
+      await new Promise(r => setTimeout(r, 10));
+      api.abortAll();
+
+      const result = await promise;
+      // fetchUser catches errors and returns null
+      expect(result).toBeNull();
+    });
+
+    it('should not abort logout requests when abortAll is called', async () => {
+      // The logout should use its own signal, not the shared controller
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      // Abort before calling logout
+      api.abortAll();
+
+      // Logout should still succeed since it uses its own controller
+      await expect(api.logout()).resolves.toBeUndefined();
+
+      // Verify the fetch call didn't use the aborted signal
+      const fetchCall = mockFetch.mock.calls[0];
+      const signal = (fetchCall[1] as RequestInit).signal as AbortSignal;
+      expect(signal.aborted).toBe(false);
+    });
+
+    it('should allow new requests after abortAll resets the controller', async () => {
+      api.abortAll();
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({ user: createMockAuthResponse().user })),
+      });
+
+      const result = await api.fetchUser();
+      expect(result).not.toBeNull();
+    });
+  });
+
+  describe('logout signal isolation', () => {
+    it('should pass signal to fetch in request()', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse({ user: createMockAuthResponse().user })),
+      });
+
+      await api.fetchUser();
+
+      const fetchCall = mockFetch.mock.calls[0];
+      const options = fetchCall[1] as RequestInit;
+      expect(options.signal).toBeDefined();
     });
   });
 });

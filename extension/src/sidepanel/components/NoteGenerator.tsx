@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '@/shared/api';
 import { validateGenerateNote, type NoteType, type GeneratedNote } from '@/shared/schemas';
+import { getErrorMessage } from '@/shared/error-messages';
 
 interface NoteGeneratorProps {
   onNoteGenerated: (note: GeneratedNote) => void;
@@ -37,6 +38,16 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
 
   // Store error message temporarily during error animation
   const errorMessageRef = useRef<string | null>(null);
+
+  // Per-generation AbortController — aborts on unmount (M-18)
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Abort in-flight generation on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
 
   // Cycle through loading stages while loading
   useEffect(() => {
@@ -102,18 +113,23 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
     setPhase('loading');
     setLoadingStage(0); // Reset loading stage in event handler, not effect
 
+    // Abort any previous in-flight generation
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const result = await api.generateNote(validation.data);
+      const result = await api.generateNote(validation.data, controller.signal);
       // Store result and transition to success phase
       generatedNoteRef.current = result;
       setPhase('success');
     } catch (err) {
-      // Store error and transition to error phase for animation
-      if (err instanceof Error) {
-        errorMessageRef.current = err.message;
-      } else {
-        errorMessageRef.current = 'Failed to generate note';
+      // Don't show error for intentional aborts (unmount or new generation)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        return;
       }
+      // Store curated error and transition to error phase for animation
+      errorMessageRef.current = getErrorMessage(err);
       setPhase('error');
     }
   };

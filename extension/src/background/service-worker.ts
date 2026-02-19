@@ -28,6 +28,43 @@ interface ExtensionMessage {
 // Key: windowId, Value: true if open
 const sidepanelOpenByWindow = new Map<number, boolean>();
 
+const SESSION_STORAGE_KEY = 'sidepanelState';
+
+/**
+ * Persist sidepanel state to chrome.storage.session so it survives
+ * service worker restarts (M-15).
+ */
+function persistSidepanelState(): void {
+  const entries = Object.fromEntries(sidepanelOpenByWindow);
+  void chrome.storage.session.set({ [SESSION_STORAGE_KEY]: entries });
+}
+
+/**
+ * Restore sidepanel state from chrome.storage.session on startup (M-15).
+ */
+async function restoreSidepanelState(): Promise<void> {
+  try {
+    const result = await chrome.storage.session.get(SESSION_STORAGE_KEY);
+    const stored = result[SESSION_STORAGE_KEY] as Record<string, boolean> | undefined;
+    if (stored) {
+      for (const [key, value] of Object.entries(stored)) {
+        sidepanelOpenByWindow.set(Number(key), value);
+      }
+    }
+  } catch (error) {
+    console.error('Failed to restore sidepanel state:', error);
+  }
+}
+
+// Restore state on service worker startup
+void restoreSidepanelState();
+
+// Clean up stale entries when windows are closed (M-15)
+chrome.windows.onRemoved.addListener((windowId) => {
+  sidepanelOpenByWindow.delete(windowId);
+  persistSidepanelState();
+});
+
 // Log when the extension is installed or updated
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === chrome.runtime.OnInstalledReason.INSTALL) {
@@ -46,6 +83,11 @@ chrome.action.onClicked.addListener((tab) => {
 
 // Handle messages from side panel or content scripts
 chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  // M-16: Reject messages from other extensions or external senders
+  if (sender.id !== chrome.runtime.id) {
+    return false;
+  }
+
   if (message.type === 'PING') {
     sendResponse({ type: 'PONG' });
     return true;
@@ -60,6 +102,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         .open({ tabId })
         .then(() => {
           sidepanelOpenByWindow.set(windowId, true);
+          persistSidepanelState();
           sendResponse({ success: true });
         })
         .catch((error) => {
@@ -81,6 +124,7 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
         .close({ windowId })
         .then(() => {
           sidepanelOpenByWindow.set(windowId, false);
+          persistSidepanelState();
           sendResponse({ success: true });
         })
         .catch((error: unknown) => {
@@ -108,8 +152,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
 
   if (message.type === 'SIDEPANEL_OPENED') {
     // Sidepanel reports it has opened (sent from sidepanel on mount)
-    if (message.windowId) {
-      sidepanelOpenByWindow.set(message.windowId, true);
+    const openWindowId = sender.tab?.windowId ?? message.windowId;
+    if (openWindowId) {
+      sidepanelOpenByWindow.set(openWindowId, true);
+      persistSidepanelState();
     }
     sendResponse({ success: true });
     return true;
@@ -117,8 +163,10 @@ chrome.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendRes
 
   if (message.type === 'SIDEPANEL_CLOSED') {
     // Sidepanel reports it is closing (sent from sidepanel on unmount)
-    if (message.windowId) {
-      sidepanelOpenByWindow.set(message.windowId, false);
+    const closeWindowId = sender.tab?.windowId ?? message.windowId;
+    if (closeWindowId) {
+      sidepanelOpenByWindow.set(closeWindowId, false);
+      persistSidepanelState();
     }
     sendResponse({ success: true });
     return true;

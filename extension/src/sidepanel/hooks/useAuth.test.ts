@@ -22,6 +22,7 @@ vi.mock('@/shared/api', () => ({
     logout: vi.fn(),
     fetchUser: vi.fn(),
     refreshUser: vi.fn(),
+    abortAll: vi.fn(),
   },
   AUTH_INVALIDATED_EVENT: 'flashnote:auth-invalidated',
 }));
@@ -147,6 +148,20 @@ describe('useAuth', () => {
       expect(result.current.user).toBeNull();
       expect(storage.clearAuth).toHaveBeenCalled();
     });
+
+    it('should call api.abortAll on logout', async () => {
+      vi.mocked(storage.getAuth).mockResolvedValue(createMockStoredAuth());
+      vi.mocked(api.logout).mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAuth());
+      await waitFor(() => expect(result.current.user).not.toBeNull());
+
+      await act(async () => {
+        await result.current.logout();
+      });
+
+      expect(api.abortAll).toHaveBeenCalled();
+    });
   });
 
   describe('fetchUser', () => {
@@ -257,6 +272,19 @@ describe('useAuth', () => {
       });
 
       expect(result.current.user).toBeNull();
+    });
+
+    it('should call api.abortAll on AUTH_INVALIDATED_EVENT', async () => {
+      vi.mocked(storage.getAuth).mockResolvedValue(createMockStoredAuth());
+
+      renderHook(() => useAuth());
+      await waitFor(() => expect(vi.mocked(storage.getAuth)).toHaveBeenCalled());
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent(AUTH_INVALIDATED_EVENT));
+      });
+
+      expect(api.abortAll).toHaveBeenCalled();
     });
   });
 

@@ -178,20 +178,23 @@ async function init(): Promise<void> {
   await loadBadgePreference();
   updateButtonVisibility();
 
-  // Listen for SPA navigation via History API
-  const originalPushState = history.pushState.bind(history);
-  history.pushState = function (...args) {
-    originalPushState(...args);
-    updateButtonVisibility();
-  };
+  // Re-inject button after SPA navigation removes it from DOM (M-14)
+  // Uses MutationObserver instead of monkey-patching history.pushState/replaceState
+  let checkScheduled = false;
+  const observer = new MutationObserver(() => {
+    if (!checkScheduled) {
+      checkScheduled = true;
+      requestIdleCallback(() => {
+        if (cachedBadgeEnabled && !document.getElementById(BUTTON_ID)) {
+          createFloatingButton();
+        }
+        checkScheduled = false;
+      });
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
-  const originalReplaceState = history.replaceState.bind(history);
-  history.replaceState = function (...args) {
-    originalReplaceState(...args);
-    updateButtonVisibility();
-  };
-
-  // Listen for back/forward navigation
+  // Listen for back/forward navigation (standard DOM API)
   window.addEventListener('popstate', () => {
     updateButtonVisibility();
   });

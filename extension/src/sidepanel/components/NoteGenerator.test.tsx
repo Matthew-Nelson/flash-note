@@ -2,12 +2,18 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NoteGenerator from './NoteGenerator';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 import { createMockGeneratedNote } from '@/test/helpers';
 
 vi.mock('@/shared/api', () => ({
   api: {
     generateNote: vi.fn(),
+  },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, public code: string, message: string) {
+      super(message);
+      this.name = 'ApiError';
+    }
   },
 }));
 
@@ -139,9 +145,11 @@ describe('NoteGenerator', () => {
     );
   });
 
-  it('should show error state on API failure', async () => {
+  it('should show curated error for API failures, not raw backend message', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
-    vi.mocked(api.generateNote).mockRejectedValue(new Error('Server error'));
+    vi.mocked(api.generateNote).mockRejectedValue(
+      new ApiError(500, 'server_error', 'raw SQL detail leaked')
+    );
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderGenerator();
@@ -152,15 +160,38 @@ describe('NoteGenerator', () => {
       expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     });
 
-    // Advance past error animation (1.5s)
     await vi.advanceTimersByTimeAsync(1500);
 
     await waitFor(() => {
-      expect(screen.getByText('Server error')).toBeInTheDocument();
+      // Should show curated default message, not raw backend message
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('raw SQL detail leaked')).not.toBeInTheDocument();
+  });
+
+  it('should show curated error for known error codes', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(api.generateNote).mockRejectedValue(
+      new ApiError(403, 'trial_expired', 'Your trial has expired')
+    );
+
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    renderGenerator();
+    await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility and decreased pain levels today.');
+    await user.click(screen.getByText('Generate Note'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+    });
+
+    await vi.advanceTimersByTimeAsync(1500);
+
+    await waitFor(() => {
+      expect(screen.getByText('Your free trial has ended.')).toBeInTheDocument();
     });
   });
 
-  it('should show generic error for non-Error throws', async () => {
+  it('should show default curated error for non-Error throws', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.mocked(api.generateNote).mockRejectedValue('string error');
 
@@ -176,7 +207,7 @@ describe('NoteGenerator', () => {
     await vi.advanceTimersByTimeAsync(1500);
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to generate note')).toBeInTheDocument();
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     });
   });
 
@@ -259,19 +290,18 @@ describe('NoteGenerator', () => {
           patientContext: 'TEST_PATIENT_A 52M',
           noteType: 'daily_note',
           quickNotes: 'Patient reports improved mobility and decreased pain levels today.',
-        })
+        }),
+        expect.any(AbortSignal),
       );
     });
   });
 
-  it('should render multiple errors as a list', async () => {
-    // To trigger multiple validation errors, we need to submit invalid data
-    // This is tested indirectly - the Zod schema can produce multiple errors
-    // We test the rendering path by forcing the errors state
+  it('should render error as single message after error animation', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
 
-    // Generate 2 errors by triggering a non-Error rejection and then submitting again with validation error
-    vi.mocked(api.generateNote).mockRejectedValueOnce(new Error('Error 1'));
+    vi.mocked(api.generateNote).mockRejectedValueOnce(
+      new ApiError(429, 'rate_limit_exceeded', 'Too many requests')
+    );
 
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderGenerator();
@@ -284,9 +314,9 @@ describe('NoteGenerator', () => {
     });
     await vi.advanceTimersByTimeAsync(1500);
 
-    // After error animation, the single error message should show
+    // After error animation, the curated error message should show
     await waitFor(() => {
-      expect(screen.getByText('Error 1')).toBeInTheDocument();
+      expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
     });
   });
 });

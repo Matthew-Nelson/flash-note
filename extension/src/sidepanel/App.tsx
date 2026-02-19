@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './hooks/useAuth';
 import LoginForm from './components/LoginForm';
 import NoteGenerator from './components/NoteGenerator';
 import ResultDisplay from './components/ResultDisplay';
 import Settings from './components/Settings';
 import { type GeneratedNote } from '@/shared/schemas';
-import { api } from '@/shared/api';
+import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
+import { isRateLimited } from '@/shared/error-messages';
 
 type View = 'generator' | 'result' | 'settings';
 type ResendStatus = 'idle' | 'sending' | 'sent' | 'error';
@@ -94,6 +95,26 @@ function AuthenticatedApp({
   const [generatedNote, setGeneratedNote] = useState<GeneratedNote | null>(null);
   const [resendStatus, setResendStatus] = useState<ResendStatus>('idle');
 
+  // Clear PHI state on forced logout (H-8) — runs before setUser(null) unmounts this component
+  useEffect(() => {
+    const handleAuthInvalidated = () => {
+      setGeneratedNote(null);
+      try { void navigator.clipboard.writeText(''); } catch { /* sidepanel may not have focus */ }
+    };
+
+    window.addEventListener(AUTH_INVALIDATED_EVENT, handleAuthInvalidated);
+    return () => {
+      window.removeEventListener(AUTH_INVALIDATED_EVENT, handleAuthInvalidated);
+    };
+  }, []);
+
+  // PHI-clearing logout wrapper (H-8 + M-12)
+  const handleLogout = useCallback(async () => {
+    setGeneratedNote(null);
+    try { await navigator.clipboard.writeText(''); } catch { /* sidepanel may not have focus */ }
+    await logout();
+  }, [logout]);
+
   // Fetch fresh user data when navigating to Settings so subscription status is current
   useEffect(() => {
     if (view === 'settings') {
@@ -130,7 +151,7 @@ function AuthenticatedApp({
       setResendStatus('sent');
     } catch (err) {
       // Show sent even on most errors to prevent enumeration
-      if (err instanceof Error && err.message.includes('Too many')) {
+      if (isRateLimited(err)) {
         setResendStatus('error');
       } else {
         setResendStatus('sent');
@@ -222,7 +243,7 @@ function AuthenticatedApp({
       {/* Main content */}
       <main className="flex-1 overflow-auto">
         <div key={view} className="animate-fade-in">
-          {view === 'settings' && <Settings user={user} onLogout={logout} />}
+          {view === 'settings' && <Settings user={user} onLogout={handleLogout} />}
           {view === 'generator' && <NoteGenerator onNoteGenerated={handleNoteGenerated} />}
           {view === 'result' && generatedNote && (
             <ResultDisplay note={generatedNote} onBack={handleBack} />

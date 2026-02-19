@@ -16,16 +16,21 @@ const SECTIONS: { key: SectionKey; label: string }[] = [
   { key: 'plan', label: 'PLAN' },
 ];
 
+// Auto-clear clipboard after 60 seconds for PHI safety (M-12)
+const CLIPBOARD_CLEAR_DELAY_MS = 60 * 1000;
+
 export default function ResultDisplay({ note, onBack }: ResultDisplayProps) {
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
   const [copyError, setCopyError] = useState<string | null>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const clipboardClearTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     return () => {
       clearTimeout(successTimerRef.current);
       clearTimeout(errorTimerRef.current);
+      clearTimeout(clipboardClearTimerRef.current);
     };
   }, []);
 
@@ -37,6 +42,12 @@ export default function ResultDisplay({ note, onBack }: ResultDisplayProps) {
       clearTimeout(successTimerRef.current);
       setCopiedSection(section);
       successTimerRef.current = setTimeout(() => setCopiedSection(null), 2000);
+
+      // Auto-clear clipboard after 60s to limit PHI exposure (M-12)
+      clearTimeout(clipboardClearTimerRef.current);
+      clipboardClearTimerRef.current = setTimeout(() => {
+        void navigator.clipboard.writeText('').catch(() => { /* may not have focus */ });
+      }, CLIPBOARD_CLEAR_DELAY_MS);
     } catch (err) {
       captureException(err instanceof Error ? err : new Error(String(err)), {
         source: 'result_display',

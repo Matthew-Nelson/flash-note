@@ -34,6 +34,7 @@ export function useAuth() {
   // Listen for forced logout (e.g., password reset invalidated token)
   useEffect(() => {
     const handleAuthInvalidated = () => {
+      api.abortAll();
       setUser(null);
     };
 
@@ -134,6 +135,7 @@ export function useAuth() {
       // Ignore logout errors - clear local state anyway
       console.error('Logout error:', error);
     }
+    api.abortAll();
     await storage.clearAuth();
     setUser(null);
   }, []);

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { validateLogin, validateRegister, validateEmail } from '@/shared/schemas';
 import { api } from '@/shared/api';
+import { getErrorMessage, isRateLimited } from '@/shared/error-messages';
 import SessionAlert from './SessionAlert';
 
 interface LoginFormProps {
@@ -46,11 +47,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         await onLogin(email, password);
       }
     } catch (err) {
-      if (err instanceof Error) {
-        setErrors([err.message]);
-      } else {
-        setErrors(['An unexpected error occurred']);
-      }
+      setErrors([getErrorMessage(err)]);
     } finally {
       setIsLoading(false);
     }
@@ -76,8 +73,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
     } catch (err) {
       // Always show success to prevent email enumeration
       // Only show error for rate limiting
-      if (err instanceof Error && err.message.includes('Too many')) {
-        setErrors([err.message]);
+      if (isRateLimited(err)) {
+        setErrors([getErrorMessage(err)]);
       } else {
         setResetEmailSent(true);
       }

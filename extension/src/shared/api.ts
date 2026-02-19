@@ -54,6 +54,12 @@ const RETRY_CONFIG = {
 };
 
 class ApiClient {
+  // Mutex: prevents concurrent token refresh requests (H-9)
+  private refreshPromise: Promise<string | null> | null = null;
+
+  // AbortController for in-flight requests (M-18)
+  private controller = new AbortController();
+
   /**
    * Determines if an error is retryable (network failure or 5xx server error)
    */
@@ -70,6 +76,15 @@ class ApiClient {
   }
 
   /**
+   * Aborts all in-flight requests and resets the controller.
+   * Called on logout / forced auth invalidation.
+   */
+  abortAll(): void {
+    this.controller.abort();
+    this.controller = new AbortController();
+  }
+
+  /**
    * Sleeps for the specified duration
    */
   private sleep(ms: number): Promise<void> {
@@ -82,7 +97,13 @@ class ApiClient {
 
     // Check if token is expired (with 60s buffer)
     if (Date.now() > auth.expiresAt - 60000) {
-      return this.refreshToken(auth.refreshToken);
+      // Mutex: if a refresh is already in progress, await it instead of starting another
+      if (this.refreshPromise) {
+        return this.refreshPromise;
+      }
+      this.refreshPromise = this.refreshToken(auth.refreshToken)
+        .finally(() => { this.refreshPromise = null; });
+      return this.refreshPromise;
     }
 
     return auth.accessToken;
@@ -99,6 +120,7 @@ class ApiClient {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),
+        signal: this.controller.signal,
       });
 
       if (!response.ok) {
@@ -123,10 +145,13 @@ class ApiClient {
 
       return data.accessToken;
     } catch (error) {
-      captureException(error, {
-        operation: 'token_refresh',
-        errorType: 'network_error',
-      });
+      // Don't report intentional aborts (logout/forced-logout) to Sentry
+      if (!(error instanceof DOMException && error.name === 'AbortError')) {
+        captureException(error, {
+          operation: 'token_refresh',
+          errorType: 'network_error',
+        });
+      }
       await storage.clearAuth();
       return null;
     }
@@ -141,6 +166,7 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
+      signal: options.signal ?? this.controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -264,15 +290,21 @@ class ApiClient {
   }
 
   async logout(): Promise<void> {
-    await this.request('/auth/logout', { method: 'POST' });
+    // Logout uses a standalone AbortController so it is never cancelled by abortAll()
+    const logoutController = new AbortController();
+    await this.request('/auth/logout', {
+      method: 'POST',
+      signal: logoutController.signal,
+    });
   }
 
-  async generateNote(input: GenerateNoteInput): Promise<GeneratedNote> {
+  async generateNote(input: GenerateNoteInput, signal?: AbortSignal): Promise<GeneratedNote> {
     // Use retry logic for note generation - this is critical for clinical UX
     // A transient network failure shouldn't lose the user's work
     return this.requestWithRetry<GeneratedNote>('/notes/generate', {
       method: 'POST',
       body: JSON.stringify(input),
+      ...(signal && { signal }),
     });
   }
 
@@ -316,39 +348,40 @@ class ApiClient {
 
   /**
    * Force refresh the access token and get updated user data.
-   * Rotates tokens and creates a new session - use fetchUser() for
-   * lightweight status checks that don't need token rotation.
+   * Uses the shared refresh mutex to avoid duplicate refresh calls.
+   * Use fetchUser() for lightweight status checks that don't need token rotation.
    */
   async refreshUser(): Promise<AuthResponse | null> {
     const auth = await storage.getAuth();
     if (!auth?.refreshToken) return null;
 
     try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: auth.refreshToken }),
-      });
-
-      if (!response.ok) {
-        return null;
+      // Force a refresh by calling refreshToken through the mutex
+      let newToken: string | null;
+      if (this.refreshPromise) {
+        newToken = await this.refreshPromise;
+      } else {
+        this.refreshPromise = this.refreshToken(auth.refreshToken)
+          .finally(() => { this.refreshPromise = null; });
+        newToken = await this.refreshPromise;
       }
 
-      const result = (await response.json()) as ApiResponse<AuthResponse>;
-      if (!result.success) {
-        return null;
-      }
+      // Bail out if refresh failed — don't waste a request on /user/me without auth
+      if (!newToken) return null;
 
-      const data = result.data;
-      await storage.setAuth({
+      // Fetch updated user data with the fresh token
+      const data = await this.request<{ user: AuthResponse['user'] }>('/user/me');
+      const updatedAuth = await storage.getAuth();
+      if (!updatedAuth) return null;
+
+      await storage.setAuth({ ...updatedAuth, user: data.user });
+
+      return {
         user: data.user,
-        accessToken: data.accessToken,
-        refreshToken: data.refreshToken,
-        csrfToken: data.csrfToken,
-        expiresAt: Date.now() + ACCESS_TOKEN_EXPIRY_MS,
-      });
-
-      return data;
+        accessToken: updatedAuth.accessToken,
+        refreshToken: updatedAuth.refreshToken,
+        csrfToken: updatedAuth.csrfToken,
+      };
     } catch {
       return null;
     }

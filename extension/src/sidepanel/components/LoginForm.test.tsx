@@ -2,11 +2,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import LoginForm from './LoginForm';
-import { api } from '@/shared/api';
+import { api, ApiError } from '@/shared/api';
 
 vi.mock('@/shared/api', () => ({
   api: {
     requestPasswordReset: vi.fn(),
+  },
+  ApiError: class ApiError extends Error {
+    constructor(public status: number, public code: string, message: string) {
+      super(message);
+      this.name = 'ApiError';
+    }
   },
   AUTH_INVALIDATED_EVENT: 'flashnote:auth-invalidated',
 }));
@@ -101,8 +107,8 @@ describe('LoginForm', () => {
       });
     });
 
-    it('should show API error message', async () => {
-      onLogin.mockRejectedValue(new Error('Invalid credentials'));
+    it('should show curated message for API errors, not raw backend message', async () => {
+      onLogin.mockRejectedValue(new ApiError(401, 'invalid_credentials', 'raw backend detail'));
       const user = userEvent.setup();
       renderForm();
 
@@ -111,11 +117,13 @@ describe('LoginForm', () => {
       await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
-        expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
+        expect(screen.getByText('Invalid email or password.')).toBeInTheDocument();
       });
+      // Must never show raw backend message
+      expect(screen.queryByText('raw backend detail')).not.toBeInTheDocument();
     });
 
-    it('should show generic error for non-Error throws', async () => {
+    it('should show default curated message for non-ApiError throws', async () => {
       onLogin.mockRejectedValue('string error');
       const user = userEvent.setup();
       renderForm();
@@ -125,7 +133,7 @@ describe('LoginForm', () => {
       await user.click(screen.getByText('Sign in'));
 
       await waitFor(() => {
-        expect(screen.getByText('An unexpected error occurred')).toBeInTheDocument();
+        expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
       });
     });
 
@@ -296,9 +304,9 @@ describe('LoginForm', () => {
       });
     });
 
-    it('should show rate limit error', async () => {
+    it('should show rate limit error using isRateLimited', async () => {
       vi.mocked(api.requestPasswordReset).mockRejectedValue(
-        new Error('Too many attempts. Please try again later.')
+        new ApiError(429, 'rate_limit_exceeded', 'Too many requests')
       );
       const user = userEvent.setup();
       renderForm();
@@ -308,7 +316,23 @@ describe('LoginForm', () => {
       await user.click(screen.getByText('Send reset link'));
 
       await waitFor(() => {
-        expect(screen.getByText(/Too many attempts/i)).toBeInTheDocument();
+        expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+      });
+    });
+
+    it('should show success on non-rate-limit API errors (email enumeration prevention)', async () => {
+      vi.mocked(api.requestPasswordReset).mockRejectedValue(
+        new ApiError(404, 'user_not_found', 'User not found')
+      );
+      const user = userEvent.setup();
+      renderForm();
+
+      await user.click(screen.getByText('Forgot password?'));
+      await user.type(screen.getByLabelText('Email address'), 'test@example.com');
+      await user.click(screen.getByText('Send reset link'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Check your email')).toBeInTheDocument();
       });
     });
 
