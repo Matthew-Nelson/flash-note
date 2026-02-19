@@ -5,7 +5,7 @@ import NoteGenerator from './components/NoteGenerator';
 import ResultDisplay from './components/ResultDisplay';
 import Settings from './components/Settings';
 import { type GeneratedNote } from '@/shared/schemas';
-import { api, AUTH_INVALIDATED_EVENT } from '@/shared/api';
+import { api, AUTH_INVALIDATED_EVENT, CLEAR_PHI_EVENT } from '@/shared/api';
 import { isRateLimited } from '@/shared/error-messages';
 
 type View = 'generator' | 'result' | 'settings';
@@ -99,6 +99,7 @@ function AuthenticatedApp({
   useEffect(() => {
     const handleAuthInvalidated = () => {
       setGeneratedNote(null);
+      window.dispatchEvent(new Event(CLEAR_PHI_EVENT));
       try { void navigator.clipboard.writeText(''); } catch { /* sidepanel may not have focus */ }
     };
 
@@ -111,6 +112,7 @@ function AuthenticatedApp({
   // PHI-clearing logout wrapper (H-8 + M-12)
   const handleLogout = useCallback(async () => {
     setGeneratedNote(null);
+    window.dispatchEvent(new Event(CLEAR_PHI_EVENT));
     try { await navigator.clipboard.writeText(''); } catch { /* sidepanel may not have focus */ }
     await logout();
   }, [logout]);

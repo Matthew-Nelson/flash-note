@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { api } from '@/shared/api';
+import { api, CLEAR_PHI_EVENT } from '@/shared/api';
 import { validateGenerateNote, type NoteType, type GeneratedNote } from '@/shared/schemas';
 import { getErrorMessage } from '@/shared/error-messages';
 
@@ -46,6 +46,22 @@ export default function NoteGenerator({ onNoteGenerated }: NoteGeneratorProps) {
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Clear PHI fields on logout (Rule 4: explicitly clear quickNotes, patientContext)
+  useEffect(() => {
+    const handleClearPhi = () => {
+      setPatientContext('');
+      setQuickNotes('');
+      setErrors([]);
+      generatedNoteRef.current = null;
+      errorMessageRef.current = null;
+    };
+
+    window.addEventListener(CLEAR_PHI_EVENT, handleClearPhi);
+    return () => {
+      window.removeEventListener(CLEAR_PHI_EVENT, handleClearPhi);
     };
   }, []);
 

@@ -652,23 +652,34 @@ describe('Extension API Client', () => {
       expect(result).toBeNull();
     });
 
-    it('should not abort logout requests when abortAll is called', async () => {
-      // The logout should use its own signal, not the shared controller
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(createMockApiResponse(undefined)),
+    it('should abort note generation with per-request signal when abortAll is called', async () => {
+      // Simulate a slow note generation request
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal;
+        return new Promise((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+            return;
+          }
+          const timer = setTimeout(() => reject(new Error('timeout')), 5000);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
       });
 
-      // Abort before calling logout
+      const perRequestController = new AbortController();
+      const promise = api.generateNote(
+        { noteType: 'daily_note', quickNotes: 'Patient notes here' },
+        perRequestController.signal,
+      );
+
+      await new Promise(r => setTimeout(r, 10));
+      // abortAll should cancel even though generateNote has its own signal
       api.abortAll();
 
-      // Logout should still succeed since it uses its own controller
-      await expect(api.logout()).resolves.toBeUndefined();
-
-      // Verify the fetch call didn't use the aborted signal
-      const fetchCall = mockFetch.mock.calls[0];
-      const signal = (fetchCall[1] as RequestInit).signal as AbortSignal;
-      expect(signal.aborted).toBe(false);
+      await expect(promise).rejects.toThrow('aborted');
     });
 
     it('should allow new requests after abortAll resets the controller', async () => {
@@ -684,7 +695,7 @@ describe('Extension API Client', () => {
     });
   });
 
-  describe('logout signal isolation', () => {
+  describe('combined signals', () => {
     it('should pass signal to fetch in request()', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -696,6 +707,46 @@ describe('Extension API Client', () => {
       const fetchCall = mockFetch.mock.calls[0];
       const options = fetchCall[1] as RequestInit;
       expect(options.signal).toBeDefined();
+    });
+
+    it('should allow logout after abortAll since controller is reset', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(createMockApiResponse(undefined)),
+      });
+
+      // abortAll resets the controller — subsequent requests use fresh signal
+      api.abortAll();
+      await expect(api.logout()).resolves.toBeUndefined();
+    });
+
+    it('should cancel per-request signal independently of class controller', async () => {
+      mockFetch.mockImplementation((_url: string, init?: RequestInit) => {
+        const signal = init?.signal;
+        return new Promise((_resolve, reject) => {
+          if (signal?.aborted) {
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+            return;
+          }
+          const timer = setTimeout(() => reject(new Error('timeout')), 5000);
+          signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException('The operation was aborted.', 'AbortError'));
+          });
+        });
+      });
+
+      const perRequestController = new AbortController();
+      const promise = api.generateNote(
+        { noteType: 'daily_note', quickNotes: 'Patient notes here' },
+        perRequestController.signal,
+      );
+
+      await new Promise(r => setTimeout(r, 10));
+      // Aborting the per-request controller should also cancel
+      perRequestController.abort();
+
+      await expect(promise).rejects.toThrow('aborted');
     });
   });
 });

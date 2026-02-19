@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import NoteGenerator from './NoteGenerator';
-import { api, ApiError } from '@/shared/api';
+import { api, ApiError, CLEAR_PHI_EVENT } from '@/shared/api';
 import * as schemas from '@/shared/schemas';
 import { createMockGeneratedNote } from '@/test/helpers';
 
@@ -16,6 +16,7 @@ vi.mock('@/shared/api', () => ({
       this.name = 'ApiError';
     }
   },
+  CLEAR_PHI_EVENT: 'flashnote:clear-phi',
 }));
 
 describe('NoteGenerator', () => {
@@ -385,6 +386,29 @@ describe('NoteGenerator', () => {
     // After error animation, the curated error message should show
     await waitFor(() => {
       expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  describe('CLEAR_PHI_EVENT (Rule 4)', () => {
+    it('should clear quickNotes and patientContext when CLEAR_PHI_EVENT fires', async () => {
+      const user = userEvent.setup();
+      renderGenerator();
+
+      // Type PHI into both fields
+      await user.type(screen.getByLabelText(/patient context/i), 'John 52M chronic LBP');
+      await user.type(screen.getByLabelText(/session notes/i), 'Patient reports improved mobility');
+
+      expect(screen.getByLabelText(/patient context/i)).toHaveValue('John 52M chronic LBP');
+      expect(screen.getByLabelText(/session notes/i)).toHaveValue('Patient reports improved mobility');
+
+      // Dispatch the clear PHI event (simulating logout)
+      act(() => {
+        window.dispatchEvent(new Event(CLEAR_PHI_EVENT));
+      });
+
+      // Fields should be cleared
+      expect(screen.getByLabelText(/patient context/i)).toHaveValue('');
+      expect(screen.getByLabelText(/session notes/i)).toHaveValue('');
     });
   });
 });

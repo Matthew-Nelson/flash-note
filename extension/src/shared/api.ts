@@ -39,6 +39,9 @@ export class ApiError extends Error {
 // Custom event for auth invalidation - allows UI to react to forced logout
 export const AUTH_INVALIDATED_EVENT = 'flashnote:auth-invalidated';
 
+// Event dispatched before logout to clear PHI from all component state (Rule 4)
+export const CLEAR_PHI_EVENT = 'flashnote:clear-phi';
+
 // Reasons for session ending - used by SessionAlert component
 export type SessionEndReason =
   | 'session_invalidated'  // Password reset, token version mismatch
@@ -82,6 +85,28 @@ class ApiClient {
   abortAll(): void {
     this.controller.abort();
     this.controller = new AbortController();
+  }
+
+  /**
+   * Combines a caller-provided signal with the class-level controller signal
+   * so that abortAll() always cancels in-flight requests regardless of whether
+   * the caller also provided its own signal (e.g., per-generation controllers).
+   */
+  private combineSignals(callerSignal?: AbortSignal | null): AbortSignal {
+    if (!callerSignal) return this.controller.signal;
+
+    const combined = new AbortController();
+    const abort = () => combined.abort();
+
+    if (this.controller.signal.aborted || callerSignal.aborted) {
+      combined.abort();
+      return combined.signal;
+    }
+
+    this.controller.signal.addEventListener('abort', abort, { once: true });
+    callerSignal.addEventListener('abort', abort, { once: true });
+
+    return combined.signal;
   }
 
   /**
@@ -166,7 +191,7 @@ class ApiClient {
 
     const response = await fetch(`${API_BASE}${endpoint}`, {
       ...options,
-      signal: options.signal ?? this.controller.signal,
+      signal: this.combineSignals(options.signal),
       headers: {
         'Content-Type': 'application/json',
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -290,12 +315,7 @@ class ApiClient {
   }
 
   async logout(): Promise<void> {
-    // Logout uses a standalone AbortController so it is never cancelled by abortAll()
-    const logoutController = new AbortController();
-    await this.request('/auth/logout', {
-      method: 'POST',
-      signal: logoutController.signal,
-    });
+    await this.request('/auth/logout', { method: 'POST' });
   }
 
   async generateNote(input: GenerateNoteInput, signal?: AbortSignal): Promise<GeneratedNote> {

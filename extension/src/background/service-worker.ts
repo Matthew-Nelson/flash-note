@@ -45,10 +45,12 @@ function persistSidepanelState(): void {
 async function restoreSidepanelState(): Promise<void> {
   try {
     const result = await chrome.storage.session.get(SESSION_STORAGE_KEY);
-    const stored = result[SESSION_STORAGE_KEY] as Record<string, boolean> | undefined;
-    if (stored) {
-      for (const [key, value] of Object.entries(stored)) {
-        sidepanelOpenByWindow.set(Number(key), value);
+    const stored: unknown = result[SESSION_STORAGE_KEY];
+    if (stored && typeof stored === 'object' && !Array.isArray(stored)) {
+      for (const [key, value] of Object.entries(stored as Record<string, unknown>)) {
+        if (typeof value === 'boolean' && /^\d+$/.test(key)) {
+          sidepanelOpenByWindow.set(Number(key), value);
+        }
       }
     }
   } catch (error) {
