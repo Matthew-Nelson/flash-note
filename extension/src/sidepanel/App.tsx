@@ -88,7 +88,7 @@ function AuthenticatedApp({
   fetchUser,
 }: {
   user: NonNullable<ReturnType<typeof useAuth>['user']>;
-  logout: () => void;
+  logout: () => Promise<void>;
   fetchUser: () => Promise<ReturnType<typeof useAuth>['user']>;
 }) {
   const [view, setView] = useState<View>('generator');
