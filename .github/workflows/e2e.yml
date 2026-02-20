@@ -1,20 +1,8 @@
 name: E2E Tests
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'extension/**'
-      - 'web/**'
-      - 'backend/**'
-      - '.github/workflows/e2e.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'extension/**'
-      - 'web/**'
-      - 'backend/**'
-      - '.github/workflows/e2e.yml'
+  # E2E tests run locally via pre-push hook to save CI minutes.
+  # Use workflow_dispatch to run manually from the Actions tab if needed.
   workflow_dispatch:
 
 concurrency:
