@@ -69,3 +69,7 @@ service-account.json
 
 # Sentry
 .sentryclirc
+
+# Design mockups (reference only, not source code)
+docs/design/*.html
+docs/design/*.png

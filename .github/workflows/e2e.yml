@@ -1,21 +1,21 @@
 name: E2E Tests
 
 on:
-  push:
-    branches: [main, develop]
-    paths:
-      - 'extension/**'
-      - 'web/**'
-      - 'backend/**'
-      - '.github/workflows/e2e.yml'
-  pull_request:
-    branches: [main, develop]
-    paths:
-      - 'extension/**'
-      - 'web/**'
-      - 'backend/**'
-      - '.github/workflows/e2e.yml'
-  workflow_dispatch:
+  # push:
+  #   branches: [main, develop]
+  #   paths:
+  #     - 'extension/**'
+  #     - 'web/**'
+  #     - 'backend/**'
+  #     - '.github/workflows/e2e.yml'
+  # pull_request:
+  #   branches: [main, develop]
+  #   paths:
+  #     - 'extension/**'
+  #     - 'web/**'
+  #     - 'backend/**'
+  #     - '.github/workflows/e2e.yml'
+  # workflow_dispatch:
 
 concurrency:
   group: e2e-${{ github.ref }}
