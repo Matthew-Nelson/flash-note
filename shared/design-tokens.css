@@ -190,7 +190,7 @@
 
   /* Glow Effects */
   --fn-accent-glow: rgba(139, 92, 246, 0.4);
-  --fn-accent-glow-light: rgba(139, 92, 246, 0.1);
+  --fn-accent-glow-light: rgba(139, 92, 246, 0.18);
 
   /* Interactive States */
   --fn-focus-ring: 0 0 0 3px var(--fn-accent-glow-light);

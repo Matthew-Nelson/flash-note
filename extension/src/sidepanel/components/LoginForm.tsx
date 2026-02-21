@@ -46,6 +46,8 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
         await onLogin(email, password);
       }
     } catch (err) {
+      // TODO: Bug — violates CLAUDE.md Rule 2. Must map error codes to curated
+      // client-side messages instead of displaying err.message directly.
       if (err instanceof Error) {
         setErrors([err.message]);
       } else {
@@ -278,7 +280,7 @@ export default function LoginForm({ onLogin, onRegister }: LoginFormProps) {
                 type="checkbox"
                 checked={acceptedLegalTerms}
                 onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
-                className="mt-1 h-4 w-4"
+                className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-fn-accent focus-visible:outline-offset-2"
               />
               <span className="text-sm text-fn-text-secondary">
                 I agree to the{' '}

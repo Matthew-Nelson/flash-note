@@ -163,7 +163,7 @@ export default function SignupPage() {
               type="checkbox"
               checked={acceptedLegalTerms}
               onChange={(e) => setAcceptedLegalTerms(e.target.checked)}
-              className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus:ring-fn-accent"
+              className="mt-1 h-4 w-4 rounded border-fn-border text-fn-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-fn-accent focus-visible:outline-offset-2"
             />
             <span className="text-sm text-fn-text-secondary">
               I agree to the{' '}
