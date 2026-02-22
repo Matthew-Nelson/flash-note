@@ -15,7 +15,7 @@ on:
   #     - 'web/**'
   #     - 'backend/**'
   #     - '.github/workflows/e2e.yml'
-  # workflow_dispatch:
+  workflow_dispatch:
 
 concurrency:
   group: e2e-${{ github.ref }}
