@@ -32,7 +32,7 @@ async function verifyAuditImmutability() {
     databaseUrl.includes('localhost') ||
     databaseUrl.includes('127.0.0.1');
 
-  if (!isTestDatabase || process.env.NODE_ENV === 'production') {
+  if (!isTestDatabase) {
     console.error('ERROR: This script only runs against local test databases');
     console.error('Database URL must contain "flashnote_test", "localhost", or "127.0.0.1"');
     process.exit(1);
@@ -107,19 +107,32 @@ async function verifyAuditImmutability() {
     }
 
     // Step 4: Verify TRUNCATE is blocked
+    // Wrap in a transaction with unconditional ROLLBACK — if the trigger is missing,
+    // a bare TRUNCATE would destroy all audit log data.
     try {
-      await db.query('TRUNCATE audit_logs');
-      console.error('  FAIL: TRUNCATE was not blocked by trigger');
-      failed++;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('cannot be truncated')) {
-        console.log('  PASS: TRUNCATE blocked — "audit_logs table cannot be truncated"');
-        passed++;
-      } else {
-        console.error(`  FAIL: TRUNCATE threw unexpected error: ${message}`);
+      await db.query('BEGIN');
+      try {
+        await db.query('TRUNCATE audit_logs');
+        // If we get here, the trigger didn't fire — TRUNCATE succeeded
+        await db.query('ROLLBACK');
+        console.error('  FAIL: TRUNCATE was not blocked by trigger');
         failed++;
+      } catch (error) {
+        // Trigger fired and raised an exception — roll back regardless
+        await db.query('ROLLBACK');
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('cannot be truncated')) {
+          console.log('  PASS: TRUNCATE blocked — "audit_logs table cannot be truncated"');
+          passed++;
+        } else {
+          console.error(`  FAIL: TRUNCATE threw unexpected error: ${message}`);
+          failed++;
+        }
       }
+    } catch (txError) {
+      // Transaction setup/teardown failed
+      console.error(`  FAIL: TRUNCATE test transaction error: ${txError instanceof Error ? txError.message : String(txError)}`);
+      failed++;
     }
 
     // Summary

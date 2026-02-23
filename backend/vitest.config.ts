@@ -5,8 +5,9 @@ export default defineConfig({
     // Test environment
     environment: 'node',
 
-    // Include test files
+    // Include unit test files (integration tests use vitest.integration.config.ts)
     include: ['src/**/*.test.ts'],
+    exclude: ['src/**/*.integration.test.ts'],
 
     // Global test setup
     setupFiles: ['src/test/setup.ts'],
@@ -35,6 +36,7 @@ export default defineConfig({
         'src/db/migrate.ts', // Migration script
         'src/db/seed-test.ts', // Test data seeding script
         'src/db/verify-audit-immutability.ts', // Audit immutability verification script
+        'src/**/*.integration.test.ts', // Integration tests — run via vitest.integration.config.ts
         // Exclude files that require external dependencies (not unit-testable)
         'src/config.ts', // Environment-dependent - validated through mocking in other tests
         'src/db/index.ts', // Database connection pool - needs real PostgreSQL
