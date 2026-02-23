@@ -19,6 +19,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "db:migrate:test": "NODE_ENV=test tsx src/db/migrate.ts",
     "db:seed:test": "tsx src/db/seed-test.ts",
+    "db:verify:audit": "NODE_ENV=test tsx src/db/verify-audit-immutability.ts",
+    "test:integration": "NODE_ENV=test vitest --run --config vitest.integration.config.ts",
     "test:setup": "pnpm db:migrate:test && pnpm db:seed:test",
     "clean": "rm -rf dist coverage",
     "stripe:listen": "stripe listen --forward-to localhost:4000/billing/webhook"

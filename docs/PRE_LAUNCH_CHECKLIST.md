@@ -95,12 +95,12 @@
 
 ### HITECH Breach Notification & Incident Response
 
-- [ ] **Document breach notification procedure** (required by HITECH Act)
+- [x] **Document breach notification procedure** (required by HITECH Act) — see [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md)
   - 72-hour notification to covered entities upon breach discovery
   - Breach investigation and documentation process
   - Cooperation with covered entity's notification to individuals and HHS
   - Template breach notification letter
-- [ ] **Document incident response plan**
+- [x] **Document incident response plan** — see [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md)
   - Who is responsible for breach assessment
   - Escalation path and decision tree
   - Evidence preservation procedures

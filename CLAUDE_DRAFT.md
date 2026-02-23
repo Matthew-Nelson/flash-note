@@ -85,26 +85,68 @@ These decisions are the result of deliberate analysis. Don't re-litigate them wi
 
 ## Tech Stack
 
-- Next.js 14+ with App Router
+- Next.js 16 with App Router
 - TypeScript (strict mode)
 - PostgreSQL with `pg` driver (raw SQL, no ORM) on Google Cloud SQL
 - Zod for validation
 - bcryptjs for password hashing
-- `jose` for session token operations (Edge Runtime compatible)
 - Upstash Redis for rate limiting (`@upstash/ratelimit`)
+- Pino structured logger + `@google-cloud/pino-logging-gcp-config` (Cloud Logging integration)
 - Tailwind CSS for styling
-- `@sentry/nextjs` for error monitoring (Business plan with BAA for production)
 - Stripe for billing
 - Google Vertex AI for LLM (Gemini 2.5 Flash)
 - Deployed to Google Cloud Run
 
+## Project Structure
+
+```
+web/src/
+  app/                    # Next.js App Router
+    (auth)/               # Auth route group (login, signup, reset, verify)
+    (marketing)/          # Public pages (landing, pricing, terms, privacy, baa)
+    dashboard/            # Protected routes
+      settings/
+      loading.tsx         # Streaming fallback
+      error.tsx           # Error boundary
+    api/
+      webhooks/stripe/    # Stripe webhook Route Handler
+      telemetry/          # Client-side error reporting endpoint
+    layout.tsx            # Root layout
+    loading.tsx           # Global loading
+    error.tsx             # Global error boundary
+    not-found.tsx         # 404 page
+  components/             # React components (shared UI)
+    ui/                   # Primitives (Button, Card, Spinner, etc.)
+    auth/                 # Auth-related UI (login form, etc.)
+  lib/                    # Shared utilities (client + server safe)
+    schemas/              # Zod validation schemas (auth, notes, billing, config)
+    types/                # TypeScript type definitions
+    utils/                # Pure utility functions
+  server/                 # Server-only code (enforced by 'server-only' package)
+    dal/                  # Data Access Layer (DB queries, row transforms)
+    services/             # Business logic (auth, billing, email, AI, lockout, token, usage, audit)
+    db/                   # Database connection pool + migration runner
+    lib/                  # Server utilities (logger, etc.)
+    prompts/              # LLM prompt templates
+  actions/                # Server Actions (grouped by domain: auth, notes, billing)
+  test/                   # Test setup, helpers, factories
+```
+
+**Key conventions:**
+- `server/` imports are forbidden from Client Components. Enforced by the `server-only` npm package — importing it from a Client Component is a build error.
+- `lib/` is shared code that may be used on either client or server. No DB imports, no Node.js-only APIs.
+- `actions/` contains Server Actions (`'use server'` files). Each action calls `server/` for business logic — actions are thin wrappers that handle cookie I/O, call services, and return results.
+- `loading.tsx` and `error.tsx` at each route level provide streaming fallbacks and error boundaries.
+- Route groups `(auth)` and `(marketing)` share layouts without affecting URL structure.
+
 ## Database Schema
 
-10 tables:
+11 tables:
 - `users` - User accounts, subscription info, org membership, email verification, lockout state
 - `sessions` - Session storage (hashed tokens, device binding)
 - `audit_logs` - HIPAA-required action logging (immutable)
 - `usage` - Monthly usage tracking (input/output token split)
+- `email_tokens` - Email verification and password reset tokens (hashed, typed, with expiry)
 - `organizations` - Clinic/team management with seat limits
 - `organization_members` - Membership records with soft-delete
 - `legal_acceptances` - Terms of Service / BAA consent tracking (per document version)
@@ -130,7 +172,7 @@ All state-changing operations use Server Actions:
 ```typescript
 'use server';
 
-import { getSession } from '@/lib/dal/session';
+import { getSession } from '@/server/dal/session';
 import { z } from 'zod';
 
 const schema = z.object({ /* ... */ });
@@ -146,7 +188,8 @@ export async function updateProfile(formData: FormData) {
 
 - Validate with Zod before any DB access
 - Read and validate the session cookie via the DAL
-- Return error codes, not raw error messages (Rule 2 still applies)
+- Return a discriminated union — `{ success: true, data: T }` or `{ success: false, error: string }` where `error` is an error code, not a raw message (Rule 2 still applies)
+- Never `throw` from Server Actions for expected errors (validation failures, auth errors) — return error codes. Only throw for truly unexpected errors (these surface via `error.tsx` boundaries).
 - Server Actions that touch security-critical paths need audit logging
 - Next.js Server Actions have built-in CSRF protection — no additional CSRF handling needed for Server Actions
 
@@ -204,7 +247,7 @@ Standard error codes:
 - React components: `PascalCase.tsx`
 - Test files: `*.test.ts` or `*.spec.ts`
 - Next.js App Router: `page.tsx`, `layout.tsx`, `loading.tsx`, `error.tsx`, `route.ts`
-- Server Actions: co-located in `actions.ts` next to the page that uses them, or in `lib/actions/` if shared
+- Server Actions: centralized in `actions/` directory, grouped by domain (e.g., `actions/auth.ts`, `actions/notes.ts`, `actions/billing.ts`)
 
 ## Commands
 
@@ -363,8 +406,8 @@ The Data Access Layer (DAL) is the single point of authorization enforcement. Th
 
 ```typescript
 // CORRECT: Server Component calls DAL
-import { getUser } from '@/lib/dal/users';
-import { getSession } from '@/lib/dal/session';
+import { getUser } from '@/server/dal/users';
+import { getSession } from '@/server/dal/session';
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -375,7 +418,7 @@ export default async function DashboardPage() {
 }
 
 // WRONG: Page queries database directly
-import { db } from '@/lib/db';
+import { db } from '@/server/db';
 
 export default async function DashboardPage() {
   const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
@@ -438,7 +481,7 @@ Every protected resource must be enforced on the server. Client-side auth checks
 
 ### Rule 9: Audit Logs Must Be in the Same Transaction as the Action
 
-When an operation requires a HIPAA audit log entry, the audit write should be part of the same database transaction as the action it documents. If that's not possible (e.g., fire-and-forget for performance), the failure must be captured to Sentry with `Sentry.captureException()`.
+When an operation requires a HIPAA audit log entry, the audit write should be part of the same database transaction as the action it documents. If that's not possible (e.g., fire-and-forget for performance), the failure must be logged at `error` level with structured context so it surfaces in Cloud Error Reporting.
 
 ### Rule 10: Database Query Results Must Be Defensively Checked
 
@@ -463,7 +506,7 @@ Next.js runs on Google Cloud Run as a containerized Node.js process. This is NOT
 - **`pg.Pool` works normally.** Cloud Run containers are persistent processes. The singleton pool pattern from Express transfers unchanged. No serverless driver or connection pooler needed.
 - **In-memory state is per-instance and ephemeral.** Cloud Run can scale to multiple instances and restart containers at any time. Never use module-level `Map`s or variables for state that must be shared across instances or survive restarts (e.g., rate limiting). Use Redis (Upstash) for shared ephemeral state.
 - **Rate limiting must be Redis-backed.** Use Upstash `@upstash/ratelimit`. In-memory rate limiters would only apply to the single instance that receives the request — ineffective when scaled to multiple instances.
-- **Edge Runtime has limited APIs.** Next.js middleware runs in Edge-compatible mode even on Cloud Run. Node.js-specific modules (`crypto`, `pg`, `bcryptjs`) do not work there. Use `jose` for token operations in middleware. Full session validation (DB queries, bcrypt) must happen in Server Components or Route Handlers running in the Node.js runtime.
+- **Edge Runtime has limited APIs.** Next.js middleware runs in Edge-compatible mode even on Cloud Run. Node.js-specific modules (`pg`, `bcryptjs`) do not work there. Middleware should only check cookie existence for optimistic redirects — no cryptographic operations needed since session tokens are opaque UUIDs. Full session validation (DB queries, bcrypt) must happen in Server Components or Route Handlers running in the Node.js runtime.
 - **Plan for container restarts.** Cloud Run may restart containers for updates, scaling, or health checks. Don't store durable state in memory. The database is the source of truth for all persistent state.
 
 ## Next.js Middleware Responsibilities
@@ -481,65 +524,70 @@ Middleware runs on every matched request at the Edge. Keep it fast and focused:
 - Act as a security boundary (it's a UX optimization layer)
 - Handle CSRF (Server Actions handle this automatically; Route Handlers need explicit protection)
 
-## Error Monitoring (Sentry)
+## Error Monitoring (GCP-Native)
 
-**Visibility into production errors is critical.** If an error is caught and handled gracefully, it becomes invisible unless explicitly captured to Sentry. Silent failures in healthcare software are unacceptable.
+**Visibility into production errors is critical.** Silent failures in healthcare software are unacceptable. All error monitoring uses GCP-native tooling: Pino structured logger → Cloud Logging → Cloud Error Reporting. No third-party error monitoring vendors.
 
-### When to Add Sentry Monitoring
+Full setup plan: [docs/planning/MONITORING_SETUP.md](docs/planning/MONITORING_SETUP.md)
 
-Add `Sentry.captureException()` when implementing or modifying:
+### Logging Stack
 
-1. **Revenue-critical operations** - Payment processing, checkout, subscription management, billing webhooks
-2. **HIPAA compliance features** - Audit logging, authentication events, authorization failures
-3. **Core product functionality** - LLM/AI service calls, note generation, any feature users pay for
-4. **Security controls** - Account lockout, rate limiting, session validation, webhook signature verification
-5. **External service integrations** - Email delivery, Stripe API, Gemini API
+- **Server-side**: Pino structured logger with `@google-cloud/pino-logging-gcp-config`. Logs flow automatically to Cloud Logging. Cloud Error Reporting groups errors from structured `error`-level log entries.
+- **Client-side**: `POST /api/telemetry` endpoint receives client errors, logs them server-side through the same Pino pipeline.
+- **Next.js instrumentation**: `onRequestError` hook in `instrumentation.ts` captures unhandled Server Component/Action errors.
+
+### When to Log at Error Level
+
+Log at `error` level (which surfaces in Cloud Error Reporting) when:
+
+1. **Revenue-critical operations fail** - Payment processing, checkout, subscription management, billing webhooks
+2. **HIPAA compliance features fail** - Audit logging, authentication events, authorization failures
+3. **Core product functionality fails** - LLM/AI service calls, note generation
+4. **Security controls fail** - Account lockout, rate limiting, session validation, webhook signature verification
+5. **External service integrations fail** - Email delivery, Stripe API, Gemini API
 6. **Graceful error handling** - Any `catch` block that doesn't re-throw (errors that would otherwise be invisible)
 
-**Rule of thumb:** If you write `console.error()` without re-throwing, you probably need `Sentry.captureException()` too.
+**Rule of thumb:** If you catch an error and don't re-throw, log it at `error` level with structured context.
 
-### What NOT to Capture
+### What NOT to Log at Error Level
 
-- **Expected client errors (4xx)** - Invalid input, missing auth, rate limits hit by users
-- **Transient background operations** - Polling failures, optional refreshes that retry automatically
-- **High-frequency expected conditions** - Rate limiting during normal operation (e.g., `rate_limited` from LLM)
+- **Expected client errors (4xx)** - Invalid input, missing auth, rate limits hit by users → `warn` level
+- **Transient background operations** - Polling failures, optional refreshes that retry automatically → `warn` level
+- **High-frequency expected conditions** - Rate limiting during normal operation → `info` level
 
-### How to Add Monitoring
+### How to Log Errors
 
 ```typescript
-import * as Sentry from '@sentry/nextjs';
+import { logger } from '@/server/lib/logger';
 
 try {
   await riskyOperation();
 } catch (error) {
-  Sentry.captureException(error, {
-    extra: {
-      source: 'service_name',        // Which service/module
-      errorType: 'descriptive_type', // What kind of failure
-      // Add relevant IDs for debugging (never PHI)
-      userId: session.userId,
-    },
-  });
-  console.error('Operation failed:', error);
+  logger.error({
+    err: error,
+    source: 'service_name',
+    errorType: 'descriptive_type',
+    userId: session.userId,           // Safe context (never PHI)
+  }, 'Operation failed');
   // Handle gracefully or re-throw
 }
 ```
 
-### Safe Extras (Include)
+### Structured Context Fields
 
-| Safe to Include | Examples |
-|-----------------|----------|
-| Source identifier | `source: 'billing_service'` |
-| Error type/code | `errorType: 'webhook_failed'` |
-| User ID | `userId: session.userId` |
+**Safe to include:**
+
+| Field | Examples |
+|-------|----------|
+| `source` | `'dal_auth'`, `'action_login'`, `'route_webhook'` |
+| `errorType` | `'session_validation_failed'`, `'webhook_signature_invalid'` |
+| `userId` | UUID |
 | Resource IDs | `subscriptionId`, `sessionId` |
-| Status codes | `statusCode: 500` |
-| Durations | `durationMs: 1234` |
-| Counts | `retryCount: 3` |
+| `statusCode` | `500` |
+| `durationMs` | `1234` |
+| `retryCount` | `3` |
 
-### Source Naming Convention
-
-Use consistent `snake_case` naming for `source` values:
+**Source naming convention** — `snake_case`:
 
 | Component Type | Pattern | Examples |
 |----------------|---------|----------|
@@ -547,34 +595,20 @@ Use consistent `snake_case` naming for `source` values:
 | Server Actions | `action_{name}` | `action_login`, `action_generate_note` |
 | Route Handlers | `route_{name}` | `route_webhook`, `route_health` |
 | Middleware | `middleware` | `middleware` |
-| Pages | `page_{name}` | `page_pricing`, `page_dashboard` |
 | Client libs | `client_{name}` | `client_auth_context` |
 
-Use `errorType` to specify the specific failure within a source (e.g., `source: 'dal_auth', errorType: 'session_validation_failed'`).
+**NEVER include (PHI/PII):**
 
-### Unsafe Extras (NEVER Include)
-
-| Never Include | Why |
-|---------------|-----|
-| Patient names | PHI |
-| Note content | PHI |
-| Diagnosis/treatment | PHI |
-| Email addresses | PII (use userId instead) |
+| Field | Why |
+|-------|-----|
+| Patient names, note content, diagnosis/treatment | PHI |
+| Email addresses | PII (use `userId` instead) |
 | Request/response bodies | May contain PHI |
 | Full error messages from user input | May contain PHI |
 
-### Existing Sentry Configuration
+### HIPAA Audit Log Retention
 
-- **Web**: `sentry.client.config.ts`, `sentry.server.config.ts`, `sentry.edge.config.ts`
-
-All configs have `beforeSend` hooks that strip PHI-sensitive fields. See `docs/planning/MONITORING_SETUP.md` for full configuration details.
-
-### Logging Gaps Audit
-
-A comprehensive audit identified all catch blocks in the codebase. See `docs/archive/SENTRY_LOGGING_GAPS.md` for:
-- The full list of what's monitored
-- Decisions on what should remain silent
-- The rationale for each monitoring decision
+Cloud Logging log sink exports `audit_logs`-tagged entries to Cloud Storage with a 6-year locked retention policy (HIPAA requirement). This is separate from application-level `audit_logs` table — it's a defense-in-depth backup of the structured log stream.
 
 ## Reference Document
 
@@ -587,15 +621,14 @@ See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification inc
 
 ## Work Priorities
 
-`docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Work is organized into **dependency-ordered tiers**:
+`docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Work is organized into **dependency-ordered phases**:
 
-- **Tier 1** (do now): Security audit CRITICALs + prompt engineering P0s
-- **Tier 2** (gate for PHI): HIPAA infrastructure (BAA, encryption, audit retention)
-- **Tier 3** (competitive pivot): PHI storage — patients, notes, templates
-- **Tier 4** (interleave): UI quality, testing, accessibility tooling
-- **Tier 5** (defer): Monitoring, clinic features waves 2-4, Stripe polish
+- **Phase 0** (pre-migration foundations): HIPAA infrastructure, database schema hardening, prompt engineering, security audit triage
+- **Phase 1** (Next.js migration): Infrastructure scaffold → DAL → sessions → auth → middleware → notes → billing → integration tests
+- **Phase 2** (PHI storage): Patients, clinical notes, templates, versioning. Blocked on Phase 1 + HIPAA infra.
+- **Phase 3** (quality & features): UI quality, testing, accessibility, monitoring, clinic features
 
-When picking up work, start from the lowest incomplete tier. Don't jump to a later tier unless earlier tiers are done or explicitly blocked on non-code dependencies (e.g., BAA signing).
+When picking up work, start from the lowest incomplete phase. Don't jump to a later phase unless earlier phases are done or explicitly blocked on non-code dependencies (e.g., BAA signing).
 
 ## Documentation Guidelines
 
@@ -606,7 +639,7 @@ When picking up work, start from the lowest incomplete tier. Don't jump to a lat
 - **Planning docs never track status** — they describe *what* to build; ROADMAP tracks *is it done*
 
 **Before starting a task:**
-1. Check `docs/ROADMAP.md` to understand current tier and priorities
+1. Check `docs/ROADMAP.md` to understand current phase and priorities
 2. Review relevant docs in `docs/` that may inform your approach:
    - `docs/guides/` - API reference and operational procedures
    - `docs/planning/` - Design specs and research (don't implement unless asked)

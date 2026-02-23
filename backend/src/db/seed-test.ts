@@ -41,7 +41,7 @@ async function seedTestData() {
     databaseUrl.includes('localhost') ||
     databaseUrl.includes('127.0.0.1');
 
-  if (!isTestDatabase || process.env.NODE_ENV === 'production') {
+  if (!isTestDatabase) {
     console.error('ERROR: This script only runs against local test databases');
     console.error('Database URL must contain "flashnote_test", "localhost", or "127.0.0.1"');
     process.exit(1);
