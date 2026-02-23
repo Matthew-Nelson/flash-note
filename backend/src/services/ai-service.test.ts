@@ -7,7 +7,7 @@ const { mockConfig } = vi.hoisted(() => ({
     GEMINI_API_KEY: 'test-api-key',
     GEMINI_MODEL: 'gemini-2.5-flash',
     GEMINI_MAX_TOKENS: 4000,
-    GEMINI_TEMPERATURE: 0.7,
+    GEMINI_TEMPERATURE: 0.2,
     GEMINI_TIMEOUT_MS: 30000,
     USE_MOCK_AI: false,
   },
@@ -207,12 +207,24 @@ describe('AIService', () => {
         '52 y/o female with shoulder pain'
       );
 
-      // Verify the fetch was called with body containing patient context
+      // Verify the fetch was called with systemInstruction and user content
       expect(mockFetch).toHaveBeenCalled();
       const callArgs = mockFetch.mock.calls[0]!;
-      const body = JSON.parse(callArgs[1].body) as { contents: Array<{ parts: Array<{ text: string }> }> };
+      const body = JSON.parse(callArgs[1].body) as {
+        systemInstruction: { parts: Array<{ text: string }> };
+        contents: Array<{ parts: Array<{ text: string }> }>;
+      };
+
+      // System prompt should be in systemInstruction field
+      expect(body.systemInstruction).toBeDefined();
+      expect(body.systemInstruction.parts[0]!.text).toContain('physical therapy documentation assistant');
+
+      // User content should be in contents with patient context
       expect(body.contents[0]!.parts[0]!.text).toContain('<patient_context>');
       expect(body.contents[0]!.parts[0]!.text).toContain('52 y/o female');
+
+      // User content should NOT contain the system prompt
+      expect(body.contents[0]!.parts[0]!.text).not.toContain('physical therapy documentation assistant');
     });
   });
 

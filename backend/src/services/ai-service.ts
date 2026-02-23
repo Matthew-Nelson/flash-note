@@ -1,6 +1,6 @@
 import * as Sentry from '@sentry/node';
 import { config, isProduction } from '../config.js';
-import { buildSOAPPrompt } from '../prompts/pt-prompts.js';
+import { getSystemPrompt, buildUserPrompt } from '../prompts/pt-prompts.js';
 import { AppError } from '../middleware/error-handler.js';
 import { generateMockSOAPNote } from './mock-ai-service.js';
 import { detectSuspiciousPatterns } from '../utils/prompt-sanitization.js';
@@ -94,10 +94,11 @@ class AIService {
 
     const startTime = Date.now();
 
-    const prompt = buildSOAPPrompt(quickNotes, noteType, patientContext);
+    const systemPrompt = getSystemPrompt();
+    const userPrompt = buildUserPrompt(quickNotes, noteType, patientContext);
 
     try {
-      const result = await this.provider.generatePTNote(prompt, this.requestConfig);
+      const result = await this.provider.generatePTNote(systemPrompt, userPrompt, this.requestConfig);
       const generationTimeMs = Date.now() - startTime;
 
       return {

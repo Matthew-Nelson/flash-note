@@ -16,7 +16,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 7/14 | Sign Google Cloud BAA |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 11/14 | Sign Google Cloud BAA |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
@@ -79,15 +79,15 @@ Framework-agnostic changes — prompt templates and LLM config transfer directly
 
 | Change | Effort | Status |
 |--------|--------|--------|
-| Lower temperature from 0.7 → 0.2-0.3 | Config change | ❌ |
-| Move system prompt to Gemini `systemInstruction` field | Moderate refactor | ❌ |
-| Fix H-16: Escape XML delimiter tags in user content (prompt injection) | Code change | ❌ |
+| Lower temperature from 0.7 → 0.2 | Config change | ✅ Done |
+| Move system prompt to `systemInstruction` (Gemini) / `system` (Claude) field | Moderate refactor | ✅ Done |
+| Fix H-16: Escape XML delimiter tags in user content (prompt injection) | Code change | ✅ Done |
 
 #### P1 — Do Soon
 
 | Change | Effort | Status |
 |--------|--------|--------|
-| Add sandwich defense (repeat security rules after user content) | Small prompt edit | ❌ |
+| Add sandwich defense (repeat security rules after user content) | Small prompt edit | ✅ Done (included in systemInstruction refactor) |
 | Inject PT abbreviation reference into prompts | Prompt addition | ❌ |
 | Add `needsReview` / `uncertainAreas` to output schema | Schema + prompt update | ❌ |
 
@@ -134,7 +134,7 @@ Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED
 | H-13 | Invite code doesn't deactivate | ✅ Done (migration 014) |
 | H-14 | No graceful shutdown | ✅ Done (`44319a8`). Cloud Run handles shutdown signals for Next.js. |
 | H-15 | No process-level error handlers | ✅ Done (`44319a8`). Next.js instrumentation hook (`onRequestError`) handles this. |
-| H-16 | XML delimiter not escaped (prompt injection) | ❌ Fix in Phase 0 (prompt engineering) |
+| H-16 | XML delimiter not escaped (prompt injection) | ✅ Done (escapeDelimiterTags + detection patterns) |
 | H-17 | Backend errors displayed to users (extension) | 🗑️ Moot — extension removed |
 | H-18 | CASCADE DELETE on sessions/usage | ✅ Done (migration 015) |
 

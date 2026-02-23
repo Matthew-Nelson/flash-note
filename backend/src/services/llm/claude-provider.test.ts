@@ -88,7 +88,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteInput.subjective);
       expect(result.note.objective).toBe(validPTNoteInput.objective);
@@ -113,7 +113,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(inputWithBilling)),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.billing).toBeDefined();
       expect(result.note.billing!.charges).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ParseError
       );
     });
@@ -142,7 +142,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse({ invalid: 'schema' })),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ParseError
       );
     });
@@ -158,7 +158,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ContentBlockedError
       );
     });
@@ -173,7 +173,7 @@ describe('ClaudeProvider', () => {
       };
       mockFetch.mockResolvedValue(errorResponse);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         RateLimitError
       );
     });
@@ -187,7 +187,7 @@ describe('ClaudeProvider', () => {
           Promise.resolve({ error: { type: 'authentication_error', message: 'Invalid API key' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
     });
@@ -203,7 +203,7 @@ describe('ClaudeProvider', () => {
       };
       mockFetch.mockResolvedValue(errorResponse);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OverloadedError
       );
     });
@@ -214,7 +214,7 @@ describe('ClaudeProvider', () => {
       // Mock persistent timeout to exhaust all retries
       mockFetch.mockRejectedValue(abortError);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         TimeoutError
       );
     });
@@ -226,13 +226,28 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      await provider.generatePTNote('test prompt', requestConfig);
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       const [, options] = mockFetch.mock.calls[0]!;
       const headers = (options as { headers: Record<string, string> }).headers;
       expect(headers['x-api-key']).toBe('test-api-key');
       expect(headers['anthropic-version']).toBe('2023-06-01');
       expect(headers['Content-Type']).toBe('application/json');
+    });
+
+    it('should include system parameter in request body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers(),
+        json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
+      });
+
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      const body = JSON.parse((options as { body: string }).body);
+      expect(body.system).toBe('test system prompt');
+      expect(body.messages[0].content).toBe('test user prompt');
     });
 
     it('should include tool definition in request body', async () => {
@@ -242,7 +257,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      await provider.generatePTNote('test prompt', requestConfig);
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       const [, options] = mockFetch.mock.calls[0]!;
       const body = JSON.parse((options as { body: string }).body);
@@ -263,7 +278,7 @@ describe('ClaudeProvider', () => {
       });
 
       try {
-        await provider.generatePTNote('sensitive patient data', requestConfig);
+        await provider.generatePTNote('test system prompt', 'sensitive patient data', requestConfig);
       } catch {
         // Expected
       }
@@ -386,7 +401,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteInput.subjective);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -412,7 +427,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteInput.subjective);
       // Check that retry was logged with correct delay
@@ -431,7 +446,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'authentication_error' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
 
@@ -448,7 +463,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'invalid_request_error', message: 'Bad request' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         InvalidRequestError
       );
     });
@@ -461,7 +476,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'permission_error', message: 'Forbidden' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
     });
@@ -474,7 +489,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'api_error', message: 'Internal error' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -487,7 +502,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'api_error', message: 'Bad gateway' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -500,7 +515,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'api_error', message: 'Service unavailable' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -513,7 +528,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve({ error: { type: 'unknown', message: 'Teapot' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -530,7 +545,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         InvalidRequestError
       );
     });
@@ -545,7 +560,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
     });
@@ -561,7 +576,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         RateLimitError
       );
     });
@@ -577,7 +592,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OverloadedError
       );
     });
@@ -592,7 +607,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -607,7 +622,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -625,7 +640,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OutputTruncatedError
       );
     });
@@ -648,7 +663,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OutputTruncatedError
       );
     });
@@ -737,7 +752,7 @@ describe('ClaudeProvider', () => {
     it('should throw NetworkError for generic fetch errors after retries exhausted', async () => {
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         NetworkError
       );
     });
@@ -745,7 +760,7 @@ describe('ClaudeProvider', () => {
     it('should throw NetworkError for non-Error objects after retries exhausted', async () => {
       mockFetch.mockRejectedValue('some string error');
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         NetworkError
       );
     });
@@ -770,7 +785,7 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.usage.inputTokens).toBe(0);
       expect(result.usage.outputTokens).toBe(0);
@@ -857,7 +872,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      await customProvider.generatePTNote('test', requestConfig);
+      await customProvider.generatePTNote('test system', 'test user', requestConfig);
 
       const [url] = mockFetch.mock.calls[0]!;
       expect(url).toBe('https://custom.api.com/v1/messages');
@@ -877,7 +892,7 @@ describe('ClaudeProvider', () => {
         json: () => Promise.resolve(createToolUseResponse(validPTNoteInput)),
       });
 
-      await customProvider.generatePTNote('test', requestConfig);
+      await customProvider.generatePTNote('test system', 'test user', requestConfig);
 
       const [, options] = mockFetch.mock.calls[0]!;
       const headers = (options as { headers: Record<string, string> }).headers;

@@ -128,7 +128,8 @@ export class GeminiProvider extends BaseLLMProvider {
    * Generate a structured PT note using Gemini's JSON mode.
    */
   protected async doGeneratePTNote(
-    prompt: string,
+    systemPrompt: string,
+    userPrompt: string,
     config: LLMRequestConfig
   ): Promise<PTNoteResult> {
     const url = `${this.apiUrl}/models/${this.model}:generateContent`;
@@ -144,9 +145,12 @@ export class GeminiProvider extends BaseLLMProvider {
           'x-goog-api-key': this.apiKey,
         },
         body: JSON.stringify({
+          systemInstruction: {
+            parts: [{ text: systemPrompt }],
+          },
           contents: [
             {
-              parts: [{ text: prompt }],
+              parts: [{ text: userPrompt }],
             },
           ],
           generationConfig: {

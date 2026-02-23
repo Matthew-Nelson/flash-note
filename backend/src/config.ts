@@ -24,14 +24,14 @@ const envSchema = z.object({
   GEMINI_API_KEY: z.string().min(1).optional(),
   GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
   GEMINI_MAX_TOKENS: z.string().transform(Number).default('4000'),
-  GEMINI_TEMPERATURE: z.string().transform(Number).default('0.7'),
+  GEMINI_TEMPERATURE: z.string().transform(Number).default('0.2'),
   GEMINI_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
   // Anthropic Claude (required when LLM_PROVIDER=claude)
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-20250514'),
   ANTHROPIC_MAX_TOKENS: z.string().transform(Number).default('2000'),
-  ANTHROPIC_TEMPERATURE: z.string().transform(Number).default('0.7'),
+  ANTHROPIC_TEMPERATURE: z.string().transform(Number).default('0.2'),
   ANTHROPIC_TIMEOUT_MS: z.string().transform(Number).default('30000'),
 
   // Registration gating (see docs/planning/APP_GATING_STRATEGY.md)

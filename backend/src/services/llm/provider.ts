@@ -30,17 +30,21 @@ export interface LLMProvider {
   readonly model: string;
 
   /**
-   * Generate a structured PT note from a prompt.
+   * Generate a structured PT note from system and user prompts.
    *
    * Uses JSON mode (Gemini) or tool use (Claude) to ensure structured output.
+   * System prompt is sent via the provider's dedicated system instruction field
+   * for stronger isolation from user content.
    *
-   * @param prompt - The prompt to send to the LLM
+   * @param systemPrompt - System instructions (sent via systemInstruction/system field)
+   * @param userPrompt - User content with note type instructions and clinician input
    * @param config - Request configuration (tokens, temperature, timeout)
    * @returns Parsed and validated PT note with usage metadata
    * @throws LLMError on failure
    */
   generatePTNote(
-    prompt: string,
+    systemPrompt: string,
+    userPrompt: string,
     config: LLMRequestConfig
   ): Promise<PTNoteResult>;
 
@@ -89,10 +93,11 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Generate a structured PT note with automatic retry.
    */
   async generatePTNote(
-    prompt: string,
+    systemPrompt: string,
+    userPrompt: string,
     config: LLMRequestConfig
   ): Promise<PTNoteResult> {
-    return this.withRetry(() => this.doGeneratePTNote(prompt, config));
+    return this.withRetry(() => this.doGeneratePTNote(systemPrompt, userPrompt, config));
   }
 
   /**
@@ -110,7 +115,8 @@ export abstract class BaseLLMProvider implements LLMProvider {
    * Must be implemented by subclasses.
    */
   protected abstract doGeneratePTNote(
-    prompt: string,
+    systemPrompt: string,
+    userPrompt: string,
     config: LLMRequestConfig
   ): Promise<PTNoteResult>;
 

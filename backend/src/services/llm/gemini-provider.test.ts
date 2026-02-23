@@ -78,7 +78,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteResponse.subjective);
       expect(result.note.objective).toBe(validPTNoteResponse.objective);
@@ -110,7 +110,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.billing).toBeDefined();
       expect(result.note.billing!.charges).toHaveLength(1);
@@ -130,7 +130,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ParseError
       );
     });
@@ -149,7 +149,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ParseError
       );
     });
@@ -168,7 +168,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ContentBlockedError
       );
     });
@@ -182,7 +182,7 @@ describe('GeminiProvider', () => {
       };
       mockFetch.mockResolvedValue(errorResponse);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         RateLimitError
       );
     });
@@ -194,7 +194,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'UNAUTHENTICATED' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
     });
@@ -208,7 +208,7 @@ describe('GeminiProvider', () => {
       };
       mockFetch.mockResolvedValue(errorResponse);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OverloadedError
       );
     });
@@ -219,7 +219,7 @@ describe('GeminiProvider', () => {
       // Mock persistent timeout to exhaust all retries
       mockFetch.mockRejectedValue(abortError);
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         TimeoutError
       );
     });
@@ -238,13 +238,37 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await provider.generatePTNote('test prompt', requestConfig);
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       const [url, options] = mockFetch.mock.calls[0]!;
       expect(url).not.toContain('test-api-key');
       expect((options as { headers: Record<string, string> }).headers['x-goog-api-key']).toBe(
         'test-api-key'
       );
+    });
+
+    it('should include systemInstruction in request body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: JSON.stringify(validPTNoteResponse) }] },
+                finishReason: 'STOP',
+              },
+            ],
+          }),
+      });
+
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
+
+      const [, options] = mockFetch.mock.calls[0]!;
+      const body = JSON.parse((options as { body: string }).body);
+      expect(body.systemInstruction).toEqual({
+        parts: [{ text: 'test system prompt' }],
+      });
+      expect(body.contents[0].parts[0].text).toBe('test user prompt');
     });
 
     it('should include response schema in request body', async () => {
@@ -261,7 +285,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await provider.generatePTNote('test prompt', requestConfig);
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       const [, options] = mockFetch.mock.calls[0]!;
       const body = JSON.parse((options as { body: string }).body);
@@ -282,7 +306,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValue(errorResponse);
 
       try {
-        await provider.generatePTNote('sensitive patient data', requestConfig);
+        await provider.generatePTNote('test system prompt', 'sensitive patient data', requestConfig);
       } catch {
         // Expected
       }
@@ -392,7 +416,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteResponse.subjective);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -406,7 +430,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'UNAUTHENTICATED' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
 
@@ -422,7 +446,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'INVALID_ARGUMENT' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         InvalidRequestError
       );
     });
@@ -434,7 +458,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'PERMISSION_DENIED' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         AuthenticationError
       );
     });
@@ -446,7 +470,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'INTERNAL' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OverloadedError
       );
     });
@@ -458,7 +482,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'BAD_GATEWAY' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OverloadedError
       );
     });
@@ -470,7 +494,7 @@ describe('GeminiProvider', () => {
         json: () => Promise.resolve({ error: { status: 'TEAPOT' } }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -487,7 +511,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         RateLimitError
       );
     });
@@ -502,7 +526,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         InvalidRequestError
       );
     });
@@ -516,7 +540,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ProviderError
       );
     });
@@ -537,7 +561,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OutputTruncatedError
       );
     });
@@ -556,7 +580,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OutputTruncatedError
       );
     });
@@ -575,7 +599,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         OutputTruncatedError
       );
     });
@@ -641,7 +665,7 @@ describe('GeminiProvider', () => {
     it('should throw NetworkError for generic fetch errors after retries exhausted', async () => {
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         NetworkError
       );
     });
@@ -649,7 +673,7 @@ describe('GeminiProvider', () => {
     it('should throw NetworkError for non-Error objects after retries exhausted', async () => {
       mockFetch.mockRejectedValue('some string error');
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         NetworkError
       );
     });
@@ -669,7 +693,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await expect(provider.generatePTNote('test prompt', requestConfig)).rejects.toThrow(
+      await expect(provider.generatePTNote('test system prompt', 'test user prompt', requestConfig)).rejects.toThrow(
         ParseError
       );
     });
@@ -706,7 +730,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      const result = await provider.generatePTNote('test prompt', requestConfig);
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.usage.inputTokens).toBe(0);
       expect(result.usage.outputTokens).toBe(0);
@@ -775,7 +799,7 @@ describe('GeminiProvider', () => {
           }),
       });
 
-      await provider.generatePTNote('test prompt', requestConfig);
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       const [, options] = mockFetch.mock.calls[0]!;
       const body = JSON.parse((options as { body: string }).body);
