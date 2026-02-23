@@ -1529,41 +1529,18 @@ export const NOTE_TYPE_INSTRUCTIONS: Record<string, string> = {
 
 ### Prompt Assembly
 
+System and user prompts are separated for better prompt injection resistance:
+
 ```typescript
-export function buildSOAPPrompt(
+// Returns the system-level instructions (PT_SYSTEM_PROMPT)
+export function getSystemPrompt(): string;
+
+// Returns user-facing content: note type instructions + clinician input
+export function buildUserPrompt(
   quickNotes: string,
-  patientContext?: string,
-  noteType: string = 'daily_note'
-): string {
-  const parts: string[] = [
-    PT_SYSTEM_PROMPT,
-    '',
-    '---',
-    '',
-    NOTE_TYPE_INSTRUCTIONS[noteType] || NOTE_TYPE_INSTRUCTIONS.daily_note,
-    '',
-  ];
-
-  if (patientContext) {
-    parts.push(
-      '## Patient Context',
-      patientContext,
-      ''
-    );
-  }
-
-  parts.push(
-    '## Clinician\'s Quick Notes',
-    quickNotes,
-    '',
-    '---',
-    '',
-    'Generate a complete, professional SOAP note based on the above information.',
-    'Remember to use the exact section headers: SUBJECTIVE:, OBJECTIVE:, ASSESSMENT:, PLAN:'
-  );
-
-  return parts.join('\n');
-}
+  noteType: NoteType,
+  patientContext?: string
+): string;
 ```
 
 ### Response Parsing

@@ -51,7 +51,10 @@ export interface LLMProvider {
   /**
    * Generate a raw completion (text response).
    *
-   * Used for non-structured outputs or debugging.
+   * Used for non-structured outputs or debugging. Unlike generatePTNote which
+   * takes separate (systemPrompt, userPrompt) arguments, this uses a single
+   * prompt — callers are responsible for ensuring user-provided content is
+   * properly isolated if passed through this method.
    *
    * @param prompt - The prompt to send to the LLM
    * @param config - Request configuration

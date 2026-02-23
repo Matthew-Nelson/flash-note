@@ -75,7 +75,7 @@ class AIService {
   ): Promise<GeneratedNote> {
     // SECURITY (MEDIUM-005): Detect suspicious patterns for monitoring
     // This is detection-only; we do NOT block requests based on this
-    // XML delimiters in buildSOAPPrompt provide the actual protection
+    // XML delimiters in buildUserPrompt provide the actual protection
     const quickNotesDetection = detectSuspiciousPatterns(quickNotes);
     const contextDetection = patientContext
       ? detectSuspiciousPatterns(patientContext)

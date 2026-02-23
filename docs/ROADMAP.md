@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 22, 2026
+**Last Updated:** February 23, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -16,7 +16,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 11/14 | Sign Google Cloud BAA |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 15/20 | Sign Google Cloud BAA |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
