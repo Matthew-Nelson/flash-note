@@ -16,7 +16,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 1/14 | Sign Google Cloud BAA |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 3/14 | Sign Google Cloud BAA |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
@@ -53,8 +53,8 @@ Framework-agnostic work that applies regardless of the migration. Do this now.
 | 1 | **Sign Google Cloud BAA** — covers Cloud Run, Cloud SQL, Vertex AI | Ops | ❌ → [Checklist §2](./PRE_LAUNCH_CHECKLIST.md) |
 | 2 | **Database encryption at rest** — Cloud SQL configuration | Ops | ❌ |
 | 3 | **TLS 1.2+ enforced on all connections** — Cloud SQL configuration | Ops | ❌ |
-| 4 | **Audit log immutability protections** — database-level constraints (revoke UPDATE/DELETE on `audit_logs`) | Code | ❌ |
-| 5 | **Breach notification / incident response procedure** | Docs | ❌ |
+| 4 | **Audit log immutability protections** — database triggers prevent UPDATE/DELETE/TRUNCATE on `audit_logs` (migration 012) | Code | ✅ Done |
+| 5 | **Breach notification / incident response procedure** — [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md) | Docs | ✅ Done |
 | 6 | BAA acceptance in signup flow (backend) | Code | ✅ Done |
 
 > Items that require new code in the Next.js architecture (audit retention automation, `/baa` page, legal re-acceptance flow) are deferred to Phase 1 where they'll be built on the new stack.
@@ -176,6 +176,7 @@ Stand up the deployment pipeline before writing business logic. Validates Cloud 
 
 ### 1.1 — DAL Foundation
 
+- Squash 12 incremental migrations into a single `001_initial_schema.sql` — clean schema definition with opaque session tokens and `token_version` dropped (no prod data to migrate; git history preserves originals)
 - Create `server/` directory structure (see migration plan [Project Structure](#project-structure))
 - Set up `pg` pool (singleton, same pattern as current)
 - Copy query functions from `backend/src/db/queries/*`, adapt imports to `server/dal/`
@@ -318,7 +319,7 @@ These items from Phase 0 HIPAA Infrastructure must be complete before PHI work b
 | Database encryption at rest | ❌ |
 | TLS 1.2+ enforced | ❌ |
 | Audit log retention automation (6-year HIPAA requirement) | ❌ — build in new DAL during Phase 1 or here |
-| Audit log immutability protections | ❌ |
+| Audit log immutability protections | ✅ Done (migration 012) |
 | Legal document re-acceptance flow | ❌ — build on new stack |
 
 ### PHI Implementation

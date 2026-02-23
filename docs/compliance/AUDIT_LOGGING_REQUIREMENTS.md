@@ -156,43 +156,20 @@ export enum AuditAction {
 
 **Regulatory Basis:** § 164.312(c)(1) requires mechanisms to protect electronic PHI from improper alteration or destruction. While audit logs don't contain PHI, their integrity is essential for compliance evidence.
 
-**Current Status:** Partial
+**Current Status:** Complete
 
 **What's Implemented:**
 - Application code only writes (never updates/deletes)
 - Separate `audit_logs` table with no application-level modification
+- Database triggers prevent UPDATE, DELETE, and TRUNCATE (migration `012_audit_log_immutability.sql`)
+  - `audit_logs_no_update` — raises exception on UPDATE
+  - `audit_logs_no_delete` — raises exception on DELETE
+  - `audit_logs_no_truncate` — raises exception on TRUNCATE (statement-level trigger)
+- Verification script: `pnpm db:verify:audit` confirms triggers are active
 
-**Gaps:**
-- No database-level protections (triggers, policies) prevent deletion
-- No checksums or tamper-detection mechanisms
-- Anyone with database access could modify logs
-
-**Recommended Implementation:**
-```sql
--- Prevent DELETE operations on audit_logs table
-CREATE OR REPLACE FUNCTION prevent_audit_delete()
-RETURNS TRIGGER AS $$
-BEGIN
-  RAISE EXCEPTION 'Audit logs cannot be deleted';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER no_audit_delete
-BEFORE DELETE ON audit_logs
-FOR EACH ROW EXECUTE FUNCTION prevent_audit_delete();
-
--- Prevent UPDATE operations on audit_logs table
-CREATE OR REPLACE FUNCTION prevent_audit_update()
-RETURNS TRIGGER AS $$
-BEGIN
-  RAISE EXCEPTION 'Audit logs cannot be modified';
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER no_audit_update
-BEFORE UPDATE ON audit_logs
-FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
-```
+**Remaining considerations:**
+- No checksums or tamper-detection mechanisms (superusers can disable triggers — acceptable risk for current scale)
+- Future: consider Cloud SQL audit logging for additional tamper evidence
 
 ---
 
@@ -237,14 +214,14 @@ FOR EACH ROW EXECUTE FUNCTION prevent_audit_update();
 | Requirement | Priority | Current State | What's Needed |
 |-------------|----------|---------------|---------------|
 | **Retention enforcement** | High | No policy enforced | Documented 6-year policy + optional archival job |
-| **Log integrity protection** | High | App-level only | Database triggers to prevent DELETE/UPDATE |
+| **Log integrity protection** | ✅ Complete | Database triggers (migration 012) prevent UPDATE/DELETE/TRUNCATE | — |
 | **Regular review process** | High | Documented in MONITORING_SETUP.md | Tooling to make reviews practical |
 
 ---
 
 ## Implementation Status
 
-Core audit logging is implemented (audit-service.ts, 17 unit tests). Remaining work — retention automation, immutability protections, admin endpoints — is tracked in [ROADMAP.md Tier 2: HIPAA Infrastructure](../ROADMAP.md#tier-2-hipaa-infrastructure).
+Core audit logging is implemented (audit-service.ts, 17 unit tests). Immutability protections are complete (migration 012 — database triggers). Remaining work — retention automation, admin endpoints — is tracked in [ROADMAP.md](../ROADMAP.md).
 
 ---
 
@@ -267,6 +244,7 @@ Core audit logging is implemented (audit-service.ts, 17 unit tests). Remaining w
 | 1.0 | 2026-01-28 | Initial document |
 | 1.1 | 2026-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status |
 | 1.2 | 2026-02-01 | Updated OPERATIONS.md references to MONITORING_SETUP.md (moved to planning folder) |
+| 1.3 | 2026-02-22 | Log integrity protection complete — database triggers implemented via migration 012 |
 
 ---
 
