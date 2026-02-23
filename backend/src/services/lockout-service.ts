@@ -37,7 +37,7 @@ class LockoutService {
   async getAccountLockoutStatus(userId: string): Promise<LockoutStatus> {
     const result = await db.query<UserLockoutRow>(
       `SELECT failed_login_attempts, locked_until, last_failed_login_at
-       FROM users WHERE id = $1`,
+       FROM users WHERE id = $1 AND NOT is_deleted`,
       [userId]
     );
 

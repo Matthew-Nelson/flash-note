@@ -93,6 +93,8 @@ export function createMockUserRow(overrides: Partial<{
   email_verified_at: Date | null;
   token_version: number;
   organization_id: string | null;
+  is_deleted: boolean;
+  deleted_at: Date | null;
 }> = {}) {
   return {
     id: 'test-user-id',
@@ -111,6 +113,8 @@ export function createMockUserRow(overrides: Partial<{
     email_verified_at: new Date(),
     token_version: 1,
     organization_id: null,
+    is_deleted: false,
+    deleted_at: null,
     ...overrides,
   };
 }

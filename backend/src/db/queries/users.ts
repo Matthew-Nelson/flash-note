@@ -8,7 +8,8 @@ const USER_COLUMNS = `
   id, email, password_hash, stripe_customer_id, subscription_id,
   subscription_status, trial_ends_at, created_at, updated_at,
   failed_login_attempts, locked_until, last_failed_login_at,
-  email_verified, email_verified_at, token_version, organization_id
+  email_verified, email_verified_at, token_version, organization_id,
+  is_deleted, deleted_at
 `;
 
 /**
@@ -32,12 +33,14 @@ function rowToUser(row: UserRow): User {
     emailVerifiedAt: row.email_verified_at,
     tokenVersion: row.token_version ?? 1,
     organizationId: row.organization_id ?? null,
+    isDeleted: row.is_deleted ?? false,
+    deletedAt: row.deleted_at ?? null,
   };
 }
 
 export async function findUserByEmail(email: string): Promise<User | null> {
   const result = await db.query<UserRow>(
-    `SELECT ${USER_COLUMNS} FROM users WHERE email = $1`,
+    `SELECT ${USER_COLUMNS} FROM users WHERE email = $1 AND NOT is_deleted`,
     [email]
   );
 
@@ -47,7 +50,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 
 export async function findUserById(id: string): Promise<User | null> {
   const result = await db.query<UserRow>(
-    `SELECT ${USER_COLUMNS} FROM users WHERE id = $1`,
+    `SELECT ${USER_COLUMNS} FROM users WHERE id = $1 AND NOT is_deleted`,
     [id]
   );
 
@@ -146,7 +149,7 @@ export async function updatePassword(
  */
 export async function getTokenVersion(userId: string): Promise<number | null> {
   const result = await db.query<UserTokenVersionRow>(
-    'SELECT token_version FROM users WHERE id = $1',
+    'SELECT token_version FROM users WHERE id = $1 AND NOT is_deleted',
     [userId]
   );
 

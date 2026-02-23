@@ -41,6 +41,17 @@ describe('User Queries', () => {
       expect(result).toBeNull();
     });
 
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await findUserByEmail('deleted@example.com');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        ['deleted@example.com']
+      );
+    });
+
     it('should transform snake_case to camelCase', async () => {
       const mockRow = createMockUserRow({
         email_verified: true,
@@ -78,6 +89,17 @@ describe('User Queries', () => {
       const result = await findUserById('nonexistent-id');
 
       expect(result).toBeNull();
+    });
+
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await findUserById('deleted-user-id');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        ['deleted-user-id']
+      );
     });
   });
 
@@ -251,6 +273,17 @@ describe('User Queries', () => {
       const result = await getTokenVersion('nonexistent');
 
       expect(result).toBeNull();
+    });
+
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await getTokenVersion('deleted-user-id');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        ['deleted-user-id']
+      );
     });
 
     it('should return 1 when token_version is null (default)', async () => {

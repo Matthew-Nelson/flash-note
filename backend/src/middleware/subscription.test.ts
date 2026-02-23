@@ -300,6 +300,19 @@ describe('Subscription Middleware', () => {
       );
     });
 
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ subscription_status: 'active', trial_ends_at: null, organization_id: null }],
+      });
+
+      await requireActiveSubscription(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        ['user-123']
+      );
+    });
+
     it('should use parameterized query to prevent SQL injection', async () => {
       mockReq.user = {
         userId: "'; DROP TABLE users; --",

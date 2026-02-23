@@ -442,7 +442,7 @@ authRouter.post('/reset-password', passwordResetCompleteRateLimit, async (req, r
              locked_until = NULL,
              last_failed_login_at = NULL,
              updated_at = NOW()
-         WHERE id = $2`,
+         WHERE id = $2 AND NOT is_deleted`,
         [passwordHash, userId]
       );
 

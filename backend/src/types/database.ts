@@ -27,6 +27,8 @@ export interface UserRow {
   email_verified_at: Date | null;
   token_version: number;
   organization_id: string | null;
+  is_deleted: boolean;
+  deleted_at: Date | null;
 }
 
 /**

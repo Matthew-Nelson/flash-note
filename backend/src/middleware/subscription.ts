@@ -39,7 +39,7 @@ export async function requireActiveSubscription(
     const userId = authenticatedReq.user.userId;
 
     const result = await db.query<UserSubscriptionRow>(
-      `SELECT subscription_status, trial_ends_at, organization_id FROM users WHERE id = $1`,
+      `SELECT subscription_status, trial_ends_at, organization_id FROM users WHERE id = $1 AND NOT is_deleted`,
       [userId]
     );
 

@@ -39,6 +39,9 @@ export interface User {
   tokenVersion: number;
   // Organization membership (PR 1C)
   organizationId: string | null;
+  // Soft-delete (H-18)
+  isDeleted: boolean;
+  deletedAt: Date | null;
 }
 
 export type SubscriptionStatus =
