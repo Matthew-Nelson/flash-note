@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 20, 2026
+**Last Updated:** February 22, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -16,7 +16,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 3/14 | Sign Google Cloud BAA |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 7/14 | Sign Google Cloud BAA |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
@@ -65,9 +65,9 @@ Surviving HIGH findings from the security audit. These are pure SQL migrations �
 
 | ID | Finding | Fix | Status |
 |----|---------|-----|--------|
-| H-11 | `subscription_status` missing CHECK constraint on `users` table | Add CHECK constraint matching `organizations` pattern | ❌ |
-| H-13 | `markCodeAsUsed` doesn't set `is_active = FALSE` | Add `is_active = FALSE` to UPDATE | ❌ |
-| H-18 | CASCADE DELETE on `sessions` and `usage` — HIPAA data retention risk | Change to ON DELETE RESTRICT, implement soft-delete for users | ❌ |
+| H-11 | `subscription_status` missing CHECK constraint on `users` table | Add CHECK constraint matching `organizations` pattern | ✅ Done (migration 013) |
+| H-13 | `markCodeAsUsed` doesn't set `is_active = FALSE` | Add `is_active = FALSE` to UPDATE | ✅ Done (migration 014) |
+| H-18 | CASCADE DELETE on `sessions` and `usage` — HIPAA data retention risk | Change to ON DELETE RESTRICT, implement soft-delete for users | ✅ Done (migration 015) |
 
 ### Prompt Engineering
 
@@ -129,24 +129,74 @@ Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED
 | H-8 | PHI not cleared on logout (extension) | 🗑️ Moot — extension removed |
 | H-9 | Token refresh race condition (extension) | 🗑️ Moot — no client-side token refresh in new architecture |
 | H-10 | Error handler returns raw err.message | ✅ Done (`44319a8`) |
-| H-11 | Missing CHECK constraint on subscription_status | ❌ Fix in Phase 0 (schema hardening) |
+| H-11 | Missing CHECK constraint on subscription_status | ✅ Done (migration 013) |
 | H-12 | Non-null assertions on query results | ❌ Fix during Phase 1.1 (DAL foundation) |
-| H-13 | Invite code doesn't deactivate | ❌ Fix in Phase 0 (schema hardening) |
+| H-13 | Invite code doesn't deactivate | ✅ Done (migration 014) |
 | H-14 | No graceful shutdown | ✅ Done (`44319a8`). Cloud Run handles shutdown signals for Next.js. |
 | H-15 | No process-level error handlers | ✅ Done (`44319a8`). Next.js instrumentation hook (`onRequestError`) handles this. |
 | H-16 | XML delimiter not escaped (prompt injection) | ❌ Fix in Phase 0 (prompt engineering) |
 | H-17 | Backend errors displayed to users (extension) | 🗑️ Moot — extension removed |
-| H-18 | CASCADE DELETE on sessions/usage | ❌ Fix in Phase 0 (schema hardening) |
+| H-18 | CASCADE DELETE on sessions/usage | ✅ Done (migration 015) |
 
 #### MEDIUM/LOW Findings
 
 Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`), M-7, M-8, M-10, M-11, M-23 (`81e6988`).
 
-Remaining 36 MEDIUM/LOW findings need triage during Phase 0:
-- **Extension-specific findings** → close as "resolved by removal"
-- **Express-specific findings** (middleware, routing) → close as "resolved by migration"
-- **Framework-agnostic findings** (schema, validation, logging) → fix during appropriate Phase 1 sub-phase
-- **Web UI findings** → carry forward to Phase 3
+##### Resolved by Removal — Extension Removed (10 findings)
+
+| ID | Finding | Notes |
+|----|---------|-------|
+| M-12 | PHI persists in clipboard | Extension sidepanel component |
+| M-13 | No React error boundary in extension | Extension UI |
+| M-14 | Content script monkey-patches history API | Extension content script |
+| M-15 | Service worker state loss on restart | Extension service worker |
+| M-16 | Missing origin validation on runtime messages | Extension service worker |
+| M-17 | `web_accessible_resources` enables fingerprinting | Extension manifest |
+| M-18 | No AbortController for in-flight requests on logout | Extension component |
+| L-9 | Dev CORS allows any Chrome extension | No extension, no extension CORS |
+| L-16 | Extension localhost in production content_scripts | Extension manifest |
+| L-17 | Extension hardcoded version string | Extension UI |
+
+##### Resolved by Migration — Express/Sentry/CI Replaced (11 findings)
+
+| ID | Finding | Why Resolved |
+|----|---------|-------------|
+| M-1 | Rate limiting IP-only | Upstash compound keying (IP + email/userId) in Phase 1.2 |
+| M-4 | Email verification middleware bypasses error handler | Express middleware → Server Actions with standard error handling |
+| M-21 | Migration 009 not idempotent | Migrations squashed into single schema in Phase 1.1 |
+| M-24 | PHI sanitization relies on field-name heuristics | Sentry removed → GCP Cloud Logging with allowlist approach |
+| M-28 | E2E workflow exposes secrets at global `env` level | CI workflows rewritten for Cloud Run deployment |
+| L-1 | Missing rate limit on validate-reset-token | Upstash rate limiting on all auth endpoints (Phase 1.2) |
+| L-2 | Auth middleware discards JWT error details | JWT auth eliminated → opaque session tokens |
+| L-4 | NaN passes CSRF timestamp check | Express CSRF middleware → Next.js Server Action CSRF |
+| L-6 | GEMINI_API_KEY optional in schema | Direct Gemini API → Vertex AI; config schema rewritten |
+| L-10 | No explicit request body size limit | Express → Next.js/Cloud Run with built-in body limits |
+| L-12 | Legacy refresh token O(n) bcrypt comparisons | Refresh tokens eliminated (opaque sessions, no legacy path) |
+
+##### Already Mitigated (1 finding)
+
+| ID | Finding | Mitigation |
+|----|---------|-----------|
+| M-9 | Reset/verification tokens in URL query parameters | Referrer-Policy header added via CR-4 (`81e6988`). POST-based validation is a nice-to-have, not required. |
+
+##### Carry Forward — Fix During Phase 1 (14 findings)
+
+| ID | Finding | Phase | Notes |
+|----|---------|-------|-------|
+| M-19 | Migration script uses pool-level transactions | 1.1 | Use dedicated PoolClient in ported migration runner |
+| M-20 | Migration script lacks advisory locks | 1.1 | Add `pg_advisory_lock` to ported migration runner |
+| M-22 | `findMemberByOrgAndUser` returns stale membership | 1.1 | Add `WHERE removed_at IS NULL` when porting query |
+| M-25 | `removeMember` doesn't verify row was updated | 1.1 | Return rowCount when porting query |
+| M-27 | `cleanupExpiredTokens()` never called | 1.1 | Wire up cleanup job for sessions + tokens |
+| L-5 | Unsafe type cast of database role value | 1.1 | Zod-validate role from DB result |
+| L-13 | `email_tokens.token_hash` lacks UNIQUE constraint | 1.1 | Fix in squashed `001_initial_schema.sql` |
+| L-14 | Redundant `idx_users_email` index | 1.1 | Drop in squashed schema (UNIQUE already creates index) |
+| L-15 | `invite_codes.created_by` nullable — TS mismatch | 1.1 | Fix in squashed schema + align types |
+| L-18 | `NOT NULL` missing on `created_at`/`updated_at` | 1.1 | Fix in squashed schema |
+| L-7 | DATABASE_URL validated as generic URL | 1.0 | Validate as `postgres://` or `postgresql://` in new config |
+| L-8 | Database URL partially logged in non-prod | 1.0 | Sanitize or remove from env logging |
+| L-3 | Zod validation details reveal schema info | 1.4 | Strip field names from validation errors in error handler |
+| L-11 | Audit action reuse (`SUBSCRIPTION_CANCELLED`) | 1.6 | Add `PAYMENT_FAILED` action when porting billing service |
 
 ---
 

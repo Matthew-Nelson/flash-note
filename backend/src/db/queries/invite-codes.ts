@@ -126,7 +126,7 @@ export async function markCodeAsUsed(
   userId: string
 ): Promise<void> {
   await client.query(
-    `UPDATE invite_codes SET used_by = $1, used_at = NOW() WHERE id = $2`,
+    `UPDATE invite_codes SET used_by = $1, used_at = NOW(), is_active = FALSE WHERE id = $2`,
     [userId, codeId]
   );
 }

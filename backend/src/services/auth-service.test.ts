@@ -1387,6 +1387,8 @@ describe('AuthService', () => {
         emailVerifiedAt: new Date(),
         tokenVersion: 1,
         organizationId: 'org-456',
+        isDeleted: false,
+        deletedAt: null,
       };
 
       const sanitized = sanitizeUser(user);
@@ -1413,6 +1415,8 @@ describe('AuthService', () => {
         emailVerifiedAt: new Date(),
         tokenVersion: 1,
         organizationId: null,
+        isDeleted: false,
+        deletedAt: null,
       };
 
       const sanitized = sanitizeUser(user);

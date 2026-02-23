@@ -196,7 +196,7 @@ describe('Invite Code Queries', () => {
   });
 
   describe('markCodeAsUsed', () => {
-    it('should update used_by and used_at', async () => {
+    it('should update used_by, used_at, and set is_active to false', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
       const mockClient = { query: mockClientQuery } as unknown as import('pg').PoolClient;
@@ -204,6 +204,10 @@ describe('Invite Code Queries', () => {
 
       expect(mockClientQuery).toHaveBeenCalledWith(
         expect.stringContaining('UPDATE invite_codes SET used_by'),
+        ['user-uuid-1', 'code-uuid-1']
+      );
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('is_active = FALSE'),
         ['user-uuid-1', 'code-uuid-1']
       );
     });
