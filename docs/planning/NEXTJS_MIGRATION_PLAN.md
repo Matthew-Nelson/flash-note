@@ -34,6 +34,8 @@
 
 FlashNote is migrating away from the Chrome extension as the primary client. Post-migration, the web app is the only client. This eliminates the original justification for a standalone Express API (serving multiple clients) and opens the question: what's the right architecture for a single Next.js web app with HIPAA-compliant auth, audit logging, and AI note generation?
 
+**There are no production users.** The product is pre-launch. This means no sessions to migrate, no backwards compatibility constraints, no rollback infrastructure needed, and no users to communicate with during the transition. The migration is a clean build that transplants tested business logic into a new framework — not a live system cutover.
+
 The existing Express backend has ~800 tests, comprehensive middleware (auth, CSRF, rate limiting, subscription checks), and represents significant hardened security work. The web app is currently a thin client — ~75% `'use client'` components, no Server Actions, no server-side auth, all data fetched client-side via Bearer tokens stored in sessionStorage.
 
 ---
@@ -304,9 +306,8 @@ Every authenticated request already requires a DB roundtrip for session validati
 | DB roundtrip required | Yes (tokenVersion check) | Yes (session lookup) |
 | Revocation | Immediate (increment tokenVersion) | Immediate (delete session row) |
 | Complexity | JWT generation + verification + version check | UUID generation + DB lookup |
-| Migration effort | Lower (existing JWT logic stays similar) | Moderate (rewrite token verification path) |
 
-Opaque tokens are smaller, simpler, and more honest about what's actually happening (every request checks the DB). The migration effort difference is modest — session lookup by ID vs JWT decode + version check.
+Opaque tokens are smaller, simpler, and more honest about what's actually happening (every request checks the DB). With no existing sessions to migrate, there's no transition cost — we build the session system from scratch.
 
 ### Cookie Configuration
 
@@ -325,7 +326,7 @@ Opaque tokens are smaller, simpler, and more honest about what's actually happen
 - **Refresh debounce:** Only extend `expires_at` if more than 50% of idle timeout has elapsed (>12 hours since last refresh). Prevents write amplification from frequent requests — a user actively generating notes won't trigger a DB write on every request.
 - **No explicit rotation.** The opaque token stays the same for the session lifetime. Revocation is immediate (delete session row).
 
-**Why not explicit rotation?** Rotation adds complexity (concurrent tab race conditions, token replay detection) for marginal security benefit when the session can be instantly revoked via DB delete. The current system already pays for this complexity with JWT refresh token rotation — the migration is an opportunity to simplify.
+**Why not explicit rotation?** Rotation adds complexity (concurrent tab race conditions, token replay detection) for marginal security benefit when the session can be instantly revoked via DB delete.
 
 **Session validation query (single roundtrip):**
 
@@ -400,7 +401,7 @@ web/src/
 
 ## Migration Strategy: Structured Transplant
 
-Not a tear-down. Not an incremental migration. A **structured transplant** — tested business logic moves from one framework shell to another.
+A **structured transplant** — tested business logic moves from one framework shell to another. The `/backend` and `/extension` directories are deleted at the start (Phase 0), not retained as fallbacks. Git history preserves them for reference during porting.
 
 The business logic (services, queries, types, schemas, prompts) is ~4,200 lines of framework-agnostic code that transfers with minimal adaptation. The Express-coupled surface (routes, middleware, app setup — ~2,300 LOC) concentrates in security-critical HTTP handling and requires full rewrites as Server Actions and DAL wrappers.
 
@@ -463,8 +464,8 @@ Same logic, new framework wrapper.
 | Web `storage.ts` (sessionStorage) | Cookies replace it |
 | Web `AuthProvider` initialization logic | Server-provided user data via Server Components |
 | Web `ProtectedRoute` component | Middleware handles redirects |
-| Entire `/extension` directory | Extension is being sunset |
-| Entire `/backend` directory | Logic transplanted to Next.js; Express shell discarded |
+| Entire `/extension` directory | Extension is being sunset. Delete at start of migration — git history preserves for reference |
+| Entire `/backend` directory | Logic transplanted to Next.js; Express shell discarded. Delete at start of migration — git history preserves for reference |
 
 ---
 
@@ -493,17 +494,17 @@ The web app (331 tests) and extension (288 tests) tests are partially relevant:
 
 Phases are sequential. Each phase is independently testable and committable. **Tests are written alongside each phase, not retrofitted at the end** — this is healthcare software where every phase contains security-critical code.
 
-### Phase 0: Infrastructure Scaffold
+### Phase 0: Infrastructure Scaffold + Cleanup
 
-Stand up the deployment pipeline before writing business logic. Validates Cloud Run + Next.js compatibility early and ensures every subsequent phase can be deployed and tested in a production-like environment.
+Delete `/backend` and `/extension` directories (git history preserves them for reference). Stand up the deployment pipeline.
 
+- Delete `/backend` and `/extension` directories
 - Configure `output: 'standalone'` in `next.config.js`
 - Write multi-stage Dockerfile: Node.js build stage → `next build` → slim production image with standalone output + `public/` + `.next/static/`
 - Set up GitHub Actions workflow: build image → push to Google Artifact Registry → deploy to Cloud Run
 - Provision Cloud Run service with `min-instances=1`
 - Provision Upstash Redis (rate limiting store)
-- Deploy a hello-world Next.js page to verify the full pipeline
-- **Verify**: Push to `main` triggers build → deploy → live page on Cloud Run. Upstash Redis is reachable from Cloud Run.
+- **Verify**: Push to `main` triggers build → deploy → live app on Cloud Run. Upstash Redis is reachable from Cloud Run.
 
 ### Phase 1: DAL Foundation + Project Structure
 
@@ -522,7 +523,7 @@ Stand up the deployment pipeline before writing business logic. Validates Cloud 
 
 Rate limiting is co-located with sessions because auth endpoints must never be exposed without brute-force protection. Building sessions without rate limits creates a security gap.
 
-- Write migration 012: add `token_hash` column to `sessions` table for opaque session tokens (the existing `refresh_token_hash` column is JWT-specific and may need renaming or replacement)
+- Write migration 012: create `sessions` table for opaque session tokens (replace the existing JWT-oriented `sessions` schema)
 - Implement opaque session token generation (`crypto.randomUUID()`)
 - Session creation: hash token (SHA-256), insert into `sessions` table, set httpOnly cookie
 - Session validation: read cookie → hash → lookup session → validate expiry (idle + absolute)
@@ -530,7 +531,7 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Session revocation: delete session row + clear cookie
 - Port device binding (IP + user agent stored for audit, not blocking)
 - Port session limit enforcement (`MAX_SESSIONS_PER_USER = 5`, delete oldest)
-- Port `SELECT ... FOR UPDATE` race condition protection from current refresh flow
+- Use `SELECT ... FOR UPDATE` for race condition protection on concurrent session access
 - Set up Upstash `@upstash/ratelimit` with compound keying (IP + email/userId, not IP-only — fixes M-1):
 
   | Limiter | Window | Max | Key |
@@ -593,18 +594,18 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Port billing service tests, rewrite webhook integration tests
 - **Verify**: Webhooks process correctly. Checkout works. Subscription status enforced. Cleanup job runs. Tests pass.
 
-### Phase 7: Integration Tests + Production Verification
+### Phase 7: Integration Tests + Production Deploy
 
-All unit tests should already be passing from Phases 1-6. This phase adds cross-cutting integration tests and validates the complete system.
+All unit tests should already be passing from Phases 1-6. This phase adds cross-cutting integration tests and deploys to production.
 
 - Integration tests: full auth lifecycle (register → verify email → login → generate note → logout)
 - Integration tests: billing webhook processing (checkout → webhook → subscription active → note generation unlocked)
 - Integration tests: rate limiting across endpoints (verify compound keying works)
 - Integration tests: concurrent session handling (multiple tabs, session limit enforcement)
 - Performance baseline: measure auth flow latency, note generation latency, protected page load times
-- Staging deployment with synthetic data — full smoke test
 - Security-critical path coverage audit (per Rule 6)
-- **Verify**: All integration tests pass. Performance is acceptable. No regressions from Express baseline. Coverage meets standards.
+- Deploy to Cloud Run production
+- **Verify**: All integration tests pass. Performance is acceptable. Coverage meets standards. Production deployment is live.
 
 ---
 
@@ -627,18 +628,6 @@ This is a multi-week migration. AI-assisted development sessions have finite con
 - Port tests alongside code (not after). Tests encode the security requirements — if a test for "rejects `algorithm: 'none'` JWTs" exists, the new system must have an equivalent.
 - The CLAUDE.md mandatory engineering rules (especially Rules 1, 6, 9, 10) serve as session-independent guardrails.
 
-#### 2. No Rollback After Cutover
-
-**Severity: High | Likelihood: Low**
-
-If a critical bug surfaces post-cutover (e.g., session validation has an edge case that locks out users), there's no running Express backend to fall back to.
-
-**Mitigation:**
-- **Do not delete `/backend` on cutover.** Keep it in the repo for 4 weeks post-cutover. It's dead code but costs nothing.
-- Cloud Run retains previous revisions. The Express backend's last working revision can be re-activated with `gcloud run services update-traffic --to-revisions=REVISION=100` if the new service fails catastrophically.
-- Before cutover: run both services in parallel for 48 hours (Express on current URL, Next.js on a staging URL). Verify feature parity with manual smoke tests.
-- Define a rollback trigger: if >5% of authenticated requests fail in the first 24 hours post-cutover, revert to Express revision.
-
 ### Elevated Risks
 
 #### 3. Cloud Run + Next.js Operational Issues
@@ -648,7 +637,7 @@ If a critical bug surfaces post-cutover (e.g., session validation has an edge ca
 Next.js is optimized for Vercel. Running on Cloud Run works but has known rough edges: standalone output mode configuration, static asset serving, image optimization, middleware Edge Runtime behavior, and build caching.
 
 **Mitigation:**
-- **Resolved by Phase 0.** The infrastructure scaffold phase validates the entire deployment pipeline with a hello-world app before any business logic is ported. If Cloud Run + Next.js has compatibility issues, they surface in Phase 0 — not Phase 6 when the billing system is half-ported.
+- **Resolved by Phase 0.** The infrastructure scaffold phase validates the deployment pipeline before business logic is ported. If Cloud Run + Next.js has compatibility issues, they surface in Phase 0 — not Phase 6 when the billing system is half-ported.
 - Specific known issues and their fixes:
   - **Standalone mode**: `output: 'standalone'` in `next.config.js`. Dockerfile copies `.next/standalone`, `.next/static`, and `public/`.
   - **Static assets**: Served from the container. If latency is measurable post-launch, add Cloud CDN (one-time config, no code change).
@@ -659,13 +648,13 @@ Next.js is optimized for Vercel. Running on Cloud Run works but has known rough 
 
 **Severity: Medium | Likelihood: Medium**
 
-Moving from JWT Bearer tokens to opaque session cookies changes the auth transport layer entirely. Edge cases: concurrent tabs sharing a cookie, race conditions on session refresh, cookie size limits, cross-tab logout synchronization.
+Opaque session cookies have known edge cases: concurrent tabs sharing a cookie, race conditions on session refresh, cookie size limits, cross-tab logout synchronization.
 
 **Mitigation:**
-- Port `SELECT ... FOR UPDATE` from the existing refresh flow — this is the proven pattern for preventing concurrent modification.
+- Use `SELECT ... FOR UPDATE` to prevent concurrent session modification.
 - Sliding window refresh with debounce (>50% of idle TTL elapsed) prevents write amplification from concurrent tab requests hitting the DB simultaneously.
 - Cookies are ~36 bytes (UUID) — well under the 4KB browser limit.
-- Cross-tab logout: use `BroadcastChannel` API to notify other tabs when logout occurs (same pattern as the current `flashnote:auth-invalidated` custom event, but cross-tab).
+- Cross-tab logout: use `BroadcastChannel` API to notify other tabs when logout occurs.
 - Write explicit tests for concurrent session creation, session limit enforcement with race conditions, and cookie behavior across tabs.
 
 #### 5. Test Regression Gap During Migration
@@ -704,19 +693,7 @@ In Express, audit logs can fire-and-forget after the response is sent — the cl
 
 ### Manageable Risks
 
-#### 8. Forced Re-Login on Cutover
-
-**Severity: Low | Likelihood: Certain**
-
-JWT → opaque token is a breaking session format change. All existing sessions become invalid. Every user must re-login.
-
-**Mitigation:**
-- Acceptable for early-stage product with small user base.
-- Communicate to users in advance via email (using existing Resend infrastructure).
-- Schedule cutover during low-usage hours (early morning or weekend for PT clinics).
-- Ensure the login page has a clear, non-alarming message ("We've upgraded our security infrastructure. Please sign in again.").
-
-#### 9. Static Asset Serving Performance
+#### 8. Static Asset Serving Performance
 
 **Severity: Low | Likelihood: Medium**
 
@@ -841,20 +818,9 @@ If email delivery latency becomes noticeable (unlikely — Resend is async on th
 
 ### 6. Cutover Strategy
 
-**Decision:** Clean cutover with forced re-login. No parallel deployment period.
+**Decision:** Deploy and go. No rollback infrastructure, no parallel run, no user migration.
 
-The JWT → opaque token change means existing sessions are inherently incompatible. For an early-stage product with a small user base, a planned maintenance window is acceptable and far simpler than a dual-stack migration.
-
-**Cutover sequence:**
-1. Deploy Next.js to Cloud Run on a staging URL. Run full smoke test with synthetic data.
-2. Run database migration (adds/modifies columns for opaque sessions if needed).
-3. Update DNS to point to the new Cloud Run service.
-4. Existing JWT-based sessions become invalid — users see a login page with a clear message.
-5. Express Cloud Run revision is retained (not deleted) for 4 weeks as a rollback safety net.
-
-**Rollback trigger:** If >5% of authenticated requests fail in the first 24 hours, revert DNS and Cloud Run traffic to the Express revision.
-
-See [Risk Assessment: Forced Re-Login on Cutover](#8-forced-re-login-on-cutover) for user communication strategy.
+There are no production users. No sessions to invalidate, no users to email, no maintenance window to schedule. The `/backend` and `/extension` directories are deleted at the start of migration (git history preserves them for reference). The Next.js app deploys to Cloud Run as the first and only production deployment.
 
 ### 7. Organization Features
 
