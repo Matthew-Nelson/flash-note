@@ -73,15 +73,17 @@ notesRouter.post('/generate', async (req, res, next) => {
     // - securityMetadata: NEVER expose (helps attackers refine injection attempts)
     // - metadata.model, metadata.inputTokens/outputTokens/totalTokens: Not used by FE, unnecessary exposure
     // - metadata.generationTimeMs: Used by FE for "Generated in X.Xs" display
+    // - billing, goals, alerts, uncertainAreas: LLM-generated clinical display fields; no raw user input
     const clientResponse = {
       subjective: result.subjective,
       objective: result.objective,
       assessment: result.assessment,
       plan: result.plan,
-      // Enhanced fields for billing, goals, and alerts (optional)
+      // Enhanced fields (optional)
       billing: result.billing,
       goals: result.goals,
       alerts: result.alerts,
+      uncertainAreas: result.uncertainAreas,
       metadata: {
         generationTimeMs: result.metadata.generationTimeMs,
       },

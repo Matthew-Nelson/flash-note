@@ -113,6 +113,9 @@ export interface GeneratedNote {
   // Billing warnings, documentation gaps, modifier reminders
   alerts?: string[];
 
+  // Uncertainty signals — ambiguous areas the model flagged for clinician review
+  uncertainAreas?: string[];
+
   // Metadata
   metadata: {
     model: string;

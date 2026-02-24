@@ -12,6 +12,7 @@ interface MockResponse {
   billing?: BillingSummary;
   goals?: GoalsTracking;
   alerts?: string[];
+  uncertainAreas?: string[];
 }
 
 /**
@@ -63,6 +64,9 @@ const MOCK_RESPONSES: Record<NoteType, MockResponse> = {
     alerts: [
       'Manual therapy 8 min = 1 unit. Consider 16+ min for safer audit threshold.',
       'Medicare patient? Ensure GP modifier is applied to all charges.',
+    ],
+    uncertainAreas: [
+      'Interpreted "ther ex" as "therapeutic exercise" (could also mean therapy extension)',
     ],
   },
 
@@ -232,6 +236,7 @@ export async function generateMockSOAPNote(
     billing: mockResponse.billing,
     goals: mockResponse.goals,
     alerts: mockResponse.alerts,
+    uncertainAreas: mockResponse.uncertainAreas,
     metadata: {
       model: 'mock-gemini-2.5-flash',
       inputTokens,
