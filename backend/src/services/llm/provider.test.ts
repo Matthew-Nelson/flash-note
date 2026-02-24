@@ -63,7 +63,8 @@ class TestProvider extends BaseLLMProvider {
     });
 
   protected async doGeneratePTNote(
-    _prompt: string,
+    _systemPrompt: string,
+    _userPrompt: string,
     _config: LLMRequestConfig
   ): Promise<PTNoteResult> {
     return this.doGeneratePTNoteImpl();
@@ -295,9 +296,9 @@ describe('BaseLLMProvider', () => {
 
       provider.doGeneratePTNoteImpl = vi.fn().mockResolvedValue(expectedResult);
 
-      const result = await provider.generatePTNote('test prompt', {
+      const result = await provider.generatePTNote('test system', 'test prompt', {
         maxTokens: 2000,
-        temperature: 0.7,
+        temperature: 0.2,
         timeoutMs: 30000,
       });
 
@@ -325,9 +326,9 @@ describe('BaseLLMProvider', () => {
         return Promise.resolve(expectedResult);
       });
 
-      const result = await provider.generatePTNote('test', {
+      const result = await provider.generatePTNote('test system', 'test', {
         maxTokens: 2000,
-        temperature: 0.7,
+        temperature: 0.2,
         timeoutMs: 30000,
       });
 
@@ -350,7 +351,7 @@ describe('BaseLLMProvider', () => {
 
       const result = await provider.generateCompletion('test prompt', {
         maxTokens: 2000,
-        temperature: 0.7,
+        temperature: 0.2,
         timeoutMs: 30000,
       });
 
@@ -378,7 +379,7 @@ describe('BaseLLMProvider', () => {
 
       const result = await provider.generateCompletion('test', {
         maxTokens: 2000,
-        temperature: 0.7,
+        temperature: 0.2,
         timeoutMs: 30000,
       });
 

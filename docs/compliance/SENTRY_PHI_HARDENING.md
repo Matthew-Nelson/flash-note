@@ -23,7 +23,7 @@ FlashNote's Sentry integration has comprehensive PHI protection:
 ### How PHI could reach an error message
 
 1. Therapist submits quickNotes containing patient details
-2. Text is passed to `buildSOAPPrompt()` and sent to Gemini
+2. Text is passed to `buildUserPrompt()` and sent to Gemini
 3. An unexpected error occurs (not wrapped in `LLMError`) that includes input text in its message
 4. Error propagates to a process-level or global handler
 5. `Sentry.captureException(err)` sends the raw error message to Sentry

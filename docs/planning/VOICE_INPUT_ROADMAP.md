@@ -305,7 +305,7 @@ Google's `medical_conversation` model natively labels clinician vs. patient spee
 </clinician_notes>
 ```
 
-The existing `buildSOAPPrompt()` in `pt-prompts.ts` handles this naturally — the system prompt already instructs the LLM to extract clinical information from the `<clinician_notes>` content regardless of format.
+The existing `buildUserPrompt()` in `pt-prompts.ts` handles this naturally — the system prompt already instructs the LLM to extract clinical information from the `<clinician_notes>` content regardless of format.
 
 **4. Longer transcripts → more Gemini tokens**
 

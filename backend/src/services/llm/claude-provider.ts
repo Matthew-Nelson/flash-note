@@ -109,7 +109,8 @@ export class ClaudeProvider extends BaseLLMProvider {
    * Generate a structured PT note using Claude's tool use.
    */
   protected async doGeneratePTNote(
-    prompt: string,
+    systemPrompt: string,
+    userPrompt: string,
     config: LLMRequestConfig
   ): Promise<PTNoteResult> {
     const url = `${this.apiUrl}/v1/messages`;
@@ -129,6 +130,7 @@ export class ClaudeProvider extends BaseLLMProvider {
           model: this.model,
           max_tokens: config.maxTokens,
           temperature: config.temperature,
+          system: systemPrompt,
           tools: [
             {
               name: PT_NOTE_TOOL_NAME,
@@ -145,7 +147,7 @@ export class ClaudeProvider extends BaseLLMProvider {
           messages: [
             {
               role: 'user',
-              content: prompt,
+              content: userPrompt,
             },
           ],
         }),

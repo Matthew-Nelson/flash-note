@@ -18,6 +18,12 @@
 export type ContentType = 'clinician_notes' | 'patient_context';
 
 /**
+ * Tag names used as XML delimiters for prompt isolation.
+ * Used by escapeDelimiterTags to strip boundary-breaking attempts.
+ */
+const DELIMITER_TAG_NAMES = ['clinician_notes', 'patient_context'] as const;
+
+/**
  * Result of suspicious pattern detection
  */
 export interface SuspiciousPatternResult {
@@ -69,7 +75,31 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
   // Attempts to break out of context
   /end\s+of\s+(user\s+)?input/i,
   /---+\s*end\s*(of\s*)?(user|patient|input)/i,
+
+  // Attempts to break XML delimiter boundaries (H-16)
+  /<\s*\/?\s*clinician_notes[^>]*>/i,
+  /<\s*\/?\s*patient_context[^>]*>/i,
 ];
+
+/**
+ * Strips XML delimiter tag strings from user content to prevent boundary breakout (H-16).
+ *
+ * This removes any opening or closing tags that match our delimiter tag names,
+ * including tags with attributes (e.g., `<clinician_notes x="">`).
+ * Medical notation like `<90°` is preserved since it doesn't match tag names.
+ *
+ * @param content - The raw user-provided content
+ * @returns Content with delimiter tags stripped
+ */
+export function escapeDelimiterTags(content: string): string {
+  let sanitized = content;
+  for (const tagName of DELIMITER_TAG_NAMES) {
+    // Strip opening/closing tags including any attributes (case-insensitive)
+    // [^>]* catches attribute-based bypasses like <clinician_notes x="">
+    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*>`, 'gi'), '');
+  }
+  return sanitized;
+}
 
 /**
  * Wraps user-provided content in XML delimiters for prompt isolation.
@@ -79,15 +109,17 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
  * and the LLM is instructed to treat content within these tags as
  * literal data only.
  *
+ * Content is sanitized for delimiter tags before wrapping to prevent
+ * boundary breakout attacks (H-16). Medical notation like "<90°" or
+ * "3+/5" is preserved since it doesn't match delimiter tag names.
+ *
  * @param content - The raw user-provided content
  * @param type - The type of content (determines tag name)
  * @returns Content wrapped in appropriate XML delimiters
  */
 export function wrapWithDelimiters(content: string, type: ContentType): string {
-  // Content is NOT escaped - we preserve it exactly as provided.
-  // The XML tags serve as semantic markers, not as actual XML parsing.
-  // Medical notation like "<90°" or "3+/5" is preserved unchanged.
-  return `<${type}>\n${content}\n</${type}>`;
+  const sanitized = escapeDelimiterTags(content);
+  return `<${type}>\n${sanitized}\n</${type}>`;
 }
 
 /**
