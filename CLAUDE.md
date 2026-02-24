@@ -151,7 +151,7 @@ web/src/
 - `organization_members` - Membership records with soft-delete
 - `legal_acceptances` - Terms of Service / BAA consent tracking (per document version)
 - `invite_codes` - Personal or clinic-based invitation codes with expiry
-- `webhook_events` - Stripe webhook deduplication (idempotency)
+- `processed_webhook_events` - Stripe webhook deduplication (idempotency)
 - `migrations` - Migration tracking (auto-managed)
 
 ## Important Patterns

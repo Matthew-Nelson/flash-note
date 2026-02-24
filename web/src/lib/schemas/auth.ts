@@ -2,7 +2,7 @@
  * Zod Validation Schemas
  *
  * Input validation for authentication forms.
- * Synced with backend validation (source of truth: backend/src/routes/auth.ts)
+ * Source of truth for password policy (per CLAUDE.md: server-side Zod schema in the DAL/auth module)
  */
 
 import { z } from 'zod';
@@ -21,7 +21,7 @@ export const loginSchema = z.object({
 });
 
 /**
- * Password policy (synced with backend/src/routes/auth.ts - source of truth):
+ * Password policy:
  * - Minimum 8 characters
  * - At least one uppercase letter
  * - At least one lowercase letter

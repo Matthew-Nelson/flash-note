@@ -458,10 +458,10 @@ Register `patientsRouter` at `/patients` and `templatesRouter` at `/templates`.
 
 ## Chunk 4: Web App API Client + Types
 
-### Modify: `web/src/lib/types.ts`
+### Modify: `web/src/lib/types/client.ts`
 Add `NoteTemplate`, `NoteTemplateSection`, `NoteTemplateWithSections`, `NoteSection`, `Patient`, `NoteType`, `ClinicalNote`, `GeneratedNote`, `NoteVersion`, `NoteVersionSource` types. Patient includes `context: string | null` and `organizationId: string | null`. ClinicalNote includes `templateId: string`, `content: NoteSection[]`, and `organizationId: string | null`.
 
-### Modify: `web/src/lib/schemas.ts`
+### Modify: `web/src/lib/schemas/auth.ts` (or create new `web/src/lib/schemas/notes.ts`)
 Add `patientSchema` (includes optional `context` field), `generateNoteSchema` (includes `templateId`) Zod schemas for form validation. Pronoun validated as `z.enum(['he/him', 'she/her', 'they/them', 'other'])`. Pagination `limit` capped at `z.number().max(100)`.
 
 ### Modify: `web/src/lib/api.ts`

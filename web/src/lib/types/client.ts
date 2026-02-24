@@ -1,7 +1,9 @@
 /**
- * Web App Type Definitions
+ * Client-side type definitions for the FlashNote web application.
  *
- * Shared types for the FlashNote web application.
+ * These types are used by React components and client-side code.
+ * They intentionally omit sensitive server fields (passwordHash, lockout state, etc.).
+ * Server-only types live in server/types.ts.
  */
 
 /**

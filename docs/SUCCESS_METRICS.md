@@ -120,7 +120,7 @@ These items must be complete before public launch.
 | **API** | Standard error codes | CLAUDE.md | ✅ Done |
 | **API** | Zod validation all inputs | CLAUDE.md | ✅ Done |
 | **API** | Health endpoint | Handoff §8 | ✅ Done |
-| **DB** | 10 tables (users, sessions, audit_logs, usage, organizations, organization_members, legal_acceptances, invite_codes, webhook_events, migrations) | Handoff §7 | ✅ Done |
+| **DB** | 11 tables (users, sessions, audit_logs, usage, organizations, organization_members, legal_acceptances, invite_codes, processed_webhook_events, email_tokens, migrations) | Handoff §7 | ✅ Done |
 | **DB** | UUID primary keys | Handoff §7 | ✅ Done |
 | **DB** | Audit logs table | HIPAA | ✅ Done |
 | **DB** | No PHI stored | HIPAA | ✅ Done |
