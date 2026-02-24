@@ -3,8 +3,16 @@ name: CI
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.claude/**'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.claude/**'
   workflow_dispatch:
 
 concurrency:
@@ -45,14 +53,6 @@ jobs:
         run: pnpm build
         working-directory: ./web
 
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: web-coverage
-          path: ./web/coverage/
-          retention-days: 30
-
       - name: Coverage summary
         if: always()
         run: |
@@ -70,32 +70,14 @@ jobs:
             echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
           fi
 
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Audit web
+      # Advisory-only — results appear in workflow logs but won't fail CI.
+      # We don't block deploys on transitive dependency vulnerabilities
+      # we can't immediately fix.
+      - name: Security audit
         run: pnpm audit --audit-level=high
         working-directory: ./web
         continue-on-error: true
 
-  # security-audit uses continue-on-error: true so it's advisory-only.
-  # It's excluded from the ci-success gate intentionally — we review audit
-  # results in the workflow summary but don't block deploys on transitive
-  # dependency vulnerabilities we can't immediately fix.
   ci-success:
     name: CI Success
     needs: [web]
