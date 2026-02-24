@@ -1,15 +1,13 @@
 import { describe, it, expect, beforeEach, vi, afterEach, beforeAll } from 'vitest';
 import { AuditAction } from '@/server/types';
 
-// Create our own mock for the db module
-const { mockDbQuery } = vi.hoisted<{ mockDbQuery: ReturnType<typeof vi.fn> }>(() => ({
-  mockDbQuery: vi.fn(),
-}));
+// Create a typed mock for the db query function
+const mockDbQuery = vi.fn<(...args: unknown[]) => Promise<{ rows: unknown[] }>>();
 
 // Mock only the db module — we'll test the real audit service against this mock
 vi.mock('@/server/db', () => ({
   db: {
-    query: (...args: unknown[]) => mockDbQuery(...args) as unknown,
+    query: (...args: unknown[]) => mockDbQuery(...args),
   },
   getPoolClient: vi.fn(),
 }));
