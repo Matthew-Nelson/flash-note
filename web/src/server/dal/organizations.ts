@@ -1,10 +1,14 @@
 import 'server-only';
 
 import type pg from 'pg';
+import { z } from 'zod';
 
 import { db } from '@/server/db';
 import type { SubscriptionStatus } from '@/server/types';
 import type { OrganizationRow, OrgSubscriptionRow } from '@/lib/types/database';
+
+// Zod schema to validate subscription_status from DB (same pattern as orgRoleSchema in organization-members.ts)
+const subscriptionStatusSchema = z.enum(['trialing', 'active', 'canceled', 'past_due', 'unpaid']);
 
 // Explicit column list — never SELECT *
 const ORG_COLUMNS = `
@@ -37,7 +41,7 @@ function rowToOrganization(row: OrganizationRow): Organization {
     maxSeats: row.max_seats,
     stripeCustomerId: row.stripe_customer_id,
     subscriptionId: row.subscription_id,
-    subscriptionStatus: row.subscription_status,
+    subscriptionStatus: subscriptionStatusSchema.parse(row.subscription_status),
     trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

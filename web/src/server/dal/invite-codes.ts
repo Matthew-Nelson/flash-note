@@ -153,8 +153,8 @@ export async function revokeCode(codeId: string): Promise<void> {
  * Returns null if valid, or a reason string if invalid.
  */
 export function validateCodeRedeemable(code: InviteCode): string | null {
-  if (!code.isActive) return 'inactive';
   if (code.usedBy !== null) return 'already_used';
+  if (!code.isActive) return 'inactive';
   if (new Date() > code.expiresAt) return 'expired';
   return null;
 }

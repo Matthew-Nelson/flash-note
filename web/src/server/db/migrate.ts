@@ -38,6 +38,8 @@ const pool = new Pool({
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+let exitCode = 0;
+
 async function migrate() {
   console.log('Running database migrations...');
 
@@ -90,7 +92,7 @@ async function migrate() {
     console.log('Migrations complete!');
   } catch (error) {
     console.error('Migration failed:', error);
-    process.exit(1);
+    exitCode = 1;
   } finally {
     // Advisory lock is released when the session ends (client.release)
     client.release();
@@ -98,4 +100,4 @@ async function migrate() {
   }
 }
 
-void migrate();
+void migrate().then(() => process.exit(exitCode));

@@ -87,6 +87,13 @@ describe('User Queries', () => {
       expect(result!.deletedAt).toBeNull();
     });
 
+    it('should throw on invalid subscription_status from DB', async () => {
+      const mockRow = createMockUserRow({ subscription_status: 'invalid_status' as never });
+      mockDbQuery.mockResolvedValueOnce({ rows: [mockRow] });
+
+      await expect(findUserByEmail('test@example.com')).rejects.toThrow();
+    });
+
     it('should normalize email to lowercase for case-insensitive lookup', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -278,6 +285,17 @@ describe('User Queries', () => {
       );
     });
 
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await updateUserSubscription('user-123', 'cus_abc', 'sub_xyz', 'active');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should propagate database errors to the caller', async () => {
       mockDbQuery.mockRejectedValueOnce(new Error('connection refused'));
 
@@ -288,6 +306,17 @@ describe('User Queries', () => {
   });
 
   describe('updateSubscriptionStatus', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await updateSubscriptionStatus('user-123', 'canceled');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should update status only', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -312,6 +341,17 @@ describe('User Queries', () => {
   });
 
   describe('markEmailVerified', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await markEmailVerified('user-123');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should set email_verified to true', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -347,6 +387,17 @@ describe('User Queries', () => {
   });
 
   describe('updatePassword', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await updatePassword('user-123', 'new-hash');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should update password hash using pool by default', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -392,6 +443,17 @@ describe('User Queries', () => {
   });
 
   describe('resetLockout', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      await resetLockout('user-123');
+
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should reset failed_login_attempts to 0', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -450,6 +512,18 @@ describe('User Queries', () => {
   });
 
   describe('updateUserOrganization', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      const mockClient = { query: mockClientQuery } as never;
+      await updateUserOrganization(mockClient, 'user-123', 'org-456');
+
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should set organization_id using transaction client', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -464,6 +538,18 @@ describe('User Queries', () => {
   });
 
   describe('clearUserOrganization', () => {
+    it('should filter out soft-deleted users', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+
+      const mockClient = { query: mockClientQuery } as never;
+      await clearUserOrganization(mockClient, 'user-123');
+
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('AND NOT is_deleted'),
+        expect.any(Array)
+      );
+    });
+
     it('should set organization_id to NULL using transaction client', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
 

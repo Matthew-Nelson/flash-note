@@ -22,7 +22,6 @@ export default defineConfig({
         'src/**/*.test.{ts,tsx}',
         'src/test/**',
         'src/app/**',         // Next.js routes - E2E tested
-        'src/lib/types.ts',   // Pure type definitions, no runtime code
         'src/lib/types/**',   // Pure type definitions, no runtime code
         'src/server/types.ts', // Pure type definitions + enum (tested via consumers)
         'src/server/db/migrate.ts', // CLI script, not unit-testable

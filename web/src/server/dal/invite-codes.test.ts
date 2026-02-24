@@ -298,6 +298,25 @@ describe('Invite Code Queries', () => {
       expect(validateCodeRedeemable(code)).toBe('already_used');
     });
 
+    it('should return "already_used" for a redeemed code (isActive=false + usedBy set)', () => {
+      // After markCodeAsUsed, both is_active=FALSE and used_by are set.
+      // The code should be identified as "already_used", not "inactive".
+      const code: InviteCode = {
+        id: 'code-uuid-1',
+        code: 'AB3K-M7RN',
+        type: 'beta',
+        organizationId: null,
+        createdBy: 'admin-uuid',
+        usedBy: 'some-user-id',
+        usedAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        isActive: false,
+        createdAt: new Date(),
+      };
+
+      expect(validateCodeRedeemable(code)).toBe('already_used');
+    });
+
     it('should return "expired" for an expired code', () => {
       const code: InviteCode = {
         id: 'code-uuid-1',

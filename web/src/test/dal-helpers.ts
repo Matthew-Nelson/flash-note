@@ -37,6 +37,12 @@ export function createMockUserRow(overrides: Partial<{
   id: string;
   email: string;
   password_hash: string;
+  stripe_customer_id: string | null;
+  subscription_id: string | null;
+  subscription_status: string;
+  trial_ends_at: Date;
+  created_at: Date;
+  updated_at: Date;
   failed_login_attempts: number;
   locked_until: Date | null;
   last_failed_login_at: Date | null;

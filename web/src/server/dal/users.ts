@@ -1,10 +1,14 @@
 import 'server-only';
 
 import type pg from 'pg';
+import { z } from 'zod';
 
 import { db } from '@/server/db';
 import type { User, SubscriptionStatus } from '@/server/types';
 import type { UserRow } from '@/lib/types/database';
+
+// Zod schema to validate subscription_status from DB (same pattern as orgRoleSchema in organization-members.ts)
+const subscriptionStatusSchema = z.enum(['trialing', 'active', 'canceled', 'past_due', 'unpaid']);
 
 // Shared column list — update here when adding new user fields
 const USER_COLUMNS = `
@@ -25,7 +29,7 @@ function rowToUser(row: UserRow): User {
     passwordHash: row.password_hash,
     stripeCustomerId: row.stripe_customer_id,
     subscriptionId: row.subscription_id,
-    subscriptionStatus: row.subscription_status,
+    subscriptionStatus: subscriptionStatusSchema.parse(row.subscription_status),
     trialEndsAt: row.trial_ends_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -111,7 +115,7 @@ export async function updateUserSubscription(
        subscription_id = $2,
        subscription_status = $3,
        updated_at = NOW()
-     WHERE id = $4`,
+     WHERE id = $4 AND NOT is_deleted`,
     [stripeCustomerId, subscriptionId, status, userId]
   );
 }
@@ -122,7 +126,7 @@ export async function updateSubscriptionStatus(
 ): Promise<void> {
   await db.query(
     `UPDATE users SET subscription_status = $1, updated_at = NOW()
-     WHERE id = $2`,
+     WHERE id = $2 AND NOT is_deleted`,
     [status, userId]
   );
 }
@@ -133,7 +137,7 @@ export async function markEmailVerified(userId: string): Promise<void> {
      SET email_verified = TRUE,
          email_verified_at = NOW(),
          updated_at = NOW()
-     WHERE id = $1`,
+     WHERE id = $1 AND NOT is_deleted`,
     [userId]
   );
 }
@@ -151,7 +155,7 @@ export async function updatePassword(
     `UPDATE users
      SET password_hash = $1,
          updated_at = NOW()
-     WHERE id = $2`,
+     WHERE id = $2 AND NOT is_deleted`,
     [passwordHash, userId]
   );
 }
@@ -170,7 +174,7 @@ export async function resetLockout(
          locked_until = NULL,
          last_failed_login_at = NULL,
          updated_at = NOW()
-     WHERE id = $1`,
+     WHERE id = $1 AND NOT is_deleted`,
     [userId]
   );
 }
@@ -185,7 +189,7 @@ export async function updateUserOrganization(
   organizationId: string
 ): Promise<void> {
   await client.query(
-    `UPDATE users SET organization_id = $1, updated_at = NOW() WHERE id = $2`,
+    `UPDATE users SET organization_id = $1, updated_at = NOW() WHERE id = $2 AND NOT is_deleted`,
     [organizationId, userId]
   );
 }
@@ -199,7 +203,7 @@ export async function clearUserOrganization(
   userId: string
 ): Promise<void> {
   await client.query(
-    `UPDATE users SET organization_id = NULL, updated_at = NOW() WHERE id = $1`,
+    `UPDATE users SET organization_id = NULL, updated_at = NOW() WHERE id = $1 AND NOT is_deleted`,
     [userId]
   );
 }
