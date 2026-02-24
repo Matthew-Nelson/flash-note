@@ -336,6 +336,34 @@ describe('LLM Schemas', () => {
       expect(result.alerts).toHaveLength(2);
     });
 
+    it('should validate a note with uncertainAreas', () => {
+      const noteWithUncertainty = {
+        ...validNote,
+        uncertainAreas: [
+          'Interpreted "tx" as "treatment" (not thoracic spine)',
+          'Unclear if "15 min" applies to manual therapy or total session',
+        ],
+      };
+
+      const result = PTNoteOutputSchema.parse(noteWithUncertainty);
+      expect(result.uncertainAreas).toHaveLength(2);
+    });
+
+    it('should validate a note without uncertainAreas (field is optional)', () => {
+      const result = PTNoteOutputSchema.parse(validNote);
+      expect(result.uncertainAreas).toBeUndefined();
+    });
+
+    it('should validate a note with empty uncertainAreas array', () => {
+      const noteWithEmptyUncertainty = {
+        ...validNote,
+        uncertainAreas: [],
+      };
+
+      const result = PTNoteOutputSchema.parse(noteWithEmptyUncertainty);
+      expect(result.uncertainAreas).toHaveLength(0);
+    });
+
     it('should reject note missing required SOAP sections', () => {
       const invalidNote = {
         subjective: 'Some content',
@@ -363,6 +391,11 @@ describe('LLM Schemas', () => {
       expect(schema.required).toContain('objective');
       expect(schema.required).toContain('assessment');
       expect(schema.required).toContain('plan');
+    });
+
+    it('should include uncertainAreas in schema properties', () => {
+      const schema = getPTNoteJsonSchema() as { properties: Record<string, unknown> };
+      expect(schema.properties).toHaveProperty('uncertainAreas');
     });
 
     it('should produce a schema usable by LLM providers', () => {

@@ -117,6 +117,9 @@ class AIService {
         // Alerts for the therapist (optional)
         alerts: result.note.alerts,
 
+        // Uncertainty signals (optional)
+        uncertainAreas: result.note.uncertainAreas,
+
         // Metadata
         metadata: {
           model: this.provider.model,

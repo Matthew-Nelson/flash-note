@@ -24,6 +24,22 @@ describe('pt-prompts', () => {
       expect(systemPrompt).toContain('8-minute rule');
       expect(systemPrompt).toContain('CPT codes');
     });
+
+    it('should contain PT shorthand disambiguation section', () => {
+      const systemPrompt = getSystemPrompt();
+      expect(systemPrompt).toContain('PT Shorthand Disambiguation');
+      expect(systemPrompt).toContain('"tx" = treatment');
+      expect(systemPrompt).toContain('NWB=non, TTWB=toe-touch, PWB=partial, WBAT=as tolerated, FWB=full');
+      expect(systemPrompt).toContain('"w/" = with, "w/o" = without');
+      expect(systemPrompt).toContain('"HEP" = home exercise program');
+    });
+
+    it('should contain uncertainty flagging instructions', () => {
+      const systemPrompt = getSystemPrompt();
+      expect(systemPrompt).toContain('Uncertainty Flagging');
+      expect(systemPrompt).toContain('uncertainAreas');
+      expect(systemPrompt).toContain('Do NOT flag routine shorthand expansion');
+    });
   });
 
   describe('buildUserPrompt', () => {

@@ -16,7 +16,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 15/20 | Sign Google Cloud BAA |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
@@ -88,8 +88,8 @@ Framework-agnostic changes — prompt templates and LLM config transfer directly
 | Change | Effort | Status |
 |--------|--------|--------|
 | Add sandwich defense (repeat security rules after user content) | Small prompt edit | ✅ Done (included in systemInstruction refactor) |
-| Inject PT abbreviation reference into prompts | Prompt addition | ❌ |
-| Add `needsReview` / `uncertainAreas` to output schema | Schema + prompt update | ❌ |
+| Inject PT abbreviation reference into prompts | Prompt addition | ✅ Done |
+| Add `uncertainAreas` to output schema | Schema + prompt update | ✅ Done |
 
 #### P2-P3 — Defer to Post-Migration
 

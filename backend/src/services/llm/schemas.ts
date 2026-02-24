@@ -204,6 +204,19 @@ export const PTNoteOutputSchema = z.object({
       'Billing warnings, documentation gaps, or modifier reminders ' +
       '(e.g., "Medicare patient? Add GP modifier", "15 min manual therapy - 16+ safer for audits")'
     ),
+
+  // Uncertainty signals for clinician review
+  uncertainAreas: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Areas where the clinician input was ambiguous and the model made an interpretation choice. ' +
+      'Examples: "Interpreted \'tx\' as \'treatment\' (not thoracic spine)", ' +
+      '"ROM mentioned without specifying joint - used general language", ' +
+      '"Unclear if \'15 min\' applies to manual therapy or total session". ' +
+      'Flag these for clinician review. Only include genuinely ambiguous items. ' +
+      'Do NOT flag routine shorthand expansion (e.g., "HEP" to "home exercise program").'
+    ),
 });
 
 export type PTNoteOutput = z.infer<typeof PTNoteOutputSchema>;

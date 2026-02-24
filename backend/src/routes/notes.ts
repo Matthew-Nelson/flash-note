@@ -78,10 +78,11 @@ notesRouter.post('/generate', async (req, res, next) => {
       objective: result.objective,
       assessment: result.assessment,
       plan: result.plan,
-      // Enhanced fields for billing, goals, and alerts (optional)
+      // Enhanced fields (optional)
       billing: result.billing,
       goals: result.goals,
       alerts: result.alerts,
+      uncertainAreas: result.uncertainAreas,
       metadata: {
         generationTimeMs: result.metadata.generationTimeMs,
       },
