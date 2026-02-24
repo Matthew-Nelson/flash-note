@@ -51,8 +51,8 @@ Framework-agnostic work that applies regardless of the migration. Do this now.
 | # | Item | Type | Status |
 |---|------|------|--------|
 | 1 | **Sign Google Cloud BAA** — covers Cloud Run, Cloud SQL, Vertex AI | Ops | ✅ Done |
-| 2 | **Database encryption at rest** — Cloud SQL default; verified during Phase 1.0 provisioning | Ops | ✅ Covered (Cloud SQL encrypts at rest by default) |
-| 3 | **TLS 1.2+ enforced on all connections** — set `require_ssl = true` during Phase 1.0 Cloud SQL provisioning | Ops | ✅ Covered (configure at provisioning) |
+| 2 | **Database encryption at rest** — Cloud SQL default; verify during Phase 1.0 provisioning | Ops | ⏳ Pending provisioning (Cloud SQL encrypts at rest by default) |
+| 3 | **TLS 1.2+ enforced on all connections** — set `require_ssl = true` during Phase 1.0 Cloud SQL provisioning | Ops | ⏳ Pending provisioning (configure at provisioning) |
 | 4 | **Audit log immutability protections** — database triggers prevent UPDATE/DELETE/TRUNCATE on `audit_logs` (migration 012) | Code | ✅ Done |
 | 5 | **Breach notification / incident response procedure** — [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md) | Docs | ✅ Done |
 | 6 | BAA acceptance in signup flow (backend) | Code | ✅ Done |
@@ -212,10 +212,12 @@ Each sub-phase is independently testable and committable. **Tests are written al
 
 Stand up the deployment pipeline before writing business logic. Validates Cloud Run + Next.js compatibility early.
 
+> **CI scope change:** CI is narrowed to web-only from this phase forward. Backend and extension CI jobs are removed — those components are being sunset by the migration. Their test suites remain runnable locally (`cd backend && pnpm test`, `cd extension && pnpm test`) until the directories are deleted in Migration Cleanup.
+
 - Configure `output: 'standalone'` in `next.config.js`
 - Write multi-stage Dockerfile (build → slim production image with standalone output)
 - Set up GitHub Actions → Artifact Registry → Cloud Run pipeline
-- Provision Cloud Run service with `min-instances=1`
+- Provision Cloud Run service with `min-instances=0` (pre-launch cost savings; increase to 1 before production traffic)
 - Provision Cloud SQL PostgreSQL with HIPAA-required config: encryption at rest (default), `require_ssl = true`, automatic backups enabled
 - Provision Upstash Redis
 - Deploy hello-world Next.js page to verify full pipeline
@@ -367,8 +369,8 @@ These items from Phase 0 HIPAA Infrastructure must be complete before PHI work b
 | Item | Status |
 |------|--------|
 | Google Cloud BAA signed | ✅ Done |
-| Database encryption at rest | ✅ Covered (Cloud SQL default; verify at provisioning) |
-| TLS 1.2+ enforced | ✅ Covered (`require_ssl = true` at provisioning) |
+| Database encryption at rest | ⏳ Pending provisioning (Cloud SQL default; verify at provisioning) |
+| TLS 1.2+ enforced | ⏳ Pending provisioning (`require_ssl = true` at provisioning) |
 | Audit log retention automation (6-year HIPAA requirement) | ❌ — build in new DAL during Phase 1 or here |
 | Audit log immutability protections | ✅ Done (migration 012) |
 | Legal document re-acceptance flow | ❌ — build on new stack |

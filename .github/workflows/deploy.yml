@@ -25,6 +25,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -42,12 +44,13 @@ jobs:
         run: |
           docker build --platform linux/amd64 \
             --build-arg "NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
-            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            --build-arg "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" \
+            -t ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }} \
             -t ${{ env.IMAGE }}:latest .
 
       - name: Push Docker image
         run: |
-          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}
           docker push ${{ env.IMAGE }}:latest
 
       # Runtime env vars: NODE_ENV is set here. Secrets (UPSTASH_REDIS_REST_URL,
@@ -57,7 +60,7 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy flashnote \
-            --image=${{ env.IMAGE }}:${{ github.sha }} \
+            --image=${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }} \
             --region=${{ secrets.GCP_REGION }} \
             --service-account=${{ secrets.GCP_SA_RUNTIME_EMAIL }} \
             --memory=1Gi \
