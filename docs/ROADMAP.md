@@ -241,7 +241,7 @@ Stand up the deployment pipeline before writing business logic. Validates Cloud 
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done — PR #79 |
 
 ### 1.2 — Session System + Auth Rate Limiting
 
