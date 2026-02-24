@@ -144,6 +144,27 @@ export interface OrganizationMemberRow {
 }
 
 /**
+ * Session JOIN users — returned by findSessionByTokenHash.
+ * Only includes user fields needed for authorization (no lockout fields).
+ */
+export interface SessionWithUserRow {
+  // Session fields
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: Date;
+  created_at: Date;
+  ip_address: string | null;
+  user_agent: string | null;
+  // User fields (authorization-relevant only)
+  email: string;
+  subscription_status: SubscriptionStatus;
+  trial_ends_at: Date;
+  email_verified: boolean;
+  organization_id: string | null;
+}
+
+/**
  * Partial row types for SELECT queries that only fetch specific columns
  */
 export interface UserLockoutRow {

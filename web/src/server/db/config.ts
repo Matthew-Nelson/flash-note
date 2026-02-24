@@ -18,6 +18,10 @@ const envSchema = z.object({
       (url) => url.startsWith('postgres://') || url.startsWith('postgresql://'),
       { message: 'DATABASE_URL must start with postgres:// or postgresql://' }
     ),
+
+  // Upstash Redis — optional in dev/test, required in production (enforced in redis.ts)
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
 });
 
 function loadConfig() {
@@ -41,6 +45,13 @@ export const isTest = config.NODE_ENV === 'test';
 // Security constants
 // SECURITY: 12 rounds provides ~250ms hash time, balancing security and UX
 export const BCRYPT_ROUNDS = 12;
+
+// Session timing
+export const SESSION_IDLE_TTL_MS = 24 * 60 * 60 * 1000;        // 24 hours
+export const SESSION_ABSOLUTE_MAX_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+export const SESSION_REFRESH_THRESHOLD = 0.5; // Refresh when >50% of idle TTL elapsed
+export const MAX_SESSIONS_PER_USER = 5;
+export const SESSION_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
 
 // Legal document versions - bump independently when each document is updated
 // Recorded in legal_acceptances for audit trail
