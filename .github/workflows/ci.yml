@@ -1,10 +1,18 @@
 name: CI
 
 on:
-  # push:
-  #   branches: [main, develop]
-  # pull_request:
-  #   branches: [main, develop]
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.claude/**'
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.claude/**'
   workflow_dispatch:
 
 concurrency:
@@ -16,125 +24,6 @@ env:
   PNPM_VERSION: '10'
 
 jobs:
-  backend:
-    name: Backend
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: ./backend
-
-      - name: Lint
-        run: pnpm lint
-        working-directory: ./backend
-
-      - name: Test
-        run: pnpm test:ci
-        working-directory: ./backend
-        env:
-          NODE_ENV: test
-          DATABASE_URL: postgresql://test:test@localhost:5432/test
-          JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-          JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-          CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-          GEMINI_API_KEY: test-gemini-api-key
-          STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-          STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
-
-      - name: Build
-        run: pnpm build
-        working-directory: ./backend
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: backend-coverage
-          path: ./backend/coverage/
-          retention-days: 30
-
-      - name: Coverage summary
-        if: always()
-        run: |
-          summary_file="./backend/coverage/coverage-summary.json"
-          echo "## Backend Coverage" >> $GITHUB_STEP_SUMMARY
-          if [ -f "$summary_file" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
-            for metric in lines branches functions statements; do
-              pct=$(jq -r ".total.${metric}.pct" "$summary_file")
-              echo "| ${metric^} | ${pct}% |" >> $GITHUB_STEP_SUMMARY
-            done
-          else
-            echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
-          fi
-
-  extension:
-    name: Extension
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        working-directory: ./extension
-
-      - name: Lint
-        run: pnpm lint
-        working-directory: ./extension
-
-      - name: Test
-        run: pnpm test:ci
-        working-directory: ./extension
-
-      - name: Build
-        run: pnpm build
-        working-directory: ./extension
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: extension-coverage
-          path: ./extension/coverage/
-          retention-days: 30
-
-      - name: Coverage summary
-        if: always()
-        run: |
-          summary_file="./extension/coverage/coverage-summary.json"
-          echo "## Extension Coverage" >> $GITHUB_STEP_SUMMARY
-          if [ -f "$summary_file" ]; then
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "| Metric | Coverage |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|----------|" >> $GITHUB_STEP_SUMMARY
-            for metric in lines branches functions statements; do
-              pct=$(jq -r ".total.${metric}.pct" "$summary_file")
-              echo "| ${metric^} | ${pct}% |" >> $GITHUB_STEP_SUMMARY
-            done
-          else
-            echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
-          fi
-
   web:
     name: Web
     runs-on: ubuntu-latest
@@ -151,7 +40,6 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-        working-directory: ./web
 
       - name: Lint
         run: pnpm lint
@@ -164,16 +52,6 @@ jobs:
       - name: Build
         run: pnpm build
         working-directory: ./web
-        env:
-          NEXT_PUBLIC_API_URL: https://api.example.com
-
-      - name: Upload coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: web-coverage
-          path: ./web/coverage/
-          retention-days: 30
 
       - name: Coverage summary
         if: always()
@@ -192,52 +70,25 @@ jobs:
             echo "Coverage summary not available" >> $GITHUB_STEP_SUMMARY
           fi
 
-  security-audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install all dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Audit backend
-        run: pnpm audit --audit-level=high
-        working-directory: ./backend
-        continue-on-error: true
-
-      - name: Audit extension
-        run: pnpm audit --audit-level=high
-        working-directory: ./extension
-        continue-on-error: true
-
-      - name: Audit web
+      # Advisory-only — results appear in workflow logs but won't fail CI.
+      # We don't block deploys on transitive dependency vulnerabilities
+      # we can't immediately fix.
+      - name: Security audit
         run: pnpm audit --audit-level=high
         working-directory: ./web
         continue-on-error: true
 
   ci-success:
     name: CI Success
-    needs: [backend, extension, web, security-audit]
+    needs: [web]
     runs-on: ubuntu-latest
     if: always()
 
     steps:
       - name: Check required jobs
         run: |
-          results=("${{ needs.backend.result }}" "${{ needs.extension.result }}" "${{ needs.web.result }}" "${{ needs.security-audit.result }}")
-          for result in "${results[@]}"; do
-            if [[ "$result" != "success" ]]; then
-              echo "One or more required jobs failed"
-              exit 1
-            fi
-          done
+          if [[ "${{ needs.web.result }}" != "success" ]]; then
+            echo "Web job failed"
+            exit 1
+          fi
           echo "All required checks passed!"

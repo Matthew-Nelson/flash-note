@@ -49,15 +49,13 @@
 ### Business Associate Agreements (BAAs)
 
 **BAAs You Need to SIGN (as the customer):**
-- [ ] **Google Cloud BAA** (for Vertex AI / Gemini)
-  - Free, required for HIPAA-compliant LLM usage
-  - Sign at: Google Cloud Console → Compliance → BAA
+- [x] **Google Cloud BAA** (for Vertex AI / Gemini)
+  - Signed Feb 2026 via GCP Console → IAM & Admin → Privacy
+  - Covers all HIPAA-eligible GCP services: Cloud Run, Cloud SQL, Vertex AI
   - Must use Vertex AI endpoint (not consumer Gemini API)
-- [ ] **Hosting Provider BAA** (Google Cloud)
-  - Google Cloud offers BAA covering Cloud Run, Cloud SQL, and other services
-  - Sign at: Google Cloud Console → Compliance → BAA
-  - BAA covers HIPAA-eligible services when configured correctly
-- [ ] **Database Provider BAA**
+- [x] **Hosting Provider BAA** (Google Cloud)
+  - Covered by the single Google Cloud BAA signed above
+- [x] **Database Provider BAA**
   - Cloud SQL is covered under the Google Cloud BAA (same agreement covers all HIPAA-eligible GCP services)
 
 **BAA You Need to PROVIDE (to customers):**
@@ -105,9 +103,8 @@
   - Escalation path and decision tree
   - Evidence preservation procedures
   - Communication templates for covered entities
-- [ ] **Verify Google Cloud/Vertex AI BAA is signed**
-  - Required before any PHI flows through Gemini/Vertex AI
-  - Must use Vertex AI endpoint (consumer Gemini API is NOT covered)
+- [x] **Verify Google Cloud/Vertex AI BAA is signed**
+  - Signed Feb 2026. Must use Vertex AI endpoint (consumer Gemini API is NOT covered)
 
 **Estimated Legal Cost:** $0 (templates only) to $1,500-3,000 (attorney review)
 
