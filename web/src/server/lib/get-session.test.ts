@@ -177,6 +177,29 @@ describe('getSession', () => {
     expect(mockRefreshSessionExpiry).not.toHaveBeenCalled();
   });
 
+  it('should still return SessionData when refresh fails (best-effort)', async () => {
+    const session = createMockSessionRow({
+      expires_at: new Date(Date.now() + 6 * 60 * 60 * 1000), // triggers refresh
+      created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
+    });
+
+    mockGetSessionToken.mockResolvedValueOnce('raw-token');
+    mockHashSessionToken.mockReturnValueOnce('hashed-token');
+    mockFindSessionByTokenHash.mockResolvedValueOnce(session);
+    mockRefreshSessionExpiry.mockRejectedValueOnce(new Error('connection timeout'));
+
+    const result = await getSession();
+
+    // Session is valid — refresh failure should NOT log the user out
+    expect(result).not.toBeNull();
+    expect(result!.sessionId).toBe('session-uuid');
+    // eslint-disable-next-line no-console
+    expect(console.error).toHaveBeenCalledWith(
+      'Session refresh failed:',
+      expect.any(Error)
+    );
+  });
+
   it('should return null on DB error (fail-closed)', async () => {
     mockGetSessionToken.mockResolvedValueOnce('raw-token');
     mockHashSessionToken.mockReturnValueOnce('hashed-token');

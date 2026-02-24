@@ -43,7 +43,16 @@ export async function getSession(): Promise<SessionData | null> {
       newExpiry.getTime() > session.expires_at.getTime();
 
     if (refreshNeeded) {
-      await refreshSessionExpiry(session.id, newExpiry);
+      try {
+        await refreshSessionExpiry(session.id, newExpiry);
+      } catch (refreshError) {
+        // Non-critical: session remains valid, just won't be extended this request
+        // TODO: Replace with Pino structured logger when available:
+        //   logger.error({ err: refreshError, source: 'lib_get_session', errorType: 'session_refresh_failed',
+        //     sessionId: session.id }, 'Session refresh failed');
+        // eslint-disable-next-line no-console
+        console.error('Session refresh failed:', refreshError);
+      }
     }
 
     return {
