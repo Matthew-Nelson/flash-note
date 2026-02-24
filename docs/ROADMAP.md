@@ -187,7 +187,7 @@ Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`
 | M-20 | Migration script lacks advisory locks | 1.1 | Add `pg_advisory_lock` to ported migration runner |
 | M-22 | `findMemberByOrgAndUser` returns stale membership | 1.1 | Add `WHERE removed_at IS NULL` when porting query |
 | M-25 | `removeMember` doesn't verify row was updated | 1.1 | Return rowCount when porting query |
-| M-27 | `cleanupExpiredTokens()` never called | 1.1 | Wire up cleanup job for sessions + tokens |
+| M-27 | `cleanupExpiredTokens()` never called | 1.2 | Wire up cleanup job for sessions + tokens (deferred — session management is 1.2) |
 | L-5 | Unsafe type cast of database role value | 1.1 | Zod-validate role from DB result |
 | L-13 | `email_tokens.token_hash` lacks UNIQUE constraint | 1.1 | Fix in squashed `001_initial_schema.sql` |
 | L-14 | Redundant `idx_users_email` index | 1.1 | Drop in squashed schema (UNIQUE already creates index) |

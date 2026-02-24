@@ -12,6 +12,9 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { afterEach, vi } from 'vitest';
 
+// Mock server-only package so server/ imports don't fail in test environment
+vi.mock('server-only', () => ({}));
+
 // React 19: RTL cleanup must be called manually
 afterEach(() => {
   cleanup();

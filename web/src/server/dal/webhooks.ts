@@ -1,0 +1,55 @@
+import 'server-only';
+
+import { db } from '@/server/db';
+
+/**
+ * Atomically check and record a webhook event for idempotency.
+ * Returns true if this is a new event (should be processed).
+ * Returns false if the event was already processed (skip).
+ *
+ * Uses INSERT ... ON CONFLICT to avoid race conditions.
+ */
+export async function tryMarkWebhookProcessed(
+  eventId: string,
+  eventType: string
+): Promise<boolean> {
+  const result = await db.query(
+    `INSERT INTO processed_webhook_events (event_id, event_type)
+     VALUES ($1, $2)
+     ON CONFLICT (event_id) DO NOTHING`,
+    [eventId, eventType]
+  );
+
+  // rowCount = 1 means we inserted (new event)
+  // rowCount = 0 means conflict (already processed)
+  return (result.rowCount ?? 0) > 0;
+}
+
+/**
+ * Delete a processed webhook event record to allow Stripe retry.
+ * Used when a handler fails after idempotency mark — removes the record
+ * so the next Stripe delivery attempt will be processed.
+ */
+export async function deleteProcessedWebhookEvent(eventId: string): Promise<void> {
+  await db.query('DELETE FROM processed_webhook_events WHERE event_id = $1', [eventId]);
+}
+
+/**
+ * Clean up old webhook events.
+ * Call periodically to prevent table bloat.
+ * Stripe guarantees event delivery for up to 72 hours,
+ * so 7 days is a safe retention period.
+ */
+export async function cleanupOldWebhookEvents(daysToKeep = 7): Promise<number> {
+  if (daysToKeep < 1) {
+    throw new Error('cleanupOldWebhookEvents: daysToKeep must be >= 1');
+  }
+
+  const result = await db.query(
+    `DELETE FROM processed_webhook_events
+     WHERE processed_at < NOW() - INTERVAL '1 day' * $1`,
+    [daysToKeep]
+  );
+
+  return result.rowCount ?? 0;
+}
