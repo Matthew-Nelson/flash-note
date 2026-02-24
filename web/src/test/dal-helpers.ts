@@ -13,13 +13,16 @@ type MockQueryFn = (...args: unknown[]) => Promise<{ rows: unknown[]; rowCount?:
 export const mockDbQuery = vi.fn<MockQueryFn>();
 export const mockClientQuery = vi.fn<MockQueryFn>();
 
+// Mock getPoolClient function (exported for test configuration)
+export const mockGetPoolClient = vi.fn();
+
 // Mock the database module
 vi.mock('@/server/db', () => ({
   db: {
     query: (...args: unknown[]): Promise<{ rows: unknown[]; rowCount?: number }> =>
       mockDbQuery(...args),
   },
-  getPoolClient: vi.fn(),
+  getPoolClient: (...args: unknown[]): unknown => mockGetPoolClient(...args),
 }));
 
 /**
@@ -28,6 +31,7 @@ vi.mock('@/server/db', () => ({
 export function resetMocks() {
   mockDbQuery.mockReset();
   mockClientQuery.mockReset();
+  mockGetPoolClient.mockReset();
 }
 
 /**
@@ -122,6 +126,40 @@ export function createMockOrgMemberRow(overrides: Partial<{
     is_billable: true,
     joined_at: new Date(),
     removed_at: null,
+    ...overrides,
+  };
+}
+
+/**
+ * Helper to create a mock session+user JOIN row (SessionWithUserRow)
+ */
+export function createMockSessionWithUserRow(overrides: Partial<{
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: Date;
+  created_at: Date;
+  ip_address: string | null;
+  user_agent: string | null;
+  email: string;
+  subscription_status: string;
+  trial_ends_at: Date;
+  email_verified: boolean;
+  organization_id: string | null;
+}> = {}) {
+  return {
+    id: 'session-uuid',
+    user_id: 'test-user-id',
+    token_hash: 'abc123hash',
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    created_at: new Date(),
+    ip_address: '127.0.0.1',
+    user_agent: 'TestAgent/1.0',
+    email: 'test@example.com',
+    subscription_status: 'trialing',
+    trial_ends_at: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    email_verified: true,
+    organization_id: null,
     ...overrides,
   };
 }

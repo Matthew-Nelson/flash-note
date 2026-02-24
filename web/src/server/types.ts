@@ -98,6 +98,21 @@ export interface AuditLogEntry {
   userAgent?: string;
 }
 
+export interface SessionData {
+  sessionId: string;
+  userId: string;
+  email: string;
+  subscriptionStatus: SubscriptionStatus;
+  trialEndsAt: Date;
+  emailVerified: boolean;
+  organizationId: string | null;
+}
+
+export interface SessionContext {
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
