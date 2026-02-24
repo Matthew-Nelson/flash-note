@@ -69,7 +69,7 @@ describe('legal-acceptances queries', () => {
       expect(mockClient.query).toHaveBeenCalledTimes(docTypes.length);
 
       docTypes.forEach((docType, index) => {
-        const call = mockClient.query.mock.calls[index]!;
+        const call = mockClient.query.mock.calls[index];
         const params = call[1] as string[];
         expect(params[0]).toBe('user-1');
         expect(params[1]).toBe(docType);

@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi, afterEach, beforeAll } from 'vite
 import { AuditAction } from '@/server/types';
 
 // Create our own mock for the db module
-const { mockDbQuery } = vi.hoisted(() => ({
+const { mockDbQuery } = vi.hoisted<{ mockDbQuery: ReturnType<typeof vi.fn> }>(() => ({
   mockDbQuery: vi.fn(),
 }));
 
 // Mock only the db module — we'll test the real audit service against this mock
 vi.mock('@/server/db', () => ({
   db: {
-    query: (...args: unknown[]) => mockDbQuery(...args),
+    query: (...args: unknown[]) => mockDbQuery(...args) as unknown,
   },
   getPoolClient: vi.fn(),
 }));
@@ -18,8 +18,6 @@ vi.mock('@/server/db', () => ({
 let auditService: typeof import('./audit').auditService;
 
 describe('AuditService', () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-
   beforeAll(async () => {
     vi.resetModules();
     const module = await import('./audit');
@@ -29,11 +27,11 @@ describe('AuditService', () => {
   beforeEach(() => {
     mockDbQuery.mockReset();
     mockDbQuery.mockResolvedValue({ rows: [] });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {}) as ReturnType<typeof vi.spyOn>;
+    vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
+    vi.restoreAllMocks();
   });
 
   describe('log', () => {
@@ -172,7 +170,7 @@ describe('AuditService', () => {
         status: 'SUCCESS',
       });
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Audit log failed:', dbError);
+      expect(console.error).toHaveBeenCalledWith('Audit log failed:', dbError);
     });
 
     it('should not break application flow when audit fails', async () => {
@@ -313,8 +311,8 @@ describe('AuditService', () => {
       });
 
       const calls = mockDbQuery.mock.calls;
-      expect(calls[0]![1]).toContain('SUCCESS');
-      expect(calls[1]![1]).toContain('FAILURE');
+      expect(calls[0][1]).toContain('SUCCESS');
+      expect(calls[1][1]).toContain('FAILURE');
     });
 
     it('should use parameterized queries', async () => {
@@ -346,7 +344,7 @@ describe('AuditService', () => {
         })
       ).resolves.not.toThrow();
 
-      expect(consoleErrorSpy).toHaveBeenCalled();
+      expect(console.error).toHaveBeenCalled();
     });
 
     it('should handle connection pool exhaustion gracefully', async () => {
