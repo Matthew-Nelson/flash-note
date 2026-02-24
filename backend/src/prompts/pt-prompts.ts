@@ -177,7 +177,7 @@ Flag potential documentation issues:
 ## Uncertainty Flagging
 
 When you encounter ambiguous input, include it in the "uncertainAreas" array rather than guessing silently. Examples of what to flag:
-- Abbreviations that could mean multiple things (e.g., "tx" could be treatment or thoracic spine)
+- Abbreviations that could mean multiple things (e.g., "ther ex" could be therapeutic exercise or therapy extension)
 - Times that could apply to different interventions
 - Unclear whether a measurement is active or passive ROM
 - Ambiguous body region references

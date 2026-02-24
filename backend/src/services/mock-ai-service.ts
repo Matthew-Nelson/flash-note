@@ -66,7 +66,7 @@ const MOCK_RESPONSES: Record<NoteType, MockResponse> = {
       'Medicare patient? Ensure GP modifier is applied to all charges.',
     ],
     uncertainAreas: [
-      'Interpreted "tx" as "treatment" (could also mean thoracic spine in anatomical context)',
+      'Interpreted "ther ex" as "therapeutic exercise" (could also mean therapy extension)',
     ],
   },
 

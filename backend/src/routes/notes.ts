@@ -73,6 +73,7 @@ notesRouter.post('/generate', async (req, res, next) => {
     // - securityMetadata: NEVER expose (helps attackers refine injection attempts)
     // - metadata.model, metadata.inputTokens/outputTokens/totalTokens: Not used by FE, unnecessary exposure
     // - metadata.generationTimeMs: Used by FE for "Generated in X.Xs" display
+    // - billing, goals, alerts, uncertainAreas: LLM-generated clinical display fields; no raw user input
     const clientResponse = {
       subjective: result.subjective,
       objective: result.objective,
