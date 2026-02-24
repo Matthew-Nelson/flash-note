@@ -211,7 +211,7 @@ export const PTNoteOutputSchema = z.object({
     .optional()
     .describe(
       'Areas where the clinician input was ambiguous and the model made an interpretation choice. ' +
-      'Examples: "Interpreted \'tx\' as \'treatment\' (not thoracic spine)", ' +
+      'Examples: "Interpreted \'ther ex\' as \'therapeutic exercise\' (not therapy extension)", ' +
       '"ROM mentioned without specifying joint - used general language", ' +
       '"Unclear if \'15 min\' applies to manual therapy or total session". ' +
       'Flag these for clinician review. Only include genuinely ambiguous items. ' +
