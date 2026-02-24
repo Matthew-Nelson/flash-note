@@ -1,0 +1,71 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main]
+    types: [completed]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy to Cloud Run
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/flashnote/flashnote
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      # TODO: Add SENTRY_AUTH_TOKEN as a build secret to enable source map uploads.
+      # Without it, withSentryConfig in next.config.ts silently skips uploads —
+      # Sentry error reports will work but without source-mapped stack traces.
+      - name: Build Docker image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg "NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
+            -t ${{ env.IMAGE }}:${{ github.sha }} \
+            -t ${{ env.IMAGE }}:latest .
+
+      - name: Push Docker image
+        run: |
+          docker push ${{ env.IMAGE }}:${{ github.sha }}
+          docker push ${{ env.IMAGE }}:latest
+
+      # Runtime env vars: NODE_ENV is set here. Secrets (UPSTASH_REDIS_REST_URL,
+      # UPSTASH_REDIS_REST_TOKEN, SENTRY_DSN, etc.) are configured in Cloud Run
+      # console or via Secret Manager — not passed in this workflow to avoid
+      # storing them as GitHub secrets when they only need to exist in GCP.
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy flashnote \
+            --image=${{ env.IMAGE }}:${{ github.sha }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --service-account=${{ secrets.GCP_SA_RUNTIME_EMAIL }} \
+            --memory=1Gi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=10 \
+            --port=3000 \
+            --startup-probe-path=/api/health \
+            --liveness-probe-path=/api/health \
+            --allow-unauthenticated \
+            --set-env-vars=NODE_ENV=production

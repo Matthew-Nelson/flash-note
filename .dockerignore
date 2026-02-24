@@ -1,0 +1,17 @@
+**/node_modules
+**/.next
+**/coverage
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/__tests__
+.git
+.github/
+.claude/
+**/.env*
+**/README.md
+CLAUDE.md
+CLAUDE_DRAFT.md
+backend/
+extension/
+docs/
