@@ -1,17 +1,35 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// --- Mocks (must be set up before imports) ---
+// --- Mocks (vi.hoisted ensures declarations are available when vi.mock factories run) ---
 
-// Mock next/navigation
-const mockRedirect = vi.fn();
+const mockRedirect = vi.hoisted(() => vi.fn());
+const mockLogin = vi.hoisted(() => vi.fn());
+const mockRegister = vi.hoisted(() => vi.fn());
+const mockCompletePasswordReset = vi.hoisted(() => vi.fn());
+const mockValidateAndConsumeToken = vi.hoisted(() => vi.fn());
+const mockIsTokenValid = vi.hoisted(() => vi.fn());
+const mockFindUserIdFromToken = vi.hoisted(() => vi.fn());
+const mockCreateToken = vi.hoisted(() => vi.fn());
+const mockSendVerificationEmail = vi.hoisted(() => vi.fn());
+const mockSendPasswordResetEmail = vi.hoisted(() => vi.fn());
+const mockSetSessionCookie = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockClearSessionCookie = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockGetSession = vi.hoisted(() => vi.fn());
+const mockFindUserByEmail = vi.hoisted(() => vi.fn());
+const mockFindUserById = vi.hoisted(() => vi.fn());
+const mockMarkEmailVerified = vi.hoisted(() => vi.fn());
+const mockDeleteSession = vi.hoisted(() => vi.fn());
+const mockFindByCode = vi.hoisted(() => vi.fn());
+const mockValidateCodeRedeemable = vi.hoisted(() => vi.fn());
+const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+
 vi.mock('next/navigation', () => ({
   redirect: (...args: unknown[]) => {
     mockRedirect(...args);
-    throw new Error('NEXT_REDIRECT'); // simulate redirect throw
+    throw new Error('NEXT_REDIRECT');
   },
 }));
 
-// Mock next/headers
 vi.mock('next/headers', () => ({
   headers: vi.fn().mockResolvedValue({
     get: (name: string) => {
@@ -27,37 +45,24 @@ vi.mock('next/headers', () => ({
   }),
 }));
 
-// Mock auth service
-const mockLogin = vi.fn();
-const mockRegister = vi.fn();
-const mockCompletePasswordReset = vi.fn();
 vi.mock('@/server/services/auth', () => ({
-  login: (...args: unknown[]) => mockLogin(...args),
-  register: (...args: unknown[]) => mockRegister(...args),
-  completePasswordReset: (...args: unknown[]) => mockCompletePasswordReset(...args),
+  login: mockLogin,
+  register: mockRegister,
+  completePasswordReset: mockCompletePasswordReset,
 }));
 
-// Mock token service
-const mockValidateAndConsumeToken = vi.fn();
-const mockIsTokenValid = vi.fn();
-const mockFindUserIdFromToken = vi.fn();
-const mockCreateToken = vi.fn();
 vi.mock('@/server/services/token', () => ({
-  validateAndConsumeToken: (...args: unknown[]) => mockValidateAndConsumeToken(...args),
-  isTokenValid: (...args: unknown[]) => mockIsTokenValid(...args),
-  findUserIdFromToken: (...args: unknown[]) => mockFindUserIdFromToken(...args),
-  createToken: (...args: unknown[]) => mockCreateToken(...args),
+  validateAndConsumeToken: mockValidateAndConsumeToken,
+  isTokenValid: mockIsTokenValid,
+  findUserIdFromToken: mockFindUserIdFromToken,
+  createToken: mockCreateToken,
 }));
 
-// Mock email service
-const mockSendVerificationEmail = vi.fn();
-const mockSendPasswordResetEmail = vi.fn();
 vi.mock('@/server/services/email', () => ({
-  sendVerificationEmail: (...args: unknown[]) => mockSendVerificationEmail(...args),
-  sendPasswordResetEmail: (...args: unknown[]) => mockSendPasswordResetEmail(...args),
+  sendVerificationEmail: mockSendVerificationEmail,
+  sendPasswordResetEmail: mockSendPasswordResetEmail,
 }));
 
-// Mock rate limiting (always allow)
 vi.mock('@/server/lib/rate-limit', () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ success: true, limit: 0, remaining: 0, reset: 0 }),
   rateLimitKey: (ip: string, id?: string) => id ? `${ip}:${id}` : ip,
@@ -70,51 +75,36 @@ vi.mock('@/server/lib/rate-limit', () => ({
   inviteCodeValidateRateLimit: null,
 }));
 
-// Mock session cookie
-const mockSetSessionCookie = vi.fn().mockResolvedValue(undefined);
-const mockClearSessionCookie = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/server/lib/session-cookie', () => ({
-  setSessionCookie: (...args: unknown[]) => mockSetSessionCookie(...args),
-  clearSessionCookie: (...args: unknown[]) => mockClearSessionCookie(...args),
+  setSessionCookie: mockSetSessionCookie,
+  clearSessionCookie: mockClearSessionCookie,
   getSessionToken: vi.fn().mockResolvedValue(null),
   hashSessionToken: vi.fn().mockReturnValue('hash'),
 }));
 
-// Mock getSession
-const mockGetSession = vi.fn();
 vi.mock('@/server/lib/get-session', () => ({
-  getSession: (...args: unknown[]) => mockGetSession(...args),
+  getSession: mockGetSession,
 }));
 
-// Mock DAL
-const mockFindUserByEmail = vi.fn();
-const mockFindUserById = vi.fn();
-const mockMarkEmailVerified = vi.fn();
 vi.mock('@/server/dal/users', () => ({
-  findUserByEmail: (...args: unknown[]) => mockFindUserByEmail(...args),
-  findUserById: (...args: unknown[]) => mockFindUserById(...args),
-  markEmailVerified: (...args: unknown[]) => mockMarkEmailVerified(...args),
+  findUserByEmail: mockFindUserByEmail,
+  findUserById: mockFindUserById,
+  markEmailVerified: mockMarkEmailVerified,
 }));
 
-const mockDeleteSession = vi.fn();
 vi.mock('@/server/dal/sessions', () => ({
-  deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
+  deleteSession: mockDeleteSession,
 }));
 
-const mockFindByCode = vi.fn();
-const mockValidateCodeRedeemable = vi.fn();
 vi.mock('@/server/dal/invite-codes', () => ({
-  findByCode: (...args: unknown[]) => mockFindByCode(...args),
-  validateCodeRedeemable: (...args: unknown[]) => mockValidateCodeRedeemable(...args),
+  findByCode: mockFindByCode,
+  validateCodeRedeemable: mockValidateCodeRedeemable,
 }));
 
-// Mock audit service
-const mockAuditLog = vi.fn().mockResolvedValue(undefined);
 vi.mock('@/server/services/audit', () => ({
-  auditService: { log: (...args: unknown[]) => mockAuditLog(...args) },
+  auditService: { log: mockAuditLog },
 }));
 
-// Mock config
 vi.mock('@/server/db/config', () => ({
   config: {
     REGISTRATION_MODE: 'open',

@@ -22,30 +22,31 @@ import {
   createMockUserRow,
 } from '@/test/dal-helpers';
 
-// --- Mocks ---
+// --- Mocks (vi.hoisted ensures declarations are available when vi.mock factories run) ---
 
-const mockAuditLog = vi.fn().mockResolvedValue(undefined);
+const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockGetAccountLockoutStatus = vi.hoisted(() => vi.fn());
+const mockRecordFailedAttempt = vi.hoisted(() => vi.fn());
+const mockResetFailedAttempts = vi.hoisted(() => vi.fn());
+const mockCreateToken = vi.hoisted(() => vi.fn());
+const mockSendVerificationEmail = vi.hoisted(() => vi.fn());
+
 vi.mock('@/server/services/audit', () => ({
-  auditService: { log: (...args: unknown[]) => mockAuditLog(...args) },
+  auditService: { log: mockAuditLog },
 }));
 
-const mockGetAccountLockoutStatus = vi.fn();
-const mockRecordFailedAttempt = vi.fn();
-const mockResetFailedAttempts = vi.fn();
 vi.mock('./lockout', () => ({
-  getAccountLockoutStatus: (...args: unknown[]) => mockGetAccountLockoutStatus(...args),
-  recordFailedAttempt: (...args: unknown[]) => mockRecordFailedAttempt(...args),
-  resetFailedAttempts: (...args: unknown[]) => mockResetFailedAttempts(...args),
+  getAccountLockoutStatus: mockGetAccountLockoutStatus,
+  recordFailedAttempt: mockRecordFailedAttempt,
+  resetFailedAttempts: mockResetFailedAttempts,
 }));
 
-const mockCreateToken = vi.fn();
 vi.mock('./token', () => ({
-  createToken: (...args: unknown[]) => mockCreateToken(...args),
+  createToken: mockCreateToken,
 }));
 
-const mockSendVerificationEmail = vi.fn();
 vi.mock('./email', () => ({
-  sendVerificationEmail: (...args: unknown[]) => mockSendVerificationEmail(...args),
+  sendVerificationEmail: mockSendVerificationEmail,
 }));
 
 // Mock bcrypt — keep compare functional for testing

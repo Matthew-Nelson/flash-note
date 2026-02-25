@@ -6,9 +6,9 @@ vi.mock('@/server/db/config', () => ({}));
 import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
 
 // Mock audit service
-const mockAuditLog = vi.fn().mockResolvedValue(undefined);
+const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/server/services/audit', () => ({
-  auditService: { log: (...args: unknown[]) => mockAuditLog(...args) },
+  auditService: { log: mockAuditLog },
 }));
 
 import {
