@@ -62,11 +62,50 @@ export const resetPasswordSchema = z.object({
 });
 
 /**
+ * Server Action schemas — used by actions/auth.ts for input validation
+ */
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+});
+
+export const resendVerificationSchema = z.object({
+  email: emailSchema,
+});
+
+export const requestPasswordResetSchema = z.object({
+  email: emailSchema,
+});
+
+export const fullResetPasswordSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+  password: passwordSchema,
+  confirmPassword: z.string().min(1, 'Please confirm your password'),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+});
+
+export const validateResetTokenSchema = z.object({
+  token: z.string().min(1, 'Token is required'),
+});
+
+export const validateInviteCodeSchema = z.object({
+  code: z.string().min(1, 'Code is required').max(20),
+});
+
+/**
  * Type exports
  */
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
+export type ResendVerificationInput = z.infer<typeof resendVerificationSchema>;
+export type RequestPasswordResetInput = z.infer<typeof requestPasswordResetSchema>;
+export type FullResetPasswordInput = z.infer<typeof fullResetPasswordSchema>;
+export type ValidateResetTokenInput = z.infer<typeof validateResetTokenSchema>;
+export type ValidateInviteCodeInput = z.infer<typeof validateInviteCodeSchema>;
 
 /**
  * Validation helper - returns first error message or null

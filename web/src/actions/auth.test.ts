@@ -1,0 +1,528 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// --- Mocks (must be set up before imports) ---
+
+// Mock next/navigation
+const mockRedirect = vi.fn();
+vi.mock('next/navigation', () => ({
+  redirect: (...args: unknown[]) => {
+    mockRedirect(...args);
+    throw new Error('NEXT_REDIRECT'); // simulate redirect throw
+  },
+}));
+
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: vi.fn().mockResolvedValue({
+    get: (name: string) => {
+      if (name === 'x-forwarded-for') return '127.0.0.1';
+      if (name === 'user-agent') return 'TestAgent/1.0';
+      return null;
+    },
+  }),
+  cookies: vi.fn().mockResolvedValue({
+    set: vi.fn(),
+    get: vi.fn(),
+    delete: vi.fn(),
+  }),
+}));
+
+// Mock auth service
+const mockLogin = vi.fn();
+const mockRegister = vi.fn();
+const mockCompletePasswordReset = vi.fn();
+vi.mock('@/server/services/auth', () => ({
+  login: (...args: unknown[]) => mockLogin(...args),
+  register: (...args: unknown[]) => mockRegister(...args),
+  completePasswordReset: (...args: unknown[]) => mockCompletePasswordReset(...args),
+}));
+
+// Mock token service
+const mockValidateAndConsumeToken = vi.fn();
+const mockIsTokenValid = vi.fn();
+const mockFindUserIdFromToken = vi.fn();
+const mockCreateToken = vi.fn();
+vi.mock('@/server/services/token', () => ({
+  validateAndConsumeToken: (...args: unknown[]) => mockValidateAndConsumeToken(...args),
+  isTokenValid: (...args: unknown[]) => mockIsTokenValid(...args),
+  findUserIdFromToken: (...args: unknown[]) => mockFindUserIdFromToken(...args),
+  createToken: (...args: unknown[]) => mockCreateToken(...args),
+}));
+
+// Mock email service
+const mockSendVerificationEmail = vi.fn();
+const mockSendPasswordResetEmail = vi.fn();
+vi.mock('@/server/services/email', () => ({
+  sendVerificationEmail: (...args: unknown[]) => mockSendVerificationEmail(...args),
+  sendPasswordResetEmail: (...args: unknown[]) => mockSendPasswordResetEmail(...args),
+}));
+
+// Mock rate limiting (always allow)
+vi.mock('@/server/lib/rate-limit', () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ success: true, limit: 0, remaining: 0, reset: 0 }),
+  rateLimitKey: (ip: string, id?: string) => id ? `${ip}:${id}` : ip,
+  loginRateLimit: null,
+  registerRateLimit: null,
+  verificationCompleteRateLimit: null,
+  verificationResendRateLimit: null,
+  passwordResetRequestRateLimit: null,
+  passwordResetCompleteRateLimit: null,
+  inviteCodeValidateRateLimit: null,
+}));
+
+// Mock session cookie
+const mockSetSessionCookie = vi.fn().mockResolvedValue(undefined);
+const mockClearSessionCookie = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/server/lib/session-cookie', () => ({
+  setSessionCookie: (...args: unknown[]) => mockSetSessionCookie(...args),
+  clearSessionCookie: (...args: unknown[]) => mockClearSessionCookie(...args),
+  getSessionToken: vi.fn().mockResolvedValue(null),
+  hashSessionToken: vi.fn().mockReturnValue('hash'),
+}));
+
+// Mock getSession
+const mockGetSession = vi.fn();
+vi.mock('@/server/lib/get-session', () => ({
+  getSession: (...args: unknown[]) => mockGetSession(...args),
+}));
+
+// Mock DAL
+const mockFindUserByEmail = vi.fn();
+const mockFindUserById = vi.fn();
+const mockMarkEmailVerified = vi.fn();
+vi.mock('@/server/dal/users', () => ({
+  findUserByEmail: (...args: unknown[]) => mockFindUserByEmail(...args),
+  findUserById: (...args: unknown[]) => mockFindUserById(...args),
+  markEmailVerified: (...args: unknown[]) => mockMarkEmailVerified(...args),
+}));
+
+const mockDeleteSession = vi.fn();
+vi.mock('@/server/dal/sessions', () => ({
+  deleteSession: (...args: unknown[]) => mockDeleteSession(...args),
+}));
+
+const mockFindByCode = vi.fn();
+const mockValidateCodeRedeemable = vi.fn();
+vi.mock('@/server/dal/invite-codes', () => ({
+  findByCode: (...args: unknown[]) => mockFindByCode(...args),
+  validateCodeRedeemable: (...args: unknown[]) => mockValidateCodeRedeemable(...args),
+}));
+
+// Mock audit service
+const mockAuditLog = vi.fn().mockResolvedValue(undefined);
+vi.mock('@/server/services/audit', () => ({
+  auditService: { log: (...args: unknown[]) => mockAuditLog(...args) },
+}));
+
+// Mock config
+vi.mock('@/server/db/config', () => ({
+  config: {
+    REGISTRATION_MODE: 'open',
+    WEB_URL: 'http://localhost:3000',
+    EMAIL_FROM_NAME: 'FlashNote',
+    EMAIL_FROM_ADDRESS: 'noreply@flashnote.test',
+  },
+}));
+
+import {
+  loginAction,
+  registerAction,
+  logoutAction,
+  requestPasswordResetAction,
+  resetPasswordAction,
+  verifyEmailAction,
+  resendVerificationAction,
+  validateResetTokenAction,
+  validateInviteCodeAction,
+} from './auth';
+
+import { checkRateLimit } from '@/server/lib/rate-limit';
+import { config } from '@/server/db/config';
+
+function toFormData(obj: Record<string, string>): FormData {
+  const fd = new FormData();
+  for (const [key, value] of Object.entries(obj)) {
+    fd.append(key, value);
+  }
+  return fd;
+}
+
+describe('auth actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuditLog.mockResolvedValue(undefined);
+  });
+
+  describe('loginAction', () => {
+    it('rejects invalid input', async () => {
+      const result = await loginAction(toFormData({ email: 'not-an-email', password: '' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('validation_error');
+        expect(result.fieldErrors).toBeDefined();
+      }
+    });
+
+    it('returns rate_limit_exceeded when rate limited', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: false, limit: 5, remaining: 0, reset: Date.now(),
+      });
+
+      const result = await loginAction(toFormData({ email: 'a@b.com', password: 'pass' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('rate_limit_exceeded');
+      }
+    });
+
+    it('sets cookie on successful login', async () => {
+      mockLogin.mockResolvedValueOnce({
+        success: true,
+        user: { id: 'u-1', email: 'a@b.com', subscriptionStatus: 'trialing', trialEndsAt: new Date(), emailVerified: true, organizationId: null },
+        token: 'session-token',
+        emailVerificationRequired: false,
+      });
+
+      const result = await loginAction(toFormData({ email: 'a@b.com', password: 'pass' }));
+
+      expect(result.success).toBe(true);
+      expect(mockSetSessionCookie).toHaveBeenCalledWith('session-token');
+    });
+
+    it('returns error code on failed login', async () => {
+      mockLogin.mockResolvedValueOnce({ success: false, error: 'invalid_credentials' });
+
+      const result = await loginAction(toFormData({ email: 'a@b.com', password: 'wrong' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_credentials');
+      }
+    });
+
+    it('fires LOGIN_FAILED audit with emailProvided, not email (H-4)', async () => {
+      mockLogin.mockResolvedValueOnce({ success: false, error: 'invalid_credentials' });
+
+      await loginAction(toFormData({ email: 'a@b.com', password: 'wrong' }));
+
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'LOGIN_FAILED',
+          metadata: { emailProvided: true },
+        })
+      );
+      // Verify no email in audit metadata
+      const auditCall = mockAuditLog.mock.calls.find(
+        (c: unknown[]) => (c[0] as Record<string, unknown>).action === 'LOGIN_FAILED'
+      );
+      expect(auditCall).toBeDefined();
+      expect((auditCall![0] as Record<string, unknown>).metadata).not.toHaveProperty('email');
+    });
+  });
+
+  describe('registerAction', () => {
+    it('rejects invalid input', async () => {
+      const result = await registerAction(toFormData({ email: 'bad', password: 'x' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('validation_error');
+      }
+    });
+
+    it('sets cookie on successful registration', async () => {
+      mockRegister.mockResolvedValueOnce({
+        success: true,
+        user: { id: 'u-1', email: 'a@b.com', subscriptionStatus: 'trialing', trialEndsAt: new Date(), emailVerified: false, organizationId: null },
+        token: 'new-session-token',
+      });
+
+      const result = await registerAction(toFormData({
+        email: 'a@b.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: 'true',
+      }));
+
+      expect(result.success).toBe(true);
+      expect(mockSetSessionCookie).toHaveBeenCalledWith('new-session-token');
+    });
+
+    it('returns error code on duplicate email', async () => {
+      mockRegister.mockResolvedValueOnce({ success: false, error: 'email_exists' });
+
+      const result = await registerAction(toFormData({
+        email: 'a@b.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: 'true',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('email_exists');
+      }
+    });
+  });
+
+  describe('logoutAction', () => {
+    it('deletes current session only and clears cookie', async () => {
+      mockGetSession.mockResolvedValueOnce({
+        sessionId: 'session-1',
+        userId: 'user-1',
+        email: 'a@b.com',
+        subscriptionStatus: 'trialing',
+        trialEndsAt: new Date(),
+        emailVerified: true,
+        organizationId: null,
+      });
+      mockDeleteSession.mockResolvedValueOnce(undefined);
+
+      // redirect throws, so catch it
+      await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
+
+      // Deletes the specific session, not all sessions
+      expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
+      expect(mockClearSessionCookie).toHaveBeenCalled();
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
+    });
+
+    it('just clears cookie and redirects when no session', async () => {
+      mockGetSession.mockResolvedValueOnce(null);
+
+      await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockDeleteSession).not.toHaveBeenCalled();
+      expect(mockClearSessionCookie).toHaveBeenCalled();
+    });
+  });
+
+  describe('requestPasswordResetAction', () => {
+    it('always returns success (anti-enumeration)', async () => {
+      // User exists
+      mockFindUserByEmail.mockResolvedValueOnce({ id: 'u-1' });
+      mockCreateToken.mockResolvedValueOnce('reset-token');
+      mockSendPasswordResetEmail.mockResolvedValueOnce(undefined);
+
+      const result = await requestPasswordResetAction(toFormData({ email: 'a@b.com' }));
+      expect(result.success).toBe(true);
+    });
+
+    it('returns success even when user does not exist', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce(null);
+
+      const result = await requestPasswordResetAction(toFormData({ email: 'nobody@b.com' }));
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('resetPasswordAction', () => {
+    it('returns invalid_token for expired token', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+
+      const result = await resetPasswordAction(toFormData({
+        token: 'expired',
+        password: 'NewPass123',
+        confirmPassword: 'NewPass123',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_token');
+      }
+    });
+
+    it('completes password reset for valid token', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockCompletePasswordReset.mockResolvedValueOnce({ success: true });
+
+      const result = await resetPasswordAction(toFormData({
+        token: 'valid-token',
+        password: 'NewPass123',
+        confirmPassword: 'NewPass123',
+      }));
+
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('verifyEmailAction', () => {
+    it('verifies email for valid token', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockMarkEmailVerified.mockResolvedValueOnce(undefined);
+
+      const result = await verifyEmailAction(toFormData({ token: 'valid' }));
+
+      expect(result.success).toBe(true);
+      expect(mockMarkEmailVerified).toHaveBeenCalledWith('user-1');
+    });
+
+    it('returns alreadyVerified for used token if user is verified', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null); // token consumed
+      mockFindUserIdFromToken.mockResolvedValueOnce('user-1');
+      mockFindUserById.mockResolvedValueOnce({ emailVerified: true });
+
+      const result = await verifyEmailAction(toFormData({ token: 'used' }));
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.alreadyVerified).toBe(true);
+      }
+    });
+
+    it('returns invalid_token for truly invalid token', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+      mockFindUserIdFromToken.mockResolvedValueOnce(null);
+
+      const result = await verifyEmailAction(toFormData({ token: 'garbage' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_token');
+      }
+    });
+  });
+
+  describe('resendVerificationAction', () => {
+    it('always returns success (anti-enumeration)', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce(null);
+
+      const result = await resendVerificationAction(toFormData({ email: 'nobody@b.com' }));
+      expect(result.success).toBe(true);
+    });
+
+    it('sends email for unverified user', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce({ id: 'u-1', emailVerified: false });
+      mockCreateToken.mockResolvedValueOnce('verify-token');
+      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
+
+      const result = await resendVerificationAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(true);
+      expect(mockSendVerificationEmail).toHaveBeenCalled();
+    });
+  });
+
+  describe('validateResetTokenAction', () => {
+    it('returns valid: true for valid token', async () => {
+      mockIsTokenValid.mockResolvedValueOnce(true);
+
+      const result = await validateResetTokenAction('valid-token');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.valid).toBe(true);
+      }
+    });
+
+    it('returns valid: false for invalid token', async () => {
+      mockIsTokenValid.mockResolvedValueOnce(false);
+
+      const result = await validateResetTokenAction('bad-token');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.valid).toBe(false);
+      }
+    });
+
+    it('returns valid: false for empty token', async () => {
+      const result = await validateResetTokenAction('');
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.valid).toBe(false);
+      }
+    });
+
+    it('returns rate_limit_exceeded when rate limited', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: false, limit: 5, remaining: 0, reset: Date.now(),
+      });
+
+      const result = await validateResetTokenAction('some-token');
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('rate_limit_exceeded');
+      }
+    });
+  });
+
+  describe('validateInviteCodeAction', () => {
+    it('returns valid: false when not in invite mode', async () => {
+      // config.REGISTRATION_MODE is 'open' (default mock)
+      const result = await validateInviteCodeAction(toFormData({ code: 'ABC123' }));
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.valid).toBe(false);
+      }
+    });
+
+    it('returns valid: true for a redeemable code in invite mode', async () => {
+      const original = config.REGISTRATION_MODE;
+      (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = 'invite';
+
+      try {
+        mockFindByCode.mockResolvedValueOnce({ id: 'code-1', type: 'personal', organizationId: null });
+        mockValidateCodeRedeemable.mockReturnValueOnce(null); // null = redeemable
+
+        const result = await validateInviteCodeAction(toFormData({ code: 'VALID1' }));
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data?.valid).toBe(true);
+          expect(result.data?.type).toBe('personal');
+        }
+        expect(mockAuditLog).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'INVITE_CODE_VALIDATED' })
+        );
+      } finally {
+        (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = original;
+      }
+    });
+
+    it('returns valid: false for an expired code in invite mode', async () => {
+      const original = config.REGISTRATION_MODE;
+      (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = 'invite';
+
+      try {
+        mockFindByCode.mockResolvedValueOnce({ id: 'code-2', type: 'personal', organizationId: null });
+        mockValidateCodeRedeemable.mockReturnValueOnce('expired'); // non-null = not redeemable
+
+        const result = await validateInviteCodeAction(toFormData({ code: 'EXPIRED' }));
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data?.valid).toBe(false);
+        }
+        expect(mockAuditLog).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'INVITE_CODE_VALIDATION_FAILED' })
+        );
+      } finally {
+        (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = original;
+      }
+    });
+
+    it('returns valid: false for a nonexistent code in invite mode', async () => {
+      const original = config.REGISTRATION_MODE;
+      (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = 'invite';
+
+      try {
+        mockFindByCode.mockResolvedValueOnce(null);
+
+        const result = await validateInviteCodeAction(toFormData({ code: 'NOPE00' }));
+
+        expect(result.success).toBe(true);
+        if (result.success) {
+          expect(result.data?.valid).toBe(false);
+        }
+      } finally {
+        (config as { REGISTRATION_MODE: string }).REGISTRATION_MODE = original;
+      }
+    });
+  });
+});

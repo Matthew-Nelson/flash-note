@@ -143,21 +143,23 @@ export async function markEmailVerified(userId: string): Promise<void> {
 }
 
 /**
- * Update password hash. Accepts optional PoolClient for transaction composition
+ * Update password hash. Returns number of affected rows (0 = user not found or soft-deleted).
+ * Accepts optional PoolClient for transaction composition
  * (Rule 1: password reset = update password + invalidate sessions + reset lockout).
  */
 export async function updatePassword(
   userId: string,
   passwordHash: string,
   client?: pg.PoolClient
-): Promise<void> {
-  await (client ?? db).query(
+): Promise<number> {
+  const result = await (client ?? db).query(
     `UPDATE users
      SET password_hash = $1,
          updated_at = NOW()
      WHERE id = $2 AND NOT is_deleted`,
     [passwordHash, userId]
   );
+  return result.rowCount ?? 0;
 }
 
 /**
@@ -206,4 +208,79 @@ export async function clearUserOrganization(
     `UPDATE users SET organization_id = NULL, updated_at = NOW() WHERE id = $1 AND NOT is_deleted`,
     [userId]
   );
+}
+
+// --- Lockout DAL functions ---
+
+export interface LockoutFields {
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+  lastFailedLoginAt: Date | null;
+}
+
+export interface LockoutUpdateResult {
+  failedLoginAttempts: number;
+  lockedUntil: Date | null;
+}
+
+/**
+ * Get lockout-related fields for a user.
+ * Returns null if user not found or soft-deleted.
+ */
+export async function getLockoutFields(userId: string): Promise<LockoutFields | null> {
+  const result = await db.query<{
+    failed_login_attempts: number;
+    locked_until: Date | null;
+    last_failed_login_at: Date | null;
+  }>(
+    `SELECT failed_login_attempts, locked_until, last_failed_login_at
+     FROM users WHERE id = $1 AND NOT is_deleted`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    failedLoginAttempts: row.failed_login_attempts,
+    lockedUntil: row.locked_until,
+    lastFailedLoginAt: row.last_failed_login_at,
+  };
+}
+
+/**
+ * Atomically increment failed login attempts and set lockout timestamp.
+ * Uses CASE WHEN to set lockout duration based on threshold in a single UPDATE,
+ * preventing race conditions where concurrent requests could bypass lockout.
+ *
+ * Returns null if user not found.
+ */
+export async function recordFailedLoginAttempt(
+  userId: string
+): Promise<LockoutUpdateResult | null> {
+  const result = await db.query<{
+    failed_login_attempts: number;
+    locked_until: Date | null;
+  }>(
+    `UPDATE users
+     SET failed_login_attempts = failed_login_attempts + 1,
+         last_failed_login_at = NOW(),
+         updated_at = NOW(),
+         locked_until = CASE
+           WHEN failed_login_attempts + 1 >= 20 THEN NULL
+           WHEN failed_login_attempts + 1 >= 15 THEN NOW() + INTERVAL '1440 minutes'
+           WHEN failed_login_attempts + 1 >= 10 THEN NOW() + INTERVAL '60 minutes'
+           WHEN failed_login_attempts + 1 >= 5 THEN NOW() + INTERVAL '15 minutes'
+           ELSE locked_until
+         END
+     WHERE id = $1 AND NOT is_deleted
+     RETURNING failed_login_attempts, locked_until`,
+    [userId]
+  );
+
+  if (result.rows.length === 0) return null;
+  const row = result.rows[0];
+  return {
+    failedLoginAttempts: row.failed_login_attempts,
+    lockedUntil: row.locked_until,
+  };
 }

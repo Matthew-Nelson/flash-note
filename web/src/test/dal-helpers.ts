@@ -131,6 +131,30 @@ export function createMockOrgMemberRow(overrides: Partial<{
 }
 
 /**
+ * Helper to create a mock email token row
+ */
+export function createMockEmailTokenRow(overrides: Partial<{
+  id: string;
+  user_id: string;
+  token_hash: string;
+  token_type: string;
+  expires_at: Date;
+  used_at: Date | null;
+  created_at: Date;
+}> = {}) {
+  return {
+    id: 'token-uuid',
+    user_id: 'test-user-id',
+    token_hash: 'abc123tokenhash',
+    token_type: 'email_verification',
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    used_at: null,
+    created_at: new Date(),
+    ...overrides,
+  };
+}
+
+/**
  * Helper to create a mock session+user JOIN row (SessionWithUserRow)
  */
 export function createMockSessionWithUserRow(overrides: Partial<{
