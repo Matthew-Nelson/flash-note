@@ -66,7 +66,7 @@ export const resetPasswordSchema = z.object({
  */
 
 export const verifyEmailSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
+  token: z.string().min(1, 'Token is required').max(128),
 });
 
 export const resendVerificationSchema = z.object({
@@ -78,7 +78,7 @@ export const requestPasswordResetSchema = z.object({
 });
 
 export const fullResetPasswordSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
+  token: z.string().min(1, 'Token is required').max(128),
   password: passwordSchema,
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -87,7 +87,7 @@ export const fullResetPasswordSchema = z.object({
 });
 
 export const validateResetTokenSchema = z.object({
-  token: z.string().min(1, 'Token is required'),
+  token: z.string().min(1, 'Token is required').max(128),
 });
 
 export const validateInviteCodeSchema = z.object({

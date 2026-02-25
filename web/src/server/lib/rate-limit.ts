@@ -48,6 +48,9 @@ export const passwordResetRequestRateLimit = createLimiter(3, '1 h', 'password_r
 /** 5 requests per 15 min, keyed by IP */
 export const passwordResetCompleteRateLimit = createLimiter(5, '15 m', 'password_reset_complete');
 
+/** 10 requests per 15 min, keyed by IP — generous for read-only page-load validation */
+export const passwordResetValidateRateLimit = createLimiter(10, '15 m', 'password_reset_validate');
+
 /** 10 requests per 1 min, keyed by IP */
 export const inviteCodeValidateRateLimit = createLimiter(10, '1 m', 'invite_code_validate');
 

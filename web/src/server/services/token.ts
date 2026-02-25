@@ -2,13 +2,19 @@ import 'server-only';
 
 import crypto from 'node:crypto';
 
-import { db, getPoolClient } from '@/server/db';
 import {
   EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS,
   PASSWORD_RESET_TOKEN_EXPIRY_MINUTES,
 } from '@/server/db/config';
+import {
+  createEmailToken,
+  consumeToken,
+  checkTokenExists,
+  findUserIdByTokenHash,
+  deleteExpiredTokens,
+} from '@/server/dal/email-tokens';
 
-export type TokenType = 'email_verification' | 'password_reset';
+import type { TokenType } from '@/server/types';
 
 interface TokenResult {
   token: string;
@@ -50,31 +56,7 @@ export async function createToken(userId: string, type: TokenType): Promise<stri
   const { token, tokenHash } = generateToken();
   const expiresAt = calculateExpiry(type);
 
-  const client = await getPoolClient();
-  try {
-    await client.query('BEGIN');
-
-    // Invalidate existing unused tokens of the same type
-    await client.query(
-      `UPDATE email_tokens
-       SET used_at = NOW()
-       WHERE user_id = $1 AND token_type = $2 AND used_at IS NULL`,
-      [userId, type]
-    );
-
-    await client.query(
-      `INSERT INTO email_tokens (user_id, token_hash, token_type, expires_at)
-       VALUES ($1, $2, $3, $4)`,
-      [userId, tokenHash, type, expiresAt]
-    );
-
-    await client.query('COMMIT');
-  } catch (err) {
-    try { await client.query('ROLLBACK'); } catch { /* connection may be unusable */ }
-    throw err;
-  } finally {
-    client.release();
-  }
+  await createEmailToken(userId, tokenHash, type, expiresAt);
 
   return token;
 }
@@ -89,20 +71,7 @@ export async function validateAndConsumeToken(
   type: TokenType
 ): Promise<string | null> {
   const tokenHash = hashToken(token);
-
-  const result = await db.query<{ user_id: string }>(
-    `UPDATE email_tokens
-     SET used_at = NOW()
-     WHERE token_hash = $1
-       AND token_type = $2
-       AND used_at IS NULL
-       AND expires_at > NOW()
-     RETURNING user_id`,
-    [tokenHash, type]
-  );
-
-  if (result.rows.length === 0) return null;
-  return result.rows[0].user_id;
+  return consumeToken(tokenHash, type);
 }
 
 /**
@@ -111,17 +80,7 @@ export async function validateAndConsumeToken(
  */
 export async function isTokenValid(token: string, type: TokenType): Promise<boolean> {
   const tokenHash = hashToken(token);
-
-  const result = await db.query(
-    `SELECT 1 FROM email_tokens
-     WHERE token_hash = $1
-       AND token_type = $2
-       AND used_at IS NULL
-       AND expires_at > NOW()`,
-    [tokenHash, type]
-  );
-
-  return result.rows.length > 0;
+  return checkTokenExists(tokenHash, type);
 }
 
 /**
@@ -133,17 +92,7 @@ export async function findUserIdFromToken(
   type: TokenType
 ): Promise<string | null> {
   const tokenHash = hashToken(token);
-
-  const result = await db.query<{ user_id: string }>(
-    `SELECT user_id FROM email_tokens
-     WHERE token_hash = $1 AND token_type = $2
-     ORDER BY created_at DESC
-     LIMIT 1`,
-    [tokenHash, type]
-  );
-
-  if (result.rows.length === 0) return null;
-  return result.rows[0].user_id;
+  return findUserIdByTokenHash(tokenHash, type);
 }
 
 /**
@@ -151,12 +100,7 @@ export async function findUserIdFromToken(
  * Deletes tokens that expired more than 7 days ago.
  */
 export async function cleanupExpiredTokens(): Promise<number> {
-  const result = await db.query(
-    `DELETE FROM email_tokens
-     WHERE expires_at < NOW() - INTERVAL '7 days'
-     RETURNING id`
-  );
-  return result.rowCount ?? 0;
+  return deleteExpiredTokens();
 }
 
 function calculateExpiry(type: TokenType): Date {

@@ -24,6 +24,7 @@ import {
   verificationResendRateLimit,
   passwordResetRequestRateLimit,
   passwordResetCompleteRateLimit,
+  passwordResetValidateRateLimit,
   inviteCodeValidateRateLimit,
 } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
@@ -74,8 +75,11 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for LOGIN_FAILED:', {
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
     return { success: false, error: result.error };
   }
@@ -89,8 +93,12 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     });
-  } catch {
-    // Non-critical audit failure
+  } catch (error) {
+    // TODO: Replace with Pino structured logger when available
+    console.error('Audit log failed for LOGIN:', {
+      userId: result.user.id,
+      errorType: error instanceof Error ? error.constructor.name : 'unknown',
+    });
   }
 
   await setSessionCookie(result.token);
@@ -163,19 +171,35 @@ export async function logoutAction(): Promise<void> {
 
   if (session) {
     // Delete current session only (not all sessions)
-    await deleteSession(session.sessionId);
+    let sessionDeleted = false;
+    try {
+      await deleteSession(session.sessionId);
+      sessionDeleted = true;
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Failed to delete session during logout:', {
+        sessionId: session.sessionId,
+        userId: session.userId,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
+    }
 
-    // Audit
+    // Audit — status reflects whether session was actually deleted
     try {
       await auditService.log({
         userId: session.userId,
         action: AuditAction.LOGOUT,
-        status: 'SUCCESS',
+        status: sessionDeleted ? 'SUCCESS' : 'FAILURE',
+        metadata: sessionDeleted ? undefined : { reason: 'session_deletion_failed' },
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for LOGOUT:', {
+        userId: session.userId,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
   }
 
@@ -205,23 +229,34 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
   const user = await findUserByEmail(email);
 
   if (user) {
+    let emailSent = false;
     try {
       const token = await createToken(user.id, 'password_reset');
       await sendPasswordResetEmail(email, token);
-    } catch {
-      // Non-critical — user can retry
+      emailSent = true;
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Password reset token/email failed:', {
+        userId: user.id,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
 
     try {
       await auditService.log({
         userId: user.id,
         action: AuditAction.PASSWORD_RESET_REQUESTED,
-        status: 'SUCCESS',
+        status: emailSent ? 'SUCCESS' : 'FAILURE',
+        metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for PASSWORD_RESET_REQUESTED:', {
+        userId: user.id,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
   }
 
@@ -256,14 +291,33 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for PASSWORD_RESET_TOKEN_INVALID:', {
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
     return { success: false, error: 'invalid_token' };
   }
 
   const result = await completePasswordReset(userId, password, context);
   if (!result.success) {
+    try {
+      await auditService.log({
+        userId,
+        action: AuditAction.PASSWORD_RESET_FAILED,
+        status: 'FAILURE',
+        metadata: { reason: result.error },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for PASSWORD_RESET_FAILED:', {
+        userId,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
+    }
     return { success: false, error: result.error };
   }
 
@@ -308,8 +362,11 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for EMAIL_VERIFICATION_FAILED:', {
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
 
     return { success: false, error: 'invalid_token' };
@@ -325,8 +382,12 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     });
-  } catch {
-    // Non-critical audit failure
+  } catch (error) {
+    // TODO: Replace with Pino structured logger when available
+    console.error('Audit log failed for EMAIL_VERIFICATION_SUCCESS:', {
+        userId,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
   }
 
   return { success: true };
@@ -352,23 +413,34 @@ export async function resendVerificationAction(formData: FormData): Promise<Acti
   const user = await findUserByEmail(email);
 
   if (user && !user.emailVerified) {
+    let emailSent = false;
     try {
       const token = await createToken(user.id, 'email_verification');
       await sendVerificationEmail(email, token);
-    } catch {
-      // Non-critical — user can retry
+      emailSent = true;
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Verification token/email failed:', {
+        userId: user.id,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
 
     try {
       await auditService.log({
         userId: user.id,
         action: AuditAction.EMAIL_VERIFICATION_RESENT,
-        status: 'SUCCESS',
+        status: emailSent ? 'SUCCESS' : 'FAILURE',
+        metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical audit failure
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for EMAIL_VERIFICATION_RESENT:', {
+        userId: user.id,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
   }
 
@@ -384,7 +456,7 @@ export async function validateResetTokenAction(token: string): Promise<ActionRes
   const context = await getRequestContext();
 
   // Rate limit by IP
-  const rl = await checkRateLimit(passwordResetCompleteRateLimit, context.ipAddress ?? 'unknown');
+  const rl = await checkRateLimit(passwordResetValidateRateLimit, context.ipAddress ?? 'unknown');
   if (!rl.success) {
     return { success: false, error: 'rate_limit_exceeded' };
   }
@@ -429,8 +501,12 @@ export async function validateInviteCodeAction(formData: FormData): Promise<Acti
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for INVITE_CODE_VALIDATED:', {
+        codeId: inviteCode.id,
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
   } else {
     try {
@@ -445,8 +521,11 @@ export async function validateInviteCodeAction(formData: FormData): Promise<Acti
         ipAddress: context.ipAddress,
         userAgent: context.userAgent,
       });
-    } catch {
-      // Non-critical
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      console.error('Audit log failed for INVITE_CODE_VALIDATION_FAILED:', {
+        errorType: error instanceof Error ? error.constructor.name : 'unknown',
+      });
     }
   }
 

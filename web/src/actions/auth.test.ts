@@ -72,6 +72,7 @@ vi.mock('@/server/lib/rate-limit', () => ({
   verificationResendRateLimit: null,
   passwordResetRequestRateLimit: null,
   passwordResetCompleteRateLimit: null,
+  passwordResetValidateRateLimit: null,
   inviteCodeValidateRateLimit: null,
 }));
 
@@ -277,6 +278,37 @@ describe('auth actions', () => {
       expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
       expect(mockClearSessionCookie).toHaveBeenCalled();
       expect(mockRedirect).toHaveBeenCalledWith('/login');
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'LOGOUT',
+          status: 'SUCCESS',
+        })
+      );
+    });
+
+    it('still clears cookie and redirects when deleteSession fails, audits FAILURE', async () => {
+      mockGetSession.mockResolvedValueOnce({
+        sessionId: 'session-1',
+        userId: 'user-1',
+        email: 'a@b.com',
+        subscriptionStatus: 'trialing',
+        trialEndsAt: new Date(),
+        emailVerified: true,
+        organizationId: null,
+      });
+      mockDeleteSession.mockRejectedValueOnce(new Error('db error'));
+
+      await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
+
+      expect(mockClearSessionCookie).toHaveBeenCalled();
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'LOGOUT',
+          status: 'FAILURE',
+          metadata: { reason: 'session_deletion_failed' },
+        })
+      );
     });
 
     it('just clears cookie and redirects when no session', async () => {
@@ -306,6 +338,39 @@ describe('auth actions', () => {
       const result = await requestPasswordResetAction(toFormData({ email: 'nobody@b.com' }));
       expect(result.success).toBe(true);
     });
+
+    it('audits FAILURE when sendPasswordResetEmail throws', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce({ id: 'u-1' });
+      mockCreateToken.mockResolvedValueOnce('reset-token');
+      mockSendPasswordResetEmail.mockRejectedValueOnce(new Error('email error'));
+
+      const result = await requestPasswordResetAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(true); // anti-enumeration
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PASSWORD_RESET_REQUESTED',
+          status: 'FAILURE',
+          metadata: { reason: 'token_or_email_failed' },
+        })
+      );
+    });
+
+    it('audits FAILURE when createToken throws', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce({ id: 'u-1' });
+      mockCreateToken.mockRejectedValueOnce(new Error('db error'));
+
+      const result = await requestPasswordResetAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(true); // anti-enumeration
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PASSWORD_RESET_REQUESTED',
+          status: 'FAILURE',
+          metadata: { reason: 'token_or_email_failed' },
+        })
+      );
+    });
   });
 
   describe('resetPasswordAction', () => {
@@ -322,6 +387,30 @@ describe('auth actions', () => {
       if (!result.success) {
         expect(result.error).toBe('invalid_token');
       }
+    });
+
+    it('audits PASSWORD_RESET_FAILED when completePasswordReset fails', async () => {
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockCompletePasswordReset.mockResolvedValueOnce({ success: false, error: 'not_found' });
+
+      const result = await resetPasswordAction(toFormData({
+        token: 'valid-token',
+        password: 'NewPass123',
+        confirmPassword: 'NewPass123',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('not_found');
+      }
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          action: 'PASSWORD_RESET_FAILED',
+          status: 'FAILURE',
+          metadata: { reason: 'not_found' },
+        })
+      );
     });
 
     it('completes password reset for valid token', async () => {
@@ -392,6 +481,23 @@ describe('auth actions', () => {
 
       expect(result.success).toBe(true);
       expect(mockSendVerificationEmail).toHaveBeenCalled();
+    });
+
+    it('audits FAILURE when sendVerificationEmail throws', async () => {
+      mockFindUserByEmail.mockResolvedValueOnce({ id: 'u-1', emailVerified: false });
+      mockCreateToken.mockResolvedValueOnce('verify-token');
+      mockSendVerificationEmail.mockRejectedValueOnce(new Error('email error'));
+
+      const result = await resendVerificationAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(true); // anti-enumeration
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'EMAIL_VERIFICATION_RESENT',
+          status: 'FAILURE',
+          metadata: { reason: 'token_or_email_failed' },
+        })
+      );
     });
   });
 

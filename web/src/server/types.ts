@@ -5,6 +5,8 @@ import type { SubscriptionStatus, OrgRole, NoteType } from '@/lib/types';
 // Re-export shared types for convenience in server code
 export type { SubscriptionStatus, OrgRole, NoteType };
 
+export type TokenType = 'email_verification' | 'password_reset';
+
 /**
  * Full server-side User type (camelCase).
  * Includes sensitive fields (passwordHash, lockout state) that the client User type omits.

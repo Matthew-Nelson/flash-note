@@ -6,12 +6,20 @@ vi.mock('@/server/db/config', () => ({
   PASSWORD_RESET_TOKEN_EXPIRY_MINUTES: 15,
 }));
 
-import {
-  mockDbQuery,
-  mockClientQuery,
-  mockGetPoolClient,
-  resetMocks,
-} from '@/test/dal-helpers';
+// Mock DAL functions
+const mockCreateEmailToken = vi.hoisted(() => vi.fn());
+const mockConsumeToken = vi.hoisted(() => vi.fn());
+const mockCheckTokenExists = vi.hoisted(() => vi.fn());
+const mockFindUserIdByTokenHash = vi.hoisted(() => vi.fn());
+const mockDeleteExpiredTokens = vi.hoisted(() => vi.fn());
+
+vi.mock('@/server/dal/email-tokens', () => ({
+  createEmailToken: mockCreateEmailToken,
+  consumeToken: mockConsumeToken,
+  checkTokenExists: mockCheckTokenExists,
+  findUserIdByTokenHash: mockFindUserIdByTokenHash,
+  deleteExpiredTokens: mockDeleteExpiredTokens,
+}));
 
 import {
   generateToken,
@@ -23,19 +31,9 @@ import {
   cleanupExpiredTokens,
 } from './token';
 
-// Helper to set up the mock pool client
-function setupMockClient() {
-  const mockClient = {
-    query: mockClientQuery,
-    release: () => {},
-  };
-  mockGetPoolClient.mockResolvedValue(mockClient);
-  return mockClient;
-}
-
 describe('token service', () => {
   beforeEach(() => {
-    resetMocks();
+    vi.clearAllMocks();
   });
 
   describe('generateToken', () => {
@@ -73,65 +71,70 @@ describe('token service', () => {
   });
 
   describe('createToken', () => {
-    it('invalidates existing tokens and inserts new one in a transaction', async () => {
-      setupMockClient();
-      // BEGIN, UPDATE (invalidate), INSERT, COMMIT
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })  // BEGIN
-        .mockResolvedValueOnce({ rows: [] })  // UPDATE invalidate
-        .mockResolvedValueOnce({ rows: [] })  // INSERT
-        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+    it('calls DAL createEmailToken with correct args', async () => {
+      mockCreateEmailToken.mockResolvedValueOnce(undefined);
 
       const token = await createToken('user-1', 'email_verification');
 
       expect(token.length).toBeGreaterThan(0);
-      expect(mockClientQuery).toHaveBeenCalledTimes(4);
-
-      // Verify BEGIN
-      expect(mockClientQuery.mock.calls[0][0]).toBe('BEGIN');
-
-      // Verify invalidation UPDATE
-      expect(mockClientQuery.mock.calls[1][0]).toContain('UPDATE email_tokens');
-      expect(mockClientQuery.mock.calls[1][0]).toContain('SET used_at = NOW()');
-      expect(mockClientQuery.mock.calls[1][1]).toEqual(['user-1', 'email_verification']);
-
-      // Verify INSERT
-      expect(mockClientQuery.mock.calls[2][0]).toContain('INSERT INTO email_tokens');
-
-      // Verify COMMIT
-      expect(mockClientQuery.mock.calls[3][0]).toBe('COMMIT');
+      expect(mockCreateEmailToken).toHaveBeenCalledTimes(1);
+      expect(mockCreateEmailToken).toHaveBeenCalledWith(
+        'user-1',
+        expect.any(String), // tokenHash
+        'email_verification',
+        expect.any(Date) // expiresAt
+      );
     });
 
-    it('rolls back on INSERT failure', async () => {
-      setupMockClient();
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })  // BEGIN
-        .mockResolvedValueOnce({ rows: [] })  // UPDATE invalidate
-        .mockRejectedValueOnce(new Error('insert failed'))  // INSERT fails
-        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+    it('propagates DAL errors', async () => {
+      mockCreateEmailToken.mockRejectedValueOnce(new Error('insert failed'));
 
       await expect(createToken('user-1', 'password_reset'))
         .rejects.toThrow('insert failed');
+    });
+
+    it('calculates email_verification expiry as 24 hours', async () => {
+      mockCreateEmailToken.mockResolvedValueOnce(undefined);
+      const before = Date.now();
+
+      await createToken('user-1', 'email_verification');
+
+      const after = Date.now();
+      const expiresAt = mockCreateEmailToken.mock.calls[0][3] as Date;
+      const expectedMs = 24 * 60 * 60 * 1000;
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
+      expect(expiresAt.getTime()).toBeLessThanOrEqual(after + expectedMs);
+    });
+
+    it('calculates password_reset expiry as 15 minutes', async () => {
+      mockCreateEmailToken.mockResolvedValueOnce(undefined);
+      const before = Date.now();
+
+      await createToken('user-1', 'password_reset');
+
+      const after = Date.now();
+      const expiresAt = mockCreateEmailToken.mock.calls[0][3] as Date;
+      const expectedMs = 15 * 60 * 1000;
+      expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + expectedMs);
+      expect(expiresAt.getTime()).toBeLessThanOrEqual(after + expectedMs);
     });
   });
 
   describe('validateAndConsumeToken', () => {
     it('returns userId for a valid unconsumed token', async () => {
-      mockDbQuery.mockResolvedValueOnce({
-        rows: [{ user_id: 'user-1' }],
-      });
+      mockConsumeToken.mockResolvedValueOnce('user-1');
 
       const userId = await validateAndConsumeToken('valid-token', 'email_verification');
 
       expect(userId).toBe('user-1');
-      expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('UPDATE email_tokens'),
-        [hashToken('valid-token'), 'email_verification']
+      expect(mockConsumeToken).toHaveBeenCalledWith(
+        hashToken('valid-token'),
+        'email_verification'
       );
     });
 
     it('returns null for an expired/used/invalid token', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockConsumeToken.mockResolvedValueOnce(null);
 
       const userId = await validateAndConsumeToken('expired-token', 'email_verification');
 
@@ -140,9 +143,9 @@ describe('token service', () => {
 
     it('enforces single-use (atomic UPDATE prevents consuming twice)', async () => {
       // First call succeeds
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ user_id: 'user-1' }] });
-      // Second call returns empty (token already used)
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockConsumeToken.mockResolvedValueOnce('user-1');
+      // Second call returns null (token already used)
+      mockConsumeToken.mockResolvedValueOnce(null);
 
       const first = await validateAndConsumeToken('token', 'password_reset');
       const second = await validateAndConsumeToken('token', 'password_reset');
@@ -154,15 +157,19 @@ describe('token service', () => {
 
   describe('isTokenValid', () => {
     it('returns true for a valid token', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [{}] });
+      mockCheckTokenExists.mockResolvedValueOnce(true);
 
       const valid = await isTokenValid('token', 'password_reset');
 
       expect(valid).toBe(true);
+      expect(mockCheckTokenExists).toHaveBeenCalledWith(
+        hashToken('token'),
+        'password_reset'
+      );
     });
 
     it('returns false for an invalid token', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockCheckTokenExists.mockResolvedValueOnce(false);
 
       const valid = await isTokenValid('bad-token', 'password_reset');
 
@@ -172,15 +179,19 @@ describe('token service', () => {
 
   describe('findUserIdFromToken', () => {
     it('returns userId regardless of token validity', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [{ user_id: 'user-1' }] });
+      mockFindUserIdByTokenHash.mockResolvedValueOnce('user-1');
 
       const userId = await findUserIdFromToken('any-token', 'email_verification');
 
       expect(userId).toBe('user-1');
+      expect(mockFindUserIdByTokenHash).toHaveBeenCalledWith(
+        hashToken('any-token'),
+        'email_verification'
+      );
     });
 
     it('returns null when no token found', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockFindUserIdByTokenHash.mockResolvedValueOnce(null);
 
       const userId = await findUserIdFromToken('nonexistent', 'email_verification');
 
@@ -190,15 +201,16 @@ describe('token service', () => {
 
   describe('cleanupExpiredTokens', () => {
     it('returns count of deleted tokens', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [{}, {}, {}], rowCount: 3 });
+      mockDeleteExpiredTokens.mockResolvedValueOnce(3);
 
       const count = await cleanupExpiredTokens();
 
       expect(count).toBe(3);
+      expect(mockDeleteExpiredTokens).toHaveBeenCalledTimes(1);
     });
 
     it('returns 0 when no expired tokens', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 });
+      mockDeleteExpiredTokens.mockResolvedValueOnce(0);
 
       const count = await cleanupExpiredTokens();
 
