@@ -391,6 +391,193 @@ describe('auth service', () => {
 
       expect(result.success).toBe(true);
     });
+
+    it('registers with beta invite code, marks code as used, fires INVITE_CODE_REDEEMED audit', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
+
+      const mockClient = setupMockClient();
+      const userRow = createMockUserRow();
+      const inviteCodeRow = {
+        id: 'code-1',
+        code: 'ABCD1234',
+        type: 'beta' as const,
+        organization_id: null,
+        created_by: 'admin-user',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
+        .mockResolvedValueOnce({ rows: [inviteCodeRow] })      // findByCodeForUpdate
+        .mockResolvedValueOnce({ rows: [userRow] })            // createUserWithClient
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })    // legal acceptance 1
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })    // legal acceptance 2
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })    // legal acceptance 3
+        .mockResolvedValueOnce({ rows: [] })                   // markCodeAsUsed
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })    // session count
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] }) // session insert
+        .mockResolvedValueOnce({ rows: [] });                  // COMMIT
+
+      mockCreateToken.mockResolvedValueOnce('verification-token');
+      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
+
+      const result = await register('new@example.com', 'Password1', {
+        ...context,
+        inviteCode: 'ABCD1234',
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockClient.release).toHaveBeenCalled();
+
+      // Verify markCodeAsUsed was called (7th client query = UPDATE invite_codes)
+      expect(mockClientQuery.mock.calls[6][0]).toContain('UPDATE invite_codes');
+
+      // Verify INVITE_CODE_REDEEMED audit was logged
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'INVITE_CODE_REDEEMED',
+          metadata: { codeId: 'code-1' },
+        })
+      );
+    });
+
+    it('registers with clinic invite code, joins org, fires ORG_MEMBER_JOINED audit', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
+
+      const mockClient = setupMockClient();
+      const userRow = createMockUserRow();
+      const clinicCodeRow = {
+        id: 'code-2',
+        code: 'CLIN5678',
+        type: 'clinic' as const,
+        organization_id: 'org-1',
+        created_by: 'admin-user',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
+        .mockResolvedValueOnce({ rows: [clinicCodeRow] })      // findByCodeForUpdate
+        .mockResolvedValueOnce({ rows: [userRow] })            // createUserWithClient
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })    // legal acceptance 1
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })    // legal acceptance 2
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })    // legal acceptance 3
+        .mockResolvedValueOnce({ rows: [{ max_seats: 10, name: 'Test Clinic' }] }) // findOrganizationByIdForUpdate
+        .mockResolvedValueOnce({ rows: [{ count: '3' }] })    // countBillableSeats
+        .mockResolvedValueOnce({ rows: [] })                   // addMember
+        .mockResolvedValueOnce({ rows: [] })                   // updateUserOrganization
+        .mockResolvedValueOnce({ rows: [] })                   // markCodeAsUsed
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })    // session count
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] }) // session insert
+        .mockResolvedValueOnce({ rows: [] });                  // COMMIT
+
+      mockCreateToken.mockResolvedValueOnce('verification-token');
+      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
+
+      const result = await register('new@example.com', 'Password1', {
+        ...context,
+        inviteCode: 'CLIN5678',
+      });
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.user.organizationId).toBe('org-1');
+      }
+      expect(mockClient.release).toHaveBeenCalled();
+
+      // Verify addMember was called (9th client query = INSERT INTO organization_members)
+      expect(mockClientQuery.mock.calls[8][0]).toContain('INSERT INTO organization_members');
+
+      // Verify updateUserOrganization was called (10th client query = UPDATE users SET organization_id)
+      expect(mockClientQuery.mock.calls[9][0]).toContain('organization_id');
+
+      // Verify ORG_MEMBER_JOINED audit was logged
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'ORG_MEMBER_JOINED',
+          metadata: { organizationId: 'org-1', source: 'registration' },
+        })
+      );
+
+      // Verify INVITE_CODE_REDEEMED audit was also logged
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'INVITE_CODE_REDEEMED',
+          metadata: { codeId: 'code-2' },
+        })
+      );
+    });
+
+    it('returns invalid_invite_code when code not found in transaction', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
+
+      const mockClient = setupMockClient();
+
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // findByCodeForUpdate — not found
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      const result = await register('new@example.com', 'Password1', {
+        ...context,
+        inviteCode: 'BADCODE1',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_invite_code');
+      }
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('returns no_seats_available when org is full', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
+
+      const mockClient = setupMockClient();
+      const userRow = createMockUserRow();
+      const clinicCodeRow = {
+        id: 'code-3',
+        code: 'FULL1234',
+        type: 'clinic' as const,
+        organization_id: 'org-full',
+        created_by: 'admin-user',
+        used_by: null,
+        used_at: null,
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        is_active: true,
+        created_at: new Date(),
+      };
+
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
+        .mockResolvedValueOnce({ rows: [clinicCodeRow] })      // findByCodeForUpdate
+        .mockResolvedValueOnce({ rows: [userRow] })            // createUserWithClient
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })    // legal acceptance 1
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })    // legal acceptance 2
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })    // legal acceptance 3
+        .mockResolvedValueOnce({ rows: [{ max_seats: 5, name: 'Full Clinic' }] }) // findOrganizationByIdForUpdate
+        .mockResolvedValueOnce({ rows: [{ count: '5' }] })    // countBillableSeats — at limit
+        .mockResolvedValueOnce({ rows: [] });                  // ROLLBACK
+
+      const result = await register('new@example.com', 'Password1', {
+        ...context,
+        inviteCode: 'FULL1234',
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('no_seats_available');
+      }
+      expect(mockClient.release).toHaveBeenCalled();
+    });
   });
 
   describe('completePasswordReset', () => {
