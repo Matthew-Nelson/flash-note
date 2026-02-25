@@ -81,20 +81,28 @@ export async function recordFailedAttempt(
 
     // Only fire audit when crossing a threshold boundary (not on every subsequent attempt)
     if (newAttemptCount === lockout.attempts) {
-      await auditService.log({
-        userId,
-        action: AuditAction.ACCOUNT_LOCKED,
-        status: 'SUCCESS',
-        metadata: {
-          failedAttempts: newAttemptCount,
-          lockoutType: isPermanent ? 'permanent' : 'temporary',
-          ...(isPermanent
-            ? { reason: 'Exceeded maximum failed login attempts' }
-            : { lockoutMinutes: lockout.durationMinutes, expiresAt: lockedUntil?.toISOString() }),
-        },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
+      try {
+        await auditService.log({
+          userId,
+          action: AuditAction.ACCOUNT_LOCKED,
+          status: 'SUCCESS',
+          metadata: {
+            failedAttempts: newAttemptCount,
+            lockoutType: isPermanent ? 'permanent' : 'temporary',
+            ...(isPermanent
+              ? { reason: 'Exceeded maximum failed login attempts' }
+              : { lockoutMinutes: lockout.durationMinutes, expiresAt: lockedUntil?.toISOString() }),
+          },
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent,
+        });
+      } catch (error) {
+        // TODO: Replace with Pino structured logger when available
+        console.error('Audit log failed for ACCOUNT_LOCKED:', {
+          userId,
+          errorType: error instanceof Error ? error.constructor.name : 'unknown',
+        });
+      }
     }
 
     return {
@@ -131,18 +139,26 @@ export async function unlockAccount(
 
   await resetLockout(userId);
 
-  await auditService.log({
-    userId,
-    action: AuditAction.ACCOUNT_UNLOCKED,
-    status: 'SUCCESS',
-    metadata: {
-      previousFailedAttempts: statusBefore.failedAttempts,
-      wasPermanentlyLocked: statusBefore.isPermanentlyLocked,
-      unlockedBy: 'admin',
-    },
-    ipAddress: context.ipAddress,
-    userAgent: context.userAgent,
-  });
+  try {
+    await auditService.log({
+      userId,
+      action: AuditAction.ACCOUNT_UNLOCKED,
+      status: 'SUCCESS',
+      metadata: {
+        previousFailedAttempts: statusBefore.failedAttempts,
+        wasPermanentlyLocked: statusBefore.isPermanentlyLocked,
+        unlockedBy: 'admin',
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+  } catch (error) {
+    // TODO: Replace with Pino structured logger when available
+    console.error('Audit log failed for ACCOUNT_UNLOCKED:', {
+      userId,
+      errorType: error instanceof Error ? error.constructor.name : 'unknown',
+    });
+  }
 }
 
 /**

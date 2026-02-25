@@ -111,6 +111,23 @@ describe('dal/email-tokens', () => {
 
       expect(userId).toBeNull();
     });
+
+    it('uses provided client instead of db pool', async () => {
+      const mockClient = setupMockClient();
+      mockClientQuery.mockResolvedValueOnce({
+        rows: [{ user_id: 'user-1' }],
+      });
+
+      const userId = await consumeToken('hash123', 'email_verification', mockClient as unknown as import('pg').PoolClient);
+
+      expect(userId).toBe('user-1');
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('UPDATE email_tokens'),
+        ['hash123', 'email_verification']
+      );
+      // db.query should NOT have been called
+      expect(mockDbQuery).not.toHaveBeenCalled();
+    });
   });
 
   describe('checkTokenExists', () => {

@@ -8,6 +8,8 @@ vi.mock('@/server/db/config', () => ({
     EMAIL_FROM_NAME: 'FlashNote',
     EMAIL_FROM_ADDRESS: 'noreply@flashnote.test',
   },
+  isDevelopment: true,
+  isTest: false,
 }));
 
 // Resend module still needs to be available (imported but not instantiated)

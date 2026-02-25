@@ -6,6 +6,8 @@ import {
   EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS,
   PASSWORD_RESET_TOKEN_EXPIRY_MINUTES,
 } from '@/server/db/config';
+import type pg from 'pg';
+
 import {
   createEmailToken,
   consumeToken,
@@ -27,11 +29,7 @@ interface TokenResult {
  */
 export function generateToken(): TokenResult {
   const randomBytes = crypto.randomBytes(32);
-  const token = randomBytes
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=/g, '');
+  const token = randomBytes.toString('base64url');
 
   const tokenHash = hashToken(token);
   return { token, tokenHash };
@@ -68,10 +66,11 @@ export async function createToken(userId: string, type: TokenType): Promise<stri
  */
 export async function validateAndConsumeToken(
   token: string,
-  type: TokenType
+  type: TokenType,
+  client?: pg.PoolClient
 ): Promise<string | null> {
   const tokenHash = hashToken(token);
-  return consumeToken(tokenHash, type);
+  return consumeToken(tokenHash, type, client);
 }
 
 /**

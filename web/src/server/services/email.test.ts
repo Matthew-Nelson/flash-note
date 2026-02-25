@@ -8,6 +8,8 @@ vi.mock('@/server/db/config', () => ({
     EMAIL_FROM_NAME: 'FlashNote',
     EMAIL_FROM_ADDRESS: 'noreply@flashnote.test',
   },
+  isDevelopment: false,
+  isTest: false,
 }));
 
 // Track calls to resend.emails.send via a global holder

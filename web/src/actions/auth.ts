@@ -28,11 +28,11 @@ import {
   inviteCodeValidateRateLimit,
 } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
-import { login, register, completePasswordReset } from '@/server/services/auth';
+import { login, register, completePasswordReset, verifyEmail } from '@/server/services/auth';
 import type { SanitizedUser } from '@/server/services/auth';
-import { validateAndConsumeToken, isTokenValid, findUserIdFromToken, createToken } from '@/server/services/token';
+import { isTokenValid, findUserIdFromToken, createToken } from '@/server/services/token';
 import { sendVerificationEmail, sendPasswordResetEmail } from '@/server/services/email';
-import { findUserByEmail, findUserById, markEmailVerified } from '@/server/dal/users';
+import { findUserByEmail, findUserById } from '@/server/dal/users';
 import { deleteSession } from '@/server/dal/sessions';
 import { findByCode, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { auditService } from '@/server/services/audit';
@@ -56,8 +56,8 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
   const { email, password } = parsed.data;
   const context = await getRequestContext();
 
-  // Rate limit by IP:email
-  const rl = await checkRateLimit(loginRateLimit, rateLimitKey(context.ipAddress ?? 'unknown', email));
+  // Rate limit by IP:email (normalize to prevent case-variant bypass)
+  const rl = await checkRateLimit(loginRateLimit, rateLimitKey(context.ipAddress ?? 'unknown', email.toLowerCase().trim()));
   if (!rl.success) {
     return { success: false, error: 'rate_limit_exceeded' };
   }
@@ -157,7 +157,10 @@ export async function registerAction(formData: FormData): Promise<ActionResult<{
   });
 
   if (!result.success) {
-    return { success: false, error: result.error };
+    // Map email_exists → generic code to prevent email enumeration;
+    // pass through actionable errors (invalid_invite_code, no_seats_available)
+    const error = result.error === 'email_exists' ? 'registration_failed' : result.error;
+    return { success: false, error };
   }
 
   await setSessionCookie(result.token);
@@ -279,33 +282,14 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
     return { success: false, error: 'rate_limit_exceeded' };
   }
 
-  // Validate and consume token
-  const userId = await validateAndConsumeToken(token, 'password_reset');
-  if (!userId) {
+  const result = await completePasswordReset(token, password, context);
+  if (!result.success) {
+    // Audit with appropriate action based on error type
+    const isTokenError = result.error === 'invalid_token';
     try {
       await auditService.log({
         userId: null,
-        action: AuditAction.PASSWORD_RESET_TOKEN_INVALID,
-        status: 'FAILURE',
-        metadata: { reason: 'invalid_or_expired_token' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for PASSWORD_RESET_TOKEN_INVALID:', {
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
-    return { success: false, error: 'invalid_token' };
-  }
-
-  const result = await completePasswordReset(userId, password, context);
-  if (!result.success) {
-    try {
-      await auditService.log({
-        userId,
-        action: AuditAction.PASSWORD_RESET_FAILED,
+        action: isTokenError ? AuditAction.PASSWORD_RESET_TOKEN_INVALID : AuditAction.PASSWORD_RESET_FAILED,
         status: 'FAILURE',
         metadata: { reason: result.error },
         ipAddress: context.ipAddress,
@@ -313,12 +297,11 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
       });
     } catch (error) {
       // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for PASSWORD_RESET_FAILED:', {
-        userId,
+      console.error(`Audit log failed for ${isTokenError ? 'PASSWORD_RESET_TOKEN_INVALID' : 'PASSWORD_RESET_FAILED'}:`, {
         errorType: error instanceof Error ? error.constructor.name : 'unknown',
       });
     }
-    return { success: false, error: result.error };
+    return { success: false, error: 'reset_failed' };
   }
 
   return { success: true };
@@ -340,7 +323,7 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
     return { success: false, error: 'rate_limit_exceeded' };
   }
 
-  const userId = await validateAndConsumeToken(token, 'email_verification');
+  const userId = await verifyEmail(token);
 
   if (!userId) {
     // Token invalid — check if user is already verified (idempotent handling)
@@ -371,8 +354,6 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
 
     return { success: false, error: 'invalid_token' };
   }
-
-  await markEmailVerified(userId);
 
   try {
     await auditService.log({

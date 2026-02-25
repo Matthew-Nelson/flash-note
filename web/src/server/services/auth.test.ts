@@ -41,8 +41,11 @@ vi.mock('./lockout', () => ({
   resetFailedAttempts: mockResetFailedAttempts,
 }));
 
+const mockValidateAndConsumeToken = vi.hoisted(() => vi.fn());
+
 vi.mock('./token', () => ({
   createToken: mockCreateToken,
+  validateAndConsumeToken: mockValidateAndConsumeToken,
 }));
 
 vi.mock('./email', () => ({
@@ -59,7 +62,7 @@ vi.mock('bcryptjs', () => ({
 
 import bcrypt from 'bcryptjs';
 
-import { login, register, completePasswordReset, sanitizeUser } from './auth';
+import { login, register, completePasswordReset, verifyEmail, sanitizeUser } from './auth';
 import type { User } from '@/server/types';
 
 // Helper to build a User object from a mock row
@@ -106,6 +109,7 @@ describe('auth service', () => {
     mockRecordFailedAttempt.mockReset();
     mockResetFailedAttempts.mockReset();
     mockCreateToken.mockReset();
+    mockValidateAndConsumeToken.mockReset();
     mockSendVerificationEmail.mockReset();
     vi.mocked(bcrypt.compare).mockReset();
     vi.mocked(bcrypt.hash).mockReset().mockResolvedValue('$2a$12$hashedvalue' as never);
@@ -796,20 +800,89 @@ describe('auth service', () => {
     });
   });
 
-  describe('completePasswordReset', () => {
-    it('updates password, deletes sessions, resets lockout in transaction', async () => {
+  describe('verifyEmail', () => {
+    it('consumes token and marks email verified in a single transaction', async () => {
       const mockClient = setupMockClient();
-
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
       mockClientQuery
         .mockResolvedValueOnce({ rows: [] })  // BEGIN
-        .mockResolvedValueOnce({ rows: [], rowCount: 1 })  // updatePassword — 1 row affected
-        .mockResolvedValueOnce({ rows: [] })  // deleteSessionsByUserId
-        .mockResolvedValueOnce({ rows: [] })  // resetLockout
+        .mockResolvedValueOnce({ rows: [] })  // markEmailVerified
         .mockResolvedValueOnce({ rows: [] }); // COMMIT
 
-      const result = await completePasswordReset('user-1', 'NewPass1', context);
+      const userId = await verifyEmail('valid-token');
+
+      expect(userId).toBe('user-1');
+      expect(mockClient.release).toHaveBeenCalled();
+
+      // Verify transaction sequence
+      expect(mockClientQuery.mock.calls[0][0]).toBe('BEGIN');
+      // markEmailVerified updates users table
+      expect(mockClientQuery.mock.calls[1][0]).toContain('email_verified = TRUE');
+      expect(mockClientQuery.mock.calls[2][0]).toBe('COMMIT');
+    });
+
+    it('returns null for invalid/expired/consumed token', async () => {
+      const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      const userId = await verifyEmail('bad-token');
+
+      expect(userId).toBeNull();
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('rolls back if markEmailVerified fails', async () => {
+      const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockRejectedValueOnce(new Error('db error'))  // markEmailVerified fails
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      await expect(verifyEmail('valid-token')).rejects.toThrow('db error');
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('passes client to validateAndConsumeToken for transaction atomicity', async () => {
+      setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] })  // markEmailVerified
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      await verifyEmail('valid-token');
+
+      // validateAndConsumeToken should receive the client as 3rd arg
+      expect(mockValidateAndConsumeToken).toHaveBeenCalledWith(
+        'valid-token',
+        'email_verification',
+        expect.objectContaining({ query: mockClientQuery })
+      );
+    });
+  });
+
+  describe('completePasswordReset', () => {
+    it('consumes token, updates password, deletes sessions, resets lockout in transaction', async () => {
+      const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })              // BEGIN
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // updatePassword — 1 row affected
+        .mockResolvedValueOnce({ rows: [] })              // deleteSessionsByUserId
+        .mockResolvedValueOnce({ rows: [] })              // resetLockout
+        .mockResolvedValueOnce({ rows: [] });             // COMMIT
+
+      const result = await completePasswordReset('valid-token', 'NewPass1', context);
 
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.userId).toBe('user-1');
+      }
       expect(mockClient.release).toHaveBeenCalled();
 
       // Verify transaction sequence
@@ -820,8 +893,25 @@ describe('auth service', () => {
       expect(mockClientQuery.mock.calls[4][0]).toBe('COMMIT');
     });
 
+    it('returns invalid_token when token is invalid/expired/consumed', async () => {
+      const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      const result = await completePasswordReset('bad-token', 'NewPass1', context);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_token');
+      }
+      expect(mockClient.release).toHaveBeenCalled();
+    });
+
     it('fires audit log after commit', async () => {
       setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
       mockClientQuery
         .mockResolvedValueOnce({ rows: [] })              // BEGIN
         .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // updatePassword
@@ -829,7 +919,7 @@ describe('auth service', () => {
         .mockResolvedValueOnce({ rows: [] })              // resetLockout
         .mockResolvedValueOnce({ rows: [] });             // COMMIT
 
-      await completePasswordReset('user-1', 'NewPass1', context);
+      await completePasswordReset('valid-token', 'NewPass1', context);
 
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -841,6 +931,7 @@ describe('auth service', () => {
 
     it('does not fail if audit log fails after commit', async () => {
       setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
       mockClientQuery
         .mockResolvedValueOnce({ rows: [] })              // BEGIN
         .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // updatePassword
@@ -850,7 +941,7 @@ describe('auth service', () => {
 
       mockAuditLog.mockRejectedValueOnce(new Error('audit failed'));
 
-      const result = await completePasswordReset('user-1', 'NewPass1', context);
+      const result = await completePasswordReset('valid-token', 'NewPass1', context);
 
       // Should still succeed
       expect(result.success).toBe(true);
@@ -858,12 +949,13 @@ describe('auth service', () => {
 
     it('returns not_found when user does not exist or is deleted', async () => {
       const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
       mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })  // BEGIN
-        .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // updatePassword — 0 rows affected
-        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+        .mockResolvedValueOnce({ rows: [] })              // BEGIN
+        .mockResolvedValueOnce({ rows: [], rowCount: 0 }) // updatePassword — 0 rows affected
+        .mockResolvedValueOnce({ rows: [] });             // ROLLBACK
 
-      const result = await completePasswordReset('deleted-user', 'NewPass1', context);
+      const result = await completePasswordReset('valid-token', 'NewPass1', context);
 
       expect(result.success).toBe(false);
       if (!result.success) {
@@ -874,14 +966,34 @@ describe('auth service', () => {
 
     it('rolls back on transaction failure', async () => {
       const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
       mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })  // BEGIN
-        .mockRejectedValueOnce(new Error('update failed'))  // updatePassword fails
-        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+        .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+        .mockRejectedValueOnce(new Error('update failed'))      // updatePassword fails
+        .mockResolvedValueOnce({ rows: [] });                   // ROLLBACK
 
-      await expect(completePasswordReset('user-1', 'NewPass1', context))
+      await expect(completePasswordReset('valid-token', 'NewPass1', context))
         .rejects.toThrow('update failed');
       expect(mockClient.release).toHaveBeenCalled();
+    });
+
+    it('passes client to validateAndConsumeToken for transaction atomicity', async () => {
+      setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })              // BEGIN
+        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // updatePassword
+        .mockResolvedValueOnce({ rows: [] })              // deleteSessionsByUserId
+        .mockResolvedValueOnce({ rows: [] })              // resetLockout
+        .mockResolvedValueOnce({ rows: [] });             // COMMIT
+
+      await completePasswordReset('valid-token', 'NewPass1', context);
+
+      expect(mockValidateAndConsumeToken).toHaveBeenCalledWith(
+        'valid-token',
+        'password_reset',
+        expect.objectContaining({ query: mockClientQuery })
+      );
     });
   });
 

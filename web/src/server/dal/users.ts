@@ -131,8 +131,11 @@ export async function updateSubscriptionStatus(
   );
 }
 
-export async function markEmailVerified(userId: string): Promise<void> {
-  await db.query(
+export async function markEmailVerified(
+  userId: string,
+  client?: pg.PoolClient
+): Promise<void> {
+  await (client ?? db).query(
     `UPDATE users
      SET email_verified = TRUE,
          email_verified_at = NOW(),

@@ -129,7 +129,8 @@ describe('token service', () => {
       expect(userId).toBe('user-1');
       expect(mockConsumeToken).toHaveBeenCalledWith(
         hashToken('valid-token'),
-        'email_verification'
+        'email_verification',
+        undefined
       );
     });
 
@@ -152,6 +153,20 @@ describe('token service', () => {
 
       expect(first).toBe('user-1');
       expect(second).toBeNull();
+    });
+
+    it('passes client through to consumeToken when provided', async () => {
+      mockConsumeToken.mockResolvedValueOnce('user-1');
+      const fakeClient = { query: vi.fn() } as unknown as import('pg').PoolClient;
+
+      const userId = await validateAndConsumeToken('token', 'password_reset', fakeClient);
+
+      expect(userId).toBe('user-1');
+      expect(mockConsumeToken).toHaveBeenCalledWith(
+        hashToken('token'),
+        'password_reset',
+        fakeClient
+      );
     });
   });
 

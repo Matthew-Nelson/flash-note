@@ -6,7 +6,7 @@ const mockRedirect = vi.hoisted(() => vi.fn());
 const mockLogin = vi.hoisted(() => vi.fn());
 const mockRegister = vi.hoisted(() => vi.fn());
 const mockCompletePasswordReset = vi.hoisted(() => vi.fn());
-const mockValidateAndConsumeToken = vi.hoisted(() => vi.fn());
+const mockVerifyEmail = vi.hoisted(() => vi.fn());
 const mockIsTokenValid = vi.hoisted(() => vi.fn());
 const mockFindUserIdFromToken = vi.hoisted(() => vi.fn());
 const mockCreateToken = vi.hoisted(() => vi.fn());
@@ -17,7 +17,6 @@ const mockClearSessionCookie = vi.hoisted(() => vi.fn().mockResolvedValue(undefi
 const mockGetSession = vi.hoisted(() => vi.fn());
 const mockFindUserByEmail = vi.hoisted(() => vi.fn());
 const mockFindUserById = vi.hoisted(() => vi.fn());
-const mockMarkEmailVerified = vi.hoisted(() => vi.fn());
 const mockDeleteSession = vi.hoisted(() => vi.fn());
 const mockFindByCode = vi.hoisted(() => vi.fn());
 const mockValidateCodeRedeemable = vi.hoisted(() => vi.fn());
@@ -49,10 +48,10 @@ vi.mock('@/server/services/auth', () => ({
   login: mockLogin,
   register: mockRegister,
   completePasswordReset: mockCompletePasswordReset,
+  verifyEmail: mockVerifyEmail,
 }));
 
 vi.mock('@/server/services/token', () => ({
-  validateAndConsumeToken: mockValidateAndConsumeToken,
   isTokenValid: mockIsTokenValid,
   findUserIdFromToken: mockFindUserIdFromToken,
   createToken: mockCreateToken,
@@ -90,7 +89,6 @@ vi.mock('@/server/lib/get-session', () => ({
 vi.mock('@/server/dal/users', () => ({
   findUserByEmail: mockFindUserByEmail,
   findUserById: mockFindUserById,
-  markEmailVerified: mockMarkEmailVerified,
 }));
 
 vi.mock('@/server/dal/sessions', () => ({
@@ -193,6 +191,17 @@ describe('auth actions', () => {
       }
     });
 
+    it('normalizes email in rate limit key to prevent case-variant bypass', async () => {
+      mockLogin.mockResolvedValue({ success: false, error: 'invalid_credentials' });
+
+      await loginAction(toFormData({ email: 'User@Example.COM', password: 'pass' }));
+
+      expect(checkRateLimit).toHaveBeenCalledWith(
+        null, // loginRateLimit mock
+        '127.0.0.1:user@example.com'
+      );
+    });
+
     it('fires LOGIN_FAILED audit with emailProvided, not email (H-4)', async () => {
       mockLogin.mockResolvedValueOnce({ success: false, error: 'invalid_credentials' });
 
@@ -241,7 +250,7 @@ describe('auth actions', () => {
       expect(mockSetSessionCookie).toHaveBeenCalledWith('new-session-token');
     });
 
-    it('returns error code on duplicate email', async () => {
+    it('maps email_exists to generic registration_failed (anti-enumeration)', async () => {
       mockRegister.mockResolvedValueOnce({ success: false, error: 'email_exists' });
 
       const result = await registerAction(toFormData({
@@ -253,7 +262,39 @@ describe('auth actions', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe('email_exists');
+        expect(result.error).toBe('registration_failed');
+      }
+    });
+
+    it('passes through actionable error codes (invalid_invite_code)', async () => {
+      mockRegister.mockResolvedValueOnce({ success: false, error: 'invalid_invite_code' });
+
+      const result = await registerAction(toFormData({
+        email: 'a@b.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: 'true',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_invite_code');
+      }
+    });
+
+    it('passes through actionable error codes (no_seats_available)', async () => {
+      mockRegister.mockResolvedValueOnce({ success: false, error: 'no_seats_available' });
+
+      const result = await registerAction(toFormData({
+        email: 'a@b.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: 'true',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('no_seats_available');
       }
     });
   });
@@ -374,8 +415,8 @@ describe('auth actions', () => {
   });
 
   describe('resetPasswordAction', () => {
-    it('returns invalid_token for expired token', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+    it('returns reset_failed for invalid token', async () => {
+      mockCompletePasswordReset.mockResolvedValueOnce({ success: false, error: 'invalid_token' });
 
       const result = await resetPasswordAction(toFormData({
         token: 'expired',
@@ -385,12 +426,19 @@ describe('auth actions', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe('invalid_token');
+        expect(result.error).toBe('reset_failed');
       }
+      // Audit with TOKEN_INVALID action for token errors
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'PASSWORD_RESET_TOKEN_INVALID',
+          status: 'FAILURE',
+          metadata: { reason: 'invalid_token' },
+        })
+      );
     });
 
-    it('audits PASSWORD_RESET_FAILED when completePasswordReset fails', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
+    it('returns reset_failed and audits PASSWORD_RESET_FAILED when service returns not_found', async () => {
       mockCompletePasswordReset.mockResolvedValueOnce({ success: false, error: 'not_found' });
 
       const result = await resetPasswordAction(toFormData({
@@ -401,11 +449,10 @@ describe('auth actions', () => {
 
       expect(result.success).toBe(false);
       if (!result.success) {
-        expect(result.error).toBe('not_found');
+        expect(result.error).toBe('reset_failed');
       }
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
-          userId: 'user-1',
           action: 'PASSWORD_RESET_FAILED',
           status: 'FAILURE',
           metadata: { reason: 'not_found' },
@@ -413,9 +460,24 @@ describe('auth actions', () => {
       );
     });
 
+    it('passes token directly to completePasswordReset', async () => {
+      mockCompletePasswordReset.mockResolvedValueOnce({ success: true, userId: 'user-1' });
+
+      await resetPasswordAction(toFormData({
+        token: 'my-token',
+        password: 'NewPass123',
+        confirmPassword: 'NewPass123',
+      }));
+
+      expect(mockCompletePasswordReset).toHaveBeenCalledWith(
+        'my-token',
+        'NewPass123',
+        expect.objectContaining({ ipAddress: '127.0.0.1' })
+      );
+    });
+
     it('completes password reset for valid token', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
-      mockCompletePasswordReset.mockResolvedValueOnce({ success: true });
+      mockCompletePasswordReset.mockResolvedValueOnce({ success: true, userId: 'user-1' });
 
       const result = await resetPasswordAction(toFormData({
         token: 'valid-token',
@@ -428,18 +490,17 @@ describe('auth actions', () => {
   });
 
   describe('verifyEmailAction', () => {
-    it('verifies email for valid token', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
-      mockMarkEmailVerified.mockResolvedValueOnce(undefined);
+    it('verifies email for valid token via verifyEmail service', async () => {
+      mockVerifyEmail.mockResolvedValueOnce('user-1');
 
       const result = await verifyEmailAction(toFormData({ token: 'valid' }));
 
       expect(result.success).toBe(true);
-      expect(mockMarkEmailVerified).toHaveBeenCalledWith('user-1');
+      expect(mockVerifyEmail).toHaveBeenCalledWith('valid');
     });
 
     it('returns alreadyVerified for used token if user is verified', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce(null); // token consumed
+      mockVerifyEmail.mockResolvedValueOnce(null); // token consumed/invalid
       mockFindUserIdFromToken.mockResolvedValueOnce('user-1');
       mockFindUserById.mockResolvedValueOnce({ emailVerified: true });
 
@@ -452,7 +513,7 @@ describe('auth actions', () => {
     });
 
     it('returns invalid_token for truly invalid token', async () => {
-      mockValidateAndConsumeToken.mockResolvedValueOnce(null);
+      mockVerifyEmail.mockResolvedValueOnce(null);
       mockFindUserIdFromToken.mockResolvedValueOnce(null);
 
       const result = await verifyEmailAction(toFormData({ token: 'garbage' }));
@@ -461,6 +522,20 @@ describe('auth actions', () => {
       if (!result.success) {
         expect(result.error).toBe('invalid_token');
       }
+    });
+
+    it('audits EMAIL_VERIFICATION_SUCCESS on success', async () => {
+      mockVerifyEmail.mockResolvedValueOnce('user-1');
+
+      await verifyEmailAction(toFormData({ token: 'valid' }));
+
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-1',
+          action: 'EMAIL_VERIFICATION_SUCCESS',
+          status: 'SUCCESS',
+        })
+      );
     });
   });
 

@@ -3,7 +3,7 @@ import 'server-only';
 
 import { Resend } from 'resend';
 
-import { config } from '@/server/db/config';
+import { config, isDevelopment, isTest } from '@/server/db/config';
 
 /**
  * Module-level Resend client singleton.
@@ -169,6 +169,9 @@ async function sendEmail(
   text: string
 ): Promise<void> {
   if (!resend) {
+    if (!isDevelopment && !isTest) {
+      throw new Error('Email service not configured in production');
+    }
     console.log('='.repeat(60));
     console.log('EMAIL SERVICE: Resend not configured, logging email:');
     console.log('To: [redacted]');

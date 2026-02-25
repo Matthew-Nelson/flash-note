@@ -220,6 +220,22 @@ describe('lockout service', () => {
       expect(status.isLocked).toBe(false);
       expect(status.failedAttempts).toBe(0);
     });
+
+    it('still returns lockout status when audit log fails at threshold', async () => {
+      const lockedUntil = new Date(Date.now() + 15 * 60 * 1000);
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{ failed_login_attempts: 5, locked_until: lockedUntil }],
+      });
+      mockAuditLog.mockRejectedValueOnce(new Error('audit service down'));
+
+      const status = await recordFailedAttempt('user-1', context);
+
+      // Lockout status should still be returned correctly
+      expect(status.isLocked).toBe(true);
+      expect(status.failedAttempts).toBe(5);
+      // Audit was attempted
+      expect(mockAuditLog).toHaveBeenCalled();
+    });
   });
 
   describe('resetFailedAttempts', () => {
@@ -260,6 +276,23 @@ describe('lockout service', () => {
           }),
         })
       );
+    });
+
+    it('does not throw when audit log fails', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [{
+          failed_login_attempts: 20,
+          locked_until: null,
+          last_failed_login_at: new Date(),
+        }],
+      });
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      mockAuditLog.mockRejectedValueOnce(new Error('audit service down'));
+
+      const context = { ipAddress: '127.0.0.1', userAgent: 'Admin/1.0' };
+
+      // Should not throw
+      await expect(unlockAccount('user-1', context)).resolves.toBeUndefined();
     });
   });
 });

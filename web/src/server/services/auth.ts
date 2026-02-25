@@ -4,14 +4,14 @@ import bcrypt from 'bcryptjs';
 
 import { getPoolClient } from '@/server/db';
 import { BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '@/server/db/config';
-import { findUserByEmail, createUserWithClient, updatePassword, resetLockout, updateUserOrganization } from '@/server/dal/users';
+import { findUserByEmail, createUserWithClient, updatePassword, resetLockout, updateUserOrganization, markEmailVerified } from '@/server/dal/users';
 import { createSession, deleteSessionsByUserId } from '@/server/dal/sessions';
 import { recordLegalAcceptances } from '@/server/dal/legal-acceptances';
 import { findByCodeForUpdate, markCodeAsUsed, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { findOrganizationByIdForUpdate } from '@/server/dal/organizations';
 import { addMember, countBillableSeats } from '@/server/dal/organization-members';
 import { getAccountLockoutStatus, recordFailedAttempt, resetFailedAttempts } from './lockout';
-import { createToken } from './token';
+import { createToken, validateAndConsumeToken } from './token';
 import { sendVerificationEmail } from './email';
 import { auditService } from './audit';
 import { AuditAction } from '@/server/types';
@@ -42,7 +42,7 @@ type RegisterResult =
   | { success: false; error: string };
 
 type ResetResult =
-  | { success: true }
+  | { success: true; userId: string }
   | { success: false; error: string };
 
 interface RegisterContext extends SessionContext {
@@ -303,21 +303,58 @@ export async function register(
 }
 
 /**
+ * Verify a user's email address atomically.
+ *
+ * Transaction: consume token + mark email verified (Rule 1).
+ * Returns userId on success, null if token is invalid/expired/consumed.
+ */
+export async function verifyEmail(token: string): Promise<string | null> {
+  const client = await getPoolClient();
+  try {
+    await client.query('BEGIN');
+
+    const userId = await validateAndConsumeToken(token, 'email_verification', client);
+    if (!userId) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    await markEmailVerified(userId, client);
+
+    await client.query('COMMIT');
+    return userId;
+  } catch (error) {
+    try { await client.query('ROLLBACK'); } catch { /* connection may be unusable */ }
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Complete a password reset flow.
  *
- * Transaction: update password + delete all sessions + reset lockout
+ * Transaction: consume token + update password + delete all sessions + reset lockout (Rule 1).
  * Audit log fires AFTER commit (try-catch, error-level on failure).
  */
 export async function completePasswordReset(
-  userId: string,
+  token: string,
   password: string,
   context: SessionContext
 ): Promise<ResetResult> {
   const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
   const client = await getPoolClient();
+  let userId: string;
   try {
     await client.query('BEGIN');
+
+    const resolvedUserId = await validateAndConsumeToken(token, 'password_reset', client);
+    if (!resolvedUserId) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'invalid_token' };
+    }
+    userId = resolvedUserId;
 
     const rowsUpdated = await updatePassword(userId, passwordHash, client);
     if (rowsUpdated === 0) {
@@ -352,7 +389,7 @@ export async function completePasswordReset(
     console.error('Audit log failed for PASSWORD_RESET_SUCCESS:', error);
   }
 
-  return { success: true };
+  return { success: true, userId };
 }
 
 /**

@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type pg from 'pg';
+
 import { db, getPoolClient } from '@/server/db';
 import type { TokenType } from '@/server/types';
 
@@ -47,9 +49,10 @@ export async function createEmailToken(
  */
 export async function consumeToken(
   tokenHash: string,
-  type: TokenType
+  type: TokenType,
+  client?: pg.PoolClient
 ): Promise<string | null> {
-  const result = await db.query<{ user_id: string }>(
+  const result = await (client ?? db).query<{ user_id: string }>(
     `UPDATE email_tokens
      SET used_at = NOW()
      WHERE token_hash = $1
