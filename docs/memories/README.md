@@ -21,6 +21,7 @@ YYYY-MM-DD-topic-description.md
 | File | Summary |
 |------|---------|
 | `2026-02-04-business-strategy-financial-analysis.md` | Financial projections, churn analysis, retention strategies, moat assessment, personalization architecture, clinic accounts design, acquisition positioning |
+| `2026-02-04-billing-codes-research.md` | Research into billing code suggestion value; conclusion that narrative quality (audit-readiness) is the real differentiator, not code suggestion |
 
 ## Usage
 

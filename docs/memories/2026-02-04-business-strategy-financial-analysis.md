@@ -225,6 +225,8 @@ CREATE TABLE user_style_profiles (
 
 ### Database Schema
 
+> **Note:** The actual migration schema (Phase 1.1) uses `organizations` / `organization_members` instead of the `clinics` / `clinic_members` names below. The concept and structure are the same — the naming was generalized during implementation.
+
 ```sql
 CREATE TABLE clinics (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

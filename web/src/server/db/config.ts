@@ -22,6 +22,17 @@ const envSchema = z.object({
   // Upstash Redis — optional in dev/test, required in production (enforced in redis.ts)
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+
+  // Email (Resend) — optional in dev/test (emails logged to console)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  EMAIL_FROM_NAME: z.string().min(1).default('FlashNote'),
+  EMAIL_FROM_ADDRESS: z.string().email().default('noreply@flashnote.app'),
+
+  // Web URL — used to construct email links (verification, password reset)
+  WEB_URL: z.string().url().default('http://localhost:3000'),
+
+  // Registration mode — controls who can sign up
+  REGISTRATION_MODE: z.enum(['open', 'closed', 'invite']).default('open'),
 });
 
 function loadConfig() {
@@ -52,6 +63,10 @@ export const SESSION_ABSOLUTE_MAX_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export const SESSION_REFRESH_THRESHOLD = 0.5; // Refresh when >50% of idle TTL elapsed
 export const MAX_SESSIONS_PER_USER = 5;
 export const SESSION_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60; // 7 days
+
+// Token expiry
+export const EMAIL_VERIFICATION_TOKEN_EXPIRY_HOURS = 24;
+export const PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 15;
 
 // Legal document versions - bump independently when each document is updated
 // Recorded in legal_acceptances for audit trail

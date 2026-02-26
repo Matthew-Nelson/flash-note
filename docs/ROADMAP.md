@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 23, 2026
+**Last Updated:** February 24, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 0/8 sub-phases | Infrastructure scaffold |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 3/8 sub-phases | Auth Server Actions (1.3) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -187,7 +187,7 @@ Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`
 | M-20 | Migration script lacks advisory locks | 1.1 | Add `pg_advisory_lock` to ported migration runner |
 | M-22 | `findMemberByOrgAndUser` returns stale membership | 1.1 | Add `WHERE removed_at IS NULL` when porting query |
 | M-25 | `removeMember` doesn't verify row was updated | 1.1 | Return rowCount when porting query |
-| M-27 | `cleanupExpiredTokens()` never called | 1.2 | Wire up cleanup job for sessions + tokens (deferred — session management is 1.2) |
+| M-27 | `cleanupExpiredTokens()` never called | 1.2 | ⚠️ Partial — `cleanupExpiredSessions()` exists + tested (PR #80), but invocation trigger deferred (Cloud Scheduler → Route Handler) |
 | L-5 | Unsafe type cast of database role value | 1.1 | Zod-validate role from DB result |
 | L-13 | `email_tokens.token_hash` lacks UNIQUE constraint | 1.1 | Fix in squashed `001_initial_schema.sql` |
 | L-14 | Redundant `idx_users_email` index | 1.1 | Drop in squashed schema (UNIQUE already creates index) |
@@ -225,7 +225,7 @@ Stand up the deployment pipeline before writing business logic. Validates Cloud 
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done — PR #78 |
 
 ### 1.1 — DAL Foundation
 
@@ -260,7 +260,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done — PR #80 |
 
 ### 1.3 — Auth Server Actions
 
@@ -278,6 +278,13 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | Status |
 |--------|
 | ❌ |
+
+**Follow-up items** (non-blocking, tracked for future phases):
+
+| # | Item | Blocked By | Notes |
+|---|------|-----------|-------|
+| 1 | Replace `console.error` with Pino `logger.error` in auth actions/services | Phase 3 Monitoring (Pino logger) | All auth catch blocks use `console.error` with TODOs. CLAUDE.md Rule 9 requires structured `error`-level logging for audit failures to surface in Cloud Error Reporting. Fix when Pino infrastructure lands. |
+| 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | In `login()`, bcrypt runs before lockout check (timing-safe). When a permanently locked account submits the correct password, `recordFailedAttempt()` is skipped (password validated, `!validPassword` branch not taken). Lockout still works, but the audit trail has a gap for these attempts. HIPAA requires logging all authentication events. |
 
 ### 1.4 — Middleware + Protected Pages + Error Boundaries
 
@@ -555,6 +562,9 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| Phase 1.2: Session System + Auth Rate Limiting (PR #80) | Opaque session tokens (SHA-256), sliding window refresh, session DAL (create/validate/refresh/revoke/enforce limit/device binding/cleanup), `getSession()` composition, Upstash rate limiting with compound keying (fixes M-1, L-1) |
+| Phase 1.1: DAL Foundation (PR #79) | Database pool, DAL pattern, audit service, types, squashed schema migration |
+| Phase 1.0: Infrastructure Scaffold (PR #78) | Next.js standalone build, multi-stage Dockerfile, Cloud Run deploy pipeline |
 | All 5 CRITICALs Resolved | CR-1 webhook idempotency, CR-2 token race condition, CR-3 trust proxy, CR-4 security headers, CR-5 password reset atomicity |
 | Backend Infrastructure & Safety (Audit PR 1) | CR-3, H-10, H-14, H-15, M-3 — trust proxy, error handling, graceful shutdown, process handlers |
 | Billing & Webhook Safety (Audit PR 2) | CR-1, H-1, H-2, H-3, M-5, M-6 — idempotency rollback, price validation, duplicate sub check, audit safety |
