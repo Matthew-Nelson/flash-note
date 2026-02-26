@@ -279,6 +279,13 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 |--------|
 | ❌ |
 
+**Follow-up items** (non-blocking, tracked for future phases):
+
+| # | Item | Blocked By | Notes |
+|---|------|-----------|-------|
+| 1 | Replace `console.error` with Pino `logger.error` in auth actions/services | Phase 3 Monitoring (Pino logger) | All auth catch blocks use `console.error` with TODOs. CLAUDE.md Rule 9 requires structured `error`-level logging for audit failures to surface in Cloud Error Reporting. Fix when Pino infrastructure lands. |
+| 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | In `login()`, bcrypt runs before lockout check (timing-safe). When a permanently locked account submits the correct password, `recordFailedAttempt()` is skipped (password validated, `!validPassword` branch not taken). Lockout still works, but the audit trail has a gap for these attempts. HIPAA requires logging all authentication events. |
+
 ### 1.4 — Middleware + Protected Pages + Error Boundaries
 
 - Update Next.js middleware: CSP nonces + cookie-based auth redirect for `/dashboard/*`

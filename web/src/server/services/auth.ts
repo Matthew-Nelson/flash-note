@@ -224,65 +224,44 @@ export async function register(
     client.release();
   }
 
-  // Audit logs OUTSIDE the transaction — each wrapped in try-catch
-  try {
-    await auditService.log({
-      userId: user.id,
-      action: AuditAction.REGISTER,
-      status: 'SUCCESS',
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
-  } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    // eslint-disable-next-line no-console
-    console.error('Audit log failed for REGISTER:', error);
-  }
+  // Audit logs OUTSIDE the transaction (fire-and-forget — auditService.log swallows errors)
+  await auditService.log({
+    userId: user.id,
+    action: AuditAction.REGISTER,
+    status: 'SUCCESS',
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 
-  try {
-    await auditService.log({
-      userId: user.id,
-      action: AuditAction.LEGAL_CONSENT_ACCEPTED,
-      status: 'SUCCESS',
-      metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('Audit log failed for LEGAL_CONSENT_ACCEPTED:', error);
-  }
+  await auditService.log({
+    userId: user.id,
+    action: AuditAction.LEGAL_CONSENT_ACCEPTED,
+    status: 'SUCCESS',
+    metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 
   if (redeemedCodeId) {
-    try {
-      await auditService.log({
-        userId: user.id,
-        action: AuditAction.INVITE_CODE_REDEEMED,
-        status: 'SUCCESS',
-        metadata: { codeId: redeemedCodeId },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed for INVITE_CODE_REDEEMED:', error);
-    }
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.INVITE_CODE_REDEEMED,
+      status: 'SUCCESS',
+      metadata: { codeId: redeemedCodeId },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   if (joinedOrganizationId) {
-    try {
-      await auditService.log({
-        userId: user.id,
-        action: AuditAction.ORG_MEMBER_JOINED,
-        status: 'SUCCESS',
-        metadata: { organizationId: joinedOrganizationId, source: 'registration' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed for ORG_MEMBER_JOINED:', error);
-    }
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.ORG_MEMBER_JOINED,
+      status: 'SUCCESS',
+      metadata: { organizationId: joinedOrganizationId, source: 'registration' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   // Send verification email (non-blocking — user can resend)
@@ -373,21 +352,15 @@ export async function completePasswordReset(
     client.release();
   }
 
-  // Audit outside transaction
-  try {
-    await auditService.log({
-      userId,
-      action: AuditAction.PASSWORD_RESET_SUCCESS,
-      status: 'SUCCESS',
-      metadata: { sessionsInvalidated: true },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
-  } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    // eslint-disable-next-line no-console
-    console.error('Audit log failed for PASSWORD_RESET_SUCCESS:', error);
-  }
+  // Audit outside transaction (fire-and-forget)
+  await auditService.log({
+    userId,
+    action: AuditAction.PASSWORD_RESET_SUCCESS,
+    status: 'SUCCESS',
+    metadata: { sessionsInvalidated: true },
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 
   return { success: true, userId };
 }

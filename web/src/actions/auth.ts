@@ -65,41 +65,26 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
   const result = await login(email, password, context);
 
   if (!result.success) {
-    // Audit failed login (fire-and-forget)
-    try {
-      await auditService.log({
-        userId: null,
-        action: AuditAction.LOGIN_FAILED,
-        status: 'FAILURE',
-        metadata: { emailProvided: true },  // H-4: never log the email
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for LOGIN_FAILED:', {
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
-    return { success: false, error: result.error };
-  }
-
-  // Audit successful login
-  try {
+    // Audit failed login (fire-and-forget — auditService.log swallows errors)
     await auditService.log({
-      userId: result.user.id,
-      action: AuditAction.LOGIN,
-      status: 'SUCCESS',
+      userId: null,
+      action: AuditAction.LOGIN_FAILED,
+      status: 'FAILURE',
+      metadata: { emailProvided: true },  // H-4: never log the email
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     });
-  } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    console.error('Audit log failed for LOGIN:', {
-      userId: result.user.id,
-      errorType: error instanceof Error ? error.constructor.name : 'unknown',
-    });
+    return { success: false, error: result.error };
   }
+
+  // Audit successful login (fire-and-forget)
+  await auditService.log({
+    userId: result.user.id,
+    action: AuditAction.LOGIN,
+    status: 'SUCCESS',
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 
   await setSessionCookie(result.token);
 
@@ -187,23 +172,15 @@ export async function logoutAction(): Promise<void> {
       });
     }
 
-    // Audit — status reflects whether session was actually deleted
-    try {
-      await auditService.log({
-        userId: session.userId,
-        action: AuditAction.LOGOUT,
-        status: sessionDeleted ? 'SUCCESS' : 'FAILURE',
-        metadata: sessionDeleted ? undefined : { reason: 'session_deletion_failed' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for LOGOUT:', {
-        userId: session.userId,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    // Audit — status reflects whether session was actually deleted (fire-and-forget)
+    await auditService.log({
+      userId: session.userId,
+      action: AuditAction.LOGOUT,
+      status: sessionDeleted ? 'SUCCESS' : 'FAILURE',
+      metadata: sessionDeleted ? undefined : { reason: 'session_deletion_failed' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   await clearSessionCookie();
@@ -245,22 +222,15 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
       });
     }
 
-    try {
-      await auditService.log({
-        userId: user.id,
-        action: AuditAction.PASSWORD_RESET_REQUESTED,
-        status: emailSent ? 'SUCCESS' : 'FAILURE',
-        metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for PASSWORD_RESET_REQUESTED:', {
-        userId: user.id,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    // Audit (fire-and-forget)
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.PASSWORD_RESET_REQUESTED,
+      status: emailSent ? 'SUCCESS' : 'FAILURE',
+      metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   return { success: true };
@@ -284,23 +254,16 @@ export async function resetPasswordAction(formData: FormData): Promise<ActionRes
 
   const result = await completePasswordReset(token, password, context);
   if (!result.success) {
-    // Audit with appropriate action based on error type
+    // Audit with appropriate action based on error type (fire-and-forget)
     const isTokenError = result.error === 'invalid_token';
-    try {
-      await auditService.log({
-        userId: null,
-        action: isTokenError ? AuditAction.PASSWORD_RESET_TOKEN_INVALID : AuditAction.PASSWORD_RESET_FAILED,
-        status: 'FAILURE',
-        metadata: { reason: result.error },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error(`Audit log failed for ${isTokenError ? 'PASSWORD_RESET_TOKEN_INVALID' : 'PASSWORD_RESET_FAILED'}:`, {
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    await auditService.log({
+      userId: null,
+      action: isTokenError ? AuditAction.PASSWORD_RESET_TOKEN_INVALID : AuditAction.PASSWORD_RESET_FAILED,
+      status: 'FAILURE',
+      metadata: { reason: result.error },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
     return { success: false, error: 'reset_failed' };
   }
 
@@ -336,40 +299,27 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
       }
     }
 
-    try {
-      await auditService.log({
-        userId: null,
-        action: AuditAction.EMAIL_VERIFICATION_FAILED,
-        status: 'FAILURE',
-        metadata: { reason: 'invalid_or_expired_token' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for EMAIL_VERIFICATION_FAILED:', {
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    // Audit (fire-and-forget)
+    await auditService.log({
+      userId: null,
+      action: AuditAction.EMAIL_VERIFICATION_FAILED,
+      status: 'FAILURE',
+      metadata: { reason: 'invalid_or_expired_token' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
 
     return { success: false, error: 'invalid_token' };
   }
 
-  try {
-    await auditService.log({
-      userId,
-      action: AuditAction.EMAIL_VERIFICATION_SUCCESS,
-      status: 'SUCCESS',
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
-  } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    console.error('Audit log failed for EMAIL_VERIFICATION_SUCCESS:', {
-        userId,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-  }
+  // Audit (fire-and-forget)
+  await auditService.log({
+    userId,
+    action: AuditAction.EMAIL_VERIFICATION_SUCCESS,
+    status: 'SUCCESS',
+    ipAddress: context.ipAddress,
+    userAgent: context.userAgent,
+  });
 
   return { success: true };
 }
@@ -407,22 +357,15 @@ export async function resendVerificationAction(formData: FormData): Promise<Acti
       });
     }
 
-    try {
-      await auditService.log({
-        userId: user.id,
-        action: AuditAction.EMAIL_VERIFICATION_RESENT,
-        status: emailSent ? 'SUCCESS' : 'FAILURE',
-        metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for EMAIL_VERIFICATION_RESENT:', {
-        userId: user.id,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    // Audit (fire-and-forget)
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.EMAIL_VERIFICATION_RESENT,
+      status: emailSent ? 'SUCCESS' : 'FAILURE',
+      metadata: emailSent ? undefined : { reason: 'token_or_email_failed' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   return { success: true };
@@ -472,42 +415,28 @@ export async function validateInviteCodeAction(formData: FormData): Promise<Acti
   const invalidReason = inviteCode ? validateCodeRedeemable(inviteCode) : 'not_found';
   const valid = invalidReason === null;
 
+  // Audit (fire-and-forget)
   if (valid && inviteCode) {
-    try {
-      await auditService.log({
-        userId: null,
-        action: AuditAction.INVITE_CODE_VALIDATED,
-        status: 'SUCCESS',
-        metadata: { codeId: inviteCode.id },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for INVITE_CODE_VALIDATED:', {
-        codeId: inviteCode.id,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    await auditService.log({
+      userId: null,
+      action: AuditAction.INVITE_CODE_VALIDATED,
+      status: 'SUCCESS',
+      metadata: { codeId: inviteCode.id },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   } else {
-    try {
-      await auditService.log({
-        userId: null,
-        action: AuditAction.INVITE_CODE_VALIDATION_FAILED,
-        status: 'FAILURE',
-        metadata: {
-          codeId: inviteCode?.id ?? null,
-          reason: invalidReason,
-        },
-        ipAddress: context.ipAddress,
-        userAgent: context.userAgent,
-      });
-    } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Audit log failed for INVITE_CODE_VALIDATION_FAILED:', {
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
-    }
+    await auditService.log({
+      userId: null,
+      action: AuditAction.INVITE_CODE_VALIDATION_FAILED,
+      status: 'FAILURE',
+      metadata: {
+        codeId: inviteCode?.id ?? null,
+        reason: invalidReason,
+      },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
   }
 
   return { success: true, data: { valid, type: valid ? inviteCode?.type : undefined } };

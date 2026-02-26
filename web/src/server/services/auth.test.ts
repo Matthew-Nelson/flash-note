@@ -372,30 +372,6 @@ describe('auth service', () => {
       expect(result.success).toBe(true);
     });
 
-    it('does not fail registration if audit log fails', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-
-      setupMockClient();
-      const userRow = createMockUserRow();
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })
-        .mockResolvedValueOnce({ rows: [userRow] })
-        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })
-        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })
-        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
-        .mockResolvedValueOnce({ rows: [{ id: 's-1' }] })
-        .mockResolvedValueOnce({ rows: [] });
-
-      mockAuditLog.mockRejectedValue(new Error('audit failed'));
-      mockCreateToken.mockResolvedValueOnce('token');
-      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
-
-      const result = await register('new@example.com', 'Password1', context);
-
-      expect(result.success).toBe(true);
-    });
-
     it('registers with beta invite code, marks code as used, fires INVITE_CODE_REDEEMED audit', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
 
@@ -696,108 +672,6 @@ describe('auth service', () => {
       expect(mockClient.release).toHaveBeenCalled();
     });
 
-    it('does not fail registration if INVITE_CODE_REDEEMED audit throws', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
-
-      setupMockClient();
-      const userRow = createMockUserRow();
-      const inviteCodeRow = {
-        id: 'code-audit-fail',
-        code: 'AUDITF12',
-        type: 'beta' as const,
-        organization_id: null,
-        created_by: 'admin-user',
-        used_by: null,
-        used_at: null,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        is_active: true,
-        created_at: new Date(),
-      };
-
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
-        .mockResolvedValueOnce({ rows: [inviteCodeRow] })      // findByCodeForUpdate
-        .mockResolvedValueOnce({ rows: [userRow] })            // createUserWithClient
-        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })    // legal acceptance 1
-        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })    // legal acceptance 2
-        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })    // legal acceptance 3
-        .mockResolvedValueOnce({ rows: [] })                   // markCodeAsUsed
-        .mockResolvedValueOnce({ rows: [{ count: '0' }] })    // session count
-        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] }) // session insert
-        .mockResolvedValueOnce({ rows: [] });                  // COMMIT
-
-      // REGISTER audit succeeds, LEGAL_CONSENT_ACCEPTED succeeds,
-      // then INVITE_CODE_REDEEMED throws
-      mockAuditLog
-        .mockResolvedValueOnce(undefined)  // REGISTER
-        .mockResolvedValueOnce(undefined)  // LEGAL_CONSENT_ACCEPTED
-        .mockRejectedValueOnce(new Error('audit service down')); // INVITE_CODE_REDEEMED
-
-      mockCreateToken.mockResolvedValueOnce('verification-token');
-      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
-
-      const result = await register('new@example.com', 'Password1', {
-        ...context,
-        inviteCode: 'AUDITF12',
-      });
-
-      // Registration still succeeds despite audit failure
-      expect(result.success).toBe(true);
-    });
-
-    it('does not fail registration if ORG_MEMBER_JOINED audit throws', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
-
-      setupMockClient();
-      const userRow = createMockUserRow();
-      const clinicCodeRow = {
-        id: 'code-org-audit',
-        code: 'ORGAUD12',
-        type: 'clinic' as const,
-        organization_id: 'org-1',
-        created_by: 'admin-user',
-        used_by: null,
-        used_at: null,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        is_active: true,
-        created_at: new Date(),
-      };
-
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })                   // BEGIN
-        .mockResolvedValueOnce({ rows: [clinicCodeRow] })      // findByCodeForUpdate
-        .mockResolvedValueOnce({ rows: [userRow] })            // createUserWithClient
-        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })    // legal acceptance 1
-        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })    // legal acceptance 2
-        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })    // legal acceptance 3
-        .mockResolvedValueOnce({ rows: [{ max_seats: 10, name: 'Test Clinic' }] }) // findOrganizationByIdForUpdate
-        .mockResolvedValueOnce({ rows: [{ count: '3' }] })    // countBillableSeats
-        .mockResolvedValueOnce({ rows: [] })                   // addMember
-        .mockResolvedValueOnce({ rows: [] })                   // updateUserOrganization
-        .mockResolvedValueOnce({ rows: [] })                   // markCodeAsUsed
-        .mockResolvedValueOnce({ rows: [{ count: '0' }] })    // session count
-        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] }) // session insert
-        .mockResolvedValueOnce({ rows: [] });                  // COMMIT
-
-      // REGISTER, LEGAL_CONSENT_ACCEPTED, INVITE_CODE_REDEEMED succeed,
-      // then ORG_MEMBER_JOINED throws
-      mockAuditLog
-        .mockResolvedValueOnce(undefined)  // REGISTER
-        .mockResolvedValueOnce(undefined)  // LEGAL_CONSENT_ACCEPTED
-        .mockResolvedValueOnce(undefined)  // INVITE_CODE_REDEEMED
-        .mockRejectedValueOnce(new Error('audit service down')); // ORG_MEMBER_JOINED
-
-      mockCreateToken.mockResolvedValueOnce('verification-token');
-      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
-
-      const result = await register('new@example.com', 'Password1', {
-        ...context,
-        inviteCode: 'ORGAUD12',
-      });
-
-      // Registration still succeeds despite audit failure
-      expect(result.success).toBe(true);
-    });
   });
 
   describe('verifyEmail', () => {
@@ -927,24 +801,6 @@ describe('auth service', () => {
           metadata: { sessionsInvalidated: true },
         })
       );
-    });
-
-    it('does not fail if audit log fails after commit', async () => {
-      setupMockClient();
-      mockValidateAndConsumeToken.mockResolvedValueOnce('user-1');
-      mockClientQuery
-        .mockResolvedValueOnce({ rows: [] })              // BEGIN
-        .mockResolvedValueOnce({ rows: [], rowCount: 1 }) // updatePassword
-        .mockResolvedValueOnce({ rows: [] })              // deleteSessionsByUserId
-        .mockResolvedValueOnce({ rows: [] })              // resetLockout
-        .mockResolvedValueOnce({ rows: [] });             // COMMIT
-
-      mockAuditLog.mockRejectedValueOnce(new Error('audit failed'));
-
-      const result = await completePasswordReset('valid-token', 'NewPass1', context);
-
-      // Should still succeed
-      expect(result.success).toBe(true);
     });
 
     it('returns not_found when user does not exist or is deleted', async () => {
