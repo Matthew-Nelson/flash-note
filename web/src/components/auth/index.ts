@@ -1,3 +1,4 @@
 export { AuthLayout } from './AuthLayout';
 export { SessionAlert } from './SessionAlert';
-export { ProtectedRoute } from './ProtectedRoute';
+export { LogoutButton } from './LogoutButton';
+export { PasswordResetSection } from './PasswordResetSection';

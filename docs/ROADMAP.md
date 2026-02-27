@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 24, 2026
+**Last Updated:** February 26, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 3/8 sub-phases | Auth Server Actions (1.3) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 5/8 sub-phases | Note Generation (1.5) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -195,7 +195,7 @@ Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`
 | L-18 | `NOT NULL` missing on `created_at`/`updated_at` | 1.1 | Fix in squashed schema |
 | L-7 | DATABASE_URL validated as generic URL | 1.0 | Validate as `postgres://` or `postgresql://` in new config |
 | L-8 | Database URL partially logged in non-prod | 1.0 | Sanitize or remove from env logging |
-| L-3 | Zod validation details reveal schema info | 1.4 | Strip field names from validation errors in error handler |
+| L-3 | Zod validation details reveal schema info | 1.5 | Strip field names from validation errors in error handler. Deferred from 1.4 — no current UI exposure (client components map error codes, don't display fieldErrors), but raw Zod field names are in Server Action responses. |
 | L-11 | Audit action reuse (`SUBSCRIPTION_CANCELLED`) | 1.6 | Add `PAYMENT_FAILED` action when porting billing service |
 
 ---
@@ -277,29 +277,40 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done — PR #81 |
 
-**Follow-up items** (non-blocking, tracked for future phases):
+**Follow-up items from 1.3** (non-blocking, tracked for future phases):
 
 | # | Item | Blocked By | Notes |
 |---|------|-----------|-------|
 | 1 | Replace `console.error` with Pino `logger.error` in auth actions/services | Phase 3 Monitoring (Pino logger) | All auth catch blocks use `console.error` with TODOs. CLAUDE.md Rule 9 requires structured `error`-level logging for audit failures to surface in Cloud Error Reporting. Fix when Pino infrastructure lands. |
 | 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | In `login()`, bcrypt runs before lockout check (timing-safe). When a permanently locked account submits the correct password, `recordFailedAttempt()` is skipped (password validated, `!validPassword` branch not taken). Lockout still works, but the audit trail has a gap for these attempts. HIPAA requires logging all authentication events. |
+| 3 | Audit test suite for mocks that violate production contracts | — | Code review found 17 dead try/catch blocks around `auditService.log()` that passed coverage because tests mocked the function to reject — violating its documented contract (never throws). Coverage reported the catch blocks as covered even though they were unreachable in production. Audit all test files for mocks that make dependencies behave differently from production (e.g., rejecting when the real implementation swallows errors), which can mask dead code and give false confidence in coverage metrics. Relates to CLAUDE.md Rule 6. |
 
 ### 1.4 — Middleware + Protected Pages + Error Boundaries
 
 - Update Next.js middleware: CSP nonces + cookie-based auth redirect for `/dashboard/*`
-- Build `getSession()` DAL function for Server Components
+- Create usage DAL function (`getUsageForUser`)
 - Convert dashboard to Server Component (call `getSession()` → call DAL → render)
 - Convert settings to Server Component
 - Create `loading.tsx`, `error.tsx`, `not-found.tsx` for protected routes
-- Create `/baa` web page (currently 404 — Tier 2 item #8)
-- Port/rewrite middleware tests
-- **Verify**: Unauthenticated users redirected. Pages render with server-provided data. Error boundaries handle failures gracefully. No flash of loading state. Tests pass.
+- Create `LogoutButton`, `PasswordResetSection`, `DeleteAccountSection` client components
+- Remove Sentry/API URL from middleware connect-src (GCP-native monitoring, no separate API)
+- Update Getting Started content for web-only flow
+- Port/rewrite middleware tests + page tests
+- **Verify**: Unauthenticated users redirected. Pages render with server-provided data. Error boundaries handle failures gracefully. Tests pass.
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done — PR #82 |
+
+**Follow-up items from 1.4** (non-blocking, tracked for future phases):
+
+| # | Item | Blocked By | Notes |
+|---|------|-----------|-------|
+| 1 | `/baa` web page | — | Currently 404. Deferred from 1.4 — standalone content page, not dependent on middleware/auth changes. |
+| 2 | Billing portal buttons (Manage subscription, Update payment) | Phase 1.6 (Billing) | Dashboard subscription card uses mailto:support links as placeholder. Replace with Stripe billing portal integration in 1.6. |
+| 3 | Checkout success polling | Phase 1.6 (Billing) | `?success=true` detection + webhook polling removed from dashboard. Re-add as Client Component in 1.6. |
 
 ### 1.5 — Note Generation
 
@@ -562,6 +573,8 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| Phase 1.4: Middleware + Protected Pages (PR #82) | Middleware auth redirect for `/dashboard/*`, usage DAL, dashboard + settings converted to Server Components, `LogoutButton`/`PasswordResetSection`/`DeleteAccountSection` client components, `loading.tsx`/`error.tsx`/`not-found.tsx` error boundaries, CSP cleanup (removed Sentry/API URL from connect-src). 56 new tests. |
+| Phase 1.3: Auth Server Actions (PR #81) | Login, register, logout, password reset, email verification, invite code validation Server Actions. Auth service with transactional registration + password reset. Progressive lockout service (atomic SQL). Token service + email service (Resend). Zod auth schemas. Full test coverage. |
 | Phase 1.2: Session System + Auth Rate Limiting (PR #80) | Opaque session tokens (SHA-256), sliding window refresh, session DAL (create/validate/refresh/revoke/enforce limit/device binding/cleanup), `getSession()` composition, Upstash rate limiting with compound keying (fixes M-1, L-1) |
 | Phase 1.1: DAL Foundation (PR #79) | Database pool, DAL pattern, audit service, types, squashed schema migration |
 | Phase 1.0: Infrastructure Scaffold (PR #78) | Next.js standalone build, multi-stage Dockerfile, Cloud Run deploy pipeline |

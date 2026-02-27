@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { cache } from 'react';
+
 import {
   SESSION_IDLE_TTL_MS,
   SESSION_ABSOLUTE_MAX_MS,
@@ -21,8 +23,11 @@ import type { SessionData } from '@/server/types';
  *
  * Fail-closed: DB errors return null (user redirected to login).
  * This is the function every Server Component and Server Action calls.
+ *
+ * Wrapped with React.cache() to deduplicate within a single request
+ * (e.g. layout + page both calling getSession() results in one DB query).
  */
-export async function getSession(): Promise<SessionData | null> {
+export const getSession = cache(async function getSession(): Promise<SessionData | null> {
   try {
     const token = await getSessionToken();
     if (!token) return null;
@@ -73,4 +78,4 @@ export async function getSession(): Promise<SessionData | null> {
     console.error('getSession error:', error);
     return null;
   }
-}
+});
