@@ -5,6 +5,13 @@ import { useSearchParams } from 'next/navigation';
 import ResetPasswordPage from './page';
 import { api } from '@/lib/api';
 
+// Mock server actions to prevent transitive import of server-only config
+// (LogoutButton/PasswordResetSection in @/components/auth barrel import @/actions/auth)
+vi.mock('@/actions/auth', () => ({
+  logoutAction: vi.fn(),
+  requestPasswordResetAction: vi.fn(),
+}));
+
 vi.mock('@/lib/api', async (importOriginal) => {
   const original = await importOriginal<typeof import('@/lib/api')>();
   return {
