@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { LogoutButton } from './LogoutButton';
 
 // Mock logoutAction
-const mockLogoutAction = vi.fn();
+const mockLogoutAction = vi.hoisted(() => vi.fn<() => Promise<void>>());
 vi.mock('@/actions/auth', () => ({
   logoutAction: (): Promise<void> => mockLogoutAction(),
 }));
