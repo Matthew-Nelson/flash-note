@@ -340,10 +340,23 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 **Follow-up items from 1.4.5** (non-blocking, tracked for future phases):
 
-| # | Item | Blocked By | Notes |
-|---|------|-----------|-------|
-| 1 | Server-side enforcement for unverified email users | — | `loginAction` creates a session unconditionally, even when `emailVerificationRequired: true`. Client-side redirect is the only gate — users can navigate directly to `/dashboard`. Rule 8 violation (server-side auth is mandatory). Pre-existing in auth service but now load-bearing. Options: (a) don't create session for unverified emails, (b) check `emailVerified` in dashboard layout, (c) add to middleware with DB-backed data. |
-| 2 | Make `ActionResult<T>` data required on success branch | — | `data?: T` is optional even on success, forcing unnecessary guards at every call site. Fix with conditional type so `data` is required when `T` is non-void. |
+| # | Item | Blocked By | Status | Notes |
+|---|------|-----------|--------|-------|
+| 1 | Server-side enforcement for unverified email users | — | ✅ Done | Dashboard layout checks `session.emailVerified` and redirects to `/resend-verification`. |
+| 2 | Middleware `?reason` param validation | — | ✅ Done | Middleware now validates against `SessionEndReason` allowlist before clearing session cookie. |
+| 3 | Make `ActionResult<T>` data required on success branch | — | Open | `data?: T` is optional even on success, forcing unnecessary guards at every call site. Fix with conditional type so `data` is required when `T` is non-void. |
+
+**Auth security test gaps** (identified during code review, non-blocking for Phase 1.5):
+
+| # | Item | Severity | Notes |
+|---|------|----------|-------|
+| 1 | `secure: true` cookie flag never tested in production mode | Critical | `session-cookie.test.ts` always mocks `isProduction: false`. Need a test with `isProduction: true` asserting `secure: true`. |
+| 2 | Rate limiting never exercises actual blocking (Rule 6) | Critical | All tests mock `checkRateLimit` to return a fixed value. Need end-to-end test where N+1 requests are rejected. |
+| 3 | No max-length on password schema (bcrypt DoS vector) | Critical | A 10,000+ character password hitting bcrypt is a CPU DoS. Add `z.string().max()` to password schema. |
+| 4 | Rate limit `rate_limit_exceeded` path untested for register, requestPasswordReset, resendVerification | Important | Only `loginAction` and `validateResetTokenAction` test this path. |
+| 5 | Token type confusion untested | Important | No test submits a `password_reset` token to the `email_verification` endpoint to verify rejection. |
+| 6 | Lockout SQL threshold values only tested via mocks | Important | Tests mock DB results with expected lockout durations rather than exercising the actual SQL that computes them. |
+| 7 | No test for expired session rows specifically | Important | `findSessionByTokenHash` WHERE clause tested textually but no test constructs an expired row scenario. |
 
 ### 1.5 — Note Generation
 
