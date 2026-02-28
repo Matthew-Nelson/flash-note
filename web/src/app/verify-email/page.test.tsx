@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
+import userEvent from '@testing-library/user-event';
 import VerifyEmailPage from './page';
 
 const mockVerifyEmailAction = vi.hoisted(() => vi.fn());
@@ -9,12 +10,22 @@ vi.mock('@/actions/auth', () => ({
   verifyEmailAction: mockVerifyEmailAction,
 }));
 
+const mockPush = vi.fn();
+
 describe('VerifyEmailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams('token=verify-token') as ReturnType<typeof useSearchParams>
     );
+    vi.mocked(useRouter).mockReturnValue({
+      push: mockPush,
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+    });
   });
 
   it('should show error when no token provided', async () => {
@@ -93,13 +104,15 @@ describe('VerifyEmailPage', () => {
     );
   });
 
-  it('should show sign in link on success', async () => {
+  it('should navigate to dashboard on success button click', async () => {
     mockVerifyEmailAction.mockResolvedValueOnce({ success: true });
+    const user = userEvent.setup();
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
-      expect(screen.getByText('Sign in')).toBeInTheDocument();
+      expect(screen.getByText('Go to Dashboard')).toBeInTheDocument();
     });
-    expect(screen.getByText('Sign in').closest('a')).toHaveAttribute('href', '/login');
+    await user.click(screen.getByText('Go to Dashboard'));
+    expect(mockPush).toHaveBeenCalledWith('/dashboard');
   });
 });

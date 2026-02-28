@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Button, LoadingSpinner } from '@/components/ui';
 import { verifyEmailAction } from '@/actions/auth';
@@ -13,6 +13,7 @@ function VerifyEmailContent() {
     () => (token ? 'verifying' : 'error')
   );
   const [message, setMessage] = useState(() => (token ? '' : 'No verification token provided'));
+  const router = useRouter();
   const verificationStarted = useRef(false);
 
   const verifyEmail = useCallback(async (verificationToken: string) => {
@@ -85,9 +86,7 @@ function VerifyEmailContent() {
                 You can now use all features in the FlashNote Chrome extension.
               </p>
               <div className="mt-6">
-                <Link href="/login">
-                  <Button className="w-full">Sign in</Button>
-                </Link>
+                <Button className="w-full" onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
               </div>
             </div>
           )}
@@ -105,9 +104,7 @@ function VerifyEmailContent() {
                 You can use all features in the FlashNote Chrome extension.
               </p>
               <div className="mt-6">
-                <Link href="/login">
-                  <Button className="w-full">Sign in</Button>
-                </Link>
+                <Button className="w-full" onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
               </div>
             </div>
           )}
