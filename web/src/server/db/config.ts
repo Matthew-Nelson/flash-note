@@ -33,6 +33,70 @@ const envSchema = z.object({
 
   // Registration mode — controls who can sign up
   REGISTRATION_MODE: z.enum(['open', 'closed', 'invite']).default('open'),
+
+  // LLM provider configuration
+  LLM_PROVIDER: z.enum(['gemini', 'claude']).default('gemini'),
+  GEMINI_API_KEY: z.string().min(1).optional(),
+  GEMINI_API_URL: z.string().url().default('https://generativelanguage.googleapis.com/v1beta'),
+  GEMINI_MODEL: z.string().default('gemini-2.5-flash'),
+  GEMINI_MAX_TOKENS: z.coerce.number().default(4000),
+  GEMINI_TEMPERATURE: z.coerce.number().default(0.2),
+  GEMINI_TIMEOUT_MS: z.coerce.number().default(30000),
+  // Use Application Default Credentials (service account) instead of API key.
+  // Required for Vertex AI on Cloud Run. When true, GEMINI_API_KEY is not needed.
+  GEMINI_USE_ADC: z.coerce.boolean().default(false),
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-20250514'),
+  ANTHROPIC_MAX_TOKENS: z.coerce.number().default(2000),
+  ANTHROPIC_TEMPERATURE: z.coerce.number().default(0.2),
+  ANTHROPIC_TIMEOUT_MS: z.coerce.number().default(30000),
+  USE_MOCK_AI: z.coerce.boolean().default(false),
+}).superRefine((data, ctx) => {
+  // Block USE_MOCK_AI in production
+  if (data.USE_MOCK_AI && data.NODE_ENV === 'production') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'USE_MOCK_AI cannot be enabled in production',
+      path: ['USE_MOCK_AI'],
+    });
+  }
+  // Block direct Gemini API in production — must use Vertex AI for BAA coverage.
+  // Vertex AI URLs follow the pattern: https://{region}-aiplatform.googleapis.com/...
+  if (data.NODE_ENV === 'production' && data.LLM_PROVIDER === 'gemini' &&
+      data.GEMINI_API_URL.includes('generativelanguage.googleapis.com')) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Direct Gemini API is not permitted in production. Use Vertex AI endpoint (GEMINI_API_URL must point to aiplatform.googleapis.com).',
+      path: ['GEMINI_API_URL'],
+    });
+  }
+  // Block Claude in production — no BAA exists with Anthropic.
+  // Claude is available for development/testing only. Vertex AI (Gemini) is the
+  // production provider because it's covered under the Google Cloud BAA.
+  if (data.LLM_PROVIDER === 'claude' && data.NODE_ENV === 'production') {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'LLM_PROVIDER=claude is not permitted in production (no Anthropic BAA). Use gemini with Vertex AI.',
+      path: ['LLM_PROVIDER'],
+    });
+  }
+  // Skip API key validation when mock AI is enabled
+  if (data.USE_MOCK_AI) return;
+  // Require API key for Gemini unless ADC is enabled (Vertex AI on Cloud Run)
+  if (data.LLM_PROVIDER === 'gemini' && !data.GEMINI_API_KEY && !data.GEMINI_USE_ADC) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'GEMINI_API_KEY is required when LLM_PROVIDER=gemini (unless GEMINI_USE_ADC=true)',
+      path: ['GEMINI_API_KEY'],
+    });
+  }
+  if (data.LLM_PROVIDER === 'claude' && !data.ANTHROPIC_API_KEY) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'ANTHROPIC_API_KEY is required when LLM_PROVIDER=claude',
+      path: ['ANTHROPIC_API_KEY'],
+    });
+  }
 });
 
 function loadConfig() {
