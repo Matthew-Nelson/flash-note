@@ -2,124 +2,163 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
 import { middleware, config } from './middleware';
 
-describe('CSP Middleware', () => {
+describe('Middleware', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  function createRequest(url = 'https://flashnote.co/dashboard'): NextRequest {
-    return new NextRequest(url);
+  function createRequest(
+    url = 'https://flashnote.co/dashboard',
+    options?: { cookies?: Record<string, string> }
+  ): NextRequest {
+    const headers = new Headers();
+    if (options?.cookies) {
+      const cookieString = Object.entries(options.cookies)
+        .map(([name, value]) => `${name}=${value}`)
+        .join('; ');
+      headers.set('Cookie', cookieString);
+    }
+    return new NextRequest(url, { headers });
   }
 
-  it('should set CSP header on response', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response = middleware(createRequest());
-    expect(response.headers.has('Content-Security-Policy')).toBe(true);
+  describe('CSP headers', () => {
+    it('should set CSP header on response', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
+
+    it('should use Content-Security-Policy in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+      expect(response.headers.has('Content-Security-Policy-Report-Only')).toBe(false);
+    });
+
+    it('should use Content-Security-Policy-Report-Only in development', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      expect(response.headers.has('Content-Security-Policy-Report-Only')).toBe(true);
+      expect(response.headers.has('Content-Security-Policy')).toBe(false);
+    });
+
+    it('should include unsafe-eval in dev for HMR', () => {
+      vi.stubEnv('NODE_ENV', 'development');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      const csp = response.headers.get('Content-Security-Policy-Report-Only')!;
+      expect(csp).toContain("'unsafe-eval'");
+    });
+
+    it('should NOT include unsafe-eval in production', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      const csp = response.headers.get('Content-Security-Policy')!;
+      expect(csp).not.toContain("'unsafe-eval'");
+    });
+
+    it('should generate unique nonces per request', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response1 = middleware(createRequest('https://flashnote.co/'));
+      const response2 = middleware(createRequest('https://flashnote.co/'));
+
+      const csp1 = response1.headers.get('Content-Security-Policy')!;
+      const csp2 = response2.headers.get('Content-Security-Policy')!;
+
+      const nonce1 = csp1.match(/nonce-([a-f0-9-]+)/)?.[1];
+      const nonce2 = csp2.match(/nonce-([a-f0-9-]+)/)?.[1];
+
+      expect(nonce1).toBeDefined();
+      expect(nonce2).toBeDefined();
+      expect(nonce1).not.toBe(nonce2);
+    });
+
+    it('should include required CSP directives', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      const csp = response.headers.get('Content-Security-Policy')!;
+
+      expect(csp).toContain("default-src 'self'");
+      expect(csp).toContain("'strict-dynamic'");
+      expect(csp).toContain("style-src 'self' 'unsafe-inline'");
+      expect(csp).toContain("connect-src 'self'");
+      expect(csp).toContain("object-src 'none'");
+      expect(csp).toContain("base-uri 'self'");
+      expect(csp).toContain("form-action 'self'");
+      expect(csp).toContain("frame-ancestors 'none'");
+      expect(csp).toContain("font-src 'self'");
+      expect(csp).toContain("img-src 'self' data: blob:");
+    });
+
+    it('should set x-nonce on request headers as a valid UUID', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/'));
+      const csp = response.headers.get('Content-Security-Policy')!;
+      const nonce = csp.match(/nonce-([a-f0-9-]+)/)?.[1];
+      expect(nonce).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/);
+    });
   });
 
-  it('should use Content-Security-Policy in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response = middleware(createRequest());
-    expect(response.headers.has('Content-Security-Policy')).toBe(true);
-    expect(response.headers.has('Content-Security-Policy-Report-Only')).toBe(false);
-  });
+  describe('auth redirect', () => {
+    it('redirects /dashboard to /login when no session_id cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/dashboard'));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/login');
+    });
 
-  it('should use Content-Security-Policy-Report-Only in development', () => {
-    vi.stubEnv('NODE_ENV', 'development');
-    const response = middleware(createRequest());
-    expect(response.headers.has('Content-Security-Policy-Report-Only')).toBe(true);
-    expect(response.headers.has('Content-Security-Policy')).toBe(false);
-  });
+    it('redirects /dashboard/settings to /login when no cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/dashboard/settings'));
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/login');
+    });
 
-  it('should include unsafe-eval in dev for HMR', () => {
-    vi.stubEnv('NODE_ENV', 'development');
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy-Report-Only')!;
-    expect(csp).toContain("'unsafe-eval'");
-  });
+    it('does NOT redirect /dashboard when session_id cookie present', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/dashboard', { cookies: { session_id: 'abc123' } })
+      );
+      expect(response.status).not.toBe(307);
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
 
-  it('should NOT include unsafe-eval in production', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-    expect(csp).not.toContain("'unsafe-eval'");
-  });
+    it('does NOT redirect public routes without cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const publicRoutes = ['/', '/login', '/signup', '/pricing', '/terms', '/privacy', '/baa'];
+      for (const route of publicRoutes) {
+        const response = middleware(createRequest(`https://flashnote.co${route}`));
+        expect(response.status).not.toBe(307);
+      }
+    });
 
-  it('should generate unique nonces per request', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response1 = middleware(createRequest());
-    const response2 = middleware(createRequest());
+    it('sets CSP headers on redirected responses', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/dashboard'));
+      expect(response.status).toBe(307);
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
 
-    const csp1 = response1.headers.get('Content-Security-Policy')!;
-    const csp2 = response2.headers.get('Content-Security-Policy')!;
+    it('sets CSP headers on dashboard responses when cookie present', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/dashboard', { cookies: { session_id: 'abc123' } })
+      );
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
 
-    const nonce1 = csp1.match(/nonce-([a-f0-9-]+)/)?.[1];
-    const nonce2 = csp2.match(/nonce-([a-f0-9-]+)/)?.[1];
-
-    expect(nonce1).toBeDefined();
-    expect(nonce2).toBeDefined();
-    expect(nonce1).not.toBe(nonce2);
-  });
-
-  it('should include required CSP directives', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-
-    expect(csp).toContain("default-src 'self'");
-    expect(csp).toContain("'strict-dynamic'");
-    expect(csp).toContain("style-src 'self' 'unsafe-inline'");
-    expect(csp).toContain("object-src 'none'");
-    expect(csp).toContain("base-uri 'self'");
-    expect(csp).toContain("form-action 'self'");
-    expect(csp).toContain("frame-ancestors 'none'");
-    expect(csp).toContain("font-src 'self'");
-    expect(csp).toContain("img-src 'self' data: blob:");
-  });
-
-  it('should include Sentry domains in connect-src', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-
-    expect(csp).toContain('https://*.sentry.io');
-    expect(csp).toContain('https://*.ingest.sentry.io');
-  });
-
-  it('should include API URL in connect-src', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.flashnote.co');
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-
-    expect(csp).toContain('https://api.flashnote.co');
-  });
-
-  it('should default API URL to localhost in connect-src', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    delete process.env.NEXT_PUBLIC_API_URL;
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-
-    expect(csp).toContain('http://localhost:4000');
-  });
-
-  it('should set x-nonce on request headers', () => {
-    vi.stubEnv('NODE_ENV', 'production');
-    const request = createRequest();
-    middleware(request);
-
-    // The nonce in CSP should be a valid UUID format
-    const response = middleware(createRequest());
-    const csp = response.headers.get('Content-Security-Policy')!;
-    const nonce = csp.match(/nonce-([a-f0-9-]+)/)?.[1];
-    expect(nonce).toMatch(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/);
+    it('redirects when session_id cookie exists but is empty', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/dashboard', { cookies: { session_id: '' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/login');
+    });
   });
 
   describe('matcher config', () => {
     it('should have exclusion pattern for static files and API routes', () => {
       const source = config.matcher[0].source;
-      // Next.js handles anchoring internally; verify the pattern excludes expected prefixes
       expect(source).toContain('_next/static');
       expect(source).toContain('_next/image');
       expect(source).toContain('favicon.ico');

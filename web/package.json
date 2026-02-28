@@ -19,7 +19,7 @@
     "test:e2e:headed": "pnpm exec playwright test --headed",
     "test:e2e:debug": "pnpm exec playwright test --debug",
     "test:e2e:codegen": "pnpm exec playwright codegen http://localhost:3000",
-    "db:migrate": "npx tsx src/server/db/migrate.ts"
+    "db:migrate": "npx tsx --env-file-if-exists=.env.local src/server/db/migrate.ts"
   },
   "dependencies": {
     "@sentry/nextjs": "^10.38.0",
