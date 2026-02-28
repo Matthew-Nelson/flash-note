@@ -29,21 +29,41 @@ export function middleware(request: NextRequest) {
     ? 'Content-Security-Policy-Report-Only'
     : 'Content-Security-Policy';
 
-  // Auth redirect: redirect unauthenticated users away from /dashboard/*.
-  // This is a UX optimization only — middleware runs on Edge Runtime and cannot
-  // query the DB. Real auth enforcement happens in Server Components via
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+
+  // Auth redirects — UX optimization only. Middleware runs on Edge Runtime and
+  // cannot query the DB. Real auth enforcement happens in Server Components via
   // getSession() (CLAUDE.md Rule 8).
-  if (request.nextUrl.pathname.startsWith('/dashboard')) {
-    const sessionCookie = request.cookies.get('session_id');
-    if (!sessionCookie?.value) {
-      const response = NextResponse.redirect(new URL('/login', request.url));
+  const sessionCookie = request.cookies.get('session_id');
+  const hasSession = !!sessionCookie?.value;
+  const pathname = request.nextUrl.pathname;
+
+  // Redirect unauthenticated users away from /dashboard/*
+  if (pathname.startsWith('/dashboard') && !hasSession) {
+    const response = NextResponse.redirect(new URL('/login', request.url));
+    response.headers.set(cspHeaderName, cspHeader);
+    return response;
+  }
+
+  // Redirect authenticated users away from /login and /signup — UNLESS the request
+  // carries a session-end reason (e.g., ?reason=session_expired). That means the
+  // dashboard layout detected an invalid session and redirected here. In that case
+  // the cookie is stale: clear it and let the user through to the login page.
+  if ((pathname === '/login' || pathname === '/signup') && hasSession) {
+    const reason = request.nextUrl.searchParams.get('reason');
+    if (reason) {
+      const response = NextResponse.next({
+        request: { headers: requestHeaders },
+      });
+      response.cookies.delete('session_id');
       response.headers.set(cspHeaderName, cspHeader);
       return response;
     }
+    const response = NextResponse.redirect(new URL('/dashboard', request.url));
+    response.headers.set(cspHeaderName, cspHeader);
+    return response;
   }
-
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set('x-nonce', nonce);
 
   const response = NextResponse.next({
     request: { headers: requestHeaders },

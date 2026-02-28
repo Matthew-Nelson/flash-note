@@ -10,7 +10,12 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await getSession();
-  if (!session) redirect('/login');
+  if (!session) {
+    // Cookie clearing happens in middleware (Server Components cannot mutate cookies).
+    // Middleware sees ?reason=session_expired and clears the stale cookie instead of
+    // redirecting back to /dashboard, breaking the loop.
+    redirect('/login?reason=session_expired');
+  }
 
   return (
     <div className="min-h-screen bg-fn-bg-secondary">

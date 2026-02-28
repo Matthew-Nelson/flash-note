@@ -77,6 +77,7 @@ export interface UsageResponse {
  * Reasons for session ending - used by SessionAlert component
  */
 export type SessionEndReason =
+  | 'logged_out' // User initiated logout
   | 'session_invalidated' // Password reset, token version mismatch
   | 'session_expired' // Refresh token expired naturally
   | 'session_limit' // Too many devices, oldest session kicked

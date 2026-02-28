@@ -2,24 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSearchParams } from 'next/navigation';
 import VerifyEmailPage from './page';
-import { api } from '@/lib/api';
 
-vi.mock('@/lib/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/lib/api')>();
-  return {
-    ...original,
-    api: {
-      verifyEmail: vi.fn(),
-    },
-  };
-});
+const mockVerifyEmailAction = vi.fn();
 
-const mockFetchUser = vi.fn();
-vi.mock('@/lib/auth-context', () => ({
-  useAuth: () => ({
-    isAuthenticated: false,
-    fetchUser: mockFetchUser,
-  }),
+vi.mock('@/actions/auth', () => ({
+  verifyEmailAction: (...args: unknown[]) => mockVerifyEmailAction(...args),
 }));
 
 describe('VerifyEmailPage', () => {
@@ -43,23 +30,25 @@ describe('VerifyEmailPage', () => {
   });
 
   it('should show verifying state initially', () => {
-    vi.mocked(api.verifyEmail).mockReturnValue(new Promise<{ alreadyVerified?: boolean }>(() => {}));
+    mockVerifyEmailAction.mockReturnValue(new Promise(() => {}));
     render(<VerifyEmailPage />);
     expect(screen.getByText('Verifying your email...')).toBeInTheDocument();
   });
 
   it('should show success after verification', async () => {
-    vi.mocked(api.verifyEmail).mockResolvedValueOnce({});
+    mockVerifyEmailAction.mockResolvedValueOnce({ success: true });
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
       expect(screen.getByText('Email Verified!')).toBeInTheDocument();
     });
-    expect(api.verifyEmail).toHaveBeenCalledWith('verify-token');
+    expect(mockVerifyEmailAction).toHaveBeenCalledTimes(1);
+    const formData = mockVerifyEmailAction.mock.calls[0][0] as FormData;
+    expect(formData.get('token')).toBe('verify-token');
   });
 
   it('should show already verified state', async () => {
-    vi.mocked(api.verifyEmail).mockResolvedValueOnce({ alreadyVerified: true });
+    mockVerifyEmailAction.mockResolvedValueOnce({ success: true, data: { alreadyVerified: true } });
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
@@ -67,8 +56,20 @@ describe('VerifyEmailPage', () => {
     });
   });
 
-  it('should show curated error on failure', async () => {
-    vi.mocked(api.verifyEmail).mockRejectedValueOnce(new Error('Server error'));
+  it('should show curated error on action failure', async () => {
+    mockVerifyEmailAction.mockResolvedValueOnce({ success: false, error: 'invalid_token' });
+
+    render(<VerifyEmailPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Verification Failed')).toBeInTheDocument();
+    });
+    expect(
+      screen.getByText('Invalid or expired verification link. Please request a new one.')
+    ).toBeInTheDocument();
+  });
+
+  it('should show curated error on unexpected exception', async () => {
+    mockVerifyEmailAction.mockRejectedValueOnce(new Error('Server error'));
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
@@ -80,7 +81,7 @@ describe('VerifyEmailPage', () => {
   });
 
   it('should render request new link button on error', async () => {
-    vi.mocked(api.verifyEmail).mockRejectedValueOnce(new Error('fail'));
+    mockVerifyEmailAction.mockRejectedValueOnce(new Error('fail'));
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
@@ -90,5 +91,15 @@ describe('VerifyEmailPage', () => {
       'href',
       '/resend-verification'
     );
+  });
+
+  it('should show sign in link on success', async () => {
+    mockVerifyEmailAction.mockResolvedValueOnce({ success: true });
+
+    render(<VerifyEmailPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Sign in')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Sign in').closest('a')).toHaveAttribute('href', '/login');
   });
 });

@@ -6,8 +6,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react';
 import { Button, Input, Alert, LoadingSpinner } from '@/components/ui';
 import { resetPasswordSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
-import { api } from '@/lib/api';
-import * as Sentry from '@sentry/nextjs';
+import { validateResetTokenAction, resetPasswordAction } from '@/actions/auth';
 
 function ResetPasswordContent() {
   const searchParams = useSearchParams();
@@ -22,16 +21,13 @@ function ResetPasswordContent() {
 
   const validateToken = useCallback(async (resetToken: string) => {
     try {
-      const result = await api.validateResetToken(resetToken);
-      if (result.valid) {
+      const result = await validateResetTokenAction(resetToken);
+      if (result.success && result.data?.valid) {
         setStatus('ready');
       } else {
         setStatus('invalid');
       }
-    } catch (err) {
-      Sentry.captureException(err, {
-        extra: { source: 'reset_password_page', errorType: 'token_validation_failed' },
-      });
+    } catch {
       setStatus('invalid');
     }
   }, []);
@@ -40,7 +36,7 @@ function ResetPasswordContent() {
     if (!token) {
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- API call on mount (external system sync)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Server Action call on mount (external system sync)
     void validateToken(token);
   }, [token, validateToken]);
 
@@ -49,12 +45,12 @@ function ResetPasswordContent() {
     setErrors([]);
     setInvalidFields(new Set());
 
-    const result = resetPasswordSchema.safeParse({ password, confirmPassword });
+    const validation = resetPasswordSchema.safeParse({ password, confirmPassword });
 
-    if (!result.success) {
+    if (!validation.success) {
       const messages: string[] = [];
       const invalid = new Set<string>();
-      result.error.errors.forEach((err) => {
+      validation.error.errors.forEach((err) => {
         messages.push(err.message);
         if (err.path[0]) invalid.add(String(err.path[0]));
       });
@@ -71,12 +67,25 @@ function ResetPasswordContent() {
     setStatus('submitting');
 
     try {
-      await api.resetPassword(token, password);
-      setStatus('success');
-    } catch (err) {
-      Sentry.captureException(err, {
-        extra: { source: 'reset_password_page', errorType: 'password_reset_failed' },
-      });
+      const formData = new FormData();
+      formData.set('token', token);
+      formData.set('password', password);
+      formData.set('confirmPassword', confirmPassword);
+      const result = await resetPasswordAction(formData);
+
+      if (result.success) {
+        setStatus('success');
+      } else {
+        setStatus('ready');
+        switch (result.error) {
+          case 'rate_limit_exceeded':
+            setErrors(['Too many attempts. Please try again later.']);
+            break;
+          default:
+            setErrors(['Failed to reset password. The link may have expired.']);
+        }
+      }
+    } catch {
       setStatus('ready');
       setErrors(['Failed to reset password. The link may have expired.']);
     }

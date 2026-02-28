@@ -3,25 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useSearchParams } from 'next/navigation';
 import ResetPasswordPage from './page';
-import { api } from '@/lib/api';
 
-// Mock server actions to prevent transitive import of server-only config
-// (LogoutButton/PasswordResetSection in @/components/auth barrel import @/actions/auth)
+const mockValidateResetTokenAction = vi.fn();
+const mockResetPasswordAction = vi.fn();
+
 vi.mock('@/actions/auth', () => ({
-  logoutAction: vi.fn(),
-  requestPasswordResetAction: vi.fn(),
+  validateResetTokenAction: (...args: unknown[]) => mockValidateResetTokenAction(...args),
+  resetPasswordAction: (...args: unknown[]) => mockResetPasswordAction(...args),
 }));
-
-vi.mock('@/lib/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/lib/api')>();
-  return {
-    ...original,
-    api: {
-      validateResetToken: vi.fn(),
-      resetPassword: vi.fn(),
-    },
-  };
-});
 
 describe('ResetPasswordPage', () => {
   beforeEach(() => {
@@ -31,14 +20,14 @@ describe('ResetPasswordPage', () => {
       new URLSearchParams('token=valid-token') as ReturnType<typeof useSearchParams>
     );
     // Mock token validation to succeed
-    vi.mocked(api.validateResetToken).mockResolvedValueOnce({ valid: true });
+    mockValidateResetTokenAction.mockResolvedValueOnce({ success: true, data: { valid: true } });
   });
 
   it('should show invalid state when no token', async () => {
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams() as ReturnType<typeof useSearchParams>
     );
-    vi.mocked(api.validateResetToken).mockReset();
+    mockValidateResetTokenAction.mockReset();
 
     render(<ResetPasswordPage />);
     await waitFor(() => {
@@ -50,7 +39,7 @@ describe('ResetPasswordPage', () => {
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams() as ReturnType<typeof useSearchParams>
     );
-    vi.mocked(api.validateResetToken).mockReset();
+    mockValidateResetTokenAction.mockReset();
 
     render(<ResetPasswordPage />);
     await waitFor(() => {
@@ -59,9 +48,9 @@ describe('ResetPasswordPage', () => {
     });
   });
 
-  it('should show invalid state when token validation fails', async () => {
-    vi.mocked(api.validateResetToken).mockReset();
-    vi.mocked(api.validateResetToken).mockResolvedValueOnce({ valid: false });
+  it('should show invalid state when token validation returns invalid', async () => {
+    mockValidateResetTokenAction.mockReset();
+    mockValidateResetTokenAction.mockResolvedValueOnce({ success: true, data: { valid: false } });
 
     render(<ResetPasswordPage />);
     await waitFor(() => {
@@ -70,8 +59,8 @@ describe('ResetPasswordPage', () => {
   });
 
   it('should show invalid state when token validation throws', async () => {
-    vi.mocked(api.validateResetToken).mockReset();
-    vi.mocked(api.validateResetToken).mockRejectedValueOnce(new Error('Network'));
+    mockValidateResetTokenAction.mockReset();
+    mockValidateResetTokenAction.mockRejectedValueOnce(new Error('Network'));
 
     render(<ResetPasswordPage />);
     await waitFor(() => {
@@ -171,7 +160,7 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByLabelText('New password')).toBeInTheDocument();
     });
 
-    vi.mocked(api.resetPassword).mockResolvedValueOnce(undefined);
+    mockResetPasswordAction.mockResolvedValueOnce({ success: true });
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
@@ -180,7 +169,10 @@ describe('ResetPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Password Reset Successfully')).toBeInTheDocument();
     });
-    expect(api.resetPassword).toHaveBeenCalledWith('valid-token', 'Password1');
+    expect(mockResetPasswordAction).toHaveBeenCalledTimes(1);
+    const formData = mockResetPasswordAction.mock.calls[0][0] as FormData;
+    expect(formData.get('token')).toBe('valid-token');
+    expect(formData.get('password')).toBe('Password1');
   });
 
   it('should show curated error on reset failure', async () => {
@@ -191,7 +183,45 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByLabelText('New password')).toBeInTheDocument();
     });
 
-    vi.mocked(api.resetPassword).mockRejectedValueOnce(new Error('Server error'));
+    mockResetPasswordAction.mockResolvedValueOnce({ success: false, error: 'reset_failed' });
+
+    await user.type(screen.getByLabelText('New password'), 'Password1');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
+    await user.click(screen.getByText('Reset password'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to reset password. The link may have expired.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show rate limit error', async () => {
+    const user = userEvent.setup();
+    render(<ResetPasswordPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    });
+
+    mockResetPasswordAction.mockResolvedValueOnce({ success: false, error: 'rate_limit_exceeded' });
+
+    await user.type(screen.getByLabelText('New password'), 'Password1');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
+    await user.click(screen.getByText('Reset password'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
+    });
+  });
+
+  it('should show curated error on unexpected exception', async () => {
+    const user = userEvent.setup();
+    render(<ResetPasswordPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    });
+
+    mockResetPasswordAction.mockRejectedValueOnce(new Error('Server error'));
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');

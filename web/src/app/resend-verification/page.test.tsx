@@ -2,24 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResendVerificationPage from './page';
-import { api, ApiError } from '@/lib/api';
 
-// Mock server actions to prevent transitive import of server-only config
-// (LogoutButton/PasswordResetSection in @/components/auth barrel import @/actions/auth)
+const mockResendVerificationAction = vi.fn();
+
 vi.mock('@/actions/auth', () => ({
-  logoutAction: vi.fn(),
-  requestPasswordResetAction: vi.fn(),
+  resendVerificationAction: (...args: unknown[]) => mockResendVerificationAction(...args),
 }));
-
-vi.mock('@/lib/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/lib/api')>();
-  return {
-    ...original,
-    api: {
-      resendVerificationEmail: vi.fn(),
-    },
-  };
-});
 
 describe('ResendVerificationPage', () => {
   beforeEach(() => {
@@ -40,7 +28,7 @@ describe('ResendVerificationPage', () => {
     expect(screen.getByLabelText('Email address')).not.toHaveAttribute('placeholder');
   });
 
-  it('should render green back to login link', () => {
+  it('should render back to login link', () => {
     render(<ResendVerificationPage />);
     const link = screen.getByText('Back to login');
     expect(link).toHaveAttribute('href', '/login');
@@ -56,7 +44,7 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(api.resendVerificationEmail).not.toHaveBeenCalled();
+    expect(mockResendVerificationAction).not.toHaveBeenCalled();
   });
 
   it('should show validation error for invalid email', async () => {
@@ -69,11 +57,11 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(api.resendVerificationEmail).not.toHaveBeenCalled();
+    expect(mockResendVerificationAction).not.toHaveBeenCalled();
   });
 
   it('should submit and show success for valid email', async () => {
-    vi.mocked(api.resendVerificationEmail).mockResolvedValueOnce(undefined);
+    mockResendVerificationAction.mockResolvedValueOnce({ success: true });
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
@@ -83,13 +71,13 @@ describe('ResendVerificationPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
     });
-    expect(api.resendVerificationEmail).toHaveBeenCalledWith('test@example.com');
+    expect(mockResendVerificationAction).toHaveBeenCalledTimes(1);
+    const formData = mockResendVerificationAction.mock.calls[0][0] as FormData;
+    expect(formData.get('email')).toBe('test@example.com');
   });
 
-  it('should show error for too_many_attempts', async () => {
-    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
-      new ApiError(429, 'too_many_attempts', 'Rate limited')
-    );
+  it('should show error for rate_limit_exceeded', async () => {
+    mockResendVerificationAction.mockResolvedValueOnce({ success: false, error: 'rate_limit_exceeded' });
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
@@ -101,27 +89,8 @@ describe('ResendVerificationPage', () => {
     });
   });
 
-  it('should show network error for TypeError (no internet)', async () => {
-    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
-      new TypeError('Failed to fetch')
-    );
-    const user = userEvent.setup();
-    render(<ResendVerificationPage />);
-
-    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('A network error occurred. Please check your connection and try again.')
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('should show success for 4xx errors (hide account existence)', async () => {
-    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
-      new ApiError(404, 'user_not_found', 'No such user')
-    );
+  it('should show success for non-rate-limit errors (anti-enumeration)', async () => {
+    mockResendVerificationAction.mockResolvedValueOnce({ success: false, error: 'some_other_error' });
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
@@ -133,10 +102,8 @@ describe('ResendVerificationPage', () => {
     });
   });
 
-  it('should show error for 5xx server errors', async () => {
-    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
-      new ApiError(500, 'internal_error', 'Internal server error')
-    );
+  it('should show error on unexpected exception', async () => {
+    mockResendVerificationAction.mockRejectedValueOnce(new Error('network error'));
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
@@ -148,18 +115,21 @@ describe('ResendVerificationPage', () => {
     });
   });
 
-  it('should show error for unexpected non-ApiError exceptions', async () => {
-    vi.mocked(api.resendVerificationEmail).mockRejectedValueOnce(
-      new SyntaxError('Unexpected token < in JSON')
-    );
+  it('should clear errors when resubmitting', async () => {
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
+    await user.click(screen.getByText('Send verification email'));
+    await waitFor(() => {
+      expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
+    });
+
+    mockResendVerificationAction.mockResolvedValueOnce({ success: true });
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
     await user.click(screen.getByText('Send verification email'));
 
     await waitFor(() => {
-      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
+      expect(screen.getByText('Check your email')).toBeInTheDocument();
     });
   });
 });

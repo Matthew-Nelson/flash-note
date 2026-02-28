@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { useAuth, ApiError } from '@/lib/auth-context';
+import { Suspense, useState } from 'react';
+import { loginAction } from '@/actions/auth';
 import { loginSchema } from '@/lib/schemas';
 import { Button, Input, Alert } from '@/components/ui';
 import { AuthLayout, SessionAlert } from '@/components/auth';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading, sessionEndReason, clearSessionEndReason } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -18,24 +17,17 @@ export default function LoginPage() {
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
     setInvalidFields(new Set());
 
-    // Validate input
-    const result = loginSchema.safeParse({ email, password });
-    if (!result.success) {
+    // Client-side validation
+    const validation = loginSchema.safeParse({ email, password });
+    if (!validation.success) {
       const messages: string[] = [];
       const invalid = new Set<string>();
-      result.error.errors.forEach((err) => {
+      validation.error.errors.forEach((err) => {
         messages.push(err.message);
         if (err.path[0]) invalid.add(String(err.path[0]));
       });
@@ -47,47 +39,38 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await login(email, password);
+      const formData = new FormData();
+      formData.set('email', email);
+      formData.set('password', password);
+      const result = await loginAction(formData);
 
-      // Check if email verification is required
-      if (response.emailVerificationRequired) {
-        router.push('/verify-email');
-        return;
-      }
-
-      router.push('/dashboard');
-    } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        // Handle specific error codes
-        switch (err.code) {
+      if (!result.success) {
+        switch (result.error) {
           case 'invalid_credentials':
-            setErrors(['Invalid email or password']);
+            setErrors(['Invalid email or password.']);
             break;
-          case 'account_locked':
-            setErrors(['Account temporarily locked. Please try again later.']);
-            break;
-          case 'email_not_verified':
-            setErrors(['Please verify your email before signing in.']);
+          case 'rate_limit_exceeded':
+            setErrors(['Too many login attempts. Please try again later.']);
             break;
           default:
             setErrors(['Something went wrong. Please try again.']);
         }
-      } else {
-        setErrors(['An unexpected error occurred. Please try again.']);
+        return;
       }
+
+      // Check if email verification is required
+      if (result.data && result.data.emailVerificationRequired) {
+        router.push('/resend-verification');
+        return;
+      }
+
+      router.push('/dashboard');
+    } catch {
+      setErrors(['An unexpected error occurred. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Show loading while checking auth state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
 
   return (
     <AuthLayout
@@ -100,9 +83,7 @@ export default function LoginPage() {
         </p>
       }
     >
-      {sessionEndReason && (
-        <SessionAlert reason={sessionEndReason} onDismiss={clearSessionEndReason} />
-      )}
+      <SessionAlert />
 
       <form className="space-y-6" onSubmit={handleSubmit} noValidate>
         <Input
@@ -155,5 +136,17 @@ export default function LoginPage() {
         </Button>
       </form>
     </AuthLayout>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="loading-spinner" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

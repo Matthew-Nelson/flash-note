@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 26, 2026
+**Last Updated:** February 27, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,9 +17,9 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 5/8 sub-phases | Note Generation (1.5) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation (1.5) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
-| **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration |
+| **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
 
 **Why this order:**
@@ -312,6 +312,39 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | 2 | Billing portal buttons (Manage subscription, Update payment) | Phase 1.6 (Billing) | Dashboard subscription card uses mailto:support links as placeholder. Replace with Stripe billing portal integration in 1.6. |
 | 3 | Checkout success polling | Phase 1.6 (Billing) | `?success=true` detection + webhook polling removed from dashboard. Re-add as Client Component in 1.6. |
 
+### 1.4.5 — Auth Page Rewiring (Gap Audit)
+
+> **Critical gap identified:** The migration plan built all backend machinery but never scoped when the 6 auth pages get rewired from the old Express API client to Server Actions. This phase fills that gap.
+
+- Convert 6 auth pages (login, signup, forgot-password, reset-password, verify-email, resend-verification) from `api.ts`/`useAuth()` to Server Actions
+- Convert `SessionAlert` from `useAuth()` context to URL query params
+- Add middleware redirect for authenticated users on `/login` and `/signup`
+- Rewrite all page tests + SessionAlert tests + middleware tests
+- **Not included**: pricing page (deferred to 1.6), old auth infrastructure deletion (deferred to 1.6)
+- **Verify**: All 6 auth pages call Server Actions. Auth redirects work. SessionAlert uses URL params. Pricing unchanged. Tests pass. Coverage maintained.
+
+| Status |
+|--------|
+| ✅ Done |
+
+**Gap audit findings** (documented in migration plan):
+
+| # | Gap | Severity | Resolution |
+|---|-----|----------|------------|
+| 1 | Auth page rewiring never scoped | Critical | This phase |
+| 2 | `AuthProvider`/`api.ts`/`storage.ts` deletion never scoped | Critical | Phase 1.6 |
+| 3 | Authenticated user redirect on auth pages | Medium | Middleware (this phase) |
+| 4 | Auth page error boundaries | Low | Deferred — root `error.tsx` sufficient |
+| 5 | Frontend test rewrite strategy | Medium | Rewrote all 6 page tests (this phase) |
+| 6 | Pricing page split dependency | Low | Noted for Phase 1.6 |
+
+**Follow-up items from 1.4.5** (non-blocking, tracked for future phases):
+
+| # | Item | Blocked By | Notes |
+|---|------|-----------|-------|
+| 1 | Server-side enforcement for unverified email users | — | `loginAction` creates a session unconditionally, even when `emailVerificationRequired: true`. Client-side redirect is the only gate — users can navigate directly to `/dashboard`. Rule 8 violation (server-side auth is mandatory). Pre-existing in auth service but now load-bearing. Options: (a) don't create session for unverified emails, (b) check `emailVerified` in dashboard layout, (c) add to middleware with DB-backed data. |
+| 2 | Make `ActionResult<T>` data required on success branch | — | `data?: T` is optional even on success, forcing unnecessary guards at every call site. Fix with conditional type so `data` is required when `T` is non-void. |
+
 ### 1.5 — Note Generation
 
 - Copy LLM service layer wholesale (`services/llm/*`, `prompts/*`, `utils/prompt-sanitization.ts`)
@@ -331,9 +364,11 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 - Rewrite webhook Route Handler: raw body parsing + signature verification + idempotency (replaces current proxy pattern)
 - Checkout and portal Server Actions
 - Port subscription check to DAL (used by note generation gate)
+- Convert pricing page from `api.ts`/`useAuth()` to Server Actions
+- **Delete old auth infrastructure**: `lib/api.ts`, `lib/auth-context.tsx`, `lib/storage.ts`, `components/Providers.tsx` + their test files (last consumer is pricing page)
 - Webhook event cleanup job
 - Port billing service tests, rewrite webhook integration tests
-- **Verify**: Webhooks process correctly. Checkout works. Subscription status enforced. Cleanup job runs. Tests pass.
+- **Verify**: Webhooks process correctly. Checkout works. Subscription status enforced. Old auth files deleted. Cleanup job runs. Tests pass.
 
 | Status |
 |--------|
@@ -413,50 +448,11 @@ These items from Phase 0 HIPAA Infrastructure must be complete before PHI work b
 
 All items scoped to the new Next.js architecture. No extension work.
 
-### UI Quality
+### ~~UI Quality~~ — Deprecated
 
-Full audit details: [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md)
-
-#### P0 — Patient Safety & Legal
-
-| Task | Ref | Status |
-|------|-----|--------|
-| Fix silent clipboard copy failure | 2.1 | ❌ |
-| Fix color contrast failures (WCAG AA) | 1.1 | ❌ |
-
-#### P1 — Accessibility Compliance
-
-| Task | Ref | Status |
-|------|-----|--------|
-| Add `role="alert"` / `aria-live` to all dynamic content | 1.2 | ❌ |
-| Add `aria-hidden="true"` to all decorative SVGs | 1.3 | ❌ |
-| Fix nested `<Link><Button>` invalid HTML | 1.4 | ❌ |
-| Add skip-to-content link | 1.5 | ❌ |
-| Add `<main>` landmark to pages | 1.6 | ❌ |
-| Fix focus management (outline, button focus, view transitions) | 1.8 | ❌ |
-| Add responsive mobile navigation | 4.1 | ❌ |
-
-#### P2 — UX Quality & Consistency
-
-| Task | Ref | Status |
-|------|-----|--------|
-| Fix heading hierarchy violations | 1.7 | ❌ |
-| Fix miscellaneous a11y issues (toggle labels, hints, aria-busy) | 1.9 | ❌ |
-| Clear form errors on input change | 2.3 | ❌ |
-| Fix dashboard off-brand alert colors | 3.2 | ❌ |
-| Add responsive text sizing for hero/pricing headings | 4.2 | ❌ |
-| Fix CTA button overflow on small screens | 4.3 | ❌ |
-| Increase touch targets to 44x44px minimum | 4.4 | ❌ |
-
-#### P3 — Polish
-
-| Task | Ref | Status |
-|------|-----|--------|
-| Fix ErrorBoundary hardcoded colors | 3.5 | ❌ |
-| Add dark mode support | 5.3 | ❌ |
-| Add print styles | 5.4 | ❌ |
-
-> Items removed (extension-specific or resolved by migration): 2.2 (✅ done), 2.4, 2.5, 2.7, 2.8, 2.9, 2.10, 2.11, 3.1, 3.3, 3.4, 5.1, 5.2. These either referenced extension components, the old API client, or patterns that no longer exist post-migration.
+> **Superseded by [planning/UI_RULES.md](./planning/UI_RULES.md).** All 19 items from the UI audit (clipboard, contrast, ARIA, semantic HTML, focus management, responsive, design tokens) are codified as build-from-scratch rules in UI_RULES.md. The UI is being rebuilt — retrofitting fixes onto pages that will be rewritten is wasted work. Dark mode and print styles are explicitly cut.
+>
+> Original audit details preserved in [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md) for reference.
 
 ### Testing
 
@@ -573,6 +569,7 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| Phase 1.4.5: Auth Page Rewiring (Gap Audit) | Converted 6 auth pages from `api.ts`/`useAuth()` to Server Actions. SessionAlert now reads URL query params instead of auth context. Middleware redirects authenticated users from `/login`/`/signup`. Logout appends `?reason=logged_out`. Gap audit identified 6 gaps in migration plan — 2 critical (auth page rewiring + old auth file deletion). 74 page tests rewritten. |
 | Phase 1.4: Middleware + Protected Pages (PR #82) | Middleware auth redirect for `/dashboard/*`, usage DAL, dashboard + settings converted to Server Components, `LogoutButton`/`PasswordResetSection`/`DeleteAccountSection` client components, `loading.tsx`/`error.tsx`/`not-found.tsx` error boundaries, CSP cleanup (removed Sentry/API URL from connect-src). 56 new tests. |
 | Phase 1.3: Auth Server Actions (PR #81) | Login, register, logout, password reset, email verification, invite code validation Server Actions. Auth service with transactional registration + password reset. Progressive lockout service (atomic SQL). Token service + email service (Resend). Zod auth schemas. Full test coverage. |
 | Phase 1.2: Session System + Auth Rate Limiting (PR #80) | Opaque session tokens (SHA-256), sliding window refresh, session DAL (create/validate/refresh/revoke/enforce limit/device binding/cleanup), `getSession()` composition, Upstash rate limiting with compound keying (fixes M-1, L-1) |
@@ -607,3 +604,4 @@ Post-launch:
 | [planning/PROMPT_ENGINEERING_RESEARCH.md](./planning/PROMPT_ENGINEERING_RESEARCH.md) | Prompt optimization research |
 | [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) | Clinic feature design spec (Waves 1-4) |
 | [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) | Monitoring stack setup plan |
+| [planning/UI_RULES.md](./planning/UI_RULES.md) | UI build rules (supersedes UI Quality phase) |

@@ -177,6 +177,9 @@ describe('auth actions', () => {
       const result = await loginAction(toFormData({ email: 'a@b.com', password: 'pass' }));
 
       expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data?.emailVerificationRequired).toBe(false);
+      }
       expect(mockSetSessionCookie).toHaveBeenCalledWith('session-token');
     });
 
@@ -318,7 +321,7 @@ describe('auth actions', () => {
       // Deletes the specific session, not all sessions
       expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
       expect(mockClearSessionCookie).toHaveBeenCalled();
-      expect(mockRedirect).toHaveBeenCalledWith('/login');
+      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=logged_out');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'LOGOUT',
@@ -342,7 +345,7 @@ describe('auth actions', () => {
       await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockClearSessionCookie).toHaveBeenCalled();
-      expect(mockRedirect).toHaveBeenCalledWith('/login');
+      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=logged_out');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'LOGOUT',

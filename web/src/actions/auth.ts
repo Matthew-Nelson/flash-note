@@ -46,7 +46,7 @@ export type ActionResult<T = void> =
 
 // --- Actions ---
 
-export async function loginAction(formData: FormData): Promise<ActionResult<{ user: SanitizedUser }>> {
+export async function loginAction(formData: FormData): Promise<ActionResult<{ user: SanitizedUser; emailVerificationRequired: boolean }>> {
   const raw = Object.fromEntries(formData);
   const parsed = loginSchema.safeParse(raw);
   if (!parsed.success) {
@@ -88,7 +88,7 @@ export async function loginAction(formData: FormData): Promise<ActionResult<{ us
 
   await setSessionCookie(result.token);
 
-  return { success: true, data: { user: result.user } };
+  return { success: true, data: { user: result.user, emailVerificationRequired: result.emailVerificationRequired } };
 }
 
 export async function registerAction(formData: FormData): Promise<ActionResult<{ user: SanitizedUser }>> {
@@ -186,7 +186,7 @@ export async function logoutAction(): Promise<void> {
   await clearSessionCookie();
 
   // redirect throws internally — must be called last
-  redirect('/login');
+  redirect('/login?reason=logged_out');
 }
 
 export async function requestPasswordResetAction(formData: FormData): Promise<ActionResult> {

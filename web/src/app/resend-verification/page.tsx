@@ -5,8 +5,7 @@ import { useState } from 'react';
 import { Button, Input, Alert } from '@/components/ui';
 import { emailSchema } from '@/lib/schemas';
 import { AuthLayout } from '@/components/auth';
-import { api, ApiError } from '@/lib/api';
-import * as Sentry from '@sentry/nextjs';
+import { resendVerificationAction } from '@/actions/auth';
 
 export default function ResendVerificationPage() {
   const [email, setEmail] = useState('');
@@ -19,9 +18,9 @@ export default function ResendVerificationPage() {
     setErrors([]);
     setInvalidFields(new Set());
 
-    const result = emailSchema.safeParse(email);
-    if (!result.success) {
-      setErrors(result.error.errors.map((e) => e.message));
+    const validation = emailSchema.safeParse(email);
+    if (!validation.success) {
+      setErrors(validation.error.errors.map((e) => e.message));
       setInvalidFields(new Set(['email']));
       return;
     }
@@ -29,34 +28,27 @@ export default function ResendVerificationPage() {
     setStatus('submitting');
 
     try {
-      await api.resendVerificationEmail(email);
-      setStatus('success');
-    } catch (err) {
-      if (err instanceof TypeError) {
-        // Network failure — request never reached the server
-        setStatus('error');
-        setErrors(['A network error occurred. Please check your connection and try again.']);
-      } else if (err instanceof ApiError && err.code === 'too_many_attempts') {
-        setStatus('error');
-        setErrors(['Too many attempts. Please try again later.']);
-      } else if (err instanceof ApiError && err.status >= 500) {
-        // Server error — the request failed, user should retry
-        Sentry.captureException(err, {
-          extra: { source: 'resend_verification_page', errorType: 'server_error', statusCode: err.status },
-        });
-        setStatus('error');
-        setErrors(['Something went wrong. Please try again later.']);
-      } else if (err instanceof ApiError) {
-        // Expected client error (4xx) — show success to avoid revealing account existence
-        setStatus('success');
-      } else {
-        // Unexpected error (malformed response, etc.) — show generic error
-        Sentry.captureException(err, {
-          extra: { source: 'resend_verification_page', errorType: 'unexpected_error' },
-        });
-        setStatus('error');
-        setErrors(['Something went wrong. Please try again later.']);
+      const formData = new FormData();
+      formData.set('email', email);
+      const result = await resendVerificationAction(formData);
+
+      if (!result.success) {
+        switch (result.error) {
+          case 'rate_limit_exceeded':
+            setStatus('error');
+            setErrors(['Too many attempts. Please try again later.']);
+            break;
+          default:
+            // Anti-enumeration: show success even on unexpected errors
+            setStatus('success');
+        }
+        return;
       }
+
+      setStatus('success');
+    } catch {
+      setStatus('error');
+      setErrors(['Something went wrong. Please try again later.']);
     }
   };
 

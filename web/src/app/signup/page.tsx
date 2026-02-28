@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
-import { useAuth, ApiError } from '@/lib/auth-context';
+import { useState } from 'react';
+import { registerAction } from '@/actions/auth';
 import { registerSchema } from '@/lib/schemas';
 import { Button, Input, Alert } from '@/components/ui';
 import { AuthLayout } from '@/components/auth';
 
 export default function SignupPage() {
   const router = useRouter();
-  const { register, isAuthenticated, isLoading } = useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,24 +20,17 @@ export default function SignupPage() {
   const [invalidFields, setInvalidFields] = useState<Set<string>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Redirect if already authenticated
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.push('/dashboard');
-    }
-  }, [isAuthenticated, isLoading, router]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors([]);
     setInvalidFields(new Set());
 
-    // Validate input
-    const result = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms, inviteCode: inviteCode || undefined });
-    if (!result.success) {
+    // Client-side validation
+    const validation = registerSchema.safeParse({ email, password, confirmPassword, acceptedLegalTerms, inviteCode: inviteCode || undefined });
+    if (!validation.success) {
       const messages: string[] = [];
       const invalid = new Set<string>();
-      result.error.errors.forEach((err) => {
+      validation.error.errors.forEach((err) => {
         messages.push(err.message);
         if (err.path[0]) invalid.add(String(err.path[0]));
       });
@@ -50,57 +42,50 @@ export default function SignupPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await register(email, password, acceptedLegalTerms, inviteCode || undefined);
+      const formData = new FormData();
+      formData.set('email', email);
+      formData.set('password', password);
+      formData.set('confirmPassword', confirmPassword);
+      formData.set('acceptedLegalTerms', String(acceptedLegalTerms));
+      if (inviteCode) formData.set('inviteCode', inviteCode);
+      const result = await registerAction(formData);
 
-      // Check if email verification is required
-      if (response.emailVerificationRequired) {
-        router.push('/verify-email');
-        return;
-      }
-
-      router.push('/dashboard');
-    } catch (err: unknown) {
-      if (err instanceof ApiError) {
-        // Handle specific error codes
-        switch (err.code) {
-          case 'email_exists':
-            setErrors(['An account with this email already exists']);
-            setInvalidFields(new Set(['email']));
-            break;
-          case 'weak_password':
-            setErrors(['Password does not meet requirements']);
-            setInvalidFields(new Set(['password']));
+      if (!result.success) {
+        switch (result.error) {
+          case 'registration_failed':
+            setErrors(['Registration could not be completed. Please try again or sign in.']);
             break;
           case 'registration_closed':
-            setErrors(['Registration is not available at this time']);
+            setErrors(['Registration is not available at this time.']);
             break;
           case 'invite_code_required':
-            setErrors(['An invite code is required to register']);
+            setErrors(['An invite code is required to register.']);
             setInvalidFields(new Set(['inviteCode']));
             break;
           case 'invalid_invite_code':
-            setErrors(['This invite code is invalid or has expired']);
+            setErrors(['This invite code is invalid or has expired.']);
             setInvalidFields(new Set(['inviteCode']));
+            break;
+          case 'no_seats_available':
+            setErrors(['This clinic has no available seats. Contact your administrator.']);
+            break;
+          case 'rate_limit_exceeded':
+            setErrors(['Too many attempts. Please try again later.']);
             break;
           default:
             setErrors(['Something went wrong. Please try again.']);
         }
-      } else {
-        setErrors(['An unexpected error occurred. Please try again.']);
+        return;
       }
+
+      // Registration always requires email verification for new users
+      router.push('/resend-verification');
+    } catch {
+      setErrors(['An unexpected error occurred. Please try again.']);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Show loading while checking auth state
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="loading-spinner" />
-      </div>
-    );
-  }
 
   return (
     <AuthLayout

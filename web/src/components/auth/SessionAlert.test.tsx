@@ -1,52 +1,108 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useSearchParams } from 'next/navigation';
 import { SessionAlert } from './SessionAlert';
 
-// Mock the Alert component
 vi.mock('../ui', () => ({
   Alert: ({ children, variant }: { children: React.ReactNode; variant: string }) => (
     <div data-testid="alert" data-variant={variant}>{children}</div>
   ),
 }));
 
+const mockReplaceState = vi.fn();
+
 describe('SessionAlert', () => {
-  it('should show message for session_invalidated', () => {
-    render(<SessionAlert reason="session_invalidated" />);
-    expect(screen.getByText(/session was invalidated/i)).toBeInTheDocument();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams() as ReturnType<typeof useSearchParams>
+    );
+    // Mock window.history.replaceState
+    Object.defineProperty(window, 'history', {
+      value: { replaceState: mockReplaceState },
+      writable: true,
+    });
+  });
+
+  it('should render nothing when no reason param', () => {
+    const { container } = render(<SessionAlert />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('should render nothing for invalid reason param', () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=bogus_value') as ReturnType<typeof useSearchParams>
+    );
+    const { container } = render(<SessionAlert />);
+    expect(container.innerHTML).toBe('');
+  });
+
+  it('should show message for logged_out', () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
+    expect(screen.getByText('You have been signed out.')).toBeInTheDocument();
   });
 
   it('should show message for session_expired', () => {
-    render(<SessionAlert reason="session_expired" />);
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
     expect(screen.getByText(/session has expired/i)).toBeInTheDocument();
   });
 
+  it('should show message for session_invalidated', () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=session_invalidated') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
+    expect(screen.getByText(/session was invalidated/i)).toBeInTheDocument();
+  });
+
   it('should show message for session_limit', () => {
-    render(<SessionAlert reason="session_limit" />);
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=session_limit') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
     expect(screen.getByText(/signed in on another device/i)).toBeInTheDocument();
   });
 
   it('should show message for session_revoked', () => {
-    render(<SessionAlert reason="session_revoked" />);
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=session_revoked') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
     expect(screen.getByText(/revoked for security reasons/i)).toBeInTheDocument();
   });
 
-  it('should show dismiss button when onDismiss is provided', () => {
-    render(<SessionAlert reason="session_expired" onDismiss={() => {}} />);
-    expect(screen.getByRole('button', { name: /dismiss/i })).toBeInTheDocument();
+  it('should clear URL param on mount', () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
+    expect(mockReplaceState).toHaveBeenCalled();
   });
 
-  it('should call onDismiss when dismiss button is clicked', async () => {
+  it('should dismiss when dismiss button is clicked', async () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
+    );
     const user = userEvent.setup();
-    const onDismiss = vi.fn();
-    render(<SessionAlert reason="session_expired" onDismiss={onDismiss} />);
+    render(<SessionAlert />);
 
+    expect(screen.getByText(/session has expired/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /dismiss/i }));
-    expect(onDismiss).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/session has expired/i)).not.toBeInTheDocument();
   });
 
-  it('should NOT show dismiss button when onDismiss is not provided', () => {
-    render(<SessionAlert reason="session_expired" />);
-    expect(screen.queryByRole('button', { name: /dismiss/i })).not.toBeInTheDocument();
+  it('should render as warning variant', () => {
+    vi.mocked(useSearchParams).mockReturnValue(
+      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
+    );
+    render(<SessionAlert />);
+    expect(screen.getByTestId('alert')).toHaveAttribute('data-variant', 'warning');
   });
 });
