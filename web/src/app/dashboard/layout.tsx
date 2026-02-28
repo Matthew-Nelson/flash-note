@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
+import { expireSessionAction } from '@/actions/auth';
 import { LogoutButton } from '@/components/auth';
 
 export default async function DashboardLayout({
@@ -11,10 +12,17 @@ export default async function DashboardLayout({
 }) {
   const session = await getSession();
   if (!session) {
-    // Cookie clearing happens in middleware (Server Components cannot mutate cookies).
-    // Middleware sees ?reason=session_expired and clears the stale cookie instead of
-    // redirecting back to /dashboard, breaking the loop.
-    redirect('/login?reason=session_expired');
+    // Must use a Server Action to clear the stale cookie + redirect:
+    // - Server Components cannot mutate cookies (cookies().delete() is a no-op)
+    // - redirect() in streaming context produces a meta-tag redirect that
+    //   doesn't re-run middleware, so middleware can't clear the cookie either
+    // Server Actions CAN mutate cookies and always produce HTTP 303 redirects.
+    return expireSessionAction('session_expired');
+  }
+
+  // Server-side enforcement: unverified email users cannot access dashboard (Rule 8)
+  if (!session.emailVerified) {
+    redirect('/resend-verification');
   }
 
   return (

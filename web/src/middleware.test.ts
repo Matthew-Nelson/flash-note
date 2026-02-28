@@ -183,17 +183,6 @@ describe('Middleware', () => {
       expect(setCookie).toContain('Expires=Thu, 01 Jan 1970');
     });
 
-    it('clears stale cookie on /login?reason=logged_out with cookie', () => {
-      vi.stubEnv('NODE_ENV', 'production');
-      const response = middleware(
-        createRequest('https://flashnote.co/login?reason=logged_out', { cookies: { session_id: 'stale-token' } })
-      );
-      expect(response.status).not.toBe(307);
-      const setCookie = response.headers.get('set-cookie');
-      expect(setCookie).toContain('session_id');
-      expect(setCookie).toContain('Expires=Thu, 01 Jan 1970');
-    });
-
     it('sets CSP headers when clearing stale cookie on /login with reason', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = middleware(

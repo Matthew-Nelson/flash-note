@@ -79,7 +79,7 @@ export default function SignupPage() {
       }
 
       // Registration always requires email verification for new users
-      router.push('/resend-verification');
+      router.push('/check-email');
     } catch {
       setErrors(['An unexpected error occurred. Please try again.']);
     } finally {

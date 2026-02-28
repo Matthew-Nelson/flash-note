@@ -60,7 +60,7 @@ function LoginContent() {
 
       // Check if email verification is required
       if (result.data && result.data.emailVerificationRequired) {
-        router.push('/resend-verification');
+        router.push('/check-email');
         return;
       }
 

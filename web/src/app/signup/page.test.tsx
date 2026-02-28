@@ -93,7 +93,7 @@ describe('SignupPage', () => {
     await user.click(screen.getByRole('button', { name: 'Create account' }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/resend-verification');
+      expect(mockPush).toHaveBeenCalledWith('/check-email');
     });
     expect(registerAction).toHaveBeenCalledTimes(1);
   });

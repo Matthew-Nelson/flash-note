@@ -38,14 +38,6 @@ describe('SessionAlert', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('should show message for logged_out', () => {
-    vi.mocked(useSearchParams).mockReturnValue(
-      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
-    );
-    render(<SessionAlert />);
-    expect(screen.getByText('You have been signed out.')).toBeInTheDocument();
-  });
-
   it('should show message for session_expired', () => {
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
@@ -80,7 +72,7 @@ describe('SessionAlert', () => {
 
   it('should clear URL param on mount', () => {
     vi.mocked(useSearchParams).mockReturnValue(
-      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
+      new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
     expect(mockReplaceState).toHaveBeenCalled();
@@ -100,7 +92,7 @@ describe('SessionAlert', () => {
 
   it('should render as warning variant', () => {
     vi.mocked(useSearchParams).mockReturnValue(
-      new URLSearchParams('reason=logged_out') as ReturnType<typeof useSearchParams>
+      new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
     expect(screen.getByTestId('alert')).toHaveAttribute('data-variant', 'warning');

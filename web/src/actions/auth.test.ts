@@ -117,6 +117,7 @@ import {
   loginAction,
   registerAction,
   logoutAction,
+  expireSessionAction,
   requestPasswordResetAction,
   resetPasswordAction,
   verifyEmailAction,
@@ -321,7 +322,7 @@ describe('auth actions', () => {
       // Deletes the specific session, not all sessions
       expect(mockDeleteSession).toHaveBeenCalledWith('session-1');
       expect(mockClearSessionCookie).toHaveBeenCalled();
-      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=logged_out');
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'LOGOUT',
@@ -345,7 +346,7 @@ describe('auth actions', () => {
       await expect(logoutAction()).rejects.toThrow('NEXT_REDIRECT');
 
       expect(mockClearSessionCookie).toHaveBeenCalled();
-      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=logged_out');
+      expect(mockRedirect).toHaveBeenCalledWith('/login');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
           action: 'LOGOUT',
@@ -362,6 +363,19 @@ describe('auth actions', () => {
 
       expect(mockDeleteSession).not.toHaveBeenCalled();
       expect(mockClearSessionCookie).toHaveBeenCalled();
+    });
+  });
+
+  describe('expireSessionAction', () => {
+    it('clears cookie and redirects with reason', async () => {
+      await expect(expireSessionAction('session_expired')).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockClearSessionCookie).toHaveBeenCalledTimes(1);
+      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    });
+
+    it('encodes reason in URL', async () => {
+      await expect(expireSessionAction('session_limit')).rejects.toThrow('NEXT_REDIRECT');
+      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=session_limit');
     });
   });
 

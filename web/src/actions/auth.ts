@@ -46,6 +46,18 @@ export type ActionResult<T = void> =
 
 // --- Actions ---
 
+/**
+ * Clear a stale session cookie and redirect to login with a session-end reason.
+ * Used by dashboard layout when getSession() returns null but a cookie exists.
+ * Must be a Server Action (not inline in a Server Component) because
+ * Server Components cannot mutate cookies, and redirect() in streaming
+ * context produces a meta-tag redirect that doesn't re-run middleware.
+ */
+export async function expireSessionAction(reason: string): Promise<never> {
+  await clearSessionCookie();
+  redirect(`/login?reason=${encodeURIComponent(reason)}`);
+}
+
 export async function loginAction(formData: FormData): Promise<ActionResult<{ user: SanitizedUser; emailVerificationRequired: boolean }>> {
   const raw = Object.fromEntries(formData);
   const parsed = loginSchema.safeParse(raw);
@@ -186,7 +198,7 @@ export async function logoutAction(): Promise<void> {
   await clearSessionCookie();
 
   // redirect throws internally — must be called last
-  redirect('/login?reason=logged_out');
+  redirect('/login');
 }
 
 export async function requestPasswordResetAction(formData: FormData): Promise<ActionResult> {

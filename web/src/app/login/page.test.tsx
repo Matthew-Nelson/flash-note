@@ -166,7 +166,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: 'Sign in' }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith('/resend-verification');
+      expect(mockPush).toHaveBeenCalledWith('/check-email');
     });
     expect(mockPush).not.toHaveBeenCalledWith('/dashboard');
   });

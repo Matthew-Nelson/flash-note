@@ -6,7 +6,6 @@ import { Alert } from '../ui';
 import type { SessionEndReason } from '@/lib/types';
 
 const reasonMessages: Record<SessionEndReason, string> = {
-  logged_out: 'You have been signed out.',
   session_invalidated: 'Your session was invalidated. This may happen after a password reset. Please sign in again.',
   session_expired: 'Your session has expired. Please sign in again.',
   session_limit: 'You were signed out because you signed in on another device.',
