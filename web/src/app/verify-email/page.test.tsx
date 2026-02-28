@@ -3,10 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { useSearchParams } from 'next/navigation';
 import VerifyEmailPage from './page';
 
-const mockVerifyEmailAction = vi.fn();
+const mockVerifyEmailAction = vi.hoisted(() => vi.fn());
 
 vi.mock('@/actions/auth', () => ({
-  verifyEmailAction: (...args: unknown[]) => mockVerifyEmailAction(...args),
+  verifyEmailAction: mockVerifyEmailAction,
 }));
 
 describe('VerifyEmailPage', () => {

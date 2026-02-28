@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event';
 import { useSearchParams } from 'next/navigation';
 import ResetPasswordPage from './page';
 
-const mockValidateResetTokenAction = vi.fn();
-const mockResetPasswordAction = vi.fn();
+const mockValidateResetTokenAction = vi.hoisted(() => vi.fn());
+const mockResetPasswordAction = vi.hoisted(() => vi.fn());
 
 vi.mock('@/actions/auth', () => ({
-  validateResetTokenAction: (...args: unknown[]) => mockValidateResetTokenAction(...args),
-  resetPasswordAction: (...args: unknown[]) => mockResetPasswordAction(...args),
+  validateResetTokenAction: mockValidateResetTokenAction,
+  resetPasswordAction: mockResetPasswordAction,
 }));
 
 describe('ResetPasswordPage', () => {

@@ -3,10 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResendVerificationPage from './page';
 
-const mockResendVerificationAction = vi.fn();
+const mockResendVerificationAction = vi.hoisted(() => vi.fn());
 
 vi.mock('@/actions/auth', () => ({
-  resendVerificationAction: (...args: unknown[]) => mockResendVerificationAction(...args),
+  resendVerificationAction: mockResendVerificationAction,
 }));
 
 describe('ResendVerificationPage', () => {

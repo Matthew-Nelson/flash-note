@@ -3,10 +3,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ForgotPasswordPage from './page';
 
-const mockRequestPasswordResetAction = vi.fn();
+const mockRequestPasswordResetAction = vi.hoisted(() => vi.fn());
 
 vi.mock('@/actions/auth', () => ({
-  requestPasswordResetAction: (...args: unknown[]) => mockRequestPasswordResetAction(...args),
+  requestPasswordResetAction: mockRequestPasswordResetAction,
 }));
 
 describe('ForgotPasswordPage', () => {
