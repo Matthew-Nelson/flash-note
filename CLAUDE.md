@@ -469,12 +469,12 @@ message: process.env.NODE_ENV === 'production' ? 'An unexpected error occurred' 
 Every protected resource must be enforced on the server. Client-side auth checks are UX conveniences, not security controls.
 
 **Authorization layers (in order of execution):**
-1. **Next.js Middleware**: Reads session cookie, redirects unauthenticated users away from protected routes. This is an *optimistic UX check*, not a security boundary. Middleware runs on Edge Runtime and cannot do DB queries.
+1. **Next.js Proxy (`proxy.ts`)**: Reads session cookie, redirects unauthenticated users away from protected routes. This is an *optimistic UX check*, not a security boundary. The proxy intentionally avoids DB queries to stay fast.
 2. **Server Components / Server Actions**: Call `getSession()` from the DAL, which validates the session against the database. This is the *real security gate*.
 3. **DAL functions**: Enforce resource-level authorization (e.g., user can only access their own data, org members can only access their org's data).
 
 **Specifically:**
-- Protected pages must call `getSession()` and redirect if null — don't rely solely on middleware
+- Protected pages must call `getSession()` and redirect if null — don't rely solely on the proxy
 - Server Actions must validate the session before performing any operation
 - Subscription-gated features must check subscription status server-side via the DAL
 - Client-side `useAuth()` or similar hooks are for UI state only — never for security decisions
@@ -506,20 +506,20 @@ Next.js runs on Google Cloud Run as a containerized Node.js process. This is NOT
 - **`pg.Pool` works normally.** Cloud Run containers are persistent processes. The singleton pool pattern from Express transfers unchanged. No serverless driver or connection pooler needed.
 - **In-memory state is per-instance and ephemeral.** Cloud Run can scale to multiple instances and restart containers at any time. Never use module-level `Map`s or variables for state that must be shared across instances or survive restarts (e.g., rate limiting). Use Redis (Upstash) for shared ephemeral state.
 - **Rate limiting must be Redis-backed.** Use Upstash `@upstash/ratelimit`. In-memory rate limiters would only apply to the single instance that receives the request — ineffective when scaled to multiple instances.
-- **Edge Runtime has limited APIs.** Next.js middleware runs in Edge-compatible mode even on Cloud Run. Node.js-specific modules (`pg`, `bcryptjs`) do not work there. Middleware should only check cookie existence for optimistic redirects — no cryptographic operations needed since session tokens are opaque UUIDs. Full session validation (DB queries, bcrypt) must happen in Server Components or Route Handlers running in the Node.js runtime.
+- **Proxy runs on Node.js runtime.** Next.js 16's `proxy.ts` runs on the Node.js runtime (not Edge). While Node.js modules like `pg` and `bcryptjs` are technically available, the proxy intentionally avoids DB queries — it only checks cookie existence for fast optimistic redirects. Full session validation (DB lookup, lockout check) happens in Server Components and Server Actions via the DAL.
 - **Plan for container restarts.** Cloud Run may restart containers for updates, scaling, or health checks. Don't store durable state in memory. The database is the source of truth for all persistent state.
 
-## Next.js Middleware Responsibilities
+## Next.js Proxy Responsibilities
 
-Middleware runs on every matched request at the Edge. Keep it fast and focused:
+The proxy (`proxy.ts`) runs on every matched request on the Node.js runtime. Keep it fast and focused:
 
-**Middleware DOES:**
+**Proxy DOES:**
 - Generate CSP nonces and set `Content-Security-Policy` headers
 - Read the session cookie and redirect unauthenticated users away from `/dashboard/*` (optimistic check — cookie exists and isn't expired)
 - Allow public routes (`/`, `/login`, `/signup`, `/pricing`, `/terms`, `/privacy`, `/baa`, etc.) without auth checks
 
-**Middleware does NOT:**
-- Query the database (Edge Runtime cannot use `pg`)
+**Proxy does NOT:**
+- Query the database (intentional — keeps proxy fast)
 - Perform full session validation (that's the DAL's job)
 - Act as a security boundary (it's a UX optimization layer)
 - Handle CSRF (Server Actions handle this automatically; Route Handlers need explicit protection)
@@ -594,7 +594,7 @@ try {
 | DAL modules | `dal_{name}` | `dal_auth`, `dal_users`, `dal_billing` |
 | Server Actions | `action_{name}` | `action_login`, `action_generate_note` |
 | Route Handlers | `route_{name}` | `route_webhook`, `route_health` |
-| Middleware | `middleware` | `middleware` |
+| Proxy | `proxy` | `proxy` |
 | Client libs | `client_{name}` | `client_auth_context` |
 
 **NEVER include (PHI/PII):**
@@ -624,7 +624,7 @@ See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification inc
 `docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Work is organized into **dependency-ordered phases**:
 
 - **Phase 0** (pre-migration foundations): HIPAA infrastructure, database schema hardening, prompt engineering, security audit triage
-- **Phase 1** (Next.js migration): Infrastructure scaffold → DAL → sessions → auth → middleware → notes → billing → integration tests
+- **Phase 1** (Next.js migration): Infrastructure scaffold → DAL → sessions → auth → proxy → notes → billing → integration tests
 - **Phase 2** (PHI storage): Patients, clinical notes, templates, versioning. Blocked on Phase 1 + HIPAA infra.
 - **Phase 3** (quality & features): UI quality, testing, accessibility, monitoring, clinic features
 

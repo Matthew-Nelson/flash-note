@@ -256,13 +256,11 @@ The compliance lives in the business logic and SQL, not in Express.
 
 ## Known Concerns and Mitigations
 
-### 1. Edge Runtime in Middleware
+### 1. Proxy Runtime (formerly "Edge Runtime in Middleware")
 
-**Problem**: Next.js middleware runs on Edge Runtime. `jsonwebtoken` and `pg` don't work there. Full session validation requires a DB query.
+**Status: Resolved by Next.js 16 migration.**
 
-**Mitigation**: Middleware does a lightweight cookie check (exists + not obviously expired) for fast redirects. Full session validation (DB lookup, lockout check) happens in Server Components and Server Actions running in Node.js runtime. Middleware is a UX layer, not a security boundary. Use `jose` library for any token operations needed at the Edge.
-
-**Note**: On Cloud Run, Next.js middleware still runs in Edge-compatible mode by default. This concern applies regardless of hosting platform.
+Next.js 16 replaced `middleware.ts` (Edge Runtime) with `proxy.ts` (Node.js runtime). The proxy now has full access to Node.js APIs, but intentionally avoids DB queries to stay fast. It does a lightweight cookie check for optimistic redirects. Full session validation (DB lookup, lockout check) happens in Server Components and Server Actions. The proxy is a UX layer, not a security boundary.
 
 ### 2. Connection Pooling
 
@@ -562,9 +560,9 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Port auth service tests, lockout service tests, token service tests
 - **Verify**: Full auth lifecycle works. Lockout triggers correctly. Password reset is transactional. No PHI in audit metadata. Tests pass.
 
-### Phase 4: Middleware + Protected Pages + Error Boundaries
+### Phase 4: Proxy + Protected Pages + Error Boundaries
 
-- Update Next.js middleware: CSP nonces + cookie-based auth redirect for `/dashboard/*` routes
+- Update Next.js proxy: CSP nonces + cookie-based auth redirect for `/dashboard/*` routes
 - Build `getSession()` DAL function (read cookie → validate session → return user or null)
 - Convert dashboard to Server Component (call `getSession()` → call DAL → render)
 - Convert settings to Server Component
@@ -572,18 +570,18 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Create `error.tsx` for protected routes (graceful error boundary — curated messages, not stack traces)
 - Create `not-found.tsx` for 404s
 - Create `/baa` page (currently 404 — deferred from Phase 0 HIPAA infrastructure)
-- Port/rewrite middleware tests
+- Port/rewrite proxy tests
 - **Verify**: Unauthenticated users redirected. Protected pages render with server-provided data. Error boundaries handle failures gracefully. No flash of loading state. Tests pass.
 
 ### Phase 4.5: Auth Page Rewiring (Gap Audit)
 
-> **Critical gap identified:** Phases 1-4 built all backend machinery (DAL, sessions, Server Actions, middleware) but never explicitly scoped when the frontend auth pages get rewired from the old Express API client (`api.ts` + `auth-context.tsx`) to the new Server Actions.
+> **Critical gap identified:** Phases 1-4 built all backend machinery (DAL, sessions, Server Actions, proxy) but never explicitly scoped when the frontend auth pages get rewired from the old Express API client (`api.ts` + `auth-context.tsx`) to the new Server Actions.
 
 - Convert 6 auth pages from `api.ts`/`useAuth()` to Server Actions: login, signup, forgot-password, reset-password, verify-email, resend-verification
 - Convert `SessionAlert` from `useAuth()` context to URL query params (`?reason=logged_out`, `?reason=session_expired`)
-- Add middleware redirect: authenticated users visiting `/login` or `/signup` → `/dashboard`
+- Add proxy redirect: authenticated users visiting `/login` or `/signup` → `/dashboard`
 - Update `logoutAction` to redirect with `?reason=logged_out`
-- Rewrite all 6 page test files + SessionAlert tests + middleware tests
+- Rewrite all 6 page test files + SessionAlert tests + proxy tests
 - **Pricing page deferred to Phase 6** — it still uses `api.ts` + `useAuth()` for checkout
 - **Old auth infrastructure (`api.ts`, `auth-context.tsx`, `storage.ts`, `Providers.tsx`) stays alive until Phase 6** — pricing depends on it. Phase 6 must delete these files.
 - **Verify**: All 6 auth pages call Server Actions. Login/signup redirect to dashboard. Authenticated users redirected away from auth pages. SessionAlert shows reasons via URL params. Pricing page unchanged. Tests pass. Coverage maintained.

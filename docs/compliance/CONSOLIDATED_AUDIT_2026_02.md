@@ -104,11 +104,11 @@ The Next.js configuration contains only `reactStrictMode: true` — no security 
 - **Referrer-Policy:** Prevents token leakage via Referer header (compounds tokens-in-URLs issue in CR-5)
 - **Permissions-Policy:** Feature restriction
 
-No `middleware.ts` file exists for edge-level enforcement.
+No `proxy.ts` file exists for request-level enforcement.
 
 **Verified:** `web/next.config.ts` lines 1-14 confirm minimal config with no `headers()` export.
 
-**Recommendation:** Add comprehensive `headers()` configuration to `next.config.ts` or create a `middleware.ts` file.
+**Recommendation:** Add comprehensive `headers()` configuration to `next.config.ts` or create a `proxy.ts` file.
 
 ---
 
@@ -531,11 +531,11 @@ Sensitive tokens passed as URL query parameters appear in browser history, serve
 **Category:** Auth Architecture
 **CLAUDE.md Rules:** Rule 8 (server-side auth mandatory)
 
-`ProtectedRoute` is client-side only using `useAuth()`. No Next.js middleware validates sessions before serving protected routes.
+`ProtectedRoute` is client-side only using `useAuth()`. No Next.js proxy validates sessions before serving protected routes.
 
 **Verified:** Lines 16-20 confirm client-side redirect only.
 
-**Recommendation:** Add a `middleware.ts` file for server-side session validation.
+**Recommendation:** Add a `proxy.ts` file for server-side session validation.
 
 ---
 
@@ -1003,10 +1003,10 @@ Individual findings within each PR range from 1-line config changes to small ref
 | M-7 | Refactor auth pages to use centralized API client | Medium |
 | M-8 | Validate redirect URLs against Stripe domain allowlist | Low |
 | M-10 | Validate token expiry on auth initialization | Low |
-| M-11 | Add Next.js `middleware.ts` for server-side route protection | Medium |
+| M-11 | Add Next.js `proxy.ts` for server-side route protection | Medium |
 | M-23 | Sanitize webhook proxy error bodies before Sentry | Low |
 
-**Why grouped:** All web package changes. Security headers, auth middleware, and API client refactoring are conceptually related — they're all about hardening the web app's security posture. Self-contained within the `web/` directory.
+**Why grouped:** All web package changes. Security headers, auth proxy, and API client refactoring are conceptually related — they're all about hardening the web app's security posture. Self-contained within the `web/` directory.
 
 **Note:** M-9 (tokens in URL params) is mitigated by CR-4's `Referrer-Policy` header. No separate code change needed beyond the header addition.
 

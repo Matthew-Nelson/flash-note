@@ -37,6 +37,7 @@ import { deleteSession } from '@/server/dal/sessions';
 import { findByCode, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { auditService } from '@/server/services/audit';
 import { AuditAction } from '@/server/types';
+import type { SessionEndReason } from '@/lib/types';
 
 // --- Result type ---
 
@@ -51,9 +52,9 @@ export type ActionResult<T = void> =
  * Used by dashboard layout when getSession() returns null but a cookie exists.
  * Must be a Server Action (not inline in a Server Component) because
  * Server Components cannot mutate cookies, and redirect() in streaming
- * context produces a meta-tag redirect that doesn't re-run middleware.
+ * context produces a meta-tag redirect that doesn't re-run the proxy.
  */
-export async function expireSessionAction(reason: string): Promise<never> {
+export async function expireSessionAction(reason: SessionEndReason): Promise<never> {
   await clearSessionCookie();
   redirect(`/login?reason=${encodeURIComponent(reason)}`);
 }

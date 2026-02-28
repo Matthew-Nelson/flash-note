@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { SessionEndReason } from '@/lib/types';
 
-export function middleware(request: NextRequest) {
+// ReadonlySet<string> so .has() accepts untrusted strings from URL params;
+// satisfies ensures only valid SessionEndReason values are in the set.
+const VALID_SESSION_END_REASONS: ReadonlySet<string> = new Set([
+  'session_invalidated',
+  'session_expired',
+  'session_limit',
+  'session_revoked',
+] satisfies readonly SessionEndReason[]);
+
+export function proxy(request: NextRequest) {
   const nonce = crypto.randomUUID();
   const isDev = process.env.NODE_ENV === 'development';
 
@@ -32,9 +42,9 @@ export function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-nonce', nonce);
 
-  // Auth redirects — UX optimization only. Middleware runs on Edge Runtime and
-  // cannot query the DB. Real auth enforcement happens in Server Components via
-  // getSession() (CLAUDE.md Rule 8).
+  // Auth redirects — UX optimization only. The proxy runs on Node.js runtime but
+  // intentionally avoids DB queries to stay fast. Real auth enforcement happens
+  // in Server Components via getSession() (CLAUDE.md Rule 8).
   const sessionCookie = request.cookies.get('session_id');
   const hasSession = !!sessionCookie?.value;
   const pathname = request.nextUrl.pathname;
@@ -52,12 +62,6 @@ export function middleware(request: NextRequest) {
   // the cookie is stale: clear it and let the user through to the login page.
   // Only known SessionEndReason values are trusted — arbitrary query params are ignored
   // to prevent crafted URLs from clearing valid session cookies.
-  const VALID_SESSION_END_REASONS = new Set([
-    'session_invalidated',
-    'session_expired',
-    'session_limit',
-    'session_revoked',
-  ]);
   if ((pathname === '/login' || pathname === '/signup') && hasSession) {
     const reason = request.nextUrl.searchParams.get('reason');
     if (reason && VALID_SESSION_END_REASONS.has(reason)) {
