@@ -177,6 +177,7 @@ describe('GeminiProvider', () => {
       const errorResponse = {
         ok: false,
         status: 429,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'RESOURCE_EXHAUSTED' } }),
       };
       mockFetch.mockResolvedValue(errorResponse);
@@ -190,6 +191,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'UNAUTHENTICATED' } }),
       });
 
@@ -202,6 +204,7 @@ describe('GeminiProvider', () => {
       const errorResponse = {
         ok: false,
         status: 503,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'SERVICE_UNAVAILABLE' } }),
       };
       mockFetch.mockResolvedValue(errorResponse);
@@ -294,6 +297,7 @@ describe('GeminiProvider', () => {
       const errorResponse = {
         ok: false,
         status: 500,
+        headers: new Headers(),
         json: () =>
           Promise.resolve({
             error: { message: 'Error with patient data: John Doe DOB 1990-01-01' },
@@ -319,6 +323,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 429,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'RESOURCE_EXHAUSTED' } }),
       });
 
@@ -342,10 +347,45 @@ describe('GeminiProvider', () => {
       expect(consoleWarnSpy).toHaveBeenCalledWith('LLM retry attempt:', expect.any(Object));
     });
 
+    it('should respect retry-after header on 429', async () => {
+      const headers = new Headers();
+      headers.set('retry-after', '2');
+
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        headers,
+        json: () => Promise.resolve({ error: { status: 'RESOURCE_EXHAUSTED' } }),
+      });
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: JSON.stringify(validPTNoteResponse) }] },
+                finishReason: 'STOP',
+              },
+            ],
+          }),
+      });
+
+      const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
+
+      expect(result.note.subjective).toBe(validPTNoteResponse.subjective);
+      const warnCall = consoleWarnSpy.mock.calls.find(
+        (call: unknown[]) => call[0] === 'LLM retry attempt:',
+      );
+      expect(warnCall).toBeDefined();
+      expect(warnCall![1]).toHaveProperty('delayMs');
+    });
+
     it('should not retry on auth error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 401,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'UNAUTHENTICATED' } }),
       });
 
@@ -362,6 +402,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'INVALID_ARGUMENT' } }),
       });
 
@@ -374,6 +415,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 403,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'PERMISSION_DENIED' } }),
       });
 
@@ -386,6 +428,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'INTERNAL' } }),
       });
 
@@ -398,6 +441,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 502,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'BAD_GATEWAY' } }),
       });
 
@@ -410,6 +454,7 @@ describe('GeminiProvider', () => {
       mockFetch.mockResolvedValue({
         ok: false,
         status: 418,
+        headers: new Headers(),
         json: () => Promise.resolve({ error: { status: 'TEAPOT' } }),
       });
 

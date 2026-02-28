@@ -185,7 +185,7 @@ export class GeminiProvider extends BaseLLMProvider {
       const data = parseResult.data;
 
       if (!response.ok) {
-        throw this.handleHttpError(response.status, data);
+        throw this.handleHttpError(response.status, response.headers, data);
       }
 
       if (data.error) {
@@ -304,10 +304,12 @@ export class GeminiProvider extends BaseLLMProvider {
     return this.adcTokenCache.token;
   }
 
-  private handleHttpError(status: number, data: GeminiResponse): LLMError {
+  private handleHttpError(status: number, headers: Headers, data: GeminiResponse): LLMError {
     // SECURITY: Never log raw error body - may echo back PHI from request
     // TODO: Replace with Pino structured logger when available
     console.error('Gemini API HTTP error:', { status });
+
+    const retryAfter = this.parseRetryAfter(headers.get('retry-after'));
 
     switch (status) {
       case 400:
@@ -316,7 +318,7 @@ export class GeminiProvider extends BaseLLMProvider {
       case 403:
         return new AuthenticationError(this.name);
       case 429:
-        return new RateLimitError(this.name);
+        return new RateLimitError(this.name, retryAfter);
       case 500:
       case 502:
       case 503:
