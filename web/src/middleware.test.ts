@@ -124,11 +124,98 @@ describe('Middleware', () => {
 
     it('does NOT redirect public routes without cookie', () => {
       vi.stubEnv('NODE_ENV', 'production');
-      const publicRoutes = ['/', '/login', '/signup', '/pricing', '/terms', '/privacy', '/baa'];
+      const publicRoutes = ['/', '/pricing', '/terms', '/privacy', '/baa', '/forgot-password'];
       for (const route of publicRoutes) {
         const response = middleware(createRequest(`https://flashnote.co${route}`));
         expect(response.status).not.toBe(307);
       }
+    });
+
+    it('redirects /login to /dashboard when session_id cookie present', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login', { cookies: { session_id: 'abc123' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
+    it('redirects /signup to /dashboard when session_id cookie present', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/signup', { cookies: { session_id: 'abc123' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
+    it('does NOT redirect /login when no session_id cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/login'));
+      expect(response.status).not.toBe(307);
+    });
+
+    it('does NOT redirect /signup when no session_id cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(createRequest('https://flashnote.co/signup'));
+      expect(response.status).not.toBe(307);
+    });
+
+    it('sets CSP headers on authenticated redirect from /login', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login', { cookies: { session_id: 'abc123' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
+
+    it('clears stale cookie and allows /login when ?reason param present with cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=session_expired', { cookies: { session_id: 'stale-token' } })
+      );
+      // Should NOT redirect — allows the login page to render
+      expect(response.status).not.toBe(307);
+      // Should delete the stale cookie
+      const setCookie = response.headers.get('set-cookie');
+      expect(setCookie).toContain('session_id');
+      expect(setCookie).toContain('Expires=Thu, 01 Jan 1970');
+    });
+
+    it('sets CSP headers when clearing stale cookie on /login with reason', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=session_expired', { cookies: { session_id: 'stale-token' } })
+      );
+      expect(response.headers.has('Content-Security-Policy')).toBe(true);
+    });
+
+    it('does NOT clear cookie for invalid ?reason values — redirects to /dashboard', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=anything', { cookies: { session_id: 'valid-token' } })
+      );
+      // Invalid reason: should redirect to /dashboard, not clear the cookie
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
+    it('does NOT clear cookie for empty ?reason value — redirects to /dashboard', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=', { cookies: { session_id: 'valid-token' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
+    it('does NOT redirect /login with empty session_id cookie', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login', { cookies: { session_id: '' } })
+      );
+      expect(response.status).not.toBe(307);
     });
 
     it('sets CSP headers on redirected responses', () => {

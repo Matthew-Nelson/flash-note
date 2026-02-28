@@ -575,6 +575,19 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Port/rewrite middleware tests
 - **Verify**: Unauthenticated users redirected. Protected pages render with server-provided data. Error boundaries handle failures gracefully. No flash of loading state. Tests pass.
 
+### Phase 4.5: Auth Page Rewiring (Gap Audit)
+
+> **Critical gap identified:** Phases 1-4 built all backend machinery (DAL, sessions, Server Actions, middleware) but never explicitly scoped when the frontend auth pages get rewired from the old Express API client (`api.ts` + `auth-context.tsx`) to the new Server Actions.
+
+- Convert 6 auth pages from `api.ts`/`useAuth()` to Server Actions: login, signup, forgot-password, reset-password, verify-email, resend-verification
+- Convert `SessionAlert` from `useAuth()` context to URL query params (`?reason=logged_out`, `?reason=session_expired`)
+- Add middleware redirect: authenticated users visiting `/login` or `/signup` → `/dashboard`
+- Update `logoutAction` to redirect with `?reason=logged_out`
+- Rewrite all 6 page test files + SessionAlert tests + middleware tests
+- **Pricing page deferred to Phase 6** — it still uses `api.ts` + `useAuth()` for checkout
+- **Old auth infrastructure (`api.ts`, `auth-context.tsx`, `storage.ts`, `Providers.tsx`) stays alive until Phase 6** — pricing depends on it. Phase 6 must delete these files.
+- **Verify**: All 6 auth pages call Server Actions. Login/signup redirect to dashboard. Authenticated users redirected away from auth pages. SessionAlert shows reasons via URL params. Pricing page unchanged. Tests pass. Coverage maintained.
+
 ### Phase 5: Note Generation
 
 - Copy LLM service layer wholesale (`services/llm/*`, `prompts/*`, `utils/prompt-sanitization.ts`)
@@ -591,8 +604,10 @@ Rate limiting is co-located with sessions because auth endpoints must never be e
 - Checkout and portal Server Actions
 - Port subscription check to DAL (used by note generation gate)
 - Webhook event cleanup job
+- Convert pricing page from `api.ts`/`useAuth()` to Server Actions
+- **Delete old auth infrastructure**: `lib/api.ts`, `lib/auth-context.tsx`, `lib/storage.ts`, `components/Providers.tsx`, and their test files — no remaining consumers after pricing page conversion
 - Port billing service tests, rewrite webhook integration tests
-- **Verify**: Webhooks process correctly. Checkout works. Subscription status enforced. Cleanup job runs. Tests pass.
+- **Verify**: Webhooks process correctly. Checkout works. Subscription status enforced. Cleanup job runs. Old auth files deleted. Tests pass.
 
 ### Phase 7: Integration Tests + Production Deploy
 

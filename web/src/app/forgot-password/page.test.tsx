@@ -2,24 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ForgotPasswordPage from './page';
-import { api, ApiError } from '@/lib/api';
 
-// Mock server actions to prevent transitive import of server-only config
-// (LogoutButton/PasswordResetSection in @/components/auth barrel import @/actions/auth)
+const mockRequestPasswordResetAction = vi.hoisted(() => vi.fn());
+
 vi.mock('@/actions/auth', () => ({
-  logoutAction: vi.fn(),
-  requestPasswordResetAction: vi.fn(),
+  requestPasswordResetAction: mockRequestPasswordResetAction,
 }));
-
-vi.mock('@/lib/api', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@/lib/api')>();
-  return {
-    ...original,
-    api: {
-      requestPasswordReset: vi.fn(),
-    },
-  };
-});
 
 describe('ForgotPasswordPage', () => {
   beforeEach(() => {
@@ -40,7 +28,7 @@ describe('ForgotPasswordPage', () => {
     expect(screen.getByLabelText('Email address')).not.toHaveAttribute('placeholder');
   });
 
-  it('should render green back to login link', () => {
+  it('should render back to login link', () => {
     render(<ForgotPasswordPage />);
     const link = screen.getByText('Back to login');
     expect(link).toHaveAttribute('href', '/login');
@@ -56,7 +44,7 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(api.requestPasswordReset).not.toHaveBeenCalled();
+    expect(mockRequestPasswordResetAction).not.toHaveBeenCalled();
   });
 
   it('should show validation error for invalid email', async () => {
@@ -69,11 +57,11 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
-    expect(api.requestPasswordReset).not.toHaveBeenCalled();
+    expect(mockRequestPasswordResetAction).not.toHaveBeenCalled();
   });
 
   it('should submit and show success for valid email', async () => {
-    vi.mocked(api.requestPasswordReset).mockResolvedValueOnce(undefined);
+    mockRequestPasswordResetAction.mockResolvedValueOnce({ success: true });
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
@@ -83,13 +71,13 @@ describe('ForgotPasswordPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
     });
-    expect(api.requestPasswordReset).toHaveBeenCalledWith('test@example.com');
+    expect(mockRequestPasswordResetAction).toHaveBeenCalledTimes(1);
+    const formData = mockRequestPasswordResetAction.mock.calls[0][0] as FormData;
+    expect(formData.get('email')).toBe('test@example.com');
   });
 
-  it('should show error for too_many_attempts', async () => {
-    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
-      new ApiError(429, 'too_many_attempts', 'Rate limited')
-    );
+  it('should show error for rate_limit_exceeded', async () => {
+    mockRequestPasswordResetAction.mockResolvedValueOnce({ success: false, error: 'rate_limit_exceeded' });
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
@@ -101,27 +89,8 @@ describe('ForgotPasswordPage', () => {
     });
   });
 
-  it('should show network error for TypeError (no internet)', async () => {
-    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
-      new TypeError('Failed to fetch')
-    );
-    const user = userEvent.setup();
-    render(<ForgotPasswordPage />);
-
-    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText('A network error occurred. Please check your connection and try again.')
-      ).toBeInTheDocument();
-    });
-  });
-
-  it('should show success for 4xx errors (hide account existence)', async () => {
-    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
-      new ApiError(404, 'user_not_found', 'No such user')
-    );
+  it('should show success for non-rate-limit errors (anti-enumeration)', async () => {
+    mockRequestPasswordResetAction.mockResolvedValueOnce({ success: false, error: 'some_other_error' });
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
@@ -133,25 +102,8 @@ describe('ForgotPasswordPage', () => {
     });
   });
 
-  it('should show error for 5xx server errors', async () => {
-    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
-      new ApiError(500, 'internal_error', 'Internal server error')
-    );
-    const user = userEvent.setup();
-    render(<ForgotPasswordPage />);
-
-    await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
-    });
-  });
-
-  it('should show error for unexpected non-ApiError exceptions', async () => {
-    vi.mocked(api.requestPasswordReset).mockRejectedValueOnce(
-      new SyntaxError('Unexpected token < in JSON')
-    );
+  it('should show error on unexpected exception', async () => {
+    mockRequestPasswordResetAction.mockRejectedValueOnce(new Error('network error'));
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
@@ -174,7 +126,7 @@ describe('ForgotPasswordPage', () => {
     });
 
     // Type valid email and resubmit
-    vi.mocked(api.requestPasswordReset).mockResolvedValueOnce(undefined);
+    mockRequestPasswordResetAction.mockResolvedValueOnce({ success: true });
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
     await user.click(screen.getByText('Send reset link'));
 

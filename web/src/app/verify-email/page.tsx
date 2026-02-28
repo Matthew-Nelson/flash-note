@@ -1,60 +1,62 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Button, LoadingSpinner } from '@/components/ui';
-import { useAuth } from '@/lib/auth-context';
-import { api } from '@/lib/api';
-import * as Sentry from '@sentry/nextjs';
+import { verifyEmailAction } from '@/actions/auth';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
-  const { isAuthenticated, fetchUser } = useAuth();
   const token = searchParams.get('token');
   const [status, setStatus] = useState<'verifying' | 'success' | 'already_verified' | 'error'>(
     () => (token ? 'verifying' : 'error')
   );
   const [message, setMessage] = useState(() => (token ? '' : 'No verification token provided'));
+  const router = useRouter();
   const verificationStarted = useRef(false);
 
   const verifyEmail = useCallback(async (verificationToken: string) => {
     try {
-      const result = await api.verifyEmail(verificationToken);
+      const formData = new FormData();
+      formData.set('token', verificationToken);
+      const result = await verifyEmailAction(formData);
 
-      // If user is logged in, fetch fresh data to get updated emailVerified status
-      if (isAuthenticated) {
-        try {
-          await fetchUser();
-        } catch {
-          // Fetch failed, but verification still succeeded - user can continue
-        }
+      if (!result.success) {
+        setStatus('error');
+        setMessage('Invalid or expired verification link. Please request a new one.');
+        return;
       }
 
-      if (result.alreadyVerified) {
+      if (result.data?.alreadyVerified) {
         setStatus('already_verified');
         setMessage('Your email was already verified.');
       } else {
         setStatus('success');
         setMessage('Your email has been verified successfully!');
       }
-    } catch (err) {
-      Sentry.captureException(err, {
-        extra: { source: 'verify_email_page', errorType: 'verification_failed' },
-      });
+    } catch {
       setStatus('error');
       setMessage('Invalid or expired verification link. Please request a new one.');
     }
-  }, [isAuthenticated, fetchUser]);
+  }, []);
 
   useEffect(() => {
     if (!token || verificationStarted.current) {
       return;
     }
     verificationStarted.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- API call on mount (external system sync)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Server Action call on mount (external system sync)
     void verifyEmail(token);
   }, [token, verifyEmail]);
+
+  // Auto-redirect to dashboard after successful verification.
+  // Middleware handles the no-session case (redirects to /login).
+  useEffect(() => {
+    if (status !== 'success' && status !== 'already_verified') return;
+    const timer = setTimeout(() => router.push('/dashboard'), 1500);
+    return () => clearTimeout(timer);
+  }, [status, router]);
 
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -91,17 +93,7 @@ function VerifyEmailContent() {
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can now use all features in the FlashNote Chrome extension.
               </p>
-              <div className="mt-6">
-                {isAuthenticated ? (
-                  <Link href="/dashboard">
-                    <Button className="w-full">Go to Dashboard</Button>
-                  </Link>
-                ) : (
-                  <Link href="/login">
-                    <Button className="w-full">Sign in</Button>
-                  </Link>
-                )}
-              </div>
+              <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
           )}
 
@@ -117,17 +109,7 @@ function VerifyEmailContent() {
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can use all features in the FlashNote Chrome extension.
               </p>
-              <div className="mt-6">
-                {isAuthenticated ? (
-                  <Link href="/dashboard">
-                    <Button className="w-full">Go to Dashboard</Button>
-                  </Link>
-                ) : (
-                  <Link href="/login">
-                    <Button className="w-full">Sign in</Button>
-                  </Link>
-                )}
-              </div>
+              <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
           )}
 

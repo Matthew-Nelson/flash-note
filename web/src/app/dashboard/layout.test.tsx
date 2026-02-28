@@ -10,6 +10,12 @@ vi.mock('@/server/lib/get-session', () => ({
   getSession: (): Promise<SessionData | null> => mockGetSession(),
 }));
 
+// Mock expireSessionAction
+const mockExpireSessionAction = vi.hoisted(() => vi.fn());
+vi.mock('@/actions/auth', () => ({
+  expireSessionAction: mockExpireSessionAction,
+}));
+
 // Mock LogoutButton (client component)
 vi.mock('@/components/auth', () => ({
   LogoutButton: () => <button>Sign out</button>,
@@ -36,13 +42,25 @@ describe('DashboardLayout', () => {
     });
   });
 
-  it('redirects to /login when getSession() returns null', async () => {
+  it('calls expireSessionAction when getSession() returns null', async () => {
     mockGetSession.mockResolvedValue(null);
+    mockExpireSessionAction.mockImplementation((): never => {
+      throw new Error('NEXT_REDIRECT');
+    });
 
     await expect(
       DashboardLayout({ children: <div>child</div> })
     ).rejects.toThrow('NEXT_REDIRECT');
-    expect(redirect).toHaveBeenCalledWith('/login');
+    expect(mockExpireSessionAction).toHaveBeenCalledWith('session_expired');
+  });
+
+  it('redirects to /resend-verification when email is not verified', async () => {
+    mockGetSession.mockResolvedValue(createMockSession({ emailVerified: false }));
+
+    await expect(
+      DashboardLayout({ children: <div>child</div> })
+    ).rejects.toThrow('NEXT_REDIRECT');
+    expect(redirect).toHaveBeenCalledWith('/resend-verification');
   });
 
   it('renders user email in nav', async () => {
