@@ -50,6 +50,14 @@ function VerifyEmailContent() {
     void verifyEmail(token);
   }, [token, verifyEmail]);
 
+  // Auto-redirect to dashboard after successful verification.
+  // Middleware handles the no-session case (redirects to /login).
+  useEffect(() => {
+    if (status !== 'success' && status !== 'already_verified') return;
+    const timer = setTimeout(() => router.push('/dashboard'), 1500);
+    return () => clearTimeout(timer);
+  }, [status, router]);
+
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -85,9 +93,7 @@ function VerifyEmailContent() {
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can now use all features in the FlashNote Chrome extension.
               </p>
-              <div className="mt-6">
-                <Button className="w-full" onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
-              </div>
+              <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
           )}
 
@@ -103,9 +109,7 @@ function VerifyEmailContent() {
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can use all features in the FlashNote Chrome extension.
               </p>
-              <div className="mt-6">
-                <Button className="w-full" onClick={() => router.push('/dashboard')}>Go to Dashboard</Button>
-              </div>
+              <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
           )}
 

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import userEvent from '@testing-library/user-event';
 import VerifyEmailPage from './page';
 
 const mockVerifyEmailAction = vi.hoisted(() => vi.fn());
@@ -104,15 +103,27 @@ describe('VerifyEmailPage', () => {
     );
   });
 
-  it('should navigate to dashboard on success button click', async () => {
+  it('should auto-redirect to dashboard after successful verification', async () => {
     mockVerifyEmailAction.mockResolvedValueOnce({ success: true });
-    const user = userEvent.setup();
 
     render(<VerifyEmailPage />);
     await waitFor(() => {
-      expect(screen.getByText('Go to Dashboard')).toBeInTheDocument();
+      expect(screen.getByText('Redirecting...')).toBeInTheDocument();
     });
-    await user.click(screen.getByText('Go to Dashboard'));
-    expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    }, { timeout: 3000 });
+  });
+
+  it('should auto-redirect to dashboard for already-verified email', async () => {
+    mockVerifyEmailAction.mockResolvedValueOnce({ success: true, data: { alreadyVerified: true } });
+
+    render(<VerifyEmailPage />);
+    await waitFor(() => {
+      expect(screen.getByText('Redirecting...')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    }, { timeout: 3000 });
   });
 });
