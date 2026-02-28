@@ -47,12 +47,20 @@ export function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from /login and /signup — UNLESS the request
-  // carries a session-end reason (e.g., ?reason=session_expired). That means the
+  // carries a valid session-end reason (e.g., ?reason=session_expired). That means the
   // dashboard layout detected an invalid session and redirected here. In that case
   // the cookie is stale: clear it and let the user through to the login page.
+  // Only known SessionEndReason values are trusted — arbitrary query params are ignored
+  // to prevent crafted URLs from clearing valid session cookies.
+  const VALID_SESSION_END_REASONS = new Set([
+    'session_invalidated',
+    'session_expired',
+    'session_limit',
+    'session_revoked',
+  ]);
   if ((pathname === '/login' || pathname === '/signup') && hasSession) {
     const reason = request.nextUrl.searchParams.get('reason');
-    if (reason) {
+    if (reason && VALID_SESSION_END_REASONS.has(reason)) {
       const response = NextResponse.next({
         request: { headers: requestHeaders },
       });

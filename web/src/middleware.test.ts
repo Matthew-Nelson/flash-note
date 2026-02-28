@@ -191,6 +191,25 @@ describe('Middleware', () => {
       expect(response.headers.has('Content-Security-Policy')).toBe(true);
     });
 
+    it('does NOT clear cookie for invalid ?reason values — redirects to /dashboard', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=anything', { cookies: { session_id: 'valid-token' } })
+      );
+      // Invalid reason: should redirect to /dashboard, not clear the cookie
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
+    it('does NOT clear cookie for empty ?reason value — redirects to /dashboard', () => {
+      vi.stubEnv('NODE_ENV', 'production');
+      const response = middleware(
+        createRequest('https://flashnote.co/login?reason=', { cookies: { session_id: 'valid-token' } })
+      );
+      expect(response.status).toBe(307);
+      expect(response.headers.get('Location')).toBe('https://flashnote.co/dashboard');
+    });
+
     it('does NOT redirect /login with empty session_id cookie', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = middleware(
