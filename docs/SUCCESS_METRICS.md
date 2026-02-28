@@ -180,7 +180,7 @@ These items must be complete before public launch.
 | **Components** | Reusable input | Best practice | ✅ Done |
 | **Components** | Navigation | Best practice | ✅ Done |
 | **Config** | .env.example | Best practice | ✅ Done |
-| **Config** | Security headers | Best practice | ✅ Done (next.config.ts + CSP middleware) |
+| **Config** | Security headers | Best practice | ✅ Done (next.config.ts + CSP proxy) |
 | **Error** | Error boundary | Best practice | ✅ Done |
 
 ---
@@ -228,7 +228,7 @@ These items must be complete before public launch.
 | Requirement | Implemented | Tested | Notes |
 |-------------|-------------|--------|-------|
 | HTTPS enforced | ❌ | ❌ | Pending deployment |
-| Security headers (Helmet) | ✅ | ❌ | Backend: Helmet; Web: next.config.ts + CSP middleware |
+| Security headers (Helmet) | ✅ | ❌ | Backend: Helmet; Web: next.config.ts + CSP proxy |
 | CORS restricted to known origins | ✅ | ❌ | ALLOWED_ORIGINS env var |
 | Stripe webhook signature verification | ✅ | ❌ | |
 | Environment variables for secrets | ✅ | ❌ | |

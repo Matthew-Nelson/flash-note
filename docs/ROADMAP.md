@@ -287,17 +287,17 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | In `login()`, bcrypt runs before lockout check (timing-safe). When a permanently locked account submits the correct password, `recordFailedAttempt()` is skipped (password validated, `!validPassword` branch not taken). Lockout still works, but the audit trail has a gap for these attempts. HIPAA requires logging all authentication events. |
 | 3 | Audit test suite for mocks that violate production contracts | — | Code review found 17 dead try/catch blocks around `auditService.log()` that passed coverage because tests mocked the function to reject — violating its documented contract (never throws). Coverage reported the catch blocks as covered even though they were unreachable in production. Audit all test files for mocks that make dependencies behave differently from production (e.g., rejecting when the real implementation swallows errors), which can mask dead code and give false confidence in coverage metrics. Relates to CLAUDE.md Rule 6. |
 
-### 1.4 — Middleware + Protected Pages + Error Boundaries
+### 1.4 — Proxy + Protected Pages + Error Boundaries
 
-- Update Next.js middleware: CSP nonces + cookie-based auth redirect for `/dashboard/*`
+- Update Next.js proxy: CSP nonces + cookie-based auth redirect for `/dashboard/*`
 - Create usage DAL function (`getUsageForUser`)
 - Convert dashboard to Server Component (call `getSession()` → call DAL → render)
 - Convert settings to Server Component
 - Create `loading.tsx`, `error.tsx`, `not-found.tsx` for protected routes
 - Create `LogoutButton`, `PasswordResetSection`, `DeleteAccountSection` client components
-- Remove Sentry/API URL from middleware connect-src (GCP-native monitoring, no separate API)
+- Remove Sentry/API URL from proxy connect-src (GCP-native monitoring, no separate API)
 - Update Getting Started content for web-only flow
-- Port/rewrite middleware tests + page tests
+- Port/rewrite proxy tests + page tests
 - **Verify**: Unauthenticated users redirected. Pages render with server-provided data. Error boundaries handle failures gracefully. Tests pass.
 
 | Status |
@@ -318,8 +318,8 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 - Convert 6 auth pages (login, signup, forgot-password, reset-password, verify-email, resend-verification) from `api.ts`/`useAuth()` to Server Actions
 - Convert `SessionAlert` from `useAuth()` context to URL query params
-- Add middleware redirect for authenticated users on `/login` and `/signup`
-- Rewrite all page tests + SessionAlert tests + middleware tests
+- Add proxy redirect for authenticated users on `/login` and `/signup`
+- Rewrite all page tests + SessionAlert tests + proxy tests
 - **Not included**: pricing page (deferred to 1.6), old auth infrastructure deletion (deferred to 1.6)
 - **Verify**: All 6 auth pages call Server Actions. Auth redirects work. SessionAlert uses URL params. Pricing unchanged. Tests pass. Coverage maintained.
 

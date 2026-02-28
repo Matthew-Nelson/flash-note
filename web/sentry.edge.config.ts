@@ -2,7 +2,8 @@
  * Sentry Edge Configuration (Edge Runtime)
  *
  * This file configures Sentry for the Edge runtime.
- * It runs in middleware and edge API routes.
+ * It runs in edge API routes (NOT the proxy — proxy.ts runs on Node.js runtime
+ * and is covered by sentry.server.config.ts).
  *
  * HIPAA COMPLIANCE:
  * - sendDefaultPii is disabled
