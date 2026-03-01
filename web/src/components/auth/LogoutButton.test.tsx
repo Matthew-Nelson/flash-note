@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { LogoutButton } from './LogoutButton';
 
@@ -29,11 +29,23 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
-describe('LogoutButton', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+// Install a configurable clipboard stub before each test so both our spy and
+// userEvent.setup() (which calls attachClipboardStubToView) can coexist.
+// configurable: true allows userEvent to redefine the property without throwing.
+// We install fresh before each test so vi.clearAllMocks() + re-stub keeps state clean.
+const mockClipboardWriteText = vi.fn().mockResolvedValue(undefined);
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockClipboardWriteText.mockResolvedValue(undefined);
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: mockClipboardWriteText },
+    writable: true,
+    configurable: true,
+  });
+});
+
+describe('LogoutButton', () => {
   it('renders Sign out button', () => {
     render(<LogoutButton />);
     expect(screen.getByText('Sign out')).toBeInTheDocument();
@@ -66,5 +78,39 @@ describe('LogoutButton', () => {
     expect(screen.getByRole('button')).toBeDisabled();
 
     resolveLogout();
+  });
+
+  it('clears clipboard before calling logoutAction', async () => {
+    mockLogoutAction.mockResolvedValue(undefined);
+
+    render(<LogoutButton />);
+    // Use fireEvent rather than userEvent here so that userEvent does not replace
+    // navigator.clipboard with its own stub (attachClipboardStubToView), which would
+    // disconnect our mockClipboardWriteText from the active clipboard object.
+    fireEvent.click(screen.getByText('Sign out'));
+
+    // Wait for both calls to complete before checking invocation order.
+    await vi.waitFor(() => {
+      expect(mockClipboardWriteText).toHaveBeenCalledWith('');
+      expect(mockLogoutAction).toHaveBeenCalledOnce();
+    });
+
+    // Clipboard clear happens before logout
+    const clipboardCallOrder = mockClipboardWriteText.mock.invocationCallOrder[0];
+    const logoutCallOrder = mockLogoutAction.mock.invocationCallOrder[0];
+    expect(clipboardCallOrder).toBeLessThan(logoutCallOrder);
+  });
+
+  it('still calls logoutAction even if clipboard.writeText rejects', async () => {
+    mockClipboardWriteText.mockRejectedValueOnce(new Error('Clipboard permission denied'));
+    mockLogoutAction.mockResolvedValue(undefined);
+
+    render(<LogoutButton />);
+    // Use fireEvent for the same reason: prevents userEvent from replacing the clipboard stub.
+    fireEvent.click(screen.getByText('Sign out'));
+
+    await vi.waitFor(() => {
+      expect(mockLogoutAction).toHaveBeenCalledOnce();
+    });
   });
 });

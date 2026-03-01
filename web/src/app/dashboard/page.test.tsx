@@ -31,6 +31,11 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
+// Mock NoteGenerationForm (Client Component — avoid rendering complexity in server component tests)
+vi.mock('@/components/notes', () => ({
+  NoteGenerationForm: () => <div data-testid="note-generation-form" />,
+}));
+
 function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
   return {
     sessionId: 'session-uuid',
@@ -107,15 +112,33 @@ describe('DashboardPage', () => {
     expect(screen.queryByText(/Organization:/)).not.toBeInTheDocument();
   });
 
-  it('renders Getting Started with web-only steps', async () => {
+  it('renders NoteGenerationForm as the primary product feature', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
     render(await DashboardPage());
 
-    expect(screen.getByText('Sign in to FlashNote')).toBeInTheDocument();
-    expect(screen.getByText('Navigate to the note generation page')).toBeInTheDocument();
-    expect(screen.queryByText(/Chrome extension/)).not.toBeInTheDocument();
+    expect(screen.getByTestId('note-generation-form')).toBeInTheDocument();
+  });
+
+  it('renders h1 "Dashboard" and h2 "Generate a SOAP Note"', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+    render(await DashboardPage());
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Generate a SOAP Note' })).toBeInTheDocument();
+  });
+
+  it('does not render Getting Started card', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+    render(await DashboardPage());
+
+    expect(screen.queryByText('Getting Started')).not.toBeInTheDocument();
+    expect(screen.queryByText('Navigate to the note generation page')).not.toBeInTheDocument();
   });
 
   describe('subscription status messaging', () => {

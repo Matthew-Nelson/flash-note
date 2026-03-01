@@ -14,6 +14,10 @@ export function LogoutButton() {
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
+          // Clear clipboard to remove any PHI (copied SOAP notes) — Rule 4
+          if (typeof navigator !== 'undefined' && navigator.clipboard) {
+            await navigator.clipboard.writeText('').catch(() => {});
+          }
           await logoutAction();
         });
       }}
