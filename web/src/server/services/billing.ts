@@ -138,13 +138,18 @@ class BillingService {
    * Stripe signs the raw bytes — any transformation breaks verification.
    */
   async handleWebhook(body: Buffer, signature: string): Promise<void> {
+    const webhookSecret = config.STRIPE_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      throw new BillingError('missing_webhook_secret', 'STRIPE_WEBHOOK_SECRET not configured');
+    }
+
     let event: Stripe.Event;
 
     try {
       event = this.stripe.webhooks.constructEvent(
         body,
         signature,
-        config.STRIPE_WEBHOOK_SECRET!
+        webhookSecret
       );
     } catch {
       throw new WebhookSignatureError();
@@ -207,7 +212,7 @@ class BillingService {
           errorType: 'idempotency_cleanup_failed',
           eventId: event.id,
           eventType: event.type,
-          cleanupError,
+          cleanupErrorType: cleanupError instanceof Error ? cleanupError.constructor.name : 'unknown',
         });
       }
 
