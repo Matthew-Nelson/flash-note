@@ -1,71 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as Sentry from '@sentry/nextjs';
+import { billingService, WebhookSignatureError } from '@/server/services/billing';
 
-// Stripe webhook handler
-// This endpoint receives events from Stripe when subscription events occur
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  // CRITICAL: Must read body as ArrayBuffer to preserve exact bytes
+  // for Stripe signature verification. Stripe signs the raw bytes.
+  const bodyBuffer = await request.arrayBuffer();
+  const body = Buffer.from(bodyBuffer);
+  const signature = request.headers.get('stripe-signature');
 
-export async function POST(request: NextRequest) {
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'Missing stripe-signature header' },
+      { status: 400 }
+    );
+  }
+
   try {
-    // CRITICAL: Read body as ArrayBuffer to preserve exact bytes for signature verification
-    // Using request.text() could modify encoding and break signature validation
-    const bodyBuffer = await request.arrayBuffer();
-    const signature = request.headers.get('stripe-signature');
-
-    if (!signature) {
-      return NextResponse.json(
-        { error: 'Missing stripe-signature header' },
-        { status: 400 }
-      );
-    }
-
-    // Forward the webhook to the backend API
-    // SECURITY: Forward raw bytes without modifying Content-Type to preserve signature integrity
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
-
-    const response = await fetch(`${backendUrl}/billing/webhook`, {
-      method: 'POST',
-      headers: {
-        // Forward the original content-type from Stripe for proper signature verification
-        'Content-Type': request.headers.get('content-type') || 'application/json',
-        'Stripe-Signature': signature,
-      },
-      body: bodyBuffer,
-    });
-
-    if (!response.ok) {
-      let errorBody: unknown;
-      try {
-        errorBody = await response.json();
-      } catch {
-        errorBody = await response.text();
-      }
-      // Capture to Sentry - critical payment infrastructure failure
-      // SECURITY: Do not include errorBody in Sentry extras — it may contain
-      // Stripe event data with customer info. Status code is sufficient for triage.
-      Sentry.captureException(new Error('Backend webhook error'), {
-        extra: {
-          source: 'stripe_webhook_proxy',
-          errorType: 'backend_webhook_rejection',
-          statusCode: response.status,
-        },
-      });
-      // Error body logged server-side only (not sent to Sentry)
-      console.error('Backend webhook error:', errorBody);
-      return NextResponse.json(
-        { error: 'Webhook processing failed' },
-        { status: response.status }
-      );
-    }
-
+    await billingService.handleWebhook(body, signature);
     return NextResponse.json({ received: true });
   } catch (error) {
-    // Capture to Sentry - critical payment infrastructure failure
-    Sentry.captureException(error, {
-      extra: {
-        source: 'stripe_webhook_proxy',
-      },
+    // Signature verification failure -> 400 (tells Stripe not to retry invalid signatures)
+    if (error instanceof WebhookSignatureError) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+    }
+
+    // Handler failure -> 500 (tells Stripe to retry — idempotency record deleted in service)
+    console.error('Webhook handler failed:', {
+      source: 'route_webhook',
+      errorType: error instanceof Error ? error.constructor.name : 'unknown',
     });
-    console.error('Webhook error:', error);
+
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }

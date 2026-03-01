@@ -196,7 +196,7 @@ Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`
 | L-7 | DATABASE_URL validated as generic URL | 1.0 | Validate as `postgres://` or `postgresql://` in new config |
 | L-8 | Database URL partially logged in non-prod | 1.0 | Sanitize or remove from env logging |
 | L-3 | Zod validation details reveal schema info | 1.5 | Strip field names from validation errors in error handler. Deferred from 1.4 — no current UI exposure (client components map error codes, don't display fieldErrors), but raw Zod field names are in Server Action responses. |
-| L-11 | Audit action reuse (`SUBSCRIPTION_CANCELLED`) | 1.6 | Add `PAYMENT_FAILED` action when porting billing service |
+| L-11 | Audit action reuse (`SUBSCRIPTION_CANCELLED`) | 1.6 | ✅ Done — `PAYMENT_FAILED` + `SUBSCRIPTION_RENEWED` added to `AuditAction` enum |
 
 ---
 
@@ -309,8 +309,8 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | # | Item | Blocked By | Notes |
 |---|------|-----------|-------|
 | 1 | `/baa` web page | — | Currently 404. Deferred from 1.4 — standalone content page, not dependent on middleware/auth changes. |
-| 2 | Billing portal buttons (Manage subscription, Update payment) | Phase 1.6 (Billing) | Dashboard subscription card uses mailto:support links as placeholder. Replace with Stripe billing portal integration in 1.6. |
-| 3 | Checkout success polling | Phase 1.6 (Billing) | `?success=true` detection + webhook polling removed from dashboard. Re-add as Client Component in 1.6. |
+| 2 | Billing portal buttons (Manage subscription, Update payment) | Phase 1.6 (Billing) | ✅ Done — `ManageSubscriptionButton` Client Component added; portal action wired up |
+| 3 | Checkout success polling | Phase 1.6 (Billing) | ✅ Done — `CheckoutSuccessAlert` Client Component added to dashboard |
 
 ### 1.4.5 — Auth Page Rewiring (Gap Audit)
 
@@ -416,7 +416,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done |
 
 ### 1.7 — Integration Tests + Production Verification
 

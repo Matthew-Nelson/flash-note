@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { Inter } from 'next/font/google';
-import Providers from '@/components/Providers';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -39,7 +39,7 @@ export default async function RootLayout({
         >
           Skip to main content
         </a>
-        <Providers>{children}</Providers>
+        <ErrorBoundary>{children}</ErrorBoundary>
       </body>
     </html>
   );
