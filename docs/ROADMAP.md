@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 27, 2026
+**Last Updated:** February 28, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation (1.5) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation UI (1.5 A4) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -344,7 +344,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 |---|------|-----------|--------|-------|
 | 1 | Server-side enforcement for unverified email users | — | ✅ Done | Dashboard layout checks `session.emailVerified` and redirects to `/resend-verification`. |
 | 2 | Middleware `?reason` param validation | — | ✅ Done | Middleware now validates against `SessionEndReason` allowlist before clearing session cookie. |
-| 3 | Make `ActionResult<T>` data required on success branch | — | Open | `data?: T` is optional even on success, forcing unnecessary guards at every call site. Fix with conditional type so `data` is required when `T` is non-void. |
+| 3 | Make `ActionResult<T>` data required on success branch | — | ✅ Done | Fixed in A3 — `ActionResult<T>` extracted to `lib/types/actions.ts` with conditional type: `data: T` required when `T ≠ void`. |
 
 **Auth security test gaps** (identified during code review, non-blocking for Phase 1.5):
 
@@ -360,16 +360,39 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 ### 1.5 — Note Generation
 
-- Copy LLM service layer wholesale (`services/llm/*`, `prompts/*`, `utils/prompt-sanitization.ts`)
-- Build Server Action with auth + subscription check + rate limiting
-- Port usage tracking service
-- Add `generateRateLimit` and `apiRateLimit` to Upstash
-- Port LLM and usage tests
-- **Verify**: Notes generate correctly. Rate limiting works. Usage tracked. PHI not logged. Tests pass.
+**A1+A2: LLM Provider Layer** ✅ Done
+- LLM providers (Gemini + Claude), factory, schemas, errors, retry logic: `server/services/llm/*`
+- Rate limiters (`generateRateLimit`, `apiRateLimit`) added to Upstash config
+- Env var validation for LLM config (`server/db/config.ts`)
+- Full test coverage (errors, schemas, provider-factory)
+
+**A3: Note Generation Backend** ✅ Done
+- Prompt sanitization ported: `server/lib/prompt-sanitization.ts`
+- PT prompt templates ported: `server/prompts/pt-prompts.ts`
+- Usage tracking write side (`incrementUsage`): `server/dal/usage.ts`
+- Subscription check service: `server/services/subscription.ts`
+- Input validation schema: `lib/schemas/notes.ts`
+- Note generation orchestration: `server/services/note-generation.ts`
+- `generateNoteAction` Server Action: `actions/notes.ts`
+- `ActionResult<T>` extracted to `lib/types/actions.ts` (shared across action domains)
+- 98 new tests across 8 files, all passing. PHI audit clean. No error message leaks.
+
+**Follow-up items from A3** (non-blocking, tracked for future phases):
+
+| # | Item | Severity | Notes |
+|---|------|----------|-------|
+| 1 | Add `.trim()` to `quickNotes` and `patientContext` in `generateNoteSchema` | Important | `z.string().min(10)` without `.trim()` allows whitespace-only input to pass validation, producing hallucinated SOAP notes with no clinical basis. Fix: `z.string().trim().min(10)`. `lib/schemas/notes.ts` |
+| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | `checkSubscriptionAccess` returns denial reasons (`trial_expired`, `subscription_required`, `clinic_subscription_expired`) but neither the service nor the calling action audit-logs these. CLAUDE.md requires "Log ALL authorization failures." `server/services/subscription.ts`, `actions/notes.ts` |
+| 3 | Include error object in `generateNoteAction` catch block logging | Moderate | `console.error('Note generation failed:', {...})` omits the `error` object — stack trace is lost. Other files (`usage.ts`, `get-session.ts`) correctly pass it. Fix: add `error` as second argument. `actions/notes.ts:136` |
+
+**A4: Note Generation UI Page** ❌
+- Dashboard note generation page with form + SOAP output display
+- Client-side error code mapping (Rule 2)
+- Loading states, streaming fallback
 
 | Status |
 |--------|
-| ❌ |
+| 🟡 A4 remaining |
 
 ### 1.6 — Billing
 

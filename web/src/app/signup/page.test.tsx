@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useRouter } from 'next/navigation';
 import SignupPage from './page';
 import { registerAction } from '@/actions/auth';
-import type { ActionResult } from '@/actions/auth';
+import type { ActionResult } from '@/lib/types/actions';
 import type { SanitizedUser } from '@/server/services/auth';
 
 vi.mock('@/actions/auth', () => ({

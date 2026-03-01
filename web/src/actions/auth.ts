@@ -38,12 +38,7 @@ import { findByCode, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { auditService } from '@/server/services/audit';
 import { AuditAction } from '@/server/types';
 import type { SessionEndReason } from '@/lib/types';
-
-// --- Result type ---
-
-export type ActionResult<T = void> =
-  | { success: true; data?: T }
-  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+import type { ActionResult } from '@/lib/types/actions';
 
 // --- Actions ---
 
@@ -334,7 +329,7 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
     userAgent: context.userAgent,
   });
 
-  return { success: true };
+  return { success: true, data: {} };
 }
 
 export async function resendVerificationAction(formData: FormData): Promise<ActionResult> {

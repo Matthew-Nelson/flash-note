@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { mockDbQuery, resetMocks, createMockOrgMemberRow, createMockOrgRow } from '@/test/dal-helpers';
-import { getUsageForUser } from './usage';
+import { getUsageForUser, incrementUsage } from './usage';
 
 // Mock organization-members and organizations DAL modules
 const mockFindActiveMembership = vi.hoisted(() => vi.fn());
@@ -113,5 +113,62 @@ describe('getUsageForUser', () => {
       'SELECT notes_generated FROM usage WHERE user_id = $1 AND month = $2',
       ['user-42', expect.stringMatching(/^\d{4}-\d{2}$/)]
     );
+  });
+});
+
+describe('incrementUsage', () => {
+  beforeEach(() => {
+    resetMocks();
+  });
+
+  it('executes UPSERT with correct parameters', async () => {
+    mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+    await incrementUsage('user-1', 100, 200);
+
+    expect(mockDbQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO usage'),
+      ['user-1', expect.stringMatching(/^\d{4}-\d{2}$/), 100, 200]
+    );
+  });
+
+  it('uses ON CONFLICT for atomic upsert', async () => {
+    mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+    await incrementUsage('user-1', 50, 75);
+
+    const sql = mockDbQuery.mock.calls[0][0] as string;
+    expect(sql).toContain('ON CONFLICT (user_id, month)');
+    expect(sql).toContain('DO UPDATE SET');
+    expect(sql).toContain('notes_generated = usage.notes_generated + 1');
+  });
+
+  it('swallows errors without throwing', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockDbQuery.mockRejectedValueOnce(new Error('DB connection lost'));
+
+    // Should not throw
+    await expect(incrementUsage('user-1', 100, 200)).resolves.toBeUndefined();
+
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('logs structured context on failure (no PHI)', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const dbError = new Error('connection refused');
+    mockDbQuery.mockRejectedValueOnce(dbError);
+
+    await incrementUsage('user-42', 10, 20);
+
+    // Single console.error call with error object and structured context
+    expect(consoleSpy).toHaveBeenCalledWith('Usage tracking failed:', dbError, {
+      source: 'dal_usage',
+      errorType: 'increment_usage_failed',
+      userId: 'user-42',
+    });
+    // Should only be called once (not split across multiple calls)
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
   });
 });

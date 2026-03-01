@@ -113,5 +113,9 @@ export async function getOrgSubscription(
   );
 
   if (result.rows.length === 0) return null;
-  return result.rows[0];
+  const row = result.rows[0];
+  return {
+    ...row,
+    subscription_status: subscriptionStatusSchema.parse(row.subscription_status),
+  };
 }
