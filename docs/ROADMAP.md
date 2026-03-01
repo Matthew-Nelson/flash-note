@@ -344,7 +344,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 |---|------|-----------|--------|-------|
 | 1 | Server-side enforcement for unverified email users | — | ✅ Done | Dashboard layout checks `session.emailVerified` and redirects to `/resend-verification`. |
 | 2 | Middleware `?reason` param validation | — | ✅ Done | Middleware now validates against `SessionEndReason` allowlist before clearing session cookie. |
-| 3 | Make `ActionResult<T>` data required on success branch | — | Open | `data?: T` is optional even on success, forcing unnecessary guards at every call site. Fix with conditional type so `data` is required when `T` is non-void. |
+| 3 | Make `ActionResult<T>` data required on success branch | — | ✅ Done | Fixed in A3 — `ActionResult<T>` extracted to `lib/types/actions.ts` with conditional type: `data: T` required when `T ≠ void`. |
 
 **Auth security test gaps** (identified during code review, non-blocking for Phase 1.5):
 
@@ -376,6 +376,14 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 - `generateNoteAction` Server Action: `actions/notes.ts`
 - `ActionResult<T>` extracted to `lib/types/actions.ts` (shared across action domains)
 - 98 new tests across 8 files, all passing. PHI audit clean. No error message leaks.
+
+**Follow-up items from A3** (non-blocking, tracked for future phases):
+
+| # | Item | Severity | Notes |
+|---|------|----------|-------|
+| 1 | Add `.trim()` to `quickNotes` and `patientContext` in `generateNoteSchema` | Important | `z.string().min(10)` without `.trim()` allows whitespace-only input to pass validation, producing hallucinated SOAP notes with no clinical basis. Fix: `z.string().trim().min(10)`. `lib/schemas/notes.ts` |
+| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | `checkSubscriptionAccess` returns denial reasons (`trial_expired`, `subscription_required`, `clinic_subscription_expired`) but neither the service nor the calling action audit-logs these. CLAUDE.md requires "Log ALL authorization failures." `server/services/subscription.ts`, `actions/notes.ts` |
+| 3 | Include error object in `generateNoteAction` catch block logging | Moderate | `console.error('Note generation failed:', {...})` omits the `error` object — stack trace is lost. Other files (`usage.ts`, `get-session.ts`) correctly pass it. Fix: add `error` as second argument. `actions/notes.ts:136` |
 
 **A4: Note Generation UI Page** ❌
 - Dashboard note generation page with form + SOAP output display
