@@ -299,6 +299,20 @@ describe('BillingService', () => {
   // -------------------------------------------------------------------------
 
   describe('handleWebhook — signature verification', () => {
+    it('throws BillingError with missing_webhook_secret when STRIPE_WEBHOOK_SECRET not configured', async () => {
+      const { config } = await import('@/server/db/config');
+      const original = config.STRIPE_WEBHOOK_SECRET;
+      config.STRIPE_WEBHOOK_SECRET = undefined;
+
+      try {
+        await expect(
+          billingService.handleWebhook(Buffer.from('{}'), 'sig')
+        ).rejects.toMatchObject({ code: 'missing_webhook_secret' });
+      } finally {
+        config.STRIPE_WEBHOOK_SECRET = original;
+      }
+    });
+
     it('throws WebhookSignatureError when signature invalid (Rule 6)', async () => {
       mockStripeWebhooksConstructEvent.mockImplementation(() => {
         throw new Error('Invalid signature');
