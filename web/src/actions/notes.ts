@@ -22,6 +22,7 @@ import { generateNote } from '@/server/services/note-generation';
 import { incrementUsage } from '@/server/dal/usage';
 import { auditService } from '@/server/services/audit';
 import { AuditAction } from '@/server/types';
+import { sanitizeFieldErrors } from '@/server/lib/validation';
 
 export interface GenerateNoteResponse {
   subjective: string;
@@ -42,7 +43,7 @@ export async function generateNoteAction(
   const raw = Object.fromEntries(formData);
   const parsed = generateNoteSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, error: 'validation_error', fieldErrors: parsed.error.flatten().fieldErrors };
+    return { success: false, error: 'validation_error', fieldErrors: sanitizeFieldErrors(parsed.error.flatten().fieldErrors) };
   }
 
   const { noteType, quickNotes, patientContext } = parsed.data;
@@ -134,6 +135,7 @@ export async function generateNoteAction(
     // TODO: Replace with Pino structured logger when available
     // Log with structured context (no PHI — never log quickNotes, patientContext, or raw error messages)
     console.error('Note generation failed:', {
+      err: error,
       source: 'action_generate_note',
       errorType: errorCode,
       userId: session.userId,

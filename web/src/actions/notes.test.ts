@@ -118,7 +118,11 @@ describe('generateNoteAction', () => {
     if (!result.success) {
       expect(result.error).toBe('validation_error');
       expect(result.fieldErrors).toBeDefined();
-      expect(result.fieldErrors?.quickNotes).toBeDefined();
+      // Verify field errors are sanitized (field names preserved, messages generic)
+      expect(result.fieldErrors?.quickNotes).toBeDefined();       // Field name preserved
+      expect(result.fieldErrors?.quickNotes?.[0]).toBe('Validation failed');  // Generic message
+      // Verify no Zod-specific messages
+      expect(result.fieldErrors?.quickNotes?.[0]).not.toContain('Please provide more detail');
     }
   });
 
@@ -141,6 +145,42 @@ describe('generateNoteAction', () => {
       expect(result.error).toBe('validation_error');
       expect(result.fieldErrors).toBeDefined();
     }
+  });
+
+  it('rejects whitespace-only input for quickNotes', async () => {
+    const result = await generateNoteAction(makeFormData({ quickNotes: '     ' }));
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('validation_error');
+      expect(result.fieldErrors?.quickNotes).toBeDefined();  // Field name preserved
+      expect(result.fieldErrors?.quickNotes?.[0]).toBe('Validation failed');
+    }
+  });
+
+  it('accepts patientContext after trimming', async () => {
+    const result = await generateNoteAction(makeFormData({
+      patientContext: '  65 y/o female  ',
+      quickNotes: 'valid text with more than ten characters'
+    }));
+    expect(result.success).toBe(true);
+    expect(mockGenerateNote).toHaveBeenCalledWith(
+      'valid text with more than ten characters',
+      'daily_note',
+      '65 y/o female'  // Should be trimmed
+    );
+  });
+
+  it('accepts quickNotes after trimming', async () => {
+    const result = await generateNoteAction(makeFormData({
+      quickNotes: '  pt reports improvement in strength and balance  '
+    }));
+    expect(result.success).toBe(true);
+    // Verify the trimmed value was passed to generateNote
+    expect(mockGenerateNote).toHaveBeenCalledWith(
+      'pt reports improvement in strength and balance',  // Trimmed
+      'daily_note',
+      undefined
+    );
   });
 
   // --- Auth ---
@@ -399,6 +439,7 @@ describe('generateNoteAction', () => {
     await generateNoteAction(makeFormData());
 
     expect(consoleSpy).toHaveBeenCalledWith('Note generation failed:', expect.objectContaining({
+      err: expect.any(Error),  // Verify error object is included for stack trace preservation
       source: 'action_generate_note',
       errorType: 'internal_error',
       userId: 'user-1',
@@ -407,6 +448,8 @@ describe('generateNoteAction', () => {
     // Verify no PHI in the log
     const loggedContext = consoleSpy.mock.calls[0][1] as Record<string, unknown>;
     expect(JSON.stringify(loggedContext)).not.toContain('pt reports');
+    // Verify error object is included (not raw message string)
+    expect(loggedContext.err).toBeInstanceOf(Error);
     consoleSpy.mockRestore();
   });
 
