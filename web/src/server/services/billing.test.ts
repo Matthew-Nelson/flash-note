@@ -493,6 +493,80 @@ describe('BillingService', () => {
         expect.anything()
       );
     });
+
+    it('skips when customer is null (Rule 3 — runtime validation)', async () => {
+      const session = {
+        id: 'cs_123',
+        customer: null,
+        subscription: 'sub_123',
+        metadata: { userId: 'user-123' },
+      };
+      const event = makeEvent('checkout.session.completed', session);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('missing customer or subscription'),
+        expect.anything()
+      );
+    });
+
+    it('skips when subscription is null (Rule 3 — runtime validation)', async () => {
+      const session = {
+        id: 'cs_123',
+        customer: 'cus_123',
+        subscription: null,
+        metadata: { userId: 'user-123' },
+      };
+      const event = makeEvent('checkout.session.completed', session);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('missing customer or subscription'),
+        expect.anything()
+      );
+    });
+
+    it('extracts ID from expanded customer object (Rule 3)', async () => {
+      const session = {
+        id: 'cs_123',
+        customer: { id: 'cus_expanded' },
+        subscription: 'sub_123',
+        metadata: { userId: 'user-123' },
+      };
+      const event = makeEvent('checkout.session.completed', session);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockUpdateUserSubscription.mockResolvedValue(undefined);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
+        'user-123', 'cus_expanded', 'sub_123', 'active'
+      );
+    });
+
+    it('extracts ID from expanded subscription object (Rule 3)', async () => {
+      const session = {
+        id: 'cs_123',
+        customer: 'cus_123',
+        subscription: { id: 'sub_expanded' },
+        metadata: { userId: 'user-123' },
+      };
+      const event = makeEvent('checkout.session.completed', session);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockUpdateUserSubscription.mockResolvedValue(undefined);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
+        'user-123', 'cus_123', 'sub_expanded', 'active'
+      );
+    });
   });
 
   // -------------------------------------------------------------------------

@@ -231,23 +231,50 @@ class BillingService {
       return;
     }
 
+    // Rule 3: Validate external data at runtime — session.customer and
+    // session.subscription can be null or expanded objects.
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
+    if (!customerId || !subscriptionId) {
+      // eslint-disable-next-line no-console
+      console.error('checkout.session.completed missing customer or subscription ID:', {
+        source: 'service_billing',
+        errorType: 'missing_checkout_ids',
+        userId,
+        sessionId: session.id,
+        hasCustomer: !!session.customer,
+        hasSubscription: !!session.subscription,
+      });
+      return;
+    }
+
     await updateUserSubscription(
       userId,
-      session.customer as string,
-      session.subscription as string,
+      customerId,
+      subscriptionId,
       'active'
     );
 
     // Rule 9: Audit log is not transactional with the update above.
     // Fire-and-forget — audit failures should not trigger CR-1 retry logic.
+    // .catch() ensures failures surface in Cloud Error Reporting (Rule 9).
     void auditService.log({
       userId,
       action: AuditAction.SUBSCRIPTION_CREATED,
       status: 'SUCCESS',
       metadata: {
-        subscriptionId: session.subscription,
-        customerId: session.customer,
+        subscriptionId,
+        customerId,
       },
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Audit log failed:', {
+        err,
+        source: 'service_billing',
+        errorType: 'audit_log_failed',
+        action: AuditAction.SUBSCRIPTION_CREATED,
+        userId,
+      });
     });
   }
 
@@ -297,6 +324,15 @@ class BillingService {
       action: AuditAction.SUBSCRIPTION_CANCELLED,
       status: 'SUCCESS',
       metadata: { subscriptionId: subscription.id },
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Audit log failed:', {
+        err,
+        source: 'service_billing',
+        errorType: 'audit_log_failed',
+        action: AuditAction.SUBSCRIPTION_CANCELLED,
+        userId,
+      });
     });
   }
 
@@ -339,6 +375,15 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Audit log failed:', {
+          err,
+          source: 'service_billing',
+          errorType: 'audit_log_failed',
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          userId,
+        });
       });
       return;
     }
@@ -364,6 +409,15 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Audit log failed:', {
+          err,
+          source: 'service_billing',
+          errorType: 'audit_log_failed',
+          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+          userId,
+        });
       });
       return;
     }
@@ -386,6 +440,15 @@ class BillingService {
           invoiceId: invoice.id,
           billingReason: 'renewal',
         },
+      }).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Audit log failed:', {
+          err,
+          source: 'service_billing',
+          errorType: 'audit_log_failed',
+          action: AuditAction.SUBSCRIPTION_RENEWED,
+          userId,
+        });
       });
     }
   }
@@ -417,6 +480,15 @@ class BillingService {
         invoiceId: invoice.id,
         reason: 'payment_failed',
       },
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Audit log failed:', {
+        err,
+        source: 'service_billing',
+        errorType: 'audit_log_failed',
+        action: AuditAction.PAYMENT_FAILED,
+        userId,
+      });
     });
   }
 
@@ -477,6 +549,15 @@ class BillingService {
         sessionId: context.sessionId,
         invoiceId: context.invoiceId,
       },
+    }).catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Audit log failed:', {
+        err,
+        source: 'service_billing',
+        errorType: 'audit_log_failed',
+        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
+        eventType,
+      });
     });
   }
 }
