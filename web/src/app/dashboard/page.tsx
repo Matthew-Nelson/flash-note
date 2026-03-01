@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Suspense } from 'react';
 
 import { getSession } from '@/server/lib/get-session';
 import { getUsageForUser } from '@/server/dal/usage';
 import type { SessionData } from '@/server/types';
 import { Card, CardContent, SubscriptionBadge } from '@/components/ui';
 import { NoteGenerationForm } from '@/components/notes';
+import { ManageSubscriptionButton } from './ManageSubscriptionButton';
+import { CheckoutSuccessAlert } from './CheckoutSuccessAlert';
 
 /**
  * Format "YYYY-MM" into a human-readable month string.
@@ -40,9 +43,7 @@ function SubscriptionContent({ session }: { session: SessionData }) {
         <p className="text-fn-text-secondary mb-4">
           Your subscription is active. Thank you for using FlashNote!
         </p>
-        <a href="mailto:support@flashnote.co" className="link text-sm">
-          Manage subscription
-        </a>
+        <ManageSubscriptionButton />
       </>
     );
   }
@@ -53,9 +54,7 @@ function SubscriptionContent({ session }: { session: SessionData }) {
         <p className="text-fn-text-secondary mb-4">
           Your payment is past due. Please update your payment method.
         </p>
-        <a href="mailto:support@flashnote.co" className="link text-sm">
-          Update payment method
-        </a>
+        <ManageSubscriptionButton label="Update payment method" />
       </>
     );
   }
@@ -79,9 +78,7 @@ function SubscriptionContent({ session }: { session: SessionData }) {
         <p className="text-fn-text-secondary mb-4">
           Your payment failed. Please update your payment method to restore access.
         </p>
-        <a href="mailto:support@flashnote.co" className="link text-sm">
-          Update payment method
-        </a>
+        <ManageSubscriptionButton label="Update payment method" />
       </>
     );
   }
@@ -107,6 +104,11 @@ export default async function DashboardPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-8">
+      {/* Checkout success alert — requires Suspense because it uses useSearchParams */}
+      <Suspense fallback={null}>
+        <CheckoutSuccessAlert />
+      </Suspense>
+
       <h1 className="text-2xl font-bold text-fn-text-primary mb-2">Dashboard</h1>
       <h2 className="text-xl font-semibold text-fn-text-primary mb-6">Generate a SOAP Note</h2>
 

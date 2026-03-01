@@ -65,6 +65,14 @@ const envSchema = z.object({
   ANTHROPIC_TEMPERATURE: z.coerce.number().default(0.2),
   ANTHROPIC_TIMEOUT_MS: z.coerce.number().default(30000),
   USE_MOCK_AI: envBoolean,
+
+  // Stripe billing — optional in dev/test, required in production
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_PRICE_MONTHLY: z.string().startsWith('price_').optional(),
+  STRIPE_PRICE_ANNUAL: z.string().startsWith('price_').optional(),
+  // Cleanup job auth (webhook event cleanup Route Handler called by Cloud Scheduler)
+  CLEANUP_SECRET: z.string().min(32).optional(),
 }).superRefine((data, ctx) => {
   // Block USE_MOCK_AI in production
   if (data.USE_MOCK_AI && data.NODE_ENV === 'production') {
@@ -93,6 +101,23 @@ const envSchema = z.object({
       message: 'LLM_PROVIDER=claude is not permitted in production (no Anthropic BAA). Use gemini with Vertex AI.',
       path: ['LLM_PROVIDER'],
     });
+  }
+  // Require Stripe keys in production
+  if (data.NODE_ENV === 'production') {
+    if (!data.STRIPE_SECRET_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'STRIPE_SECRET_KEY is required in production',
+        path: ['STRIPE_SECRET_KEY'],
+      });
+    }
+    if (!data.STRIPE_WEBHOOK_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'STRIPE_WEBHOOK_SECRET is required in production',
+        path: ['STRIPE_WEBHOOK_SECRET'],
+      });
+    }
   }
   // Skip API key validation when mock AI is enabled
   if (data.USE_MOCK_AI) return;
