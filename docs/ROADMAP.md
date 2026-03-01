@@ -377,13 +377,18 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 - `ActionResult<T>` extracted to `lib/types/actions.ts` (shared across action domains)
 - 98 new tests across 8 files, all passing. PHI audit clean. No error message leaks.
 
-**Follow-up items from A3** (non-blocking, tracked for future phases):
+**Follow-up items from A3** (Phase 1.5 C critical bugs — fixed):
 
-| # | Item | Severity | Notes |
-|---|------|----------|-------|
-| 1 | Add `.trim()` to `quickNotes` and `patientContext` in `generateNoteSchema` | Important | `z.string().min(10)` without `.trim()` allows whitespace-only input to pass validation, producing hallucinated SOAP notes with no clinical basis. Fix: `z.string().trim().min(10)`. `lib/schemas/notes.ts` |
-| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | `checkSubscriptionAccess` returns denial reasons (`trial_expired`, `subscription_required`, `clinic_subscription_expired`) but neither the service nor the calling action audit-logs these. CLAUDE.md requires "Log ALL authorization failures." `server/services/subscription.ts`, `actions/notes.ts` |
-| 3 | Include error object in `generateNoteAction` catch block logging | Moderate | `console.error('Note generation failed:', {...})` omits the `error` object — stack trace is lost. Other files (`usage.ts`, `get-session.ts`) correctly pass it. Fix: add `error` as second argument. `actions/notes.ts:136` |
+| # | Item | Severity | Status |
+|---|------|----------|--------|
+| 1 | Add `.trim()` to `quickNotes` and `patientContext` in `generateNoteSchema` | Important | ✅ FIXED — `z.string().trim().min(10)` added to both fields. `lib/schemas/notes.ts` |
+| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | 🟡 DEFERRED — Requires separate audit logging refactor across `subscription.ts` + `notes.ts`. |
+| 3 | Include error object in `generateNoteAction` catch block logging | Moderate | ✅ FIXED — `err: error` added to structured log context. `actions/notes.ts` |
+
+**Phase 1.5 C additions (critical bug fixes):**
+- ✅ `server/lib/validation.ts` with `sanitizeFieldErrors()` helper — prevents Zod field name leaks to client (Rule L-3)
+- ✅ Field error sanitization in `actions/notes.ts:45` — returns generic 'Validation failed' messages per Rule 2
+- ✅ 8 new tests for `sanitizeFieldErrors()`, 3 new tests in `notes.test.ts` — 41 total new tests (1113 passing)
 
 **A4: Note Generation UI Page** ❌
 - Dashboard note generation page with form + SOAP output display
@@ -392,7 +397,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | Status |
 |--------|
-| 🟡 A4 remaining |
+| 🟡 A3 critical bugs fixed (Phase 1.5 C), A4 remaining |
 
 ### 1.6 — Billing
 
