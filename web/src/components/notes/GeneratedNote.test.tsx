@@ -457,6 +457,33 @@ describe('GeneratedNote', () => {
     });
   });
 
+  it('CopyButton clears timeout on unmount (no stale state update)', async () => {
+    vi.useFakeTimers();
+    mockWriteText.mockResolvedValue(undefined);
+
+    const { unmount } = render(<GeneratedNote note={buildNote()} />);
+
+    const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
+    fireEvent.click(copyButton);
+
+    // Wait for async clipboard write to resolve
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Copied!')).toBeInTheDocument();
+
+    // Unmount before the 2s timeout fires
+    unmount();
+
+    // Advance past the timeout — should not throw or warn about state update on unmounted component
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    vi.useRealTimers();
+  });
+
   it('displays generationTimeMs as "Generated in X.Xs"', () => {
     render(<GeneratedNote note={buildNote({ metadata: { generationTimeMs: 2300 } })} />);
 

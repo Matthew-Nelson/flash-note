@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { generateNoteAction } from '@/actions/notes';
 import type { GenerateNoteResponse } from '@/actions/notes';
 import { GeneratedNote } from './GeneratedNote';
@@ -40,6 +40,19 @@ export function NoteGenerationForm() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Rule 4: Clear all PHI state when logout is initiated
+  useEffect(() => {
+    function handleLogout() {
+      setQuickNotes('');
+      setPatientContext('');
+      setGeneratedNote(null);
+      setErrorCode(null);
+      setFieldErrors(null);
+    }
+    window.addEventListener('flashnote:logout', handleLogout);
+    return () => window.removeEventListener('flashnote:logout', handleLogout);
+  }, []);
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErrorCode(null);
@@ -48,7 +61,7 @@ export function NoteGenerationForm() {
     startTransition(async () => {
       const formData = new FormData();
       formData.set('noteType', noteType);
-      formData.set('quickNotes', quickNotes);
+      formData.set('quickNotes', quickNotes.trim());
       if (patientContext.trim()) formData.set('patientContext', patientContext);
       const result = await generateNoteAction(formData);
       if (result.success) {
@@ -64,7 +77,6 @@ export function NoteGenerationForm() {
 
   function handleQuickNotesChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     setQuickNotes(e.target.value);
-    setErrorCode(null);
     setFieldErrors(null);
   }
 
@@ -83,7 +95,10 @@ export function NoteGenerationForm() {
             id="noteType"
             name="noteType"
             value={noteType}
-            onChange={(e) => setNoteType(e.target.value as NoteType)}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value in NOTE_TYPE_LABELS) setNoteType(value as NoteType);
+            }}
             className="input-field w-full px-3 py-2"
             disabled={isPending}
           >

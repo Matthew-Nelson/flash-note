@@ -101,6 +101,27 @@ describe('LogoutButton', () => {
     expect(clipboardCallOrder).toBeLessThan(logoutCallOrder);
   });
 
+  it('dispatches flashnote:logout event before logoutAction', async () => {
+    mockLogoutAction.mockResolvedValue(undefined);
+    const logoutListener = vi.fn();
+    window.addEventListener('flashnote:logout', logoutListener);
+
+    render(<LogoutButton />);
+    fireEvent.click(screen.getByText('Sign out'));
+
+    await vi.waitFor(() => {
+      expect(logoutListener).toHaveBeenCalledOnce();
+      expect(mockLogoutAction).toHaveBeenCalledOnce();
+    });
+
+    // Event dispatched before logoutAction
+    const eventCallOrder = logoutListener.mock.invocationCallOrder[0];
+    const logoutCallOrder = mockLogoutAction.mock.invocationCallOrder[0];
+    expect(eventCallOrder).toBeLessThan(logoutCallOrder);
+
+    window.removeEventListener('flashnote:logout', logoutListener);
+  });
+
   it('still calls logoutAction even if clipboard.writeText rejects', async () => {
     mockClipboardWriteText.mockRejectedValueOnce(new Error('Clipboard permission denied'));
     mockLogoutAction.mockResolvedValue(undefined);

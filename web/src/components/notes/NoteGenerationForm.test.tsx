@@ -263,10 +263,11 @@ describe('NoteGenerationForm', () => {
     });
   });
 
-  it('clears error when quickNotes field value changes (UI Rule 15)', async () => {
+  it('system error persists on quickNotes change; only field errors clear', async () => {
     mockGenerateNoteAction.mockResolvedValue({
       success: false,
       error: 'ai_error',
+      fieldErrors: { quickNotes: ['Too short.'] },
     });
     const user = userEvent.setup();
 
@@ -277,12 +278,14 @@ describe('NoteGenerationForm', () => {
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText('Too short.')).toBeInTheDocument();
     });
 
-    // Type in quickNotes field — error should clear
+    // Type in quickNotes field — system error persists, field error clears
     await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), ' more text');
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Too short.')).not.toBeInTheDocument();
   });
 
   it('shows Alert for email_not_verified error code', async () => {
@@ -322,6 +325,49 @@ describe('NoteGenerationForm', () => {
 
     const formData = mockGenerateNoteAction.mock.calls[0][0];
     expect(formData.get('noteType')).toBe('initial_eval');
+  });
+
+  it('clears all PHI state on flashnote:logout event (Rule 4)', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    // Fill in PHI and generate a note
+    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some clinical notes');
+    await user.type(screen.getByRole('textbox', { name: /Patient Context/i }), '68yo female');
+    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generated-note')).toBeInTheDocument();
+    });
+
+    // Dispatch logout event
+    window.dispatchEvent(new CustomEvent('flashnote:logout'));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('textbox', { name: /Quick Notes/i })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /Patient Context/i })).toHaveValue('');
+  });
+
+  it('trims quickNotes whitespace in FormData before submission', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), '  knee pain 5/10  ');
+    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    const formData = mockGenerateNoteAction.mock.calls[0][0];
+    expect(formData.get('quickNotes')).toBe('knee pain 5/10');
   });
 
   it('shows fallback error message for unknown error codes', async () => {

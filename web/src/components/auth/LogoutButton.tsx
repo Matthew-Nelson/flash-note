@@ -14,6 +14,8 @@ export function LogoutButton() {
       disabled={isPending}
       onClick={() => {
         startTransition(async () => {
+          // Notify client components to clear PHI state before logout — Rule 4
+          window.dispatchEvent(new CustomEvent('flashnote:logout'));
           // Clear clipboard to remove any PHI (copied SOAP notes) — Rule 4
           if (typeof navigator !== 'undefined' && navigator.clipboard) {
             await navigator.clipboard.writeText('').catch(() => {});

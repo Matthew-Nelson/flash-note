@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import type { GenerateNoteResponse } from '@/actions/notes';
 
 type BillingData = NonNullable<GenerateNoteResponse['billing']>;
@@ -32,13 +32,21 @@ function CopyButton({
 }) {
   const [copied, setCopied] = useState(false);
   const [fallbackText, setFallbackText] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   async function handleCopy() {
     const success = await writeToClipboard(text);
     if (success) {
       setCopied(true);
       setFallbackText(null);
-      setTimeout(() => setCopied(false), 2000);
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } else {
       setFallbackText(text);
     }
@@ -315,6 +323,9 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
         </div>
       )}
 
+      {/* Security note: uncertainAreas contains LLM-generated interpretive hints (not raw PHI).
+          Displayed only to the same authenticated clinician who submitted the input,
+          scoped to this session, transmitted over TLS, and cleared on logout per Rule 4. */}
       {note.uncertainAreas && note.uncertainAreas.length > 0 && (
         <div className="mb-6">
           <h3 className="text-sm font-semibold text-fn-text-primary uppercase tracking-wide mb-2">
