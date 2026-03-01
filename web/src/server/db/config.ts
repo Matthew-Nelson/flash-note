@@ -3,6 +3,20 @@ import 'server-only';
 import { z } from 'zod';
 
 /**
+ * Parse a string env var as a boolean.
+ *
+ * z.coerce.boolean() uses Boolean(value), which treats ANY non-empty string
+ * as true — including "false". Env vars are always strings, so "false" would
+ * be coerced to true. This helper only treats "true" (case-insensitive) and
+ * "1" as true; everything else (including "false", "0", undefined) is false.
+ */
+const envBoolean = z
+  .string()
+  .optional()
+  .transform((val) => val?.toLowerCase() === 'true' || val === '1')
+  .pipe(z.boolean());
+
+/**
  * Server configuration — Zod-validated environment variables.
  *
  * Only includes variables needed by the DAL and database layer.
@@ -44,13 +58,13 @@ const envSchema = z.object({
   GEMINI_TIMEOUT_MS: z.coerce.number().default(30000),
   // Use Application Default Credentials (service account) instead of API key.
   // Required for Vertex AI on Cloud Run. When true, GEMINI_API_KEY is not needed.
-  GEMINI_USE_ADC: z.coerce.boolean().default(false),
+  GEMINI_USE_ADC: envBoolean,
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
   ANTHROPIC_MODEL: z.string().default('claude-sonnet-4-20250514'),
   ANTHROPIC_MAX_TOKENS: z.coerce.number().default(2000),
   ANTHROPIC_TEMPERATURE: z.coerce.number().default(0.2),
   ANTHROPIC_TIMEOUT_MS: z.coerce.number().default(30000),
-  USE_MOCK_AI: z.coerce.boolean().default(false),
+  USE_MOCK_AI: envBoolean,
 }).superRefine((data, ctx) => {
   // Block USE_MOCK_AI in production
   if (data.USE_MOCK_AI && data.NODE_ENV === 'production') {

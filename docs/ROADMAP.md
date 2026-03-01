@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation UI (1.5 A4) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 7/9 sub-phases | Billing (1.6) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -390,14 +390,17 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 - ✅ Field error sanitization in `actions/notes.ts:45` — returns generic 'Validation failed' messages per Rule 2
 - ✅ 8 new tests for `sanitizeFieldErrors()`, 3 new tests in `notes.test.ts` — 41 total new tests (1113 passing)
 
-**A4: Note Generation UI Page** ❌
+**A4: Note Generation UI Page** ✅ Done
 - Dashboard note generation page with form + SOAP output display
 - Client-side error code mapping (Rule 2)
-- Loading states, streaming fallback
+- Loading states with up-to-30s indication
+- PHI cleared from clipboard on logout (Rule 4)
+- Copy-to-clipboard with fallback textarea on failure (UI Rule 5)
+- Field-level validation error display with aria-describedby wiring
 
 | Status |
 |--------|
-| 🟡 A3 critical bugs fixed (Phase 1.5 C), A4 remaining |
+| ✅ Done — A1+A2+A3+C+A4 complete |
 
 ### 1.6 — Billing
 

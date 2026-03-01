@@ -141,6 +141,27 @@ describe('Server Config', () => {
       expect(config.GEMINI_API_KEY).toBeUndefined();
     });
 
+    it('should parse USE_MOCK_AI=false as boolean false', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'false';
+      env.GEMINI_API_KEY = 'test-key';
+
+      const { config } = await import('./config');
+      expect(config.USE_MOCK_AI).toBe(false);
+    });
+
+    it('should parse GEMINI_USE_ADC=false as boolean false', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.LLM_PROVIDER = 'gemini';
+      env.GEMINI_API_KEY = 'test-key';
+      env.GEMINI_USE_ADC = 'false';
+
+      const { config } = await import('./config');
+      expect(config.GEMINI_USE_ADC).toBe(false);
+    });
+
     it('should reject missing GEMINI_API_KEY when LLM_PROVIDER=gemini', async () => {
       env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
       env.NODE_ENV = 'test';
