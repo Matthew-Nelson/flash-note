@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 27, 2026
+**Last Updated:** February 28, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation (1.5) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 6/9 sub-phases | Note Generation UI (1.5 A4) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -360,16 +360,31 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 ### 1.5 — Note Generation
 
-- Copy LLM service layer wholesale (`services/llm/*`, `prompts/*`, `utils/prompt-sanitization.ts`)
-- Build Server Action with auth + subscription check + rate limiting
-- Port usage tracking service
-- Add `generateRateLimit` and `apiRateLimit` to Upstash
-- Port LLM and usage tests
-- **Verify**: Notes generate correctly. Rate limiting works. Usage tracked. PHI not logged. Tests pass.
+**A1+A2: LLM Provider Layer** ✅ Done
+- LLM providers (Gemini + Claude), factory, schemas, errors, retry logic: `server/services/llm/*`
+- Rate limiters (`generateRateLimit`, `apiRateLimit`) added to Upstash config
+- Env var validation for LLM config (`server/db/config.ts`)
+- Full test coverage (errors, schemas, provider-factory)
+
+**A3: Note Generation Backend** ✅ Done
+- Prompt sanitization ported: `server/lib/prompt-sanitization.ts`
+- PT prompt templates ported: `server/prompts/pt-prompts.ts`
+- Usage tracking write side (`incrementUsage`): `server/dal/usage.ts`
+- Subscription check service: `server/services/subscription.ts`
+- Input validation schema: `lib/schemas/notes.ts`
+- Note generation orchestration: `server/services/note-generation.ts`
+- `generateNoteAction` Server Action: `actions/notes.ts`
+- `ActionResult<T>` extracted to `lib/types/actions.ts` (shared across action domains)
+- 98 new tests across 8 files, all passing. PHI audit clean. No error message leaks.
+
+**A4: Note Generation UI Page** ❌
+- Dashboard note generation page with form + SOAP output display
+- Client-side error code mapping (Rule 2)
+- Loading states, streaming fallback
 
 | Status |
 |--------|
-| ❌ |
+| 🟡 A4 remaining |
 
 ### 1.6 — Billing
 

@@ -14,3 +14,7 @@ export type {
   RegisterInput,
   ResetPasswordInput,
 } from './auth';
+
+export { generateNoteSchema } from './notes';
+
+export type { GenerateNoteInput } from './notes';

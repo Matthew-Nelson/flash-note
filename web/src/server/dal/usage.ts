@@ -11,6 +11,15 @@ export interface UsageData {
 }
 
 /**
+ * Returns the current month as YYYY-MM (e.g., "2026-02").
+ * Shared between getUsageForUser and incrementUsage.
+ */
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
  * Get usage data for a user in the current month.
  *
  * Includes organization context when the user has an active membership.
@@ -24,8 +33,7 @@ export async function getUsageForUser(
    *  against stale users.organization_id). */
   organizationId: string | null
 ): Promise<UsageData> {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonth = getCurrentMonth();
 
   const result = await db.query<{ notes_generated: number }>(
     'SELECT notes_generated FROM usage WHERE user_id = $1 AND month = $2',
@@ -49,4 +57,41 @@ export async function getUsageForUser(
   }
 
   return { currentMonth, notesGenerated, organization };
+}
+
+/**
+ * Increment usage counters for a note generation.
+ *
+ * Uses UPSERT to atomically create or update the usage row for the current month.
+ * Failures are swallowed and logged — usage tracking must never break note generation.
+ */
+export async function incrementUsage(
+  userId: string,
+  inputTokens: number,
+  outputTokens: number
+): Promise<void> {
+  const month = getCurrentMonth();
+
+  try {
+    await db.query(
+      `INSERT INTO usage (user_id, month, notes_generated, input_tokens, output_tokens)
+       VALUES ($1, $2, 1, $3, $4)
+       ON CONFLICT (user_id, month)
+       DO UPDATE SET
+         notes_generated = usage.notes_generated + 1,
+         input_tokens = usage.input_tokens + EXCLUDED.input_tokens,
+         output_tokens = usage.output_tokens + EXCLUDED.output_tokens,
+         updated_at = NOW()`,
+      [userId, month, inputTokens, outputTokens]
+    );
+  } catch (error) {
+    // Don't throw — usage tracking failures must not break note generation
+    console.error('Usage tracking failed:', {
+      source: 'dal_usage',
+      errorType: 'increment_usage_failed',
+      userId,
+    });
+    // Log the actual error separately (safe — no PHI in the error itself)
+    console.error(error);
+  }
 }
