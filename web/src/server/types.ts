@@ -37,12 +37,6 @@ export interface OrgMembership {
   isBillable: boolean;
 }
 
-export interface GenerateNoteInput {
-  noteType: NoteType;
-  patientContext?: string;
-  quickNotes: string;
-}
-
 export interface MonthlyUsageStats {
   notesGenerated: number;
   inputTokens: number;

@@ -42,7 +42,7 @@ export async function generateNoteAction(
   const raw = Object.fromEntries(formData);
   const parsed = generateNoteSchema.safeParse(raw);
   if (!parsed.success) {
-    return { success: false, error: 'validation_error' };
+    return { success: false, error: 'validation_error', fieldErrors: parsed.error.flatten().fieldErrors };
   }
 
   const { noteType, quickNotes, patientContext } = parsed.data;
@@ -78,15 +78,26 @@ export async function generateNoteAction(
   try {
     const result = await generateNote(quickNotes, noteType, patientContext);
 
-    // 7. Usage tracking (fire-and-forget — swallowed internally)
-    void incrementUsage(
+    // 7. Usage tracking (errors swallowed internally)
+    await incrementUsage(
       session.userId,
       result.metadata.inputTokens,
       result.metadata.outputTokens
     );
 
-    // 8. Audit log (fire-and-forget)
-    void auditService.log({
+    // 8. Security monitoring — log suspicious patterns synchronously before audit
+    if (result.securityMetadata.suspiciousPatternDetected) {
+      // TODO: Replace with Pino structured logger when available
+      console.warn('Suspicious prompt patterns detected:', {
+        source: 'action_generate_note',
+        userId: session.userId,
+        noteType,
+        suspiciousPatternCount: result.securityMetadata.suspiciousPatternCount,
+      });
+    }
+
+    // 9. Audit log (errors swallowed internally by auditService.log)
+    await auditService.log({
       userId: session.userId,
       action: AuditAction.NOTE_GENERATED,
       status: 'SUCCESS',
@@ -120,6 +131,7 @@ export async function generateNoteAction(
     // Map LLM errors to error codes
     const errorCode = mapLLMErrorCode(error);
 
+    // TODO: Replace with Pino structured logger when available
     // Log with structured context (no PHI — never log quickNotes, patientContext, or raw error messages)
     console.error('Note generation failed:', {
       source: 'action_generate_note',
@@ -127,6 +139,16 @@ export async function generateNoteAction(
       userId: session.userId,
       noteType,
       isLLMError: error instanceof LLMError,
+    });
+
+    // Audit failure (errors swallowed internally by auditService.log)
+    await auditService.log({
+      userId: session.userId,
+      action: AuditAction.NOTE_GENERATED,
+      status: 'FAILURE',
+      metadata: { noteType, errorCode },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
     });
 
     return { success: false, error: errorCode };

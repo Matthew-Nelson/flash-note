@@ -156,16 +156,19 @@ describe('incrementUsage', () => {
 
   it('logs structured context on failure (no PHI)', async () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    mockDbQuery.mockRejectedValueOnce(new Error('connection refused'));
+    const dbError = new Error('connection refused');
+    mockDbQuery.mockRejectedValueOnce(dbError);
 
     await incrementUsage('user-42', 10, 20);
 
-    // First console.error call should have structured context
-    expect(consoleSpy).toHaveBeenCalledWith('Usage tracking failed:', {
+    // Single console.error call with error object and structured context
+    expect(consoleSpy).toHaveBeenCalledWith('Usage tracking failed:', dbError, {
       source: 'dal_usage',
       errorType: 'increment_usage_failed',
       userId: 'user-42',
     });
+    // Should only be called once (not split across multiple calls)
+    expect(consoleSpy).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
 });

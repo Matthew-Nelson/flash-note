@@ -329,7 +329,7 @@ export async function verifyEmailAction(formData: FormData): Promise<ActionResul
     userAgent: context.userAgent,
   });
 
-  return { success: true };
+  return { success: true, data: {} };
 }
 
 export async function resendVerificationAction(formData: FormData): Promise<ActionResult> {

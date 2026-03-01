@@ -112,21 +112,35 @@ describe('generateNoteAction', () => {
 
   // --- Validation ---
 
-  it('returns validation_error for invalid input', async () => {
+  it('returns validation_error with fieldErrors for invalid input', async () => {
     const result = await generateNoteAction(makeFormData({ quickNotes: 'short' }));
-    expect(result).toEqual({ success: false, error: 'validation_error' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('validation_error');
+      expect(result.fieldErrors).toBeDefined();
+      expect(result.fieldErrors?.quickNotes).toBeDefined();
+    }
   });
 
-  it('returns validation_error for missing noteType', async () => {
+  it('returns validation_error with fieldErrors for missing noteType', async () => {
     const fd = new FormData();
     fd.set('quickNotes', 'pt reports pain 5/10, ROM improving');
     const result = await generateNoteAction(fd);
-    expect(result).toEqual({ success: false, error: 'validation_error' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('validation_error');
+      expect(result.fieldErrors).toBeDefined();
+      expect(result.fieldErrors?.noteType).toBeDefined();
+    }
   });
 
-  it('returns validation_error for invalid noteType', async () => {
+  it('returns validation_error with fieldErrors for invalid noteType', async () => {
     const result = await generateNoteAction(makeFormData({ noteType: 'invalid_type' }));
-    expect(result).toEqual({ success: false, error: 'validation_error' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('validation_error');
+      expect(result.fieldErrors).toBeDefined();
+    }
   });
 
   // --- Auth ---
@@ -183,10 +197,10 @@ describe('generateNoteAction', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.subjective).toBe('Patient reports pain 4/10.');
-      expect(result.data?.objective).toBe('ROM: Flexion 60°.');
-      expect(result.data?.assessment).toBe('Progressing well.');
-      expect(result.data?.plan).toBe('Continue PT 2x/week.');
+      expect(result.data.subjective).toBe('Patient reports pain 4/10.');
+      expect(result.data.objective).toBe('ROM: Flexion 60°.');
+      expect(result.data.assessment).toBe('Progressing well.');
+      expect(result.data.plan).toBe('Continue PT 2x/week.');
     }
   });
 
@@ -195,9 +209,9 @@ describe('generateNoteAction', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data?.billing).toBeDefined();
-      expect(result.data?.alerts).toEqual(['Check billing codes.']);
-      expect(result.data?.metadata.generationTimeMs).toBe(1500);
+      expect(result.data.billing).toBeDefined();
+      expect(result.data.alerts).toEqual(['Check billing codes.']);
+      expect(result.data.metadata.generationTimeMs).toBe(1500);
     }
   });
 
@@ -207,9 +221,9 @@ describe('generateNoteAction', () => {
     expect(result.success).toBe(true);
     if (result.success) {
       // metadata should only have generationTimeMs, not model/tokens
-      expect(result.data?.metadata).toEqual({ generationTimeMs: 1500 });
-      expect((result.data?.metadata as Record<string, unknown>)['model']).toBeUndefined();
-      expect((result.data?.metadata as Record<string, unknown>)['inputTokens']).toBeUndefined();
+      expect(result.data.metadata).toEqual({ generationTimeMs: 1500 });
+      expect((result.data.metadata as Record<string, unknown>)['model']).toBeUndefined();
+      expect((result.data.metadata as Record<string, unknown>)['inputTokens']).toBeUndefined();
     }
   });
 
@@ -252,6 +266,53 @@ describe('generateNoteAction', () => {
         userAgent: 'TestAgent/1.0',
       })
     );
+  });
+
+  it('logs audit entry with FAILURE status on generation error', async () => {
+    mockGenerateNote.mockRejectedValueOnce(new Error('LLM down'));
+
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await generateNoteAction(makeFormData());
+    consoleSpy.mockRestore();
+
+    expect(mockAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 'user-1',
+        action: 'NOTE_GENERATED',
+        status: 'FAILURE',
+        metadata: expect.objectContaining({
+          noteType: 'daily_note',
+          errorCode: 'internal_error',
+        }),
+        ipAddress: '127.0.0.1',
+        userAgent: 'TestAgent/1.0',
+      })
+    );
+  });
+
+  it('logs warn when suspicious patterns detected', async () => {
+    mockGenerateNote.mockResolvedValue(createGenerateResult({
+      securityMetadata: { suspiciousPatternDetected: true, suspiciousPatternCount: 3 },
+    }));
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await generateNoteAction(makeFormData());
+
+    expect(warnSpy).toHaveBeenCalledWith('Suspicious prompt patterns detected:', expect.objectContaining({
+      source: 'action_generate_note',
+      userId: 'user-1',
+      noteType: 'daily_note',
+      suspiciousPatternCount: 3,
+    }));
+    warnSpy.mockRestore();
+  });
+
+  it('does not log warn when no suspicious patterns detected', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await generateNoteAction(makeFormData());
+
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it('audit metadata never contains PHI (quickNotes, patientContext, note content)', async () => {
@@ -353,7 +414,10 @@ describe('generateNoteAction', () => {
 
   it('validates input before checking session', async () => {
     const result = await generateNoteAction(makeFormData({ quickNotes: '' }));
-    expect(result).toEqual({ success: false, error: 'validation_error' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe('validation_error');
+    }
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 

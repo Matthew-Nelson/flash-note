@@ -86,12 +86,12 @@ export async function incrementUsage(
     );
   } catch (error) {
     // Don't throw — usage tracking failures must not break note generation
-    console.error('Usage tracking failed:', {
+    // TODO: Replace with Pino structured logger when available:
+    //   logger.error({ err: error, source: 'dal_usage', errorType: 'increment_usage_failed', userId }, 'Usage tracking failed');
+    console.error('Usage tracking failed:', error, {
       source: 'dal_usage',
       errorType: 'increment_usage_failed',
       userId,
     });
-    // Log the actual error separately (safe — no PHI in the error itself)
-    console.error(error);
   }
 }

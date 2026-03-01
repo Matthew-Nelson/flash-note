@@ -10,7 +10,7 @@ export type SubscriptionCheckResult =
 /**
  * Check whether a user has an active subscription (individual or org-level).
  *
- * Logic mirrors backend/src/middleware/subscription.ts:67-164:
+ * Logic mirrors backend/src/middleware/subscription.ts:67-164 (equivalent logic, order differs):
  * 1. Individual active → allowed
  * 2. Individual trialing + valid → allowed
  * 3. Individual check failed + has org → check org subscription
