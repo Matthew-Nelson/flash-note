@@ -5,6 +5,7 @@ import { getSession } from '@/server/lib/get-session';
 import { getUsageForUser } from '@/server/dal/usage';
 import type { SessionData } from '@/server/types';
 import { Card, CardContent, SubscriptionBadge } from '@/components/ui';
+import { NoteGenerationForm } from '@/components/notes';
 
 /**
  * Format "YYYY-MM" into a human-readable month string.
@@ -106,9 +107,14 @@ export default async function DashboardPage() {
 
   return (
     <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-8">
-      <h1 className="text-2xl font-bold text-fn-text-primary mb-8">Dashboard</h1>
+      <h1 className="text-2xl font-bold text-fn-text-primary mb-2">Dashboard</h1>
+      <h2 className="text-xl font-semibold text-fn-text-primary mb-6">Generate a SOAP Note</h2>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      {/* Note generation form — primary product feature */}
+      <NoteGenerationForm />
+
+      {/* Usage and subscription status */}
+      <div className="grid md:grid-cols-2 gap-6 mt-8">
         {/* Usage Card */}
         <Card>
           <CardContent>
@@ -142,21 +148,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* Getting Started */}
-      <Card className="mt-8">
-        <CardContent>
-          <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
-            Getting Started
-          </h2>
-          <ol className="list-decimal list-inside space-y-3 text-fn-text-secondary">
-            <li>Sign in to FlashNote</li>
-            <li>Navigate to the note generation page</li>
-            <li>Enter your quick notes and patient context</li>
-            <li>Generate your SOAP note</li>
-          </ol>
-        </CardContent>
-      </Card>
 
       {/* Support */}
       <Card className="mt-8">
