@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 import { getSession } from '@/server/lib/get-session';
-import { billingService, SubscriptionExistsError } from '@/server/services/billing';
+import { getBillingService, SubscriptionExistsError } from '@/server/services/billing';
 import { config } from '@/server/db/config';
 import type { ActionResult } from '@/lib/types/actions';
 
@@ -45,7 +45,7 @@ export async function createCheckoutAction(
   if (!parsed.success) return { success: false, error: 'invalid_price_id' };
 
   try {
-    const checkoutUrl = await billingService.createCheckoutSession(
+    const checkoutUrl = await getBillingService().createCheckoutSession(
       session.userId,
       session.email,
       parsed.data.priceId
@@ -74,7 +74,7 @@ export async function createPortalAction(): Promise<ActionResult<{ portalUrl: st
   if (!session) return { success: false, error: 'unauthenticated' };
 
   try {
-    const portalUrl = await billingService.createPortalSession(session.userId);
+    const portalUrl = await getBillingService().createPortalSession(session.userId);
     return { success: true, data: { portalUrl } };
   } catch (error) {
     console.error('createPortalAction failed:', {

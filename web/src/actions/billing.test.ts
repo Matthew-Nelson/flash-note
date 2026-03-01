@@ -24,10 +24,10 @@ vi.mock('@/server/lib/get-session', () => ({
 }));
 
 vi.mock('@/server/services/billing', () => ({
-  billingService: {
+  getBillingService: () => ({
     createCheckoutSession: mockCreateCheckoutSession,
     createPortalSession: mockCreatePortalSession,
-  },
+  }),
   SubscriptionExistsError,
 }));
 

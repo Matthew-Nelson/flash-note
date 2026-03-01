@@ -18,9 +18,9 @@ const { WebhookSignatureError } = vi.hoisted(() => {
 });
 
 vi.mock('@/server/services/billing', () => ({
-  billingService: {
+  getBillingService: () => ({
     handleWebhook: mockHandleWebhook,
-  },
+  }),
   WebhookSignatureError,
 }));
 

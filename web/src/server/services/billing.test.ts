@@ -80,8 +80,9 @@ vi.mock('@/server/types', () => ({
 }));
 
 // Import after mocking
-const { billingService, WebhookSignatureError, SubscriptionExistsError, BillingError } =
+const { getBillingService, WebhookSignatureError, SubscriptionExistsError, BillingError } =
   await import('./billing');
+const billingService = getBillingService();
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -92,6 +93,7 @@ function makeUser(overrides: Record<string, unknown> = {}) {
     id: 'user-123',
     subscriptionStatus: 'trialing',
     stripeCustomerId: null,
+    subscriptionId: null,
     ...overrides,
   };
 }
@@ -232,8 +234,19 @@ describe('BillingService', () => {
       ).rejects.toMatchObject({ code: 'user_not_found' });
     });
 
-    it('throws SubscriptionExistsError when user has active subscription (H-2)', async () => {
-      mockFindUserById.mockResolvedValue(makeUser({ subscriptionStatus: 'active' }));
+    it('throws SubscriptionExistsError when user has existing subscription (H-2)', async () => {
+      mockFindUserById.mockResolvedValue(makeUser({ subscriptionId: 'sub_existing' }));
+
+      await expect(
+        billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly')
+      ).rejects.toThrow(SubscriptionExistsError);
+    });
+
+    it('throws SubscriptionExistsError for past_due user with existing subscription (H-2)', async () => {
+      mockFindUserById.mockResolvedValue(makeUser({
+        subscriptionStatus: 'past_due',
+        subscriptionId: 'sub_existing',
+      }));
 
       await expect(
         billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly')

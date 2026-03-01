@@ -85,7 +85,12 @@ class BillingService {
   ): Promise<string> {
     const user = await findUserById(userId);
     if (!user) throw new BillingError('user_not_found', 'User not found');
-    if (user.subscriptionStatus === 'active') throw new SubscriptionExistsError();
+
+    // H-2 guard: Block checkout if user already has a Stripe subscription.
+    // Checking subscriptionId (not just 'active' status) prevents duplicate
+    // subscriptions for users in 'past_due' or 'unpaid' states who already
+    // have a billing relationship with Stripe.
+    if (user.subscriptionId) throw new SubscriptionExistsError();
 
     // Reuse existing Stripe customer to avoid orphaned Customer records
     const customerParam: { customer: string } | { customer_email: string } =
@@ -562,4 +567,15 @@ class BillingService {
   }
 }
 
-export const billingService = new BillingService();
+// Lazy singleton — deferred to first use so the module can be imported in
+// dev/test environments where STRIPE_SECRET_KEY is absent (config makes it
+// optional outside production). Eager `new BillingService()` would throw at
+// import time and crash the process.
+let _billingService: BillingService | null = null;
+
+export function getBillingService(): BillingService {
+  if (!_billingService) {
+    _billingService = new BillingService();
+  }
+  return _billingService;
+}

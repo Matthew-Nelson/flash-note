@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { billingService, WebhookSignatureError } from '@/server/services/billing';
+import { getBillingService, WebhookSignatureError } from '@/server/services/billing';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   // CRITICAL: Must read body as ArrayBuffer to preserve exact bytes
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   try {
-    await billingService.handleWebhook(body, signature);
+    await getBillingService().handleWebhook(body, signature);
     return NextResponse.json({ received: true });
   } catch (error) {
     // Signature verification failure -> 400 (tells Stripe not to retry invalid signatures)
@@ -24,12 +24,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
     }
 
-    // Handler failure -> 500 (tells Stripe to retry — idempotency record deleted in service)
-    console.error('Webhook handler failed:', {
-      source: 'route_webhook',
-      errorType: error instanceof Error ? error.constructor.name : 'unknown',
-    });
-
+    // Handler failure -> 500 (tells Stripe to retry — idempotency record deleted in service).
+    // Error is already logged with structured context in billingService.handleWebhook().
     return NextResponse.json(
       { error: 'Webhook processing failed' },
       { status: 500 }
