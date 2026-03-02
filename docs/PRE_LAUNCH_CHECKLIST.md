@@ -230,9 +230,6 @@
   - [ ] Set up alerting for downtime/errors
 
 ### Production Security
-- [ ] **Generate production secrets**
-  - SESSION_SECRET or equivalent (256-bit random)
-  - Use: `openssl rand -base64 32`
 - [ ] **Verify TLS configuration**
   - TLS 1.2+ only
   - Test with SSL Labs (ssllabs.com)
