@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 7/9 sub-phases | Billing (1.6) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 8/9 sub-phases | Integration Tests (1.7) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -418,6 +418,14 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 |--------|
 | ✅ Done |
 
+**Follow-up items from 1.6** (non-blocking, tracked for future phases):
+
+| # | Item | Blocked By | Notes |
+|---|------|-----------|-------|
+| 1 | Enforce `CLEANUP_SECRET` in production `superRefine` block | — | `config.ts` validates `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in production but not `CLEANUP_SECRET`. Cleanup endpoint fails closed (401) if unset, so no security risk — but silent misconfiguration in production. Add to the `superRefine` production block alongside the other Stripe secrets. |
+| 2 | Add `emailVerified` check to `createPortalAction` | — | `createCheckoutAction` checks `session.emailVerified`; `createPortalAction` does not. An unverified user can't have a `stripeCustomerId` (checkout requires verification), so the call fails gracefully — but inconsistent defensive posture. Add for defense-in-depth. |
+| 3 | Zod-validate webhook event data after `constructEvent` | — | CLAUDE.md Rule 3 says webhook payloads should be Zod-validated after signature verification. Currently relies on Stripe SDK types. Low practical risk (SDK types are reliable), but adding Zod schemas for `metadata.userId`, `customer`, `subscription` fields would satisfy the rule. |
+
 ### 1.7 — Integration Tests + Production Verification
 
 Unit tests already passing from 1.1-1.6. This phase adds cross-cutting integration tests and validates the complete system.
@@ -434,6 +442,22 @@ Unit tests already passing from 1.1-1.6. This phase adds cross-cutting integrati
 | Status |
 |--------|
 | ❌ |
+
+### Migration Technical Debt — Consolidated Cleanup
+
+Accumulated follow-up items from Phases 1.3–1.6 code reviews. None are blocking for Phase 1.7 or launch, but all should be resolved before production traffic. Candidates for a single "migration cleanup" PR after 1.7.
+
+| # | Item | Source | Priority | Notes |
+|---|------|--------|----------|-------|
+| 1 | Replace `console.error` with Pino `logger.error` across all server code | 1.3 #1 | P1 | ~21 `console.error` calls with TODO comments. Blocks Cloud Error Reporting grouping. Fix when Pino infrastructure lands (Phase 3 Monitoring). |
+| 2 | Lockout audit gap: locked accounts with correct password | 1.3 #2 | P2 | Correct password on permanently locked account skips `recordFailedAttempt()`. Audit trail gap for HIPAA. |
+| 3 | Audit test mocks that violate production contracts | 1.3 #3 | P2 | 17 dead try/catch blocks passed coverage via mocks that reject (real implementation swallows). False confidence in coverage. |
+| 4 | `/baa` web page | 1.4 #1 | P2 | Currently 404. Standalone content page. |
+| 5 | Auth security test gaps (7 items) | 1.4.5 | P1 | Secure cookie flag, rate limit blocking, bcrypt max-length DoS, token type confusion, etc. See 1.4.5 section for full list. |
+| 6 | Enforce `CLEANUP_SECRET` in production config | 1.6 #1 | P2 | Silent misconfiguration — endpoint fails closed but no startup error. |
+| 7 | Add `emailVerified` check to `createPortalAction` | 1.6 #2 | P3 | Defense-in-depth. Not exploitable due to upstream constraint. |
+| 8 | Zod-validate webhook event data after `constructEvent` | 1.6 #3 | P3 | Rule 3 compliance. Low practical risk with Stripe SDK types. |
+| 9 | `ACCESS_DENIED` audit logging for subscription denials | 1.5 A3 #2 | P2 | Deferred audit refactor across `subscription.ts` + `notes.ts`. |
 
 ### Migration Cleanup
 
@@ -590,7 +614,7 @@ Full reference: [STRIPE_TODOS.md](./STRIPE_TODOS.md)
 Post-launch:
 - Trial ending soon notifications
 - Subscription reactivation flow
-- `SUBSCRIPTION_RENEWED` and `PAYMENT_FAILED` audit actions
+- ~~`SUBSCRIPTION_RENEWED` and `PAYMENT_FAILED` audit actions~~ — ✅ Done (Phase 1.6)
 
 ---
 
@@ -613,6 +637,7 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| Phase 1.6: Billing (PR #89) | Stripe billing service, webhook handlers with idempotency, checkout + portal Server Actions, pricing page converted to Server Component, old auth infrastructure deleted (8 files, 1361 lines). Code review fixes: env var mismatch, unsafe Stripe casts, audit log catch handlers, lazy singleton, H-2 guard widened, duplicate webhook log removed. 1195 tests, 98%+ coverage. |
 | Phase 1.4.5: Auth Page Rewiring (Gap Audit) | Converted 6 auth pages from `api.ts`/`useAuth()` to Server Actions. SessionAlert now reads URL query params instead of auth context. Middleware redirects authenticated users from `/login`/`/signup`. Logout appends `?reason=logged_out`. Gap audit identified 6 gaps in migration plan — 2 critical (auth page rewiring + old auth file deletion). 74 page tests rewritten. |
 | Phase 1.4: Middleware + Protected Pages (PR #82) | Middleware auth redirect for `/dashboard/*`, usage DAL, dashboard + settings converted to Server Components, `LogoutButton`/`PasswordResetSection`/`DeleteAccountSection` client components, `loading.tsx`/`error.tsx`/`not-found.tsx` error boundaries, CSP cleanup (removed Sentry/API URL from connect-src). 56 new tests. |
 | Phase 1.3: Auth Server Actions (PR #81) | Login, register, logout, password reset, email verification, invite code validation Server Actions. Auth service with transactional registration + password reset. Progressive lockout service (atomic SQL). Token service + email service (Resend). Zod auth schemas. Full test coverage. |
