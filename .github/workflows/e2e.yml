@@ -4,16 +4,12 @@ on:
   # push:
   #   branches: [main, develop]
   #   paths:
-  #     - 'extension/**'
   #     - 'web/**'
-  #     - 'backend/**'
   #     - '.github/workflows/e2e.yml'
   # pull_request:
   #   branches: [main, develop]
   #   paths:
-  #     - 'extension/**'
   #     - 'web/**'
-  #     - 'backend/**'
   #     - '.github/workflows/e2e.yml'
   workflow_dispatch:
 
@@ -24,215 +20,103 @@ concurrency:
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10'
-  # Shared backend env for all E2E jobs (migrations, seeding, server start)
-  DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-  JWT_SECRET: test-jwt-secret-minimum-32-characters-long-for-ci
-  JWT_REFRESH_SECRET: test-refresh-secret-minimum-32-characters-long
-  CSRF_SECRET: test-csrf-secret-minimum-32-characters-long-ci
-  STRIPE_SECRET_KEY: sk_test_fake_key_for_ci
-  STRIPE_WEBHOOK_SECRET: whsec_test_fake_secret_for_ci
-  GEMINI_API_KEY: fake-key-not-used-with-mock-ai
 
 jobs:
-  extension-e2e:
-    name: Extension E2E
+  # TODO: Rewrite for Next.js embedded database
+  # web-e2e:
+  #   name: Web E2E
+  #   runs-on: ubuntu-latest
+  #   timeout-minutes: 30
+  #
+  #   services:
+  #     postgres:
+  #       image: postgres:16
+  #       env:
+  #         POSTGRES_USER: test
+  #         POSTGRES_PASSWORD: test
+  #         POSTGRES_DB: flashnote_test
+  #       ports:
+  #         - 5432:5432
+  #       options: >-
+  #         --health-cmd pg_isready
+  #         --health-interval 10s
+  #         --health-timeout 5s
+  #         --health-retries 5
+  #
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: pnpm/action-setup@v2
+  #       with:
+  #         version: ${{ env.PNPM_VERSION }}
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #         cache: 'pnpm'
+  #
+  #     - name: Install dependencies
+  #       run: pnpm install --frozen-lockfile
+  #
+  #     - name: Setup database
+  #       run: pnpm db:migrate
+  #       working-directory: ./web
+  #       env:
+  #         NODE_ENV: test
+  #         DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+  #
+  #     - name: Build Next.js app
+  #       run: pnpm build
+  #       working-directory: ./web
+  #
+  #     - name: Start Next.js server
+  #       run: |
+  #         pnpm start &
+  #         echo $! > /tmp/web.pid
+  #       working-directory: ./web
+  #       env:
+  #         NODE_ENV: test
+  #         DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
+  #
+  #     - name: Wait for server
+  #       run: |
+  #         for i in {1..30}; do
+  #           curl -sf http://localhost:3000 > /dev/null && echo "Server ready" && exit 0
+  #           sleep 2
+  #         done
+  #         echo "Server failed to start" && exit 1
+  #
+  #     - name: Install Playwright browsers
+  #       run: pnpm exec playwright install --with-deps chromium
+  #       working-directory: ./web
+  #
+  #     - name: Run E2E tests
+  #       run: pnpm test:e2e:ci --project=chromium
+  #       working-directory: ./web
+  #       env:
+  #         CI: true
+  #         WEB_URL: http://localhost:3000
+  #
+  #     - name: Upload Playwright report
+  #       uses: actions/upload-artifact@v4
+  #       if: ${{ !cancelled() }}
+  #       with:
+  #         name: web-playwright-report
+  #         path: web/playwright-report/
+  #         retention-days: 7
+  #
+  #     - name: Upload test results
+  #       uses: actions/upload-artifact@v4
+  #       if: ${{ !cancelled() }}
+  #       with:
+  #         name: web-test-results
+  #         path: web/test-results/
+  #         retention-days: 7
+  #
+  #     - name: Stop server
+  #       if: always()
+  #       run: kill $(cat /tmp/web.pid) 2>/dev/null || true
+
+  placeholder:
+    name: E2E (disabled)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: flashnote_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup database
-        run: pnpm db:migrate:test && pnpm db:seed:test
-        working-directory: ./backend
-        env:
-          NODE_ENV: test
-
-      - name: Build extension
-        run: pnpm build
-        working-directory: ./extension
-
-      - name: Start backend
-        run: |
-          pnpm dev:test &
-          echo $! > /tmp/backend.pid
-        working-directory: ./backend
-        env:
-          NODE_ENV: test
-          USE_MOCK_AI: 'true'
-          PORT: 4000
-
-      - name: Wait for backend
-        run: |
-          for i in {1..30}; do
-            curl -sf http://localhost:4000/health > /dev/null && echo "Backend ready" && exit 0
-            sleep 2
-          done
-          echo "Backend failed to start" && exit 1
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-        working-directory: ./extension
-
-      - name: Run E2E tests
-        run: pnpm test:e2e:ci
-        working-directory: ./extension
-        env:
-          CI: true
-          API_URL: http://localhost:4000
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: extension-playwright-report
-          path: extension/playwright-report/
-          retention-days: 7
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: extension-test-results
-          path: extension/test-results/
-          retention-days: 7
-
-      - name: Stop backend
-        if: always()
-        run: kill $(cat /tmp/backend.pid) 2>/dev/null || true
-
-  web-e2e:
-    name: Web E2E
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: test
-          POSTGRES_PASSWORD: test
-          POSTGRES_DB: flashnote_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v2
-        with:
-          version: ${{ env.PNPM_VERSION }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Setup database
-        run: pnpm db:migrate:test && pnpm db:seed:test
-        working-directory: ./backend
-        env:
-          NODE_ENV: test
-
-      - name: Start backend
-        run: |
-          pnpm dev:test &
-          echo $! > /tmp/backend.pid
-        working-directory: ./backend
-        env:
-          NODE_ENV: test
-          USE_MOCK_AI: 'true'
-          PORT: 4000
-
-      - name: Wait for backend
-        run: |
-          for i in {1..30}; do
-            curl -sf http://localhost:4000/health > /dev/null && echo "Backend ready" && exit 0
-            sleep 2
-          done
-          echo "Backend failed to start" && exit 1
-
-      - name: Start web server
-        run: |
-          pnpm dev &
-          echo $! > /tmp/web.pid
-        working-directory: ./web
-        env:
-          NEXT_PUBLIC_BACKEND_URL: http://localhost:4000
-          NEXT_PUBLIC_API_URL: http://localhost:4000
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_fake_key_for_ci
-          NEXT_PUBLIC_STRIPE_PRICE_MONTHLY: price_test_monthly
-          NEXT_PUBLIC_STRIPE_PRICE_ANNUAL: price_test_annual
-
-      - name: Wait for web server
-        run: |
-          for i in {1..30}; do
-            curl -sf http://localhost:3000 > /dev/null && echo "Web server ready" && exit 0
-            sleep 2
-          done
-          echo "Web server failed to start" && exit 1
-
-      - name: Install Playwright browsers
-        run: pnpm exec playwright install --with-deps chromium
-        working-directory: ./web
-
-      - name: Run E2E tests
-        run: pnpm test:e2e:ci --project=chromium
-        working-directory: ./web
-        env:
-          CI: true
-          API_URL: http://localhost:4000
-          WEB_URL: http://localhost:3000
-
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: web-playwright-report
-          path: web/playwright-report/
-          retention-days: 7
-
-      - name: Upload test results
-        uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: web-test-results
-          path: web/test-results/
-          retention-days: 7
-
-      - name: Stop servers
-        if: always()
-        run: |
-          kill $(cat /tmp/web.pid) 2>/dev/null || true
-          kill $(cat /tmp/backend.pid) 2>/dev/null || true
+      - run: echo "E2E tests disabled — pending rewrite for Next.js embedded database architecture"
