@@ -18,7 +18,7 @@
 6. [Code References from Physio AI](#6-code-references-from-physio-ai)
 7. [Database Schema](#7-database-schema)
 8. [API Specification](#8-api-specification)
-9. [Browser Extension Architecture](#9-browser-extension-architecture)
+9. ~~Browser Extension Architecture~~ — Removed (extension sunset March 2026)
 10. [AI/LLM Integration](#10-aillm-integration)
 11. [Authentication System](#11-authentication-system)
 12. [HIPAA Compliance](#12-hipaa-compliance)
@@ -32,7 +32,9 @@
 
 ### What We're Building
 
-**FlashNote** is a browser extension that helps physical therapists write SOAP notes faster using AI. Therapists enter shorthand notes, and the AI expands them into complete, insurance-compliant documentation.
+**FlashNote** is a web application that helps physical therapists write SOAP notes faster using AI. Therapists enter shorthand notes, and the AI expands them into complete, insurance-compliant documentation.
+
+> **Architecture Note (March 2026):** FlashNote has been consolidated from a three-component architecture (Express backend + Chrome extension + Next.js web) to a **single Next.js application** on Google Cloud Run. The Chrome extension has been sunset. All references to "browser extension" or "Chrome extension" in this document reflect the original design and are retained for historical context only.
 
 ### Core Value Proposition
 
@@ -81,9 +83,9 @@ Physical therapists spend 1-2 hours per day writing documentation. Insurance req
 
 ### The Solution
 
-A browser extension that sits alongside any EMR and generates complete SOAP notes from shorthand input. The therapist:
+A web application that generates complete SOAP notes from shorthand input. The therapist:
 
-1. Clicks the extension icon
+1. Opens FlashNote in their browser alongside their EMR
 2. Types quick notes (abbreviations, shorthand, bullet points)
 3. Clicks "Generate"
 4. Copies the complete note into their EMR
@@ -97,7 +99,7 @@ A browser extension that sits alongside any EMR and generates complete SOAP note
 | EMR-specific integrations | v2 maybe | Start with universal copy/paste |
 | OT/SLP support | v2 maybe | Focus on PT market first |
 | Team/clinic accounts | v2 maybe | Single-user is simpler |
-| Mobile app | Not planned | Browser extension sufficient |
+| Mobile app | Not planned | Web app covers primary use case |
 | Custom templates | v2 maybe | Ship with good defaults first |
 
 ### Success Metrics
@@ -210,43 +212,47 @@ Rationale:
 
 ### Tech Stack
 
+> **Note:** The following reflects the **current (March 2026) web-only architecture**. The original Express backend and Chrome extension have been removed.
+
 | Component | Technology | Rationale |
 |-----------|------------|-----------|
-| Backend runtime | Node.js 20+ | Familiar, fast, good ecosystem |
-| Backend framework | Express | Simple, proven, sufficient |
-| Language | TypeScript | Type safety, better DX |
+| Framework | Next.js 16 (App Router) | Single app — server + client, integrated routing |
+| Language | TypeScript (strict) | Type safety, better DX |
 | Database | PostgreSQL | Reliable, HIPAA-friendly, good tooling |
 | ORM/Query | Raw SQL with pg | Simple, no magic, full control |
 | Validation | Zod | Runtime + compile-time safety |
-| Auth | JWT (jsonwebtoken) | Stateless, simple |
+| Auth | Opaque session tokens (httpOnly cookie) | No JWT overhead; every request hits DB anyway |
 | Password hashing | bcryptjs | Industry standard |
-| LLM | Google Gemini API | Cost-effective, quality output |
-| Extension UI | React 18+ | Familiar, component-based |
-| Extension styling | Tailwind CSS | Rapid development |
-| Extension bundler | Vite | Fast builds, good DX |
+| LLM | Google Gemini (Vertex AI) | Cost-effective, covered under Google Cloud BAA |
+| Styling | Tailwind CSS | Rapid development |
 | Payments | Stripe | Industry standard, great docs |
-| Hosting (API) | Google Cloud Run | Managed, scalable, HIPAA-eligible |
-| Hosting (Web) | Vercel | Free tier, great for Next.js |
+| Hosting | Google Cloud Run | Managed, scalable, HIPAA-eligible |
 | Database hosting | Google Cloud SQL | Managed PostgreSQL, HIPAA-eligible |
+| Rate limiting | Upstash Redis | Multi-instance safe; no in-memory limiters |
 
 ### Project Structure
 
+> **Note:** The `/backend` and `/extension` directories have been removed. The codebase is now a single Next.js application in `/web`.
+
 ```
 flashnote/
-├── backend/
-│   ├── src/
-│   │   ├── index.ts              # Express app entry
-│   │   ├── config.ts             # Environment config
-│   │   ├── routes/
-│   │   │   ├── auth.ts           # Auth endpoints
-│   │   │   ├── notes.ts          # Note generation
-│   │   │   ├── billing.ts        # Stripe integration
-│   │   │   └── health.ts         # Health check
-│   │   ├── services/
-│   │   │   ├── auth-service.ts   # JWT + password hashing
-│   │   │   ├── ai-service.ts     # Gemini integration
-│   │   │   ├── audit-service.ts  # HIPAA logging
-│   │   │   └── billing-service.ts # Stripe helpers
+├── web/                          # Single Next.js application (entire product)
+│   └── src/
+│       ├── app/                  # Next.js App Router
+│       │   ├── (auth)/           # Auth route group (login, signup, reset, verify)
+│       │   ├── (marketing)/      # Public pages (landing, pricing, terms, privacy)
+│       │   ├── dashboard/        # Protected routes
+│       │   └── api/
+│       │       └── webhooks/
+│       │           └── stripe/   # Stripe webhook Route Handler
+│       ├── server/               # Server-only code
+│       │   ├── dal/              # Data Access Layer (single auth enforcement point)
+│       │   ├── services/         # Business logic (auth, billing, AI, audit)
+│       │   ├── db/               # PostgreSQL pool + migrations
+│       │   └── prompts/          # LLM prompt templates
+│       ├── actions/              # Server Actions (auth, notes, billing)
+│       ├── components/           # React components
+│       └── lib/                  # Shared utilities + Zod schemas
 │   │   ├── middleware/
 │   │   │   ├── auth.ts           # JWT verification
 │   │   │   ├── rate-limit.ts     # Rate limiting
@@ -256,71 +262,16 @@ flashnote/
 │   │   │   ├── queries/          # SQL query functions
 │   │   │   └── migrations/       # SQL migration files
 │   │   ├── prompts/
-│   │   │   └── pt-prompts.ts     # PT-specific prompts
-│   │   └── types/
-│   │       └── index.ts          # TypeScript types
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .env.example
-│
-├── extension/
-│   ├── public/
-│   │   ├── manifest.json         # Chrome extension manifest v3
-│   │   └── icons/
-│   ├── src/
-│   │   ├── sidepanel/            # Sidepanel UI (not popup)
-│   │   │   ├── index.html
-│   │   │   ├── main.tsx          # React entry
-│   │   │   ├── App.tsx           # Main component
-│   │   │   ├── components/
-│   │   │   │   ├── LoginForm.tsx
-│   │   │   │   ├── NoteGenerator.tsx
-│   │   │   │   ├── ResultDisplay.tsx
-│   │   │   │   ├── Settings.tsx
-│   │   │   │   ├── SessionAlert.tsx
-│   │   │   │   └── ErrorBoundary.tsx
-│   │   │   └── hooks/
-│   │   │       ├── useAuth.ts
-│   │   │       ├── useApi.ts
-│   │   │       └── useStreamingText.ts
-│   │   ├── background/
-│   │   │   └── service-worker.ts
-│   │   └── shared/
-│   │       ├── api.ts            # API client with CSRF + retry
-│   │       ├── storage.ts        # chrome.storage wrapper
-│   │       ├── schemas.ts        # Zod validation schemas
-│   │       └── types.ts
-│   ├── public/
-│   │   └── icons/
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── tsconfig.json
-│
-├── web/                          # Landing page + dashboard
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── page.tsx          # Landing page
-│   │   │   ├── pricing/
-│   │   │   ├── login/
-│   │   │   ├── signup/
-│   │   │   ├── dashboard/
-│   │   │   └── api/
-│   │   │       └── webhooks/
-│   │   │           └── stripe/
-│   │   └── components/
-│   ├── package.json
-│   └── next.config.js
 │
 └── docs/
     ├── legal/
     │   ├── PRIVACY_POLICY.md
     │   ├── TERMS_OF_SERVICE.md
     │   └── BAA_TEMPLATE.md
-    ├── guides/              # API reference, deployment guides
     ├── planning/            # Future feature designs
     ├── compliance/          # Security audit, testing strategy
     ├── reference/           # This handoff doc, business analysis
-    └── archive/             # Completed planning docs
+    └── archive/             # Completed/retired planning docs
 ```
 
 ---
@@ -647,7 +598,7 @@ function validateBody<T>(schema: z.ZodSchema<T>) {
 
 ### Complete Schema (10 tables)
 
-> **Note:** This section was written early in development. The authoritative schema is the migrations directory (`backend/src/db/migrations/`). Table count grew from the original 4 to 10 as invite codes, organizations, organization members, and legal acceptances were added.
+> **Note:** This section was written early in development. The authoritative schema is the migrations directory (`web/src/server/db/migrations/`). Table count grew from the original 4 to 11 as invite codes, organizations, organization members, legal acceptances, and processed webhook events were added.
 
 ```sql
 -- migrations/001_initial_schema.sql
@@ -1102,267 +1053,12 @@ Response 200: { "received": true }
 
 ---
 
-## 9. Browser Extension Architecture
+## 9. ~~Browser Extension Architecture~~ — Removed
 
-### Manifest V3 Configuration
+> **This section has been removed.** The Chrome extension was sunset in March 2026. FlashNote is now a single Next.js web application. All extension code (manifest, storage schema, API client, UI components) has been deleted from the repository.
 
-The extension uses a **sidepanel** architecture (not popup) for a better persistent experience.
+The section below is retained only as a horizontal separator for navigation compatibility.
 
-```json
-{
-  "manifest_version": 3,
-  "name": "FlashNote - AI SOAP Notes for Physical Therapists",
-  "version": "0.1.0",
-  "minimum_chrome_version": "116",
-  "description": "Generate professional PT documentation in seconds. Type shorthand, get complete SOAP notes.",
-
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'"
-  },
-
-  "permissions": [
-    "storage",
-    "sidePanel"
-  ],
-
-  "host_permissions": [
-    "http://localhost:4000/*",
-    "https://api.flashnote.co/*"
-  ],
-
-  "action": {
-    "default_icon": {
-      "16": "icons/icon-16.png",
-      "32": "icons/icon-32.png",
-      "48": "icons/icon-48.png",
-      "128": "icons/icon-128.png"
-    }
-  },
-
-  "side_panel": {
-    "default_path": "sidepanel/index.html"
-  },
-
-  "background": {
-    "service_worker": "background/service-worker.js",
-    "type": "module"
-  },
-
-  "icons": {
-    "16": "icons/icon-16.png",
-    "32": "icons/icon-32.png",
-    "48": "icons/icon-48.png",
-    "128": "icons/icon-128.png"
-  }
-}
-```
-
-### Storage Schema
-
-```typescript
-// Types for chrome.storage.local
-interface StorageSchema {
-  auth: {
-    accessToken: string;
-    refreshToken: string;
-    csrfToken: string;  // CSRF token for state-changing requests
-    user: {
-      id: string;
-      email: string;
-      subscriptionStatus: string;
-      trialEndsAt: string;
-      emailVerified: boolean;
-    };
-    expiresAt: number;  // Unix timestamp
-  } | null;
-
-  preferences: {
-    defaultNoteType: string;
-    lastUsedPatientContext: string;
-  };
-}
-
-// Storage helpers
-export const storage = {
-  async getAuth(): Promise<StorageSchema['auth']> {
-    const { auth } = await chrome.storage.local.get('auth');
-    return auth || null;
-  },
-
-  async setAuth(auth: StorageSchema['auth']): Promise<void> {
-    await chrome.storage.local.set({ auth });
-  },
-
-  async clearAuth(): Promise<void> {
-    await chrome.storage.local.remove('auth');
-  },
-
-  async getPreferences(): Promise<StorageSchema['preferences']> {
-    const { preferences } = await chrome.storage.local.get('preferences');
-    return preferences || { defaultNoteType: 'daily_note', lastUsedPatientContext: '' };
-  },
-
-  async setPreferences(prefs: Partial<StorageSchema['preferences']>): Promise<void> {
-    const current = await this.getPreferences();
-    await chrome.storage.local.set({ preferences: { ...current, ...prefs } });
-  },
-};
-```
-
-### API Client
-
-```typescript
-// src/shared/api.ts
-const API_BASE = process.env.NODE_ENV === 'production'
-  ? 'https://api.flashnote.co'
-  : 'http://localhost:4000';
-
-class ApiClient {
-  private async getToken(): Promise<string | null> {
-    const auth = await storage.getAuth();
-    if (!auth) return null;
-
-    // Check if token is expired (with 60s buffer)
-    if (Date.now() > auth.expiresAt - 60000) {
-      return this.refreshToken(auth.refreshToken);
-    }
-
-    return auth.accessToken;
-  }
-
-  private async refreshToken(refreshToken: string): Promise<string | null> {
-    try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (!response.ok) {
-        await storage.clearAuth();
-        return null;
-      }
-
-      const data = await response.json();
-      await storage.setAuth({
-        ...data,
-        expiresAt: Date.now() + 55 * 60 * 1000,  // 55 minutes
-      });
-
-      return data.accessToken;
-    } catch {
-      await storage.clearAuth();
-      return null;
-    }
-  }
-
-  async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const token = await this.getToken();
-
-    const response = await fetch(`${API_BASE}${endpoint}`, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new ApiError(response.status, error.error, error.message);
-    }
-
-    return response.json();
-  }
-
-  // Convenience methods
-  async login(email: string, password: string) {
-    const data = await this.request<AuthResponse>('/auth/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    });
-    await storage.setAuth({
-      ...data,
-      expiresAt: Date.now() + 55 * 60 * 1000,
-    });
-    return data;
-  }
-
-  async generateNote(input: GenerateNoteInput): Promise<GeneratedNote> {
-    return this.request('/notes/generate', {
-      method: 'POST',
-      body: JSON.stringify(input),
-    });
-  }
-}
-
-export const api = new ApiClient();
-```
-
-### UI Components
-
-The extension sidepanel should be simple and focused:
-
-```
-┌─────────────────────────────────────┐
-│  FlashNote              [Settings]  │  ← Header (40px)
-├─────────────────────────────────────┤
-│                                     │
-│  Note Type: [Daily Note      ▼]     │  ← Dropdown
-│                                     │
-│  Patient Context (optional):        │
-│  ┌─────────────────────────────┐   │
-│  │ John, 52M, LBP, visit 5    │   │  ← Single line input
-│  └─────────────────────────────┘   │
-│                                     │
-│  Session Notes:                     │
-│  ┌─────────────────────────────┐   │
-│  │ reports 40% pain reduction  │   │
-│  │ flex ROM 50->65            │   │  ← Textarea (expands)
-│  │ MFR lumbar, mobs L4-5      │   │
-│  │ HEP bridges 2x15           │   │
-│  │ tolerated well             │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  [      ✨ Generate Note      ]     │  ← Primary CTA
-│                                     │
-└─────────────────────────────────────┘
-         Width: 400px
-```
-
-After generation:
-
-```
-┌─────────────────────────────────────┐
-│  ← Back                  [Copy All] │
-├─────────────────────────────────────┤
-│  SUBJECTIVE                  [Copy] │
-│  ┌─────────────────────────────┐   │
-│  │ Patient reports approx...   │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  OBJECTIVE                   [Copy] │
-│  ┌─────────────────────────────┐   │
-│  │ Lumbar ROM: Flexion...     │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  ASSESSMENT                  [Copy] │
-│  ┌─────────────────────────────┐   │
-│  │ Patient demonstrating...    │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  PLAN                        [Copy] │
-│  ┌─────────────────────────────┐   │
-│  │ Continue current POC...    │   │
-│  └─────────────────────────────┘   │
-│                                     │
-│  Generated in 1.2s • 847 tokens     │
-└─────────────────────────────────────┘
-```
 
 ---
 
@@ -2161,138 +1857,79 @@ export function requireActiveSubscription(db: Pool) {
 
 ## 14. Deployment Strategy
 
+> **Updated for web-only architecture (March 2026).** FlashNote is now a single Next.js application on Google Cloud Run. No separate backend or extension deployment.
+
 ### Infrastructure
 
 | Component | Service | Cost |
 |-----------|---------|------|
-| Backend API | Google Cloud Run | Free tier / ~$5-15/mo |
+| Next.js App | Google Cloud Run | Free tier / ~$5-15/mo |
 | PostgreSQL | Google Cloud SQL | ~$10-30/mo |
-| Landing Page | Vercel | Free |
 | Domain | Namecheap | ~$12/yr |
-| SSL | Included with Cloud Run/Vercel | Free |
+| SSL | Included with Cloud Run | Free |
 | **Total** | | **~$15-45/mo** |
 
 ### Environment Variables
 
-**Backend (.env):**
+See `web/src/server/db/config.ts` for the full validated schema. Key variables:
+
 ```env
-# Server
 NODE_ENV=production
-PORT=4000
 
 # Database
 DATABASE_URL=postgresql://user:pass@host:5432/flashnote
 
-# Auth
-JWT_SECRET=your-256-bit-secret-here
-JWT_REFRESH_SECRET=another-256-bit-secret-here
-
-# AI
-GEMINI_API_KEY=your-gemini-api-key
-GEMINI_MODEL=gemini-2.5-flash
+# Vertex AI (HIPAA-covered, not consumer Gemini API)
+GOOGLE_CLOUD_PROJECT=your-gcp-project-id
+VERTEX_AI_LOCATION=us-central1
 
 # Stripe
 STRIPE_SECRET_KEY=sk_live_xxx
 STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_MONTHLY=price_xxx
+STRIPE_PRICE_ANNUAL=price_xxx
 
-# URLs
-WEB_URL=https://flashnote.co
-API_URL=https://api.flashnote.co
+# Email (Resend)
+RESEND_API_KEY=re_xxx
+EMAIL_FROM=noreply@flashnote.co
 
-# For production HIPAA compliance
-GCP_PROJECT_ID=your-project-id
+# Redis (Upstash — rate limiting)
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=xxx
 ```
 
 ### Deployment Checklist
 
 ```
 Pre-deployment:
-☐ All environment variables configured
-☐ Database migrations tested
-☐ API endpoints tested locally
-☐ Extension tested with production API URL
+☐ All environment variables configured in Cloud Run secrets
+☐ Database migrations tested (pnpm db:migrate)
+☐ Build passes locally (pnpm build)
 
 Google Cloud Setup:
-☐ Create GCP project
+☐ Create GCP project and sign Google Cloud BAA
 ☐ Enable Cloud Run and Cloud SQL APIs
-☐ Create Cloud SQL PostgreSQL instance
-☐ Note DATABASE_URL connection string (Cloud SQL Auth Proxy or private IP)
-☐ Deploy backend to Cloud Run (connect GitHub or use Cloud Build)
+☐ Create Cloud SQL PostgreSQL instance (encryption at rest)
+☐ Deploy Next.js app to Cloud Run (connect GitHub or use Cloud Build)
 ☐ Configure environment variables in Cloud Run
-☐ Map custom domain (api.flashnote.co) to Cloud Run service
-
-Vercel Setup:
-☐ Connect GitHub repository (web folder)
-☐ Configure Next.js project
-☐ Add environment variables
-☐ Deploy
+☐ Map custom domain (flashnote.co) to Cloud Run service
 
 DNS Setup:
 ☐ Purchase domain (flashnote.co)
-☐ Configure A record for api.flashnote.co → Cloud Run
-☐ Configure CNAME for www → Vercel
+☐ Configure A record for flashnote.co → Cloud Run
 ☐ Wait for SSL certificate provisioning
 
 Stripe Setup:
 ☐ Create products and prices
-☐ Configure webhook endpoint
+☐ Configure webhook endpoint (https://flashnote.co/api/webhooks/stripe)
 ☐ Test checkout flow
-
-Extension:
-☐ Update manifest with production URLs
-☐ Build extension for production
-☐ Test with production API
 ```
 
 ---
 
 ## 15. Launch Checklist
 
-### Chrome Web Store Submission
-
-**Requirements:**
-
-1. **Developer account:** $5 one-time fee
-2. **Privacy policy:** Required, must be hosted publicly
-3. **Screenshots:** 1280x800 or 640x400
-4. **Promotional images:** Optional but recommended
-5. **Description:** Detailed, keyword-rich
-
-**Store Listing Content:**
-
-```
-Name: FlashNote - AI SOAP Notes for Physical Therapists
-
-Short Description (132 chars max):
-Generate professional PT documentation in seconds. Type shorthand, get complete SOAP notes ready for any EMR.
-
-Detailed Description:
-FlashNote helps physical therapists write documentation faster using AI.
-
-🚀 HOW IT WORKS
-1. Click the FlashNote icon
-2. Type your quick notes (shorthand is fine)
-3. Click "Generate"
-4. Copy the complete SOAP note to your EMR
-
-✨ FEATURES
-• Generates complete SOAP notes from shorthand
-• PT-specific medical terminology
-• Insurance-compliant documentation
-• Works with any EMR (copy/paste)
-• Secure and HIPAA-compliant
-
-💰 PRICING
-• 14-day free trial
-• $29/month unlimited notes
-
-🔒 SECURITY
-• HIPAA-compliant infrastructure
-• No patient data stored
-• Encrypted connections
-
-Built by a physical therapist, for physical therapists.
-```
+> **Updated for web-only architecture (March 2026).** Chrome Web Store submission is no longer applicable.
 
 ### Pre-Launch Testing
 
@@ -2300,14 +1937,15 @@ Built by a physical therapist, for physical therapists.
 Functional Testing:
 ☐ Register new account
 ☐ Login/logout
+☐ Email verification flow
 ☐ Generate note (all 4 types)
 ☐ Copy individual sections
 ☐ Copy full note
-☐ Token refresh works
 ☐ Trial expiration enforced
 ☐ Subscription checkout works
 ☐ Webhook updates user status
 ☐ Subscription cancellation works
+☐ Password reset flow
 
 Edge Cases:
 ☐ Empty quick notes rejected
@@ -2315,12 +1953,13 @@ Edge Cases:
 ☐ Network error handling
 ☐ Rate limiting works
 ☐ Invalid credentials rejected
-☐ Expired token handled
+☐ Expired session handled
 
 Cross-Browser:
 ☐ Chrome (primary)
+☐ Firefox
+☐ Safari
 ☐ Edge (Chromium-based)
-☐ Brave (Chromium-based)
 ```
 
 ### Beta Testing
@@ -2342,10 +1981,11 @@ Cross-Browser:
 ### Launch Day
 
 ```
-☐ Extension approved in Chrome Web Store
+☐ Production deployment stable
 ☐ Landing page live
 ☐ Pricing page live
-☐ Stripe checkout working
+☐ Legal documents published (ToS, Privacy Policy, BAA)
+☐ Stripe checkout working (live mode)
 ☐ Support email configured
 ☐ Social media announcement ready
 ☐ Consider: Product Hunt launch
@@ -2461,7 +2101,7 @@ These patterns were extracted from the Physio AI codebase CLAUDE.md files and ar
 
 ### D.1 Password Validation
 
-**Current Requirements (source of truth: `backend/src/routes/auth.ts`):**
+**Current Requirements (source of truth: `web/src/lib/schemas/`):**
 - Minimum 8 characters
 - At least one uppercase letter
 - At least one lowercase letter
@@ -2470,7 +2110,7 @@ These patterns were extracted from the Physio AI codebase CLAUDE.md files and ar
 Note: Special character requirement was removed for better usability.
 
 ```typescript
-// From backend/src/routes/auth.ts - registerSchema and resetPasswordSchema
+// From web/src/lib/schemas/ - password Zod schema
 const passwordSchema = z
   .string()
   .min(8, 'Password must be at least 8 characters')
@@ -2480,9 +2120,8 @@ const passwordSchema = z
 ```
 
 **When updating password policy, sync changes to:**
-1. `backend/src/routes/auth.ts` - registerSchema and resetPasswordSchema (SOURCE OF TRUTH)
-2. `web/src/app/reset-password/page.tsx` - client-side validation
-3. `extension/src/shared/schemas.ts` - client-side validation
+1. `web/src/lib/schemas/` - server-side Zod schema (SOURCE OF TRUTH)
+2. Client-side form components that perform pre-validation
 
 ### D.2 Tailwind Class Merge Utility (from libs/ui)
 

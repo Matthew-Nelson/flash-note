@@ -145,7 +145,7 @@
    ```
 3. Start the webhook listener (run this while developing):
    ```bash
-   stripe listen --forward-to localhost:4000/billing/webhook
+   stripe listen --forward-to localhost:3000/api/webhooks/stripe
    ```
 4. Copy the webhook signing secret (`whsec_xxx`) it outputs and add to your `.env`:
    ```
@@ -156,7 +156,7 @@
 **For Production:**
 - [ ] **Set up Webhook endpoint in Stripe Dashboard**
   - Go to Developers → Webhooks → Add endpoint
-  - Endpoint URL: `https://api.flashnote.co/billing/webhook`
+  - Endpoint URL: `https://flashnote.co/api/webhooks/stripe`
   - Subscribe to required events:
     - `checkout.session.completed`
     - `customer.subscription.updated`
@@ -200,8 +200,8 @@
   - Namecheap, Google Domains, Cloudflare Registrar
   - Consider purchasing variations for protection
 - [ ] **Configure DNS records**
-  - A record for api.flashnote.co → Cloud Run service
-  - CNAME for www → Vercel
+  - A record for flashnote.co → Cloud Run service
+  - CNAME for www → Cloud Run
   - MX records for email (if using custom email)
 - [ ] **Enable DNSSEC** (recommended)
 - [ ] **Set up email**
@@ -210,11 +210,11 @@
   - Consider Google Workspace, Zoho, or Fastmail
 
 ### Production Infrastructure
-- [ ] **Deploy Backend API (Cloud Run)**
+- [ ] **Deploy Next.js App (Cloud Run)**
   - [ ] Create GCP project and enable Cloud Run API
   - [ ] Configure environment variables (Cloud Run secrets or Secret Manager)
   - [ ] Set up SSL/TLS (automatic with Cloud Run custom domains)
-  - [ ] Configure custom domain (api.flashnote.co)
+  - [ ] Configure custom domain (flashnote.co)
   - [ ] Configure min/max instances for scaling
 
 - [ ] **Deploy Production Database (Cloud SQL)**
@@ -224,22 +224,14 @@
   - [ ] Configure Cloud SQL Auth Proxy or private IP for Cloud Run connection
   - [ ] Document connection string securely (use Secret Manager)
 
-- [ ] **Deploy Web/Landing Page (Vercel)**
-  - [ ] Deploy to Vercel
-  - [ ] Configure custom domain
-  - [ ] Set environment variables
-
 - [~] **Configure monitoring and alerting**
-  - [x] Error tracking (Sentry - free tier) - Backend implemented with HIPAA-compliant PHI filtering
-  - [x] Error tracking (Sentry) - Extension implemented with BrowserClient + HIPAA PHI filtering
+  - [ ] Error tracking (GCP Cloud Error Reporting via Pino structured logger — see [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md))
   - [ ] Uptime monitoring (UptimeRobot, Better Uptime - free tiers)
   - [ ] Set up alerting for downtime/errors
 
 ### Production Security
 - [ ] **Generate production secrets**
-  - JWT_SECRET (256-bit random)
-  - JWT_REFRESH_SECRET (256-bit random)
-  - CSRF_SECRET (256-bit random)
+  - SESSION_SECRET or equivalent (256-bit random)
   - Use: `openssl rand -base64 32`
 - [ ] **Verify TLS configuration**
   - TLS 1.2+ only
@@ -247,9 +239,7 @@
 - [ ] **Enable database encryption**
   - At-rest encryption
   - In-transit encryption (SSL connections)
-- [x] **Review environment variables** - See `backend/src/config.ts` for full schema
-  - `API_URL` - Currently unused, kept for future inter-service communication
-  - `GCP_PROJECT_ID` - Currently unused, kept for future Vertex AI migration
+- [x] **Review environment variables** - See `web/src/server/db/config.ts` for full schema
   - `STRIPE_PRICE_MONTHLY` and `STRIPE_PRICE_ANNUAL` - Used for price ID validation in billing routes
 
 **Estimated Monthly Cost:** ~$15-45/month (basic Cloud Run + Cloud SQL) to $100-300/month (production scale)
@@ -264,41 +254,9 @@
 
 ---
 
-## 6. Chrome Web Store Preparation
+## 6. ~~Chrome Web Store Preparation~~ — Removed
 
-### Developer Account
-- [ ] **Create Chrome Web Store Developer Account** ($5 one-time fee)
-- [ ] **Complete identity verification** (may take a few days)
-
-### Extension Preparation
-- [ ] **Update manifest.json with production values**
-  - Correct API URLs
-  - Final extension name and description
-  - Production extension ID
-- [ ] **Create store listing assets**
-  - [ ] Icon: 128x128 PNG (placeholder exists, needs professional redesign)
-  - [ ] Screenshots: 1280x800 or 640x400 (at least 1, up to 5)
-
-> **Note:** Current extension icons are placeholders. Generate production-quality icons before Chrome Web Store submission.
-  - [ ] Promotional images (optional but recommended):
-    - Small: 440x280
-    - Large: 920x680
-    - Marquee: 1400x560
-- [ ] **Write store listing copy**
-  - Short description (132 characters max)
-  - Detailed description (see FLASHNOTE_HANDOFF.md for template)
-  - Category: Productivity
-- [ ] **Prepare Privacy Policy URL** (required)
-- [ ] **Build production extension package**
-  - `pnpm build && pnpm package`
-  - Creates .zip for upload
-- [ ] **Submit for review**
-  - Review typically takes 1-5 business days
-  - May require additional justification for permissions
-
-### Post-Approval
-- [ ] **Note your extension ID** for CORS configuration
-- [ ] **Set up extension update process**
+> **Architecture change (March 2026):** FlashNote is a web-only application. The Chrome extension has been sunset. All items in this section are no longer applicable.
 
 ---
 
@@ -338,12 +296,12 @@
 - [ ] **Run automated security scan** (OWASP ZAP, Burp Suite free)
 - [ ] **Test rate limiting** is enforced
 - [ ] **Verify no PHI in logs** (check all log outputs)
-- [ ] **Test CORS configuration** with extension
 
 ### Cross-Browser Testing
 - [ ] **Chrome** (primary target)
+- [ ] **Firefox**
+- [ ] **Safari**
 - [ ] **Microsoft Edge** (Chromium-based)
-- [ ] **Brave** (Chromium-based)
 
 ---
 
@@ -377,7 +335,7 @@
 ### Support Infrastructure
 - [ ] **Set up support email** (support@flashnote.co)
 - [ ] **Create help documentation / FAQ**
-  - How to install the extension
+  - How to use FlashNote
   - How to generate notes
   - How to manage subscription
   - Troubleshooting common issues
@@ -403,7 +361,6 @@
 - [ ] **All critical security issues resolved**
 - [ ] **Production environment stable for 48+ hours**
 - [ ] **Stripe live mode tested with real $1 charge (refund immediately)**
-- [ ] **Extension approved in Chrome Web Store**
 - [ ] **Legal documents published on website**
 - [ ] **BAA ready to provide to customers**
 - [ ] **Support email working**
@@ -451,10 +408,9 @@
 | Item | Low Estimate | High Estimate |
 |------|--------------|---------------|
 | LLC Formation | $100 | $300 |
-| Chrome Store Developer | $5 | $5 |
 | Domain (1 year) | $12 | $20 |
 | Legal Document Review | $0 | $3,000 |
-| **Total One-Time** | **$117** | **$3,325** |
+| **Total One-Time** | **$112** | **$3,320** |
 
 ### Monthly Recurring Costs
 | Item | Low Estimate | High Estimate |
@@ -500,10 +456,9 @@
 2. Configure monitoring
 3. Run security tests
 
-### Phase 4: Payments & Store (Week 4)
+### Phase 4: Payments (Week 4)
 1. Configure Stripe live mode
-2. Submit extension to Chrome Web Store
-3. Finalize and publish legal documents
+2. Finalize and publish legal documents
 
 ### Phase 5: Beta (Weeks 5-6)
 1. Recruit beta testers
@@ -530,10 +485,6 @@
 - [HITECH Act Text](https://www.congress.gov/bill/111th-congress/house-bill/1/text)
 - [HITECH Breach Notification Rule](https://www.ecfr.gov/current/title-45/subtitle-A/subchapter-C/part-164/subpart-D)
 - [HITECH Safe Harbor (2021)](https://www.congress.gov/bill/116th-congress/house-bill/7898)
-
-### Chrome Web Store
-- [Developer Dashboard](https://chrome.google.com/webstore/devconsole/)
-- [Publishing Documentation](https://developer.chrome.com/docs/webstore/publish/)
 
 ### Payment Processing
 - [Stripe Atlas](https://stripe.com/atlas) (business formation bundle)

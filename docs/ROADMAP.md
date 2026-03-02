@@ -461,18 +461,18 @@ Accumulated follow-up items from Phases 1.3–1.6 code reviews. None are blockin
 
 ### Migration Cleanup
 
-After all 8 sub-phases are verified:
+Completed in PR cleanup commit series (March 2026). All legacy code and documentation removed.
 
-- [ ] Delete `/backend` directory
-- [ ] Delete `/extension` directory
-- [ ] Replace `CLAUDE.md` with `CLAUDE_DRAFT.md` (if not already done)
-- [ ] Archive `guides/API.md` (Express routes no longer apply)
-- [ ] Archive `guides/EXTENSION_DEPLOYMENT.md`
-- [ ] Archive `guides/ENVIRONMENT_VARIABLES.md` (rewrite for Cloud Run env vars)
-- [ ] Archive `planning/IDEA_DUMPING_GROUND.md`
-- [ ] Update `reference/FLASHNOTE_HANDOFF.md` architecture sections
-- [ ] Update `PRE_LAUNCH_CHECKLIST.md` (remove Chrome Web Store items)
-- [ ] Update `STRIPE_TODOS.md` (remove extension sync item)
+- [x] Delete `/backend` directory
+- [x] Delete `/extension` directory
+- [x] Replace `CLAUDE.md` with `CLAUDE_DRAFT.md` (done — current `CLAUDE.md` reflects web-only architecture)
+- [x] Archive `guides/API.md` (Express routes no longer apply) → `docs/archive/guides/API.md`
+- [x] Archive `guides/EXTENSION_DEPLOYMENT.md` → `docs/archive/guides/EXTENSION_DEPLOYMENT.md`
+- [x] Archive `guides/ENVIRONMENT_VARIABLES.md` → `docs/archive/guides/ENVIRONMENT_VARIABLES.md`
+- [x] Archive `planning/IDEA_DUMPING_GROUND.md` → `docs/archive/planning/IDEA_DUMPING_GROUND.md`
+- [x] Update `reference/FLASHNOTE_HANDOFF.md` architecture sections
+- [x] Update `PRE_LAUNCH_CHECKLIST.md` (remove Chrome Web Store items)
+- [ ] Update `STRIPE_TODOS.md` (remove extension sync item) — skipped, not critical for launch/beta
 - [ ] Remove Sentry from all components (replaced by GCP-native monitoring — see [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md))
 
 ---
