@@ -650,7 +650,6 @@ When picking up work, start from the lowest incomplete phase. Don't jump to a la
 1. Update `docs/ROADMAP.md` to mark the item done
 2. Update any other docs affected by the changes
 3. Move fully-implemented planning docs to `docs/archive/`
-4. Update `docs/guides/API.md` if you added/changed endpoints
 
 **Documentation principles:**
 - Keep docs current — outdated docs are worse than no docs

@@ -62,7 +62,7 @@ cron.schedule('0 3 * * *', async () => {
 
 **Retention:** 7 days is safe (Stripe retries for up to 72 hours).
 
-**Query available:** `cleanupOldWebhookEvents(daysToKeep)` in `backend/src/db/queries/webhooks.ts`
+**Query available:** `cleanupOldWebhookEvents(daysToKeep)` in `web/src/server/dal/webhooks.ts`
 
 ---
 
@@ -155,5 +155,4 @@ Stripe → webhook endpoint → signature verification → event routing → dat
 
 - [ROADMAP.md — Stripe section](./ROADMAP.md#stripe) - Remaining task status
 - [PRE_LAUNCH_CHECKLIST.md §3](./PRE_LAUNCH_CHECKLIST.md) - Stripe Dashboard config tasks
-- [API.md](./guides/API.md) - Billing endpoints documentation
 - [BUSINESS_COST_ANALYSIS.md](./reference/BUSINESS_COST_ANALYSIS.md) - Stripe fee analysis
