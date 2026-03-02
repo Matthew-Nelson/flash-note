@@ -4,11 +4,6 @@
  * HIPAA COMPLIANCE:
  * These functions sanitize data before it's sent to Sentry to prevent
  * Protected Health Information (PHI) from being transmitted to external services.
- *
- * NOTE: This mirrors the sanitization logic in:
- * - backend/src/utils/sentry-sanitization.ts
- * - extension/src/shared/sentry-sanitization.ts
- * If you update patterns here, update the other versions too.
  */
 
 /**
