@@ -91,7 +91,7 @@ function VerifyEmailContent() {
               <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Email Verified!</h3>
               <p className="mt-2 text-fn-text-secondary">{message}</p>
               <p className="mt-4 text-sm text-fn-text-muted">
-                You can now use all features in the FlashNote Chrome extension.
+                You can now use all features in FlashNote.
               </p>
               <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
@@ -107,7 +107,7 @@ function VerifyEmailContent() {
               <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Already Verified</h3>
               <p className="mt-2 text-fn-text-secondary">{message}</p>
               <p className="mt-4 text-sm text-fn-text-muted">
-                You can use all features in the FlashNote Chrome extension.
+                You can use all features in FlashNote.
               </p>
               <p className="mt-4 text-sm text-fn-text-secondary">Redirecting...</p>
             </div>
