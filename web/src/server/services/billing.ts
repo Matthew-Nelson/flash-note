@@ -271,7 +271,7 @@ class BillingService {
         subscriptionId,
         customerId,
       },
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       // eslint-disable-next-line no-console
       console.error('Audit log failed:', {
         err,
@@ -329,7 +329,7 @@ class BillingService {
       action: AuditAction.SUBSCRIPTION_CANCELLED,
       status: 'SUCCESS',
       metadata: { subscriptionId: subscription.id },
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       // eslint-disable-next-line no-console
       console.error('Audit log failed:', {
         err,
@@ -380,7 +380,7 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         // eslint-disable-next-line no-console
         console.error('Audit log failed:', {
           err,
@@ -414,7 +414,7 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         // eslint-disable-next-line no-console
         console.error('Audit log failed:', {
           err,
@@ -445,7 +445,7 @@ class BillingService {
           invoiceId: invoice.id,
           billingReason: 'renewal',
         },
-      }).catch((err) => {
+      }).catch((err: unknown) => {
         // eslint-disable-next-line no-console
         console.error('Audit log failed:', {
           err,
@@ -485,7 +485,7 @@ class BillingService {
         invoiceId: invoice.id,
         reason: 'payment_failed',
       },
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       // eslint-disable-next-line no-console
       console.error('Audit log failed:', {
         err,
@@ -554,7 +554,7 @@ class BillingService {
         sessionId: context.sessionId,
         invoiceId: context.invoiceId,
       },
-    }).catch((err) => {
+    }).catch((err: unknown) => {
       // eslint-disable-next-line no-console
       console.error('Audit log failed:', {
         err,
