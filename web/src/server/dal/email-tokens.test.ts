@@ -112,6 +112,21 @@ describe('dal/email-tokens', () => {
       expect(userId).toBeNull();
     });
 
+    it('returns null when token type does not match (type confusion prevention)', async () => {
+      // Simulate: password_reset token submitted to email_verification endpoint.
+      // The WHERE clause enforces token_type = $2, so wrong type → no row.
+      mockDbQuery.mockResolvedValueOnce({ rows: [] }); // no match for wrong type
+
+      const userId = await consumeToken('password-reset-hash', 'email_verification');
+
+      expect(userId).toBeNull();
+
+      // Verify the query uses the token_type parameter — not just the hash
+      const params = mockDbQuery.mock.calls[0][1] as unknown[];
+      expect(params[1]).toBe('email_verification');  // second param is token_type
+      // If the attacker submitted a password_reset token, this mismatch is enforced by SQL
+    });
+
     it('uses provided client instead of db pool', async () => {
       const mockClient = setupMockClient();
       mockClientQuery.mockResolvedValueOnce({

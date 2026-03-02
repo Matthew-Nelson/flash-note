@@ -51,6 +51,23 @@ describe('Web Validation Schemas', () => {
     it('should reject password without number', () => {
       expect(passwordSchema.safeParse('Password').success).toBe(false);
     });
+
+    it('should accept password of exactly 72 characters (bcrypt boundary)', () => {
+      // bcrypt ignores bytes past position 72 — 72 chars is the valid upper limit
+      const password72 = 'A1a' + 'b'.repeat(69); // 3 + 69 = 72 chars
+      expect(passwordSchema.safeParse(password72).success).toBe(true);
+    });
+
+    it('should reject password longer than 72 characters (bcrypt DoS vector)', () => {
+      // Passwords >72 chars are CPU-intensive but provide no extra security.
+      // Enforcing .max(72) prevents CPU DoS against unauthenticated endpoints.
+      const password73 = 'A1a' + 'b'.repeat(70); // 3 + 70 = 73 chars
+      const result = passwordSchema.safeParse(password73);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Password must be 72 characters or fewer');
+      }
+    });
   });
 
   describe('loginSchema', () => {

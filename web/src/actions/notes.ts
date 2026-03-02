@@ -59,14 +59,25 @@ export async function generateNoteAction(
     return { success: false, error: 'email_not_verified' };
   }
 
+  // Get request context early — needed for audit logging and rate limiting
+  const context = await getRequestContext();
+
   // 4. Subscription check
   const subscriptionResult = await checkSubscriptionAccess(session);
   if (!subscriptionResult.allowed) {
+    // HIPAA: log ACCESS_DENIED for subscription gate failures
+    await auditService.log({
+      userId: session.userId,
+      action: AuditAction.ACCESS_DENIED,
+      status: 'FAILURE',
+      metadata: { reason: subscriptionResult.reason, resource: 'note_generation' },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
     return { success: false, error: subscriptionResult.reason };
   }
 
-  // 5. Rate limit
-  const context = await getRequestContext();
+  // 5. Rate limit (context already obtained above)
   const rl = await checkRateLimit(
     generateRateLimit,
     rateLimitKey(context.ipAddress ?? 'unknown', session.userId)

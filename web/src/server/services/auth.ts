@@ -98,6 +98,17 @@ export async function login(
   }
 
   if (lockoutStatus.isLocked) {
+    // HIPAA: Log the authentication attempt for the locked account audit trail.
+    // When a locked account submits the correct password, the normal
+    // recordFailedAttempt path is bypassed. Audit this event separately.
+    await auditService.log({
+      userId: user.id,
+      action: AuditAction.LOGIN_FAILED,
+      status: 'FAILURE',
+      metadata: { reason: 'account_locked', emailProvided: true },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
     // Don't reveal that the password was correct
     return { success: false, error: 'invalid_credentials' };
   }

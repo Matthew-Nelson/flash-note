@@ -72,6 +72,7 @@ export async function createCheckoutAction(
 export async function createPortalAction(): Promise<ActionResult<{ portalUrl: string }>> {
   const session = await getSession();
   if (!session) return { success: false, error: 'unauthenticated' };
+  if (!session.emailVerified) return { success: false, error: 'email_not_verified' };
 
   try {
     const portalUrl = await getBillingService().createPortalSession(session.userId);

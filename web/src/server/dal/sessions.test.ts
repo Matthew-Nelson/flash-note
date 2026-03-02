@@ -234,6 +234,22 @@ describe('Session DAL', () => {
       expect(query).toContain('s.expires_at > NOW()');
     });
 
+    it('returns null for expired sessions (SQL enforces expiry filter)', async () => {
+      // Simulate: DB filters out the expired session (returns empty rows, as it would for
+      // a session where expires_at < NOW()). Application code MUST NOT re-check expiry
+      // on returned rows — the SQL WHERE clause is the single enforcement point.
+      // A real DB integration test would verify the SQL engine actually enforces this.
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await findSessionByTokenHash('expired-hash');
+
+      expect(result).toBeNull();
+
+      // Verify the SQL includes the expiry check — this is the actual security enforcement
+      const query = mockDbQuery.mock.calls[0][0] as string;
+      expect(query).toContain('s.expires_at > NOW()');
+    });
+
     it('should exclude soft-deleted users', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 

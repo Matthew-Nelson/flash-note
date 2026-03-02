@@ -12,6 +12,7 @@ import {
   resetLockout,
   updateUserOrganization,
   clearUserOrganization,
+  recordFailedLoginAttempt,
 } from './users';
 
 describe('User Queries', () => {
@@ -560,6 +561,26 @@ describe('User Queries', () => {
         expect.stringContaining('organization_id = NULL'),
         ['user-123']
       );
+    });
+  });
+
+  describe('recordFailedLoginAttempt', () => {
+    it('SQL CASE WHEN contains correct lockout thresholds (structural guard)', async () => {
+      // This test verifies the SQL text contains the expected threshold values.
+      // It does NOT test SQL execution — that requires a real PostgreSQL integration test.
+      // Purpose: catch accidental edits to the CASE WHEN expression that would break lockout.
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ failed_login_attempts: 1, locked_until: null }] });
+
+      await recordFailedLoginAttempt('user-1');
+
+      const query = mockDbQuery.mock.calls[0][0] as string;
+      // Verify lockout interval thresholds are present in the SQL
+      expect(query).toContain('15');   // 15-minute lockout for 5 attempts
+      expect(query).toContain('60');   // 60-minute lockout for 10 attempts
+      expect(query).toContain('1440'); // 24-hour (1440 min) lockout for 15 attempts
+      // Note: threshold attempt counts (5, 10, 15, 20) are also present but
+      // might collide with other values — validate the full CASE WHEN structure
+      // in a real DB integration test when available.
     });
   });
 });
