@@ -467,7 +467,7 @@ security-scan:
     - name: OWASP ZAP Scan
       uses: zaproxy/action-full-scan@v0.4.0
       with:
-        target: 'https://staging-api.flashnote.co'
+        target: 'https://staging.flashnote.co'
         rules_file_name: '.zap/rules.tsv'
         fail_action: true
 ```
@@ -677,7 +677,7 @@ export const options = {
 };
 
 export default function () {
-  const res = http.post('https://api.flashnote.co/auth/login', {
+  const res = http.post('https://flashnote.co/api/auth/login', {
     email: 'loadtest@example.com',
     password: 'testpassword123',
   });
@@ -895,7 +895,7 @@ export default defineConfig({
 
 ---
 
-> **Implementation status:** Unit testing is complete across all 3 packages (backend 38 files, extension 14 files, web 19 files). E2E foundation exists (37 Playwright tests). Integration tests, DAST, and secret scanning remain. See [ROADMAP.md Tier 4: Testing](../ROADMAP.md#tier-4-testing) for remaining work items.
+> **Implementation status:** Unit testing is complete across all 3 packages (backend 38 files, extension 14 files, web 19 files). E2E foundation exists (37 Playwright tests). Integration tests, DAST, and secret scanning remain. See [ROADMAP.md Testing](../ROADMAP.md#testing) for remaining work items.
 
 ---
 

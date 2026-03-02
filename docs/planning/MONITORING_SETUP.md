@@ -1,19 +1,19 @@
 # FlashNote Monitoring Setup Plan
 
-> **Status: STRATEGY REVISION — GCP-Native Monitoring**
+> **Status: READY TO IMPLEMENT — GCP-Native Monitoring**
 >
 > This document replaces the previous Sentry + Axiom monitoring plan with a consolidated Google Cloud-native approach. See [Decision Record](#decision-record-consolidate-on-gcp-native-monitoring) for rationale.
 >
 > **Completed (prior work):**
-> - [x] Sentry integration across backend, extension, and web (to be removed during migration)
+> - [x] Sentry integration across web app (to be removed after Pino verified in production)
 > - [x] Logging gaps audit — 12 gaps identified and fixed (see `docs/archive/SENTRY_LOGGING_GAPS.md`)
+> - [x] Backend and extension removed (web-only architecture — PR #91)
 >
-> **New plan:**
-> - [ ] Pino structured logger utility
-> - [ ] Replace `Sentry.captureException` calls with structured logging
-> - [ ] Remove `@sentry/node`, `@sentry/nextjs`, `@sentry/browser` dependencies
-> - [ ] Next.js `instrumentation.ts` — `onRequestError` hook for server-side error capture
-> - [ ] Client-side telemetry endpoint (`/api/telemetry`)
+> **Implementation plan (2 PRs):**
+> - [ ] **PR 1**: Pino structured logger + replace ~44 `console.*` calls + client telemetry endpoint + `onRequestError` hook
+> - [ ] **PR 2**: Remove `@sentry/nextjs` and all Sentry config files (blocked on PR 1 production verification)
+>
+> **Ops (post-PRs):**
 > - [ ] Cloud Logging log sink for HIPAA audit retention (6 years)
 > - [ ] Cloud Monitoring alert policies
 > - [ ] UptimeRobot monitors
@@ -174,7 +174,7 @@ pnpm add -D pino-pretty  # local dev only — human-readable output
 ### Logger Utility
 
 ```typescript
-// src/lib/logger.ts
+// src/server/lib/logger.ts
 import pino from 'pino';
 import { createGcpLoggingPinoConfig } from '@google-cloud/pino-logging-gcp-config';
 
@@ -485,64 +485,70 @@ export const onRequestError: Instrumentation.onRequestError = async (
 
 ---
 
-## Sentry Migration Plan
+## Implementation Plan
 
-### Phase 1: Add Pino Logger
+> **Updated March 2026.** Backend and extension have been removed (consolidation to web-only architecture). Sentry surface area is now web-only. Work is split into 2 PRs to avoid a monitoring gap.
 
-Add the Pino logger utility and start using it alongside Sentry. Both systems run in parallel — no risk of losing visibility.
+### PR 1: Pino Logger + Console Migration + Client Telemetry
 
-1. Install `pino` and `@google-cloud/pino-logging-gcp-config`
-2. Create `src/lib/logger.ts`
-3. Add trace correlation middleware
-4. Begin replacing `console.log` / `console.error` calls with `logger.info` / `logger.error`
+Add the Pino logger, replace all `console.*` calls with structured logging, add client-side telemetry, and wire up the `onRequestError` instrumentation hook. Sentry remains active in parallel — no risk of losing visibility.
 
-### Phase 2: Add Client Telemetry Endpoint
+**Scope:**
+1. Install `pino`, `@google-cloud/pino-logging-gcp-config`, `pino-pretty` (dev)
+2. Create `src/server/lib/logger.ts` singleton (prod: GCP JSON, dev: pino-pretty)
+3. Replace ~44 `console.*` calls across 18 production files with structured `logger.error`/`.warn`/`.info`
+4. Create `/api/telemetry` route handler (`src/app/api/telemetry/route.ts`)
+5. Create `src/lib/telemetry.ts` with global error handlers + `reportErrorBoundary`
+6. Initialize telemetry in the root layout
+7. Update error boundaries (`global-error.tsx`, `ErrorBoundary.tsx`) to use `reportErrorBoundary`
+8. Update `instrumentation.ts` `onRequestError` hook to use Pino
+9. Update ~4 test files that spy on `console.error`
 
-1. Create `/api/telemetry` route handler
-2. Create `src/lib/telemetry.ts` with global error handlers
-3. Initialize telemetry in the root layout
-4. Update error boundaries to use `reportErrorBoundary`
+**Note:** `src/server/db/migrate.ts` is a CLI script, not server code — its `console.*` calls can remain as-is.
 
-### Phase 3: Verify GCP Coverage
+**Verify (local):** Tests pass. Build succeeds. Dev server logs via pino-pretty.
+**Verify (staging):** Structured logs appear in Cloud Logging with correct severity. Errors with stack traces appear in Cloud Error Reporting. Client-side errors arrive via telemetry endpoint.
 
-Deploy to Cloud Run and verify:
-- Structured logs appear in Cloud Logging with correct severity levels
-- Errors with stack traces appear in Cloud Error Reporting, properly grouped
-- Trace correlation works (application logs nest under request logs)
-- Client-side errors arrive via the telemetry endpoint
-- Log-based alerts fire correctly
+### PR 2: Sentry Removal (blocked on PR 1 production verification)
 
-### Phase 4: Remove Sentry
+Only after PR 1 is deployed and verified in production:
 
-Only after Phase 3 is verified in production:
-
-1. Remove `@sentry/node` from backend
-2. Remove `@sentry/nextjs` from web app (including `withSentryConfig` in `next.config.ts`)
-3. Remove `@sentry/browser` from extension (if extension is still active)
-4. Remove all `Sentry.captureException` / `captureException` calls (replace with `logger.error`)
-5. Remove all `sentry.*.config.ts` files
-6. Remove all `sentry-sanitization.ts` files
+1. Delete `web/sentry.server.config.ts`
+2. Delete `web/sentry.edge.config.ts`
+3. Delete `web/src/instrumentation-client.ts` (Sentry client init)
+4. Delete `web/src/lib/sentry-sanitization.ts` (PHI redaction now handled by Pino's `redact` config)
+5. Remove `withSentryConfig` wrapper from `web/next.config.ts`
+6. Remove `@sentry/nextjs` from dependencies
 7. Remove Sentry DSN environment variables
-8. Clean up `beforeSend` / `beforeBreadcrumb` hooks (PHI redaction moves to Pino's `redact` config)
+8. Clean up Sentry mock in `web/src/test/setup.ts`
 
-### Files to Modify/Remove
+**Verify:** No Sentry references remain. Build succeeds. Error monitoring confirmed working via Pino/Cloud Error Reporting.
 
-**Remove entirely:**
-- `backend/src/instrument.ts`
-- `backend/src/utils/sentry-sanitization.ts`
-- `web/sentry.client.config.ts`
-- `web/sentry.server.config.ts`
-- `web/sentry.edge.config.ts`
-- `web/src/lib/sentry-sanitization.ts`
-- `extension/src/shared/sentry.ts`
-- `extension/src/shared/sentry-sanitization.ts`
+### Files Summary
 
-**Modify (replace Sentry calls with logger):**
-- All files containing `captureException` (~42 files, ~104 call sites)
-- `web/next.config.ts` (remove `withSentryConfig` wrapper)
-- `web/src/instrumentation.ts` (replace Sentry init with `onRequestError` logger)
-- `web/src/app/global-error.tsx` (use `reportErrorBoundary` instead of Sentry)
-- `web/src/components/ErrorBoundary.tsx` (use `reportErrorBoundary`)
+**PR 1 — Create:**
+| File | Description |
+|------|-------------|
+| `web/src/server/lib/logger.ts` | Pino logger singleton (prod: GCP JSON, dev: pino-pretty) |
+| `web/src/app/api/telemetry/route.ts` | Client-side error ingestion endpoint |
+| `web/src/lib/telemetry.ts` | Browser-side error handlers + `reportErrorBoundary` |
+
+**PR 1 — Modify (~18 files):** All production files containing `console.error`/`console.log`/`console.warn` calls, plus error boundaries and `instrumentation.ts`.
+
+**PR 2 — Delete:**
+| File | Notes |
+|------|-------|
+| `web/sentry.server.config.ts` | Sentry server init |
+| `web/sentry.edge.config.ts` | Sentry edge init |
+| `web/src/instrumentation-client.ts` | Sentry client init + `onRouterTransitionStart` |
+| `web/src/lib/sentry-sanitization.ts` | PHI redaction (moves to Pino `redact`) |
+
+**PR 2 — Modify:**
+| File | Change |
+|------|--------|
+| `web/next.config.ts` | Remove `withSentryConfig` wrapper |
+| `web/src/test/setup.ts` | Remove `captureException` mock |
+| `web/package.json` | Remove `@sentry/nextjs` |
 
 ---
 
@@ -648,7 +654,7 @@ Cloud Monitoring alert policies monitor from inside GCP. UptimeRobot provides ex
 
 | Monitor | URL | Interval |
 |---|---|---|
-| API Health | `https://api.flashnote.co/health` | 5 min |
+| Health Check | `https://flashnote.co/api/health` | 5 min |
 | Web App | `https://flashnote.co` | 5 min |
 
 ---
@@ -659,18 +665,6 @@ Cloud Monitoring alert policies monitor from inside GCP. UptimeRobot provides ex
 # .github/dependabot.yml
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/backend"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
-  - package-ecosystem: "npm"
-    directory: "/extension"
-    schedule:
-      interval: "weekly"
-    open-pull-requests-limit: 5
-
   - package-ecosystem: "npm"
     directory: "/web"
     schedule:

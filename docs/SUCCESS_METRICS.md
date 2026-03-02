@@ -1,6 +1,6 @@
 # FlashNote Success Metrics & Quality Gates
 
-**Created:** January 2025
+**Created:** February 2026
 **Purpose:** Define measurable pass/fail criteria for production readiness
 
 > **Note:** This document defines *what must be true* (quality gates). For *what to work on next* (task tracking), see [ROADMAP.md](./ROADMAP.md). For business/ops tasks, see [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md).
@@ -22,7 +22,7 @@
 | Metric | Target | Current |
 |--------|--------|---------|
 | Web test coverage | ≥80% | ✅ 99%+ line, 95%+ branch (764 tests) |
-| Security vulnerabilities | 0 critical, 0 high | ✅ 0 CRITICALs; ❌ 10 HIGHs open — see [CONSOLIDATED_AUDIT](./compliance/CONSOLIDATED_AUDIT_2026_02.md) |
+| Security vulnerabilities | 0 critical, 0 high | ✅ 0 CRITICALs; ✅ 16/18 HIGHs resolved (H-5 resolved by architecture, H-12 fixed in Phase 1.1) — see [ROADMAP.md Phase 0](./ROADMAP.md#phase-0-pre-migration-foundations) |
 | HIPAA checklist complete | 100% | ~85% (infra items pending deployment) |
 | Lighthouse performance score | ≥90 | Not measured |
 | API response time (p95) | <500ms | Not measured |
@@ -58,7 +58,7 @@ These items must be complete before beta testing with real PTs.
 | BETA-04 | Trial expiration enforced | Web | P0 | ✅ Done (manually verified) |
 | BETA-05 | Rate limiting works (verified) | Web | P0 | ✅ Done (Upstash Redis limits enforced) |
 | BETA-06 | Password validation matches spec | Web | P0 | ✅ Done |
-| BETA-07 | Web dashboard shows real data | Web | P0 | ⚠️ Auth/subscription live, usage tracking ready |
+| BETA-07 | Web dashboard shows real data | Web | P0 | ✅ Done (Server Component with real DAL data since Phase 1.4) |
 | BETA-08 | Privacy policy page exists | Web | P0 | ✅ Done |
 | BETA-09 | Terms of service page exists | Web | P0 | ✅ Done |
 
@@ -73,15 +73,15 @@ These items must be complete before public launch.
 | PROD-03 | All secrets in env vars (no hardcoding) | Web | P0 | ✅ Done |
 | PROD-04 | Database encrypted at rest | Infra | P0 | ❌ Not deployed |
 | PROD-05 | TLS 1.2+ enforced | Infra | P0 | ❌ Not deployed |
-| PROD-06 | Vertex AI BAA signed (HIPAA) | Infra | P0 | ❌ Not done |
-| PROD-07 | Audit logs retained 6 years | Web | P0 | ❌ Not implemented |
-| PROD-08 | Error tracking (Sentry) configured | Web | P1 | ✅ Done |
-| PROD-09 | BAA template available for customers | Docs | P0 | ❌ Not done |
-| PROD-10 | Incident response plan documented | Docs | P1 | ❌ Not done |
+| PROD-06 | Vertex AI BAA signed (HIPAA) | Infra | P0 | ✅ Done (signed Feb 2026 via GCP Console) |
+| PROD-07 | Audit logs retained 6 years | Web | P0 | ⚠️ Partial — DB immutability protections done (migration 012), Cloud Logging sink for 6-year retention not yet configured |
+| PROD-08 | Error monitoring configured | Web | P1 | ⚠️ Transitioning — Sentry active, replacing with GCP-native monitoring (Pino + Cloud Logging). See [Deployment Readiness](./ROADMAP.md#deployment-readiness) Steps 1+5. |
+| PROD-09 | BAA template available for customers | Docs | P0 | ⚠️ Partial — template exists at `docs/legal/BAA_TEMPLATE.md`; `/baa` page live but pending legal review |
+| PROD-10 | Incident response plan documented | Docs | P1 | ✅ Done — see [INCIDENT_RESPONSE_PLAN.md](./compliance/INCIDENT_RESPONSE_PLAN.md) |
 | PROD-11 | WCAG 2.1 AA accessibility | Web | P2 | ❌ Not done |
-| PROD-12 | Audit logging workflow complete | Web | P0 | ❌ Not done |
+| PROD-12 | Audit logging workflow complete | Web | P0 | ⚠️ Partial — audit logging implemented (DAL, immutability via migration 012, all auth/billing events logged). Remaining: 6-year retention automation (Cloud Logging sink), admin export API. |
 
-> **PROD-16 Details:** Implement admin API for viewing/exporting audit logs, add database-level immutability protections, and document retention policy. See [compliance/AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md) for full requirements.
+> **PROD-12 Details:** Database-level immutability protections are done (migration 012). Audit events are logged for auth, billing, and access control. Remaining: Cloud Logging sink for 6-year retention (see [Deployment Readiness](./ROADMAP.md#deployment-readiness)), admin API for viewing/exporting logs.
 
 ---
 
@@ -116,19 +116,19 @@ These items must be complete before public launch.
 | **Billing** | 14-day trial | CLAUDE.md | ✅ Done |
 | **Testing** | Vitest configured | Best practice | ✅ Done |
 | **Testing** | Auth service tests | Critical | ✅ Done |
-| **Testing** | API endpoint tests | Critical | ⚠️ Partial |
+| **Testing** | API endpoint tests | Critical | ✅ Done (Phase 1.7 integration tests) |
 
 ### Web Requirements
 
 | Category | Requirement | Spec Reference | Status |
 |----------|-------------|----------------|--------|
-| **Framework** | Next.js 14+ App Router | CLAUDE.md | ✅ Done |
+| **Framework** | Next.js 16 App Router | CLAUDE.md | ✅ Done |
 | **TypeScript** | Strict mode | CLAUDE.md | ✅ Done |
 | **Pages** | Landing page | Handoff §5 | ✅ Done |
 | **Pages** | Pricing page | Handoff §5 | ✅ Done |
 | **Pages** | Login page | Handoff §5 | ✅ Done |
 | **Pages** | Signup page | Handoff §5 | ✅ Done |
-| **Pages** | Dashboard | Handoff §5 | ⚠️ Usage data mock |
+| **Pages** | Dashboard | Handoff §5 | ✅ Done (Server Component with real DAL data) |
 | **Pages** | Privacy policy | Legal | ✅ Done |
 | **Pages** | Terms of service | Legal | ✅ Done |
 | **Auth** | Session-based authentication | Core | ✅ Done |
@@ -145,6 +145,8 @@ These items must be complete before public launch.
 ---
 
 ## Security & HIPAA Checklist
+
+> **Note on "Tested" column:** "Tested" below means formal external verification (e.g., penetration test, manual QA protocol). Most security behaviors are exercised by the 764-test unit/integration suite (Phase 1.7), but have not been formally verified by an external party.
 
 ### Authentication Security
 

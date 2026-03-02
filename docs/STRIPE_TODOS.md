@@ -46,7 +46,7 @@ $$);
 **Option B: External cron job**
 ```bash
 # Add to crontab or use a scheduler like AWS EventBridge
-0 3 * * * curl -X POST https://api.flashnote.co/admin/cleanup-webhook-events
+0 3 * * * curl -X POST https://flashnote.co/api/cleanup/webhook-events
 ```
 
 **Option C: Application-level scheduled task**

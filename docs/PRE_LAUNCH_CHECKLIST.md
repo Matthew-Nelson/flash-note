@@ -156,7 +156,7 @@
 **For Production:**
 - [ ] **Set up Webhook endpoint in Stripe Dashboard**
   - Go to Developers → Webhooks → Add endpoint
-  - Endpoint URL: `https://flashnote.co/api/webhooks/stripe`
+  - Endpoint URL: `https://flashnote.co/api/webhooks/stripe` (single-origin — no `api.` subdomain)
   - Subscribe to required events:
     - `checkout.session.completed`
     - `customer.subscription.updated`
@@ -171,9 +171,10 @@
   - Test cancellation
   - Test failed payments (use card `4000000000000341`)
   - Test successful renewal
-- [ ] **Configure webhook event cleanup job**
-  - The `processed_webhook_events` table needs periodic cleanup
-  - Set up daily cron job to delete events older than 7 days
+- [ ] **Configure webhook event cleanup job scheduling**
+  - DAL function exists (`cleanupOldWebhookEvents` in `web/src/server/dal/webhooks.ts`)
+  - Route Handler exists (`/api/cleanup/webhook-events`)
+  - Needs: Cloud Scheduler trigger to call the route on a daily cron
   - See `docs/STRIPE_TODOS.md` Operations section for options
 - [ ] **Switch to Stripe live mode** when ready
 
@@ -215,7 +216,7 @@
   - [ ] Configure environment variables (Cloud Run secrets or Secret Manager)
   - [ ] Set up SSL/TLS (automatic with Cloud Run custom domains)
   - [ ] Configure custom domain (flashnote.co)
-  - [ ] Configure min/max instances for scaling
+  - [ ] Configure min/max instances for scaling (deploy.yml defaults to `min-instances=0` for pre-launch cost savings; **increase to 1 before production traffic** to avoid cold starts)
 
 - [ ] **Deploy Production Database (Cloud SQL)**
   - [ ] Create Cloud SQL PostgreSQL instance with encryption at rest
@@ -247,7 +248,7 @@
 
 > The authoritative security audit is [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED_AUDIT_2026_02.md) (Feb 2026, 69 findings). The original `SECURITY_AUDIT.md` (Jan 2026) has been archived — its findings were resolved, but the consolidated audit found additional issues.
 
-**Current status:** All 5 CRITICALs resolved; 10 of 18 HIGH findings open. 23 of 69 total findings remediated. See [ROADMAP.md Tier 1: Security Hardening](./ROADMAP.md#tier-1-security-hardening) for task tracking.
+**Current status:** All 5 CRITICALs resolved. 16 of 18 HIGH findings resolved (remaining 2 are moot or resolved by architecture). Majority of MEDIUM/LOW findings resolved by migration (extension removed, Express replaced, sessions replaced JWT). See [ROADMAP.md Phase 0](./ROADMAP.md#phase-0-pre-migration-foundations) for full audit disposition.
 
 ---
 
@@ -267,7 +268,6 @@
   - [ ] Login with valid credentials
   - [ ] Login with invalid credentials (rate limiting)
   - [ ] Login with unverified email (should work but flag `emailVerified: false`)
-  - [ ] Token refresh
   - [ ] Logout
   - [ ] Request password reset
   - [ ] Complete password reset (click link from email)
@@ -412,7 +412,7 @@
 ### Monthly Recurring Costs
 | Item | Low Estimate | High Estimate |
 |------|--------------|---------------|
-| Hosting (API + DB) | $15 | $100 |
+| Hosting (Cloud Run + Cloud SQL) | $15 | $100 |
 | Email/Productivity | $0 | $12 |
 | Monitoring | $0 | $20 |
 | **Total Monthly** | **$15** | **$132** |
@@ -489,5 +489,5 @@
 
 ---
 
-*Last Updated: February 2026*
+*Last Updated: March 2026*
 *This checklist should be reviewed with legal and financial professionals for your specific situation.*

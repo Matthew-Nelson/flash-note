@@ -16,21 +16,23 @@ Work is organized into phases by dependency order. Complete each phase before st
 
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
-| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
+| **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
-| **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
+| **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | **← Start here.** Monitoring PR 1 (Pino Logger) |
+| **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
+| **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
 
 **Why this order:**
 - **Phase 0** handles infrastructure and framework-agnostic fixes that apply regardless of the migration. Unblocks the Google Cloud BAA and hardens the database schema. No wasted work — everything here transfers.
 - **Phase 1** is the architectural pivot. Express backend and Chrome extension are removed; everything consolidates into a single Next.js app on Cloud Run. This is the largest body of work and the foundation for everything after.
-- **Phase 2** is the competitive pivot — patients, notes, templates. Blocked on Phase 1 completion and HIPAA infrastructure.
-- **Phase 3** is important but non-differentiating. UI quality, testing, clinic features, monitoring — all scoped to the new architecture.
+- **Deployment Readiness** is the bridge between "code passes tests locally" and "app is live and accepting users." Monitoring, pipeline hardening, infrastructure provisioning, staging verification, and Stripe live mode — everything needed to go from code-complete to production.
+- **Phase 2** is the competitive pivot — patients, notes, templates. Blocked on deployment readiness and HIPAA infrastructure.
+- **Phase 3** is important but non-differentiating. Testing, accessibility, clinic features — all scoped to the new architecture and sequenced after the app is live.
 
 ### Architecture Decision
 
-FlashNote is consolidating from three components (Express backend + Chrome extension + Next.js web app) to a **single Next.js application** deployed on Google Cloud Run. Full analysis and rationale: [planning/NEXTJS_MIGRATION_PLAN.md](./planning/NEXTJS_MIGRATION_PLAN.md)
+FlashNote is consolidating from three components (Express backend + Chrome extension + Next.js web app) to a **single Next.js application** deployed on Google Cloud Run. Full analysis and rationale: [planning/NEXTJS_MIGRATION_PLAN.md](./archive/planning/NEXTJS_MIGRATION_PLAN.md)
 
 **Key decisions:**
 - Pure Next.js with Data Access Layer (DAL) — single codebase, single authorization point
@@ -202,9 +204,7 @@ Previously resolved: M-2, M-26 (`af50b29`), M-3 (`44319a8`), M-5, M-6 (`63b3d10`
 
 ## Phase 1: Next.js Migration
 
-Full plan: [planning/NEXTJS_MIGRATION_PLAN.md](./planning/NEXTJS_MIGRATION_PLAN.md) | CLAUDE.md draft: `CLAUDE_DRAFT.md` (project root)
-
-> **Before starting Phase 1:** Adopt `CLAUDE_DRAFT.md` as the new `CLAUDE.md`. The draft reflects the new architecture and its patterns.
+Full plan: [planning/NEXTJS_MIGRATION_PLAN.md](./archive/planning/NEXTJS_MIGRATION_PLAN.md) (archived — migration complete)
 
 Each sub-phase is independently testable and committable. **Tests are written alongside each phase, not retrofitted at the end.** Verify the current phase before starting the next.
 
@@ -308,7 +308,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | # | Item | Blocked By | Notes |
 |---|------|-----------|-------|
-| 1 | `/baa` web page | — | Currently 404. Deferred from 1.4 — standalone content page, not dependent on middleware/auth changes. |
+| 1 | `/baa` web page | — | ⚠️ Live but showing "PENDING LEGAL REVIEW" — awaiting legal counsel to finalize content. |
 | 2 | Billing portal buttons (Manage subscription, Update payment) | Phase 1.6 (Billing) | ✅ Done — `ManageSubscriptionButton` Client Component added; portal action wired up |
 | 3 | Checkout success polling | Phase 1.6 (Billing) | ✅ Done — `CheckoutSuccessAlert` Client Component added to dashboard |
 
@@ -449,10 +449,10 @@ Accumulated follow-up items from Phases 1.3–1.6 code reviews. None are blockin
 
 | # | Item | Source | Priority | Notes |
 |---|------|--------|----------|-------|
-| 1 | Replace `console.error` with Pino `logger.error` across all server code | 1.3 #1 | P1 | ~21 `console.error` calls with TODO comments. Blocks Cloud Error Reporting grouping. Fix when Pino infrastructure lands (Phase 3 Monitoring). |
+| 1 | Replace `console.*` with Pino structured logging across all server code | 1.3 #1 | P1 | ~44 `console.*` calls across 18 production files. Blocks Cloud Error Reporting grouping. Included in Phase 3 Monitoring PR 1 (Pino Logger). |
 | 2 | Lockout audit gap: locked accounts with correct password | 1.3 #2 | P2 | Correct password on permanently locked account skips `recordFailedAttempt()`. Audit trail gap for HIPAA. |
 | 3 | Audit test mocks that violate production contracts | 1.3 #3 | P2 | 17 dead try/catch blocks passed coverage via mocks that reject (real implementation swallows). False confidence in coverage. |
-| 4 | `/baa` web page | 1.4 #1 | P2 | Currently 404. Standalone content page. |
+| 4 | `/baa` web page | 1.4 #1 | P2 | ⚠️ Live but showing "PENDING LEGAL REVIEW" — awaiting legal counsel to finalize content. |
 | 5 | Auth security test gaps (7 items) | 1.4.5 | P1 | ✅ Done (Phase 1.7) — All 7 gaps addressed: production cookie flag, rate limit blocking (3 actions), bcrypt `.max(72)`, token type confusion, lockout SQL threshold, expired session contract. |
 | 6 | Enforce `CLEANUP_SECRET` in production config | 1.6 #1 | P2 | ✅ Done (Phase 1.7) — See 1.6 follow-up #1. |
 | 7 | Add `emailVerified` check to `createPortalAction` | 1.6 #2 | P3 | ✅ Done (Phase 1.7) — See 1.6 follow-up #2. |
@@ -476,6 +476,117 @@ Completed in PR cleanup commit series (March 2026). All legacy code and document
 - [ ] Refactor `/shared` design system into `web/design-system/` — no longer "shared" between packages; move to web root alongside `tailwind.config.ts` and update import paths
 - [ ] Update `STRIPE_TODOS.md` (remove extension sync item) — skipped, not critical for launch/beta
 - [ ] Remove Sentry from all components (replaced by GCP-native monitoring — see [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md))
+
+---
+
+## Deployment Readiness
+
+The bridge between "code passes tests locally" and "app is live accepting beta users." Steps are dependency-ordered — complete each before starting the next.
+
+Full monitoring plan: [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md)
+
+### Step 1: Monitoring PR 1 — Pino Logger + Console Migration + Client Telemetry (~5 SP)
+
+Need observability before deploying to any environment. Sentry remains active in parallel.
+
+| Item | Status |
+|------|--------|
+| Logging gaps audit (12 gaps fixed) | ✅ Done (patterns transfer to new logger) |
+| Install `pino` + `@google-cloud/pino-logging-gcp-config` + `pino-pretty` (dev) | ❌ |
+| Create `server/lib/logger.ts` singleton (prod: GCP JSON, dev: pino-pretty) | ❌ |
+| Replace ~44 `console.*` calls across 18 production files with structured Pino logging | ❌ |
+| Create `/api/telemetry` route handler for client-side error ingestion | ❌ |
+| Create `lib/telemetry.ts` with global error handlers + `reportErrorBoundary` | ❌ |
+| Wire error boundaries (`global-error.tsx`, `ErrorBoundary.tsx`) to telemetry | ❌ |
+| Update `instrumentation.ts` `onRequestError` hook to use Pino | ❌ |
+| Update ~4 test files that spy on `console.error` | ❌ |
+| **Verify**: Tests pass. Build succeeds. Dev server logs via pino-pretty. | |
+
+### Step 2: Pipeline Hardening PR (~2 SP)
+
+Fix the deploy pipeline before the first real deployment.
+
+| Item | Status |
+|------|--------|
+| Add DB migration step to `deploy.yml` (run migrations before traffic cutover) | ❌ |
+| Deep health check — `/api/health` probes DB connectivity, not just `{ status: 'ok' }` | ❌ |
+| Remove stale `NEXT_PUBLIC_API_URL` build arg from Dockerfile + deploy.yml | ✅ Done (Dockerfile cleaned; deploy.yml build arg removed) |
+| Replace Sentry TODO in deploy.yml with removal note | ✅ Done |
+| Add `min-instances` comment in deploy.yml (increase to 1 before production traffic) | ✅ Done |
+| Remove dead `develop` branch from ci.yml triggers | ✅ Done |
+| **Verify**: CI passes. Docker build succeeds. Pipeline is clean. | |
+
+### Step 3: GCP Infrastructure Provisioning (ops)
+
+Provision the production environment. No code changes — all infrastructure/console work.
+
+| Item | Status |
+|------|--------|
+| Create GCP project and enable Cloud Run, Cloud SQL, Artifact Registry APIs | ❌ |
+| Enable Vertex AI API (`aiplatform.googleapis.com`) — required for HIPAA-compliant LLM access | ❌ |
+| Create LLM service account with `roles/aiplatform.user` (or assign to Cloud Run runtime SA) | ❌ |
+| Provision Cloud SQL PostgreSQL — encryption at rest (default), `require_ssl = true`, automatic backups | ❌ |
+| Configure Secret Manager with runtime secrets (DB URL, Stripe keys, Upstash Redis, Resend API key) | ❌ |
+| Set Cloud Run env vars: `GEMINI_USE_ADC=true`, `GCP_PROJECT_ID`, `GCP_REGION` (Vertex AI ADC config — replaces consumer API key) | ❌ |
+| Set up Workload Identity Federation for GitHub Actions (keyless auth) | ❌ |
+| Configure custom domain (flashnote.co) with SSL | ❌ |
+| Set GitHub repository secrets (`GCP_REGION`, `GCP_PROJECT_ID`, `GCP_WORKLOAD_IDENTITY_PROVIDER`, `GCP_SA_EMAIL`, `GCP_SA_RUNTIME_EMAIL`) | ❌ |
+| **Verify**: `gcloud run deploy` succeeds. Cloud SQL reachable over SSL. Secrets accessible. Domain resolves. | |
+
+### Step 4: First Staging Deploy + Verification
+
+Deploy `main` and verify the full system works end-to-end in a real environment.
+
+| Item | Status |
+|------|--------|
+| Push to `main` → CI passes → deploy pipeline builds + deploys to Cloud Run | ❌ |
+| Verify Pino structured logs appear in Cloud Logging with correct severity levels | ❌ |
+| Verify errors with stack traces appear in Cloud Error Reporting, properly grouped | ❌ |
+| Verify client-side errors arrive via `/api/telemetry` endpoint | ❌ |
+| Verify health check probes pass (Cloud Run startup + liveness) | ❌ |
+| Verify Vertex AI ADC is active — note generation uses `GEMINI_USE_ADC=true` endpoint, not consumer API key | ❌ |
+| Smoke test: register → verify email → login → generate note → logout | ❌ |
+| Smoke test: Stripe checkout (test mode) → webhook → subscription active → notes unlocked | ❌ |
+| **Verify**: App is live, monitored, and functional. All smoke tests pass. | |
+
+### Step 5: Monitoring PR 2 — Sentry Removal (~2 SP)
+
+Only after Pino is verified working in the deployed environment.
+
+| Item | Status |
+|------|--------|
+| Delete Sentry config files (`sentry.server.config.ts`, `sentry.edge.config.ts`, `instrumentation-client.ts`, `sentry-sanitization.ts`) | ❌ |
+| Remove `withSentryConfig` from `next.config.ts` | ❌ |
+| Remove `@sentry/nextjs` dependency | ❌ |
+| Remove `NEXT_PUBLIC_SENTRY_DSN` build arg from Dockerfile + deploy.yml | ❌ |
+| Clean up Sentry test mocks in `test/setup.ts` | ❌ |
+| **Verify**: No Sentry references remain. Build succeeds. Error monitoring confirmed working via Pino/Cloud Logging. | |
+
+### Step 6: Stripe Live Mode (ops)
+
+Switch from Stripe test mode to live mode with real payment processing.
+
+| Item | Status |
+|------|--------|
+| Complete Stripe identity verification (business docs, bank account) | ❌ |
+| Create production webhook endpoint in Stripe Dashboard (`flashnote.co/api/webhooks/stripe`) | ❌ |
+| Configure production webhook signing secret in Secret Manager | ❌ |
+| Test with real $1 charge (refund immediately) | ❌ |
+| Verify webhook processes correctly in production | ❌ |
+| **Verify**: Real payments work. Webhooks fire and process. Subscription status updates. | |
+
+### Step 7: Beta Launch Gate
+
+Everything needed before inviting beta users with real patient data.
+
+| Item | Status |
+|------|--------|
+| Increase `min-instances` from 0 to 1 in deploy.yml (avoid cold starts for real users) | ❌ |
+| Legal documents published on site (Terms, Privacy Policy, BAA) | ❌ |
+| Support email working (support@flashnote.co) | ❌ |
+| 48-hour stability soak — no errors, no crashes, monitoring clean | ❌ |
+| Recruit 5-10 PT beta testers (see [PRE_LAUNCH_CHECKLIST.md §8](./PRE_LAUNCH_CHECKLIST.md)) | ❌ |
+| **Gate**: All items checked → invite beta users via invite codes | |
 
 ---
 
@@ -520,7 +631,7 @@ All items scoped to the new Next.js architecture. No extension work.
 
 ### ~~UI Quality~~ — Deprecated
 
-> **Superseded by [planning/UI_RULES.md](./planning/UI_RULES.md).** All 19 items from the UI audit (clipboard, contrast, ARIA, semantic HTML, focus management, responsive, design tokens) are codified as build-from-scratch rules in UI_RULES.md. The UI is being rebuilt — retrofitting fixes onto pages that will be rewritten is wasted work. Dark mode and print styles are explicitly cut.
+> **Superseded by UI build rules in CLAUDE.md.** All 19 items from the UI audit (clipboard, contrast, ARIA, semantic HTML, focus management, responsive, design tokens) are codified as build-from-scratch rules. The UI is being rebuilt — retrofitting fixes onto pages that will be rewritten is wasted work. Dark mode and print styles are explicitly cut.
 >
 > Original audit details preserved in [compliance/UI_AUDIT.md](./compliance/UI_AUDIT.md) for reference.
 
@@ -556,21 +667,18 @@ Full plan: [planning/ACCESSIBILITY_IMPLEMENTATION.md](./planning/ACCESSIBILITY_I
 | 4 | E2E accessibility audits (`@axe-core/playwright`) | ❌ |
 | 5 | Dev-time overlay (`@axe-core/react`) | ❌ |
 
-### Monitoring
+### Monitoring (Post-Launch Ops)
 
 Full plan: [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md)
 
-> **Strategy change:** Monitoring is consolidating from Sentry + Axiom to GCP-native tooling (Cloud Logging + Cloud Error Reporting + Cloud Monitoring). Single BAA, $0/mo, zero additional vendors. See decision record in MONITORING_SETUP.md for rationale.
+> Pino logger setup (PR 1) and Sentry removal (PR 2) are tracked in [Deployment Readiness](#deployment-readiness) — they're deployment-blocking, not post-launch work.
 
-| Component | Status |
-|-----------|--------|
-| Logging gaps audit (12 gaps fixed) | ✅ Done (patterns transfer to new logger) |
-| Pino structured logger + `@google-cloud/pino-logging-gcp-config` | ❌ |
-| Client-side telemetry endpoint (`/api/telemetry`) | ❌ |
-| Next.js `onRequestError` instrumentation hook | ❌ |
-| Remove Sentry from all components | ❌ — after GCP logging verified in production |
+These items are operational configuration after the app is live and Pino is verified:
+
+| Item | Status |
+|------|--------|
 | Cloud Logging log sink for HIPAA audit retention (6 years) | ❌ |
-| Cloud Monitoring alert policies | ❌ |
+| Cloud Monitoring alert policies (error spikes, auth failures, billing webhook failures) | ❌ |
 | UptimeRobot monitors (external uptime validation) | ❌ |
 
 ### Clinic Features (Waves 2-4)
@@ -664,7 +772,7 @@ Post-launch:
 
 | Document | Role |
 |----------|------|
-| [planning/NEXTJS_MIGRATION_PLAN.md](./planning/NEXTJS_MIGRATION_PLAN.md) | Migration analysis, architecture decisions, build order, infrastructure |
+| [planning/NEXTJS_MIGRATION_PLAN.md](./archive/planning/NEXTJS_MIGRATION_PLAN.md) | Migration analysis, architecture decisions, build order, infrastructure |
 | [SUCCESS_METRICS.md](./SUCCESS_METRICS.md) | Quality gate criteria (pass/fail definitions) |
 | [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) | Business, legal, and ops tasks |
 | [STRIPE_TODOS.md](./STRIPE_TODOS.md) | Stripe reference (architecture, test cards, security) |
@@ -675,4 +783,4 @@ Post-launch:
 | [planning/PROMPT_ENGINEERING_RESEARCH.md](./planning/PROMPT_ENGINEERING_RESEARCH.md) | Prompt optimization research |
 | [planning/APP_GATING_STRATEGY.md](./planning/APP_GATING_STRATEGY.md) | Clinic feature design spec (Waves 1-4) |
 | [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md) | Monitoring stack setup plan |
-| [planning/UI_RULES.md](./planning/UI_RULES.md) | UI build rules (supersedes UI Quality phase) |
+| CLAUDE.md (Code Quality Standards + UI patterns) | UI build rules (supersedes UI Quality phase) |

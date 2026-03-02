@@ -57,6 +57,8 @@ jobs:
       # UPSTASH_REDIS_REST_TOKEN, SENTRY_DSN, etc.) are configured in Cloud Run
       # console or via Secret Manager — not passed in this workflow to avoid
       # storing them as GitHub secrets when they only need to exist in GCP.
+      # min-instances=0 is pre-launch cost savings.
+      # Increase to 1 before production traffic to avoid cold starts on every request.
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy flashnote \

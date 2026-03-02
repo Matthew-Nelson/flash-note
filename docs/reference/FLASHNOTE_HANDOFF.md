@@ -700,8 +700,8 @@ The base schema has been extended with additional migrations:
 
 ### Base URL
 
-- Development: `http://localhost:4000`
-- Production: `https://api.flashnote.co`
+- Development: `http://localhost:3000`
+- Production: `https://flashnote.co` (single-origin — no separate API subdomain)
 
 ### Authentication
 

@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-FlashNote processes Protected Health Information (PHI) and is legally classified as a **Business Associate** under HIPAA. The core technical implementation is complete — both signup flows now include BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records.
+FlashNote processes Protected Health Information (PHI) and is legally classified as a **Business Associate** under HIPAA. The core technical implementation is complete — the web signup flow includes BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records.
 
 **Remaining items:**
 - ❌ `/baa` web page does not exist (signup forms link to it — users get 404)
@@ -97,9 +97,9 @@ Both serve different legal purposes under different laws:
 
 ## Current State Assessment
 
-> **Updated February 8, 2026:** All technical implementation items below are now complete. The signup flows have been unified across web and extension (see PR #47).
+> **Updated March 2026:** All technical implementation items below are complete. The web signup flow includes BAA acceptance (PR #47). The Chrome extension was removed in the web-only architecture consolidation (PR #91).
 
-### Web Signup Flow (`web/src/app/signup/page.tsx`) — ✅ IMPLEMENTED
+### Web Signup Flow (`web/src/app/(auth)/signup/page.tsx`) — ✅ IMPLEMENTED
 
 **What's implemented:**
 - ✅ Confirm password field with validation
@@ -108,30 +108,7 @@ Both serve different legal purposes under different laws:
 - ✅ `acceptedLegalTerms` sent to backend and stored
 - ✅ Zod validation requires acceptance before registration
 
-**Remaining issue:** `/baa` page does not exist — link returns 404
-
-### Extension Signup Flow (`extension/src/sidepanel/components/LoginForm.tsx`) — ✅ IMPLEMENTED
-
-**What's implemented:**
-- ✅ Confirm password field with validation
-- ✅ Required checkbox for legal acceptance (`acceptedLegalTerms` state)
-- ✅ Links to BAA (`flashnote.co/baa`), Terms, Privacy (open in new tab)
-- ✅ `acceptedLegalTerms` sent to backend and stored
-- ✅ Shared validation schemas enforce acceptance
-
-**Remaining issue:** `flashnote.co/baa` page does not exist — link returns 404
-
-### Form Field Parity — ✅ UNIFIED
-
-| Feature | Web | Extension |
-|---------|-----|-----------|
-| Confirm Password Field | ✅ Yes | ✅ Yes |
-| Password requirements hint | ✅ Yes | ✅ Yes |
-| Terms of Service link | ✅ Yes | ✅ Yes |
-| Privacy Policy link | ✅ Yes | ✅ Yes |
-| BAA link | ✅ Yes | ✅ Yes |
-| Explicit checkbox | ✅ Yes | ✅ Yes |
-| Backend stores acceptance | ✅ Yes | ✅ Yes |
+**Remaining issue:** `/baa` page is live but showing "PENDING LEGAL REVIEW" — awaiting legal counsel to finalize
 
 ---
 
@@ -198,31 +175,7 @@ Two separate checkboxes:
 - ⚠️ Slightly more friction
 - ⚠️ Two documents to maintain
 
-### Priority 2: Standardize Signup Forms (P0)
-
-**Required changes:**
-
-1. **Extension: Add confirm password field**
-   - Update `extension/src/shared/schemas.ts` to include confirmPassword
-   - Add confirmPassword input field to LoginForm
-   - Match web validation behavior
-
-2. **Extension: Add legal acceptance**
-   - Add Terms/Privacy/BAA checkbox(es) above submit button
-   - Link to web-hosted legal pages
-   - Store acceptance in signup API call
-
-3. **Web: Add explicit checkbox**
-   - Replace passive text with required checkbox
-   - Include BAA reference
-   - Add HIPAA acknowledgment
-
-4. **Both: Consistent styling**
-   - Same field order: email, password, confirm password, checkboxes
-   - Same validation messages
-   - Same error handling
-
-### Priority 3: Update Legal Documents (P0)
+### Priority 2: Update Legal Documents (P0)
 
 **Files to modify:**
 
@@ -241,7 +194,7 @@ Two separate checkboxes:
    - Update to render new ToS with embedded BAA
    - Ensure Section 9 is clearly marked/styled
 
-### Priority 4: Backend Changes (P1)
+### Priority 3: Backend Changes (P1)
 
 **Database:**
 ```sql
@@ -262,7 +215,7 @@ ALTER TABLE users ADD COLUMN baa_version VARCHAR(50); -- e.g., "1.0-2026-02-02"
 
 ## Implementation Status
 
-Technical implementation is **substantially complete**. Both signup flows (web and extension) include BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records (`legal_acceptances` table, migration 008).
+Technical implementation is **substantially complete**. The web signup flow includes BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records (`legal_acceptances` table, migration 008).
 
 **Remaining items** (tracked elsewhere):
 - Create `/baa` web page → [ROADMAP.md](./ROADMAP.md) launch blockers
