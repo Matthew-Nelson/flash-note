@@ -36,6 +36,11 @@ vi.mock('@/components/notes', () => ({
   NoteGenerationForm: () => <div data-testid="note-generation-form" />,
 }));
 
+// Mock billing actions — prevents transitive import of billing service → config (no DATABASE_URL in test env)
+vi.mock('@/actions/billing', () => ({
+  createPortalAction: vi.fn(),
+}));
+
 function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
   return {
     sessionId: 'session-uuid',

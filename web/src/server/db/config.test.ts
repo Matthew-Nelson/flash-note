@@ -265,6 +265,8 @@ describe('Server Config', () => {
       env.LLM_PROVIDER = 'gemini';
       env.GEMINI_API_KEY = 'test-key';
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
+      env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
+      env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
 
       const { config } = await import('./config');
       expect(config.GEMINI_API_URL).toBe('https://us-central1-aiplatform.googleapis.com/v1');
@@ -288,6 +290,8 @@ describe('Server Config', () => {
       env.LLM_PROVIDER = 'gemini';
       env.GEMINI_USE_ADC = 'true';
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
+      env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
+      env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
       delete env.GEMINI_API_KEY;
 
       const { config } = await import('./config');
@@ -309,6 +313,62 @@ describe('Server Config', () => {
       expect(config.ANTHROPIC_MAX_TOKENS).toBe(2000);
       expect(config.ANTHROPIC_TEMPERATURE).toBe(0.2);
       expect(config.ANTHROPIC_TIMEOUT_MS).toBe(30000);
+    });
+  });
+
+  describe('Stripe config validation', () => {
+    it('should reject missing STRIPE_SECRET_KEY in production', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'production';
+      env.LLM_PROVIDER = 'gemini';
+      env.GEMINI_USE_ADC = 'true';
+      env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
+      env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      delete env.STRIPE_SECRET_KEY;
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject missing STRIPE_WEBHOOK_SECRET in production', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'production';
+      env.LLM_PROVIDER = 'gemini';
+      env.GEMINI_USE_ADC = 'true';
+      env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
+      env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
+      delete env.STRIPE_WEBHOOK_SECRET;
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should accept Stripe keys as optional in non-production', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      delete env.STRIPE_SECRET_KEY;
+      delete env.STRIPE_WEBHOOK_SECRET;
+
+      const { config } = await import('./config');
+      expect(config.STRIPE_SECRET_KEY).toBeUndefined();
+      expect(config.STRIPE_WEBHOOK_SECRET).toBeUndefined();
     });
   });
 
