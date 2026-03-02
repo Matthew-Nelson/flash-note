@@ -118,6 +118,13 @@ const envSchema = z.object({
         path: ['STRIPE_WEBHOOK_SECRET'],
       });
     }
+    if (!data.CLEANUP_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'CLEANUP_SECRET is required in production (minimum 32 characters)',
+        path: ['CLEANUP_SECRET'],
+      });
+    }
   }
   // Skip API key validation when mock AI is enabled
   if (data.USE_MOCK_AI) return;

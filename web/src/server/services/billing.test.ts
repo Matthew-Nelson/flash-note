@@ -507,6 +507,25 @@ describe('BillingService', () => {
       );
     });
 
+    it('skips when userId in metadata is not a valid UUID (Rule 3 — validateMetadataUserId)', async () => {
+      const session = {
+        id: 'cs_123',
+        customer: 'cus_123',
+        subscription: 'sub_123',
+        metadata: { userId: 'invalid-not-a-uuid' },
+      };
+      const event = makeEvent('checkout.session.completed', session);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('userId'),
+        expect.anything()
+      );
+    });
+
     it('skips when customer is null (Rule 3 — runtime validation)', async () => {
       const session = {
         id: 'cs_123',
@@ -625,6 +644,33 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+    });
+
+    it('skips when userId in metadata is not a valid UUID (Rule 3 — validateMetadataUserId)', async () => {
+      // Non-UUID userId in metadata should be rejected
+      const subscription = makeSubscription({ metadata: { userId: 'not-a-valid-uuid' } });
+      const event = makeEvent('customer.subscription.updated', subscription);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('userId'),
+        expect.anything()
+      );
+    });
+
+    it('proceeds when userId is a valid UUID (validateMetadataUserId passes)', async () => {
+      const validUuid = '550e8400-e29b-41d4-a716-446655440000';
+      const subscription = makeSubscription({ status: 'active', metadata: { userId: validUuid } });
+      const event = makeEvent('customer.subscription.updated', subscription);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(validUuid, 'active');
     });
   });
 
@@ -745,6 +791,23 @@ describe('BillingService', () => {
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
     });
 
+    it('skips when userId in subscription metadata is not a valid UUID (validateMetadataUserId)', async () => {
+      const invoice = makeInvoice();
+      const event = makeEvent('invoice.paid', invoice);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(
+        makeSubscription({ metadata: { userId: 'not-a-uuid-string' } })
+      );
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('userId'),
+        expect.anything()
+      );
+    });
+
     it('skips and logs when user not found', async () => {
       const invoice = makeInvoice();
       const event = makeEvent('invoice.paid', invoice);
@@ -817,6 +880,23 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+    });
+
+    it('skips when userId in subscription metadata is not a valid UUID (validateMetadataUserId)', async () => {
+      const invoice = makeInvoice();
+      const event = makeEvent('invoice.payment_failed', invoice);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(
+        makeSubscription({ metadata: { userId: 'not-a-uuid-string' } })
+      );
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('userId'),
+        expect.anything()
+      );
     });
   });
 });

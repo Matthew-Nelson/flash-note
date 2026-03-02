@@ -301,6 +301,26 @@ describe('auth actions', () => {
         expect(result.error).toBe('no_seats_available');
       }
     });
+
+    it('returns rate_limit_exceeded when rate limited', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: false, limit: 3, remaining: 0, reset: Date.now(),
+      });
+
+      const result = await registerAction(toFormData({
+        email: 'a@b.com',
+        password: 'Password1',
+        confirmPassword: 'Password1',
+        acceptedLegalTerms: 'true',
+      }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('rate_limit_exceeded');
+      }
+      // Verify service was NOT called (rate limit fires before auth service)
+      expect(mockRegister).not.toHaveBeenCalled();
+    });
   });
 
   describe('logoutAction', () => {
@@ -428,6 +448,20 @@ describe('auth actions', () => {
           metadata: { reason: 'token_or_email_failed' },
         })
       );
+    });
+
+    it('returns rate_limit_exceeded when rate limited', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: false, limit: 3, remaining: 0, reset: Date.now(),
+      });
+
+      const result = await requestPasswordResetAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('rate_limit_exceeded');
+      }
+      expect(mockFindUserByEmail).not.toHaveBeenCalled();
     });
   });
 
@@ -590,6 +624,20 @@ describe('auth actions', () => {
           metadata: { reason: 'token_or_email_failed' },
         })
       );
+    });
+
+    it('returns rate_limit_exceeded when rate limited', async () => {
+      vi.mocked(checkRateLimit).mockResolvedValueOnce({
+        success: false, limit: 3, remaining: 0, reset: Date.now(),
+      });
+
+      const result = await resendVerificationAction(toFormData({ email: 'a@b.com' }));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('rate_limit_exceeded');
+      }
+      expect(mockFindUserByEmail).not.toHaveBeenCalled();
     });
   });
 

@@ -1,6 +1,7 @@
 import 'server-only';
 
 import Stripe from 'stripe';
+import { z } from 'zod';
 
 import { config } from '@/server/db/config';
 import {
@@ -70,6 +71,28 @@ class BillingService {
       // @ts-expect-error stripe-version-2025-12-15 — webhook locked to this version
       apiVersion: '2025-12-15.clover',
     });
+  }
+
+  /**
+   * Validate that metadata.userId is a valid UUID string.
+   * Rule 3: validate external data (webhook metadata) at runtime after signature verification.
+   * Returns the validated userId string, or null if invalid/missing.
+   */
+  private validateMetadataUserId(
+    userId: unknown,
+    eventType: string,
+    context: Record<string, unknown>
+  ): string | null {
+    if (typeof userId !== 'string') {
+      this.logMissingUserIdError(eventType, context);
+      return null;
+    }
+    const parsed = z.string().uuid().safeParse(userId);
+    if (!parsed.success) {
+      this.logMissingUserIdError(eventType, { ...context, invalidUserId: '[REDACTED]' });
+      return null;
+    }
+    return parsed.data;
   }
 
   /**
@@ -227,14 +250,12 @@ class BillingService {
   }
 
   private async handleCheckoutComplete(session: Stripe.Checkout.Session): Promise<void> {
-    const userId = session.metadata?.userId;
-    if (!userId) {
-      this.logMissingUserIdError('checkout.session.completed', {
-        sessionId: session.id,
-        customerId: session.customer,
-      });
-      return;
-    }
+    const userId = this.validateMetadataUserId(
+      session.metadata?.userId,
+      'checkout.session.completed',
+      { sessionId: session.id }
+    );
+    if (!userId) return;
 
     // Rule 3: Validate external data at runtime — session.customer and
     // session.subscription can be null or expanded objects.
@@ -261,8 +282,7 @@ class BillingService {
     );
 
     // Rule 9: Audit log is not transactional with the update above.
-    // Fire-and-forget — audit failures should not trigger CR-1 retry logic.
-    // .catch() ensures failures surface in Cloud Error Reporting (Rule 9).
+    // Fire-and-forget — auditService.log swallows errors internally (never rejects).
     void auditService.log({
       userId,
       action: AuditAction.SUBSCRIPTION_CREATED,
@@ -271,26 +291,16 @@ class BillingService {
         subscriptionId,
         customerId,
       },
-    }).catch((err: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed:', {
-        err,
-        source: 'service_billing',
-        errorType: 'audit_log_failed',
-        action: AuditAction.SUBSCRIPTION_CREATED,
-        userId,
-      });
     });
   }
 
   private async handleSubscriptionUpdate(subscription: Stripe.Subscription): Promise<void> {
-    const userId = subscription.metadata.userId;
-    if (!userId) {
-      this.logMissingUserIdError('customer.subscription.updated', {
-        subscriptionId: subscription.id,
-      });
-      return;
-    }
+    const userId = this.validateMetadataUserId(
+      subscription.metadata.userId,
+      'customer.subscription.updated',
+      { subscriptionId: subscription.id }
+    );
+    if (!userId) return;
 
     // Validate Stripe status against known application statuses.
     // Stripe can send statuses (e.g., 'incomplete', 'incomplete_expired', 'paused')
@@ -314,30 +324,21 @@ class BillingService {
   }
 
   private async handleSubscriptionDelete(subscription: Stripe.Subscription): Promise<void> {
-    const userId = subscription.metadata.userId;
-    if (!userId) {
-      this.logMissingUserIdError('customer.subscription.deleted', {
-        subscriptionId: subscription.id,
-      });
-      return;
-    }
+    const userId = this.validateMetadataUserId(
+      subscription.metadata.userId,
+      'customer.subscription.deleted',
+      { subscriptionId: subscription.id }
+    );
+    if (!userId) return;
 
     await updateSubscriptionStatus(userId, 'canceled');
 
+    // Fire-and-forget — auditService.log swallows errors internally (never rejects).
     void auditService.log({
       userId,
       action: AuditAction.SUBSCRIPTION_CANCELLED,
       status: 'SUCCESS',
       metadata: { subscriptionId: subscription.id },
-    }).catch((err: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed:', {
-        err,
-        source: 'service_billing',
-        errorType: 'audit_log_failed',
-        action: AuditAction.SUBSCRIPTION_CANCELLED,
-        userId,
-      });
     });
   }
 
@@ -349,14 +350,12 @@ class BillingService {
 
     // Retrieve subscription metadata to get userId
     const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
-    const userId = subscription.metadata.userId;
-    if (!userId) {
-      this.logMissingUserIdError('invoice.paid', {
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-      });
-      return;
-    }
+    const userId = this.validateMetadataUserId(
+      subscription.metadata.userId,
+      'invoice.paid',
+      { subscriptionId: subscription.id, invoiceId: invoice.id }
+    );
+    if (!userId) return;
 
     // H-3: Only reactivate from states where payment resolves the issue.
     // Don't reactivate canceled subscriptions — that requires explicit re-subscribe.
@@ -370,6 +369,7 @@ class BillingService {
         subscriptionId: subscription.id,
         invoiceId: invoice.id,
       });
+      // Fire-and-forget — auditService.log swallows errors internally (never rejects).
       void auditService.log({
         userId,
         action: AuditAction.WEBHOOK_PROCESSING_FAILED,
@@ -380,15 +380,6 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
-      }).catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error('Audit log failed:', {
-          err,
-          source: 'service_billing',
-          errorType: 'audit_log_failed',
-          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-          userId,
-        });
       });
       return;
     }
@@ -404,6 +395,7 @@ class BillingService {
         subscriptionId: subscription.id,
         invoiceId: invoice.id,
       });
+      // Fire-and-forget — auditService.log swallows errors internally (never rejects).
       void auditService.log({
         userId,
         action: AuditAction.WEBHOOK_PROCESSING_FAILED,
@@ -414,15 +406,6 @@ class BillingService {
           subscriptionId: subscription.id,
           invoiceId: invoice.id,
         },
-      }).catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error('Audit log failed:', {
-          err,
-          source: 'service_billing',
-          errorType: 'audit_log_failed',
-          action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-          userId,
-        });
       });
       return;
     }
@@ -436,6 +419,7 @@ class BillingService {
 
     // Log successful renewal (not initial payment, which is handled by checkout.session.completed)
     if (invoice.billing_reason === 'subscription_cycle') {
+      // Fire-and-forget — auditService.log swallows errors internally (never rejects).
       void auditService.log({
         userId,
         action: AuditAction.SUBSCRIPTION_RENEWED,
@@ -445,15 +429,6 @@ class BillingService {
           invoiceId: invoice.id,
           billingReason: 'renewal',
         },
-      }).catch((err: unknown) => {
-        // eslint-disable-next-line no-console
-        console.error('Audit log failed:', {
-          err,
-          source: 'service_billing',
-          errorType: 'audit_log_failed',
-          action: AuditAction.SUBSCRIPTION_RENEWED,
-          userId,
-        });
       });
     }
   }
@@ -465,17 +440,16 @@ class BillingService {
     }
 
     const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
-    const userId = subscription.metadata.userId;
-    if (!userId) {
-      this.logMissingUserIdError('invoice.payment_failed', {
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-      });
-      return;
-    }
+    const userId = this.validateMetadataUserId(
+      subscription.metadata.userId,
+      'invoice.payment_failed',
+      { subscriptionId: subscription.id, invoiceId: invoice.id }
+    );
+    if (!userId) return;
 
     await updateSubscriptionStatus(userId, 'past_due');
 
+    // Fire-and-forget — auditService.log swallows errors internally (never rejects).
     void auditService.log({
       userId,
       action: AuditAction.PAYMENT_FAILED,
@@ -485,15 +459,6 @@ class BillingService {
         invoiceId: invoice.id,
         reason: 'payment_failed',
       },
-    }).catch((err: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed:', {
-        err,
-        source: 'service_billing',
-        errorType: 'audit_log_failed',
-        action: AuditAction.PAYMENT_FAILED,
-        userId,
-      });
     });
   }
 
@@ -520,29 +485,25 @@ class BillingService {
   }
 
   /**
-   * Log missing userId in webhook metadata.
+   * Log missing or invalid userId in webhook metadata.
    * This happens when a subscription wasn't created through our checkout flow
-   * (e.g., created manually in Stripe Dashboard).
+   * (e.g., created manually in Stripe Dashboard) or when metadata.userId is malformed.
    */
   private logMissingUserIdError(
     eventType: string,
-    context: {
-      subscriptionId?: string;
-      customerId?: unknown;
-      sessionId?: string;
-      invoiceId?: string;
-    }
+    context: Record<string, unknown>
   ): void {
-    console.error('Webhook missing userId in metadata:', {
+    console.error('Webhook missing or invalid userId in metadata:', {
       source: 'service_billing',
       errorType: 'missing_user_metadata',
       eventType,
-      subscriptionId: context.subscriptionId,
-      sessionId: context.sessionId,
-      invoiceId: context.invoiceId,
-      // Note: customerId intentionally omitted — may contain PII
+      subscriptionId: context['subscriptionId'],
+      sessionId: context['sessionId'],
+      invoiceId: context['invoiceId'],
+      // Note: customerId and invalidUserId intentionally omitted — may contain PII
     });
 
+    // Fire-and-forget — auditService.log swallows errors internally (never rejects).
     void auditService.log({
       userId: null,
       action: AuditAction.WEBHOOK_PROCESSING_FAILED,
@@ -550,19 +511,10 @@ class BillingService {
       metadata: {
         reason: 'missing_user_metadata',
         eventType,
-        subscriptionId: context.subscriptionId,
-        sessionId: context.sessionId,
-        invoiceId: context.invoiceId,
+        subscriptionId: context['subscriptionId'],
+        sessionId: context['sessionId'],
+        invoiceId: context['invoiceId'],
       },
-    }).catch((err: unknown) => {
-      // eslint-disable-next-line no-console
-      console.error('Audit log failed:', {
-        err,
-        source: 'service_billing',
-        errorType: 'audit_log_failed',
-        action: AuditAction.WEBHOOK_PROCESSING_FAILED,
-        eventType,
-      });
     });
   }
 }
