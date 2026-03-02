@@ -267,6 +267,7 @@ describe('Server Config', () => {
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
       env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
       env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      env.CLEANUP_SECRET = 'a'.repeat(32);
 
       const { config } = await import('./config');
       expect(config.GEMINI_API_URL).toBe('https://us-central1-aiplatform.googleapis.com/v1');
@@ -292,6 +293,7 @@ describe('Server Config', () => {
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
       env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
       env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      env.CLEANUP_SECRET = 'a'.repeat(32);
       delete env.GEMINI_API_KEY;
 
       const { config } = await import('./config');

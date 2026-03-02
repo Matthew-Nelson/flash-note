@@ -92,7 +92,7 @@ describe('auth service integration', () => {
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.token).toBeDefined();
-        expect(result.user.email).toBe('test@example.com'); // from mock row
+        expect(result.user.email).toBe('new@example.com'); // register uses the input email
       }
       // Transaction must be committed
       expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');

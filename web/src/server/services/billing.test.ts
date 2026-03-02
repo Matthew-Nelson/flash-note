@@ -88,9 +88,12 @@ const billingService = getBillingService();
 // Helpers
 // ---------------------------------------------------------------------------
 
+// Valid UUID required by validateMetadataUserId (z.string().uuid())
+const TEST_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
 function makeUser(overrides: Record<string, unknown> = {}) {
   return {
-    id: 'user-123',
+    id: TEST_USER_ID,
     subscriptionStatus: 'trialing',
     stripeCustomerId: null,
     subscriptionId: null,
@@ -115,7 +118,7 @@ function makeSubscription(overrides: Record<string, unknown> = {}) {
   return {
     id: 'sub-123',
     status: 'active',
-    metadata: { userId: 'user-123' },
+    metadata: { userId: TEST_USER_ID },
     ...overrides,
   };
 }
@@ -378,7 +381,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: 'cus_123',
         subscription: 'sub_123',
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -387,7 +390,7 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
-        'user-123', 'cus_123', 'sub_123', 'active'
+        TEST_USER_ID, 'cus_123', 'sub_123', 'active'
       );
     });
 
@@ -399,7 +402,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'past_due');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'past_due');
     });
 
     it('routes customer.subscription.deleted to handleSubscriptionDelete', async () => {
@@ -410,7 +413,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'canceled');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'canceled');
     });
 
     it('routes invoice.paid to handleInvoicePaid', async () => {
@@ -425,7 +428,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'active');
     });
 
     it('routes invoice.payment_failed to handleInvoicePaymentFailed', async () => {
@@ -437,7 +440,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'past_due');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'past_due');
     });
 
     it('on handler failure: deletes idempotency record and re-throws (CR-1)', async () => {
@@ -476,7 +479,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: 'cus_123',
         subscription: 'sub_123',
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -485,7 +488,7 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
-        'user-123', 'cus_123', 'sub_123', 'active'
+        TEST_USER_ID, 'cus_123', 'sub_123', 'active'
       );
       // Fire-and-forget — called (not awaited), verify it was scheduled
       expect(mockAuditLog).toHaveBeenCalledWith(
@@ -531,7 +534,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: null,
         subscription: 'sub_123',
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -550,7 +553,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: 'cus_123',
         subscription: null,
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -569,7 +572,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: { id: 'cus_expanded' },
         subscription: 'sub_123',
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -578,7 +581,7 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
-        'user-123', 'cus_expanded', 'sub_123', 'active'
+        TEST_USER_ID, 'cus_expanded', 'sub_123', 'active'
       );
     });
 
@@ -587,7 +590,7 @@ describe('BillingService', () => {
         id: 'cs_123',
         customer: 'cus_123',
         subscription: { id: 'sub_expanded' },
-        metadata: { userId: 'user-123' },
+        metadata: { userId: TEST_USER_ID },
       };
       const event = makeEvent('checkout.session.completed', session);
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -596,7 +599,7 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).toHaveBeenCalledWith(
-        'user-123', 'cus_123', 'sub_expanded', 'active'
+        TEST_USER_ID, 'cus_123', 'sub_expanded', 'active'
       );
     });
   });
@@ -618,7 +621,7 @@ describe('BillingService', () => {
 
         await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', status);
+        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, status);
       }
     });
 
@@ -687,7 +690,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'canceled');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'canceled');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'SUBSCRIPTION_CANCELLED', status: 'SUCCESS' })
       );
@@ -709,7 +712,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'active');
     });
 
     it('reactivates from trialing to active', async () => {
@@ -722,7 +725,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'active');
     });
 
     it('reactivates from unpaid to active', async () => {
@@ -735,7 +738,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'active');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'active');
     });
 
     it('does NOT reactivate canceled subscriptions (H-3)', async () => {
@@ -854,7 +857,7 @@ describe('BillingService', () => {
 
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith('user-123', 'past_due');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'past_due');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'PAYMENT_FAILED', status: 'FAILURE' })
       );

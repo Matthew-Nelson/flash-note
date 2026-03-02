@@ -9,7 +9,7 @@ const mockSet = vi.fn();
 
 vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue({
-    set: (...args: unknown[]) => mockSet(...args),
+    set: (...args: unknown[]): unknown => mockSet(...args),
     get: vi.fn(),
     delete: vi.fn(),
   }),
