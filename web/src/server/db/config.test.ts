@@ -267,6 +267,7 @@ describe('Server Config', () => {
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
       env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
       env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      env.CLEANUP_SECRET = 'a'.repeat(32);
 
       const { config } = await import('./config');
       expect(config.GEMINI_API_URL).toBe('https://us-central1-aiplatform.googleapis.com/v1');
@@ -292,6 +293,7 @@ describe('Server Config', () => {
       env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
       env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
       env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      env.CLEANUP_SECRET = 'a'.repeat(32);
       delete env.GEMINI_API_KEY;
 
       const { config } = await import('./config');
@@ -369,6 +371,38 @@ describe('Server Config', () => {
       const { config } = await import('./config');
       expect(config.STRIPE_SECRET_KEY).toBeUndefined();
       expect(config.STRIPE_WEBHOOK_SECRET).toBeUndefined();
+    });
+
+    it('should reject missing CLEANUP_SECRET in production', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'production';
+      env.LLM_PROVIDER = 'gemini';
+      env.GEMINI_USE_ADC = 'true';
+      env.GEMINI_API_URL = 'https://us-central1-aiplatform.googleapis.com/v1';
+      env.STRIPE_SECRET_KEY = 'sk_test_prod_key';
+      env.STRIPE_WEBHOOK_SECRET = 'whsec_prod_secret';
+      delete env.CLEANUP_SECRET;
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should accept missing CLEANUP_SECRET in non-production', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      delete env.CLEANUP_SECRET;
+
+      const { config } = await import('./config');
+      expect(config.CLEANUP_SECRET).toBeUndefined();
     });
   });
 

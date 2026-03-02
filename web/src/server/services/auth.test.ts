@@ -221,6 +221,35 @@ describe('auth service', () => {
       expect(result.success).toBe(false);
     });
 
+    it('fires LOGIN_FAILED audit when locked account submits correct password', async () => {
+      // User exists with correct password, but account is locked.
+      // The normal recordFailedAttempt path is bypassed when password is valid.
+      // Verify the audit trail is still complete (Fix 6 / HIPAA requirement).
+      const userRow = createMockUserRow();
+      mockDbQuery.mockResolvedValueOnce({ rows: [userRow] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never); // correct password
+      mockGetAccountLockoutStatus.mockResolvedValueOnce({
+        isLocked: true, failedAttempts: 5, isPermanentlyLocked: false,
+        lockedUntil: new Date(Date.now() + 15 * 60 * 1000),
+      });
+
+      const result = await login('test@example.com', 'correct-password', context);
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBe('invalid_credentials');
+      }
+      // Verify LOGIN_FAILED audit fired with reason: account_locked
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'test-user-id',
+          action: 'LOGIN_FAILED',
+          status: 'FAILURE',
+          metadata: expect.objectContaining({ reason: 'account_locked' }),
+        })
+      );
+    });
+
     it('resets failed attempts on successful login', async () => {
       const userRow = createMockUserRow();
       mockDbQuery.mockResolvedValueOnce({ rows: [userRow] });
@@ -736,6 +765,29 @@ describe('auth service', () => {
         'email_verification',
         expect.objectContaining({ query: mockClientQuery })
       );
+    });
+
+    it('returns null when password_reset token submitted to email verification (type confusion)', async () => {
+      // verifyEmail calls validateAndConsumeToken with type='email_verification'.
+      // If a password_reset token is submitted, consumeToken returns null due to
+      // the token_type mismatch enforced by SQL WHERE clause (Gap 3 coverage).
+      // This tests that the type parameter is correctly passed through the service layer.
+      const mockClient = setupMockClient();
+      mockValidateAndConsumeToken.mockResolvedValueOnce(null); // type mismatch → null
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
+
+      const result = await verifyEmail('password-reset-token-value');
+
+      expect(result).toBeNull();
+      // Verify verifyEmail always passes 'email_verification' as the token type
+      expect(mockValidateAndConsumeToken).toHaveBeenCalledWith(
+        'password-reset-token-value',
+        'email_verification',
+        expect.anything()
+      );
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 

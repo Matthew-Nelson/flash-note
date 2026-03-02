@@ -44,7 +44,10 @@ vi.mock('@/server/services/audit', () => ({
 }));
 
 vi.mock('@/server/types', () => ({
-  AuditAction: { NOTE_GENERATED: 'NOTE_GENERATED' },
+  AuditAction: {
+    NOTE_GENERATED: 'NOTE_GENERATED',
+    ACCESS_DENIED: 'ACCESS_DENIED',
+  },
 }));
 
 // --- Helpers ---
@@ -215,6 +218,27 @@ describe('generateNoteAction', () => {
     mockCheckSubscriptionAccess.mockResolvedValue({ allowed: false, reason: 'clinic_subscription_expired' });
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'clinic_subscription_expired' });
+  });
+
+  it('logs ACCESS_DENIED audit when trial is expired (Fix 5 / HIPAA)', async () => {
+    mockGetSession.mockResolvedValueOnce(createSession({
+      subscriptionStatus: 'trialing',
+      trialEndsAt: new Date(0),
+    }));
+    mockGetRequestContext.mockResolvedValueOnce({ ipAddress: '127.0.0.1', userAgent: 'TestAgent' });
+    mockCheckSubscriptionAccess.mockResolvedValueOnce({ allowed: false, reason: 'trial_expired' });
+
+    const result = await generateNoteAction(makeFormData());
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toBe('trial_expired');
+    expect(mockAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'ACCESS_DENIED',
+        status: 'FAILURE',
+        metadata: expect.objectContaining({ reason: 'trial_expired', resource: 'note_generation' }),
+      })
+    );
   });
 
   // --- Rate limiting ---

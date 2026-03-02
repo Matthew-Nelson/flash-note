@@ -175,6 +175,14 @@ describe('createPortalAction', () => {
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
   });
 
+  it('returns email_not_verified when email not verified', async () => {
+    mockGetSession.mockResolvedValue(createSession({ emailVerified: false }));
+
+    const result = await createPortalAction();
+
+    expect(result).toEqual({ success: false, error: 'email_not_verified' });
+  });
+
   it('returns success with portalUrl on success', async () => {
     mockGetSession.mockResolvedValue(createSession());
     mockCreatePortalSession.mockResolvedValue('https://billing.stripe.com/portal');

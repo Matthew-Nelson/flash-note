@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** February 28, 2026
+**Last Updated:** March 2, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -17,7 +17,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 | Phase | Track | Progress | Next Action |
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (BAA, encryption, TLS) remain |
-| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 8/9 sub-phases | Integration Tests (1.7) |
+| **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on Phase 1 + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-migration (UI Quality deprecated — see UI_RULES.md) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -284,8 +284,8 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | # | Item | Blocked By | Notes |
 |---|------|-----------|-------|
 | 1 | Replace `console.error` with Pino `logger.error` in auth actions/services | Phase 3 Monitoring (Pino logger) | All auth catch blocks use `console.error` with TODOs. CLAUDE.md Rule 9 requires structured `error`-level logging for audit failures to surface in Cloud Error Reporting. Fix when Pino infrastructure lands. |
-| 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | In `login()`, bcrypt runs before lockout check (timing-safe). When a permanently locked account submits the correct password, `recordFailedAttempt()` is skipped (password validated, `!validPassword` branch not taken). Lockout still works, but the audit trail has a gap for these attempts. HIPAA requires logging all authentication events. |
-| 3 | Audit test suite for mocks that violate production contracts | — | Code review found 17 dead try/catch blocks around `auditService.log()` that passed coverage because tests mocked the function to reject — violating its documented contract (never throws). Coverage reported the catch blocks as covered even though they were unreachable in production. Audit all test files for mocks that make dependencies behave differently from production (e.g., rejecting when the real implementation swallows errors), which can mask dead code and give false confidence in coverage metrics. Relates to CLAUDE.md Rule 6. |
+| 2 | Lockout audit gap: locked accounts with correct password don't record failed attempts | — | ✅ Done (Phase 1.7) — Added `LOGIN_FAILED` audit in `auth.ts` when locked account with correct password bypasses `recordFailedAttempt()` path. |
+| 3 | Audit test suite for mocks that violate production contracts | — | ✅ Partial (Phase 1.7) — Dead `.catch()` blocks on `auditService.log()` in `billing.ts` removed (Fix 4). No test files mock `auditService.log` to reject. Broader codebase sweep deferred to a future cleanup PR if needed. |
 
 ### 1.4 — Proxy + Protected Pages + Error Boundaries
 
@@ -382,7 +382,7 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 | # | Item | Severity | Status |
 |---|------|----------|--------|
 | 1 | Add `.trim()` to `quickNotes` and `patientContext` in `generateNoteSchema` | Important | ✅ FIXED — `z.string().trim().min(10)` added to both fields. `lib/schemas/notes.ts` |
-| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | 🟡 DEFERRED — Requires separate audit logging refactor across `subscription.ts` + `notes.ts`. |
+| 2 | Add `ACCESS_DENIED` audit logging for subscription denials | Important | ✅ Done (Phase 1.7) — `getRequestContext()` moved before subscription check; `ACCESS_DENIED` audit fires on denial. `actions/notes.ts`. |
 | 3 | Include error object in `generateNoteAction` catch block logging | Moderate | ✅ FIXED — `err: error` added to structured log context. `actions/notes.ts` |
 
 **Phase 1.5 C additions (critical bug fixes):**
@@ -422,9 +422,9 @@ Rate limiting is co-located with sessions — auth endpoints must never be expos
 
 | # | Item | Blocked By | Notes |
 |---|------|-----------|-------|
-| 1 | Enforce `CLEANUP_SECRET` in production `superRefine` block | — | `config.ts` validates `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` in production but not `CLEANUP_SECRET`. Cleanup endpoint fails closed (401) if unset, so no security risk — but silent misconfiguration in production. Add to the `superRefine` production block alongside the other Stripe secrets. |
-| 2 | Add `emailVerified` check to `createPortalAction` | — | `createCheckoutAction` checks `session.emailVerified`; `createPortalAction` does not. An unverified user can't have a `stripeCustomerId` (checkout requires verification), so the call fails gracefully — but inconsistent defensive posture. Add for defense-in-depth. |
-| 3 | Zod-validate webhook event data after `constructEvent` | — | CLAUDE.md Rule 3 says webhook payloads should be Zod-validated after signature verification. Currently relies on Stripe SDK types. Low practical risk (SDK types are reliable), but adding Zod schemas for `metadata.userId`, `customer`, `subscription` fields would satisfy the rule. |
+| 1 | Enforce `CLEANUP_SECRET` in production `superRefine` block | — | ✅ Done (Phase 1.7) — Added to `superRefine` in `server/db/config.ts` alongside Stripe secrets. |
+| 2 | Add `emailVerified` check to `createPortalAction` | — | ✅ Done (Phase 1.7) — Added to `actions/billing.ts` for defense-in-depth parity with `createCheckoutAction`. |
+| 3 | Zod-validate webhook event data after `constructEvent` | — | ✅ Done (Phase 1.7) — `validateMetadataUserId` private helper added to `BillingService`; applied to all 5 webhook handlers. Dead `.catch()` blocks on `auditService.log()` removed. |
 
 ### 1.7 — Integration Tests + Production Verification
 
@@ -441,7 +441,7 @@ Unit tests already passing from 1.1-1.6. This phase adds cross-cutting integrati
 
 | Status |
 |--------|
-| ❌ |
+| ✅ Done |
 
 ### Migration Technical Debt — Consolidated Cleanup
 
@@ -453,11 +453,11 @@ Accumulated follow-up items from Phases 1.3–1.6 code reviews. None are blockin
 | 2 | Lockout audit gap: locked accounts with correct password | 1.3 #2 | P2 | Correct password on permanently locked account skips `recordFailedAttempt()`. Audit trail gap for HIPAA. |
 | 3 | Audit test mocks that violate production contracts | 1.3 #3 | P2 | 17 dead try/catch blocks passed coverage via mocks that reject (real implementation swallows). False confidence in coverage. |
 | 4 | `/baa` web page | 1.4 #1 | P2 | Currently 404. Standalone content page. |
-| 5 | Auth security test gaps (7 items) | 1.4.5 | P1 | Secure cookie flag, rate limit blocking, bcrypt max-length DoS, token type confusion, etc. See 1.4.5 section for full list. |
-| 6 | Enforce `CLEANUP_SECRET` in production config | 1.6 #1 | P2 | Silent misconfiguration — endpoint fails closed but no startup error. |
-| 7 | Add `emailVerified` check to `createPortalAction` | 1.6 #2 | P3 | Defense-in-depth. Not exploitable due to upstream constraint. |
-| 8 | Zod-validate webhook event data after `constructEvent` | 1.6 #3 | P3 | Rule 3 compliance. Low practical risk with Stripe SDK types. |
-| 9 | `ACCESS_DENIED` audit logging for subscription denials | 1.5 A3 #2 | P2 | Deferred audit refactor across `subscription.ts` + `notes.ts`. |
+| 5 | Auth security test gaps (7 items) | 1.4.5 | P1 | ✅ Done (Phase 1.7) — All 7 gaps addressed: production cookie flag, rate limit blocking (3 actions), bcrypt `.max(72)`, token type confusion, lockout SQL threshold, expired session contract. |
+| 6 | Enforce `CLEANUP_SECRET` in production config | 1.6 #1 | P2 | ✅ Done (Phase 1.7) — See 1.6 follow-up #1. |
+| 7 | Add `emailVerified` check to `createPortalAction` | 1.6 #2 | P3 | ✅ Done (Phase 1.7) — See 1.6 follow-up #2. |
+| 8 | Zod-validate webhook event data after `constructEvent` | 1.6 #3 | P3 | ✅ Done (Phase 1.7) — See 1.6 follow-up #3. |
+| 9 | `ACCESS_DENIED` audit logging for subscription denials | 1.5 A3 #2 | P2 | ✅ Done (Phase 1.7) — See 1.5 A3 follow-up #2. |
 
 ### Migration Cleanup
 
