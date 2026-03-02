@@ -472,6 +472,8 @@ Completed in PR cleanup commit series (March 2026). All legacy code and document
 - [x] Archive `planning/IDEA_DUMPING_GROUND.md` → `docs/archive/planning/IDEA_DUMPING_GROUND.md`
 - [x] Update `reference/FLASHNOTE_HANDOFF.md` architecture sections
 - [x] Update `PRE_LAUNCH_CHECKLIST.md` (remove Chrome Web Store items)
+- [x] Update `SUCCESS_METRICS.md` (consolidate for web-only, remove backend/extension metrics)
+- [ ] Refactor `/shared` design system into `web/design-system/` — no longer "shared" between packages; move to web root alongside `tailwind.config.ts` and update import paths
 - [ ] Update `STRIPE_TODOS.md` (remove extension sync item) — skipped, not critical for launch/beta
 - [ ] Remove Sentry from all components (replaced by GCP-native monitoring — see [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md))
 
