@@ -117,7 +117,6 @@ import {
   loginAction,
   registerAction,
   logoutAction,
-  expireSessionAction,
   requestPasswordResetAction,
   resetPasswordAction,
   verifyEmailAction,
@@ -383,19 +382,6 @@ describe('auth actions', () => {
 
       expect(mockDeleteSession).not.toHaveBeenCalled();
       expect(mockClearSessionCookie).toHaveBeenCalled();
-    });
-  });
-
-  describe('expireSessionAction', () => {
-    it('clears cookie and redirects with reason', async () => {
-      await expect(expireSessionAction('session_expired')).rejects.toThrow('NEXT_REDIRECT');
-      expect(mockClearSessionCookie).toHaveBeenCalledTimes(1);
-      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=session_expired');
-    });
-
-    it('encodes reason in URL', async () => {
-      await expect(expireSessionAction('session_limit')).rejects.toThrow('NEXT_REDIRECT');
-      expect(mockRedirect).toHaveBeenCalledWith('/login?reason=session_limit');
     });
   });
 

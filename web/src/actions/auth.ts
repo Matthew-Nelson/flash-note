@@ -37,22 +37,9 @@ import { deleteSession } from '@/server/dal/sessions';
 import { findByCode, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { auditService } from '@/server/services/audit';
 import { AuditAction } from '@/server/types';
-import type { SessionEndReason } from '@/lib/types';
 import type { ActionResult } from '@/lib/types/actions';
 
 // --- Actions ---
-
-/**
- * Clear a stale session cookie and redirect to login with a session-end reason.
- * Used by dashboard layout when getSession() returns null but a cookie exists.
- * Must be a Server Action (not inline in a Server Component) because
- * Server Components cannot mutate cookies, and redirect() in streaming
- * context produces a meta-tag redirect that doesn't re-run the proxy.
- */
-export async function expireSessionAction(reason: SessionEndReason): Promise<never> {
-  await clearSessionCookie();
-  redirect(`/login?reason=${encodeURIComponent(reason)}`);
-}
 
 export async function loginAction(formData: FormData): Promise<ActionResult<{ user: SanitizedUser; emailVerificationRequired: boolean }>> {
   const raw = Object.fromEntries(formData);
