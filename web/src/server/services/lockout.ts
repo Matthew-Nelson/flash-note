@@ -69,17 +69,19 @@ const NIL_UUID = '00000000-0000-0000-0000-000000000000';
  * The atomic SQL in the DAL prevents race conditions.
  *
  * Accepts string | null to support timing equalization in the auth service:
- * when userId is null (user not found), executes the same DB round-trip as the
- * real path (UPDATE against nil UUID returns zero rows) so that non-existent-user
- * and wrong-password paths are indistinguishable by timing.
+ * when userId is null (user not found), executes the same primary DB round-trip
+ * as the real path (UPDATE against nil UUID returns zero rows) to equalize the
+ * dominant cost. Note: at lockout-threshold boundaries (5/10/15/20 attempts),
+ * the real path fires an additional audit log write that the null path does not.
  */
 export async function recordFailedAttempt(
   userId: string | null,
   context: SessionContext
 ): Promise<LockoutStatus> {
   if (userId === null) {
-    // Timing equalization: execute the same DB round-trip as the real path.
+    // Timing equalization: execute the same primary DB round-trip as the real path.
     // The nil UUID matches no real user row — no data is modified.
+    // Residual gap: the real path may fire an additional audit write at lockout thresholds.
     await recordFailedLoginAttempt(NIL_UUID);
     return { isLocked: false, lockedUntil: null, failedAttempts: 0, isPermanentlyLocked: false };
   }

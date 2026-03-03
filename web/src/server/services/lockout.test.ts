@@ -234,8 +234,12 @@ describe('lockout service', () => {
         failedAttempts: 0,
         isPermanentlyLocked: false,
       });
-      // The DB query should have been called (timing equalization — not short-circuited)
+      // The DB query must be called with the nil UUID (timing equalization — not short-circuited)
       expect(mockDbQuery).toHaveBeenCalledTimes(1);
+      expect(mockDbQuery).toHaveBeenCalledWith(
+        expect.any(String),
+        ['00000000-0000-0000-0000-000000000000'],
+      );
       // No audit log should be fired for the nil UUID path
       expect(mockAuditLog).not.toHaveBeenCalled();
     });

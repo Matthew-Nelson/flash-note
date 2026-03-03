@@ -73,8 +73,9 @@ export async function login(
 
   if (!user || !validPassword) {
     // Timing equalization: always call recordFailedAttempt regardless of whether
-    // the user exists. When user is null, recordFailedAttempt executes the same DB
-    // round-trip against a nil UUID (no rows match) so both paths take identical time.
+    // the user exists. When user is null, recordFailedAttempt executes the same
+    // primary DB round-trip against a nil UUID (no rows match) to equalize the
+    // dominant cost of both paths.
     try {
       await recordFailedAttempt(user?.id ?? null, context);
     } catch (error) {
