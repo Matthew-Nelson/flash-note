@@ -98,7 +98,7 @@ function SubscriptionContent({ session }: { session: SessionData }) {
 
 export default async function DashboardPage() {
   const session = await getSession();
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?reason=session_expired');
 
   const usage = await getUsageForUser(session.userId, session.organizationId);
 

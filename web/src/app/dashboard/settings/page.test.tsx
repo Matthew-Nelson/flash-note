@@ -50,11 +50,11 @@ describe('SettingsPage', () => {
     });
   });
 
-  it('redirects to /login when getSession() returns null', async () => {
+  it('redirects to /login?reason=session_expired when getSession() returns null', async () => {
     mockGetSession.mockResolvedValue(null);
 
     await expect(SettingsPage()).rejects.toThrow('NEXT_REDIRECT');
-    expect(redirect).toHaveBeenCalledWith('/login');
+    expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
   });
 
   it('renders user email in account info', async () => {

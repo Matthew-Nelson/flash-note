@@ -18,7 +18,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
 
 ### P1 — Fix Before Production
 
-- [ ] **BUG-2**: Dashboard page redirects missing `?reason=` — latent redirect loop
+- [x] **BUG-2**: Dashboard page redirects missing `?reason=` — latent redirect loop
   - Blocked by: BUG-1
 - [ ] **BUG-3**: X-Forwarded-For spoofing bypasses all rate limiting in production
   - Compounds: BUG-4
