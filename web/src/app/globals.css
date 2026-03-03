@@ -1,6 +1,6 @@
 /* Import shared design tokens (Warm Wellness theme) and components */
-@import '../../../shared/design-tokens-warm.css';
-@import '../../../shared/components.css';
+@import '../../design-system/design-tokens-warm.css';
+@import '../../design-system/components.css';
 
 @tailwind base;
 @tailwind components;

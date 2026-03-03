@@ -2,7 +2,7 @@
 
 Source of truth for all visual design tokens, typography, and principles. Extracted from the HTML mockups in `docs/design/`.
 
-Implementation: `shared/design-tokens-teal.css` + `shared/tailwind-preset-teal.js`
+Implementation: `web/design-system/design-tokens-teal.css` + `web/design-system/tailwind-preset-teal.js`
 
 ---
 
@@ -148,7 +148,7 @@ Replaces Inter. Plus Jakarta Sans is more distinctive and friendly while remaini
 
 ## Component CSS Classes
 
-Component-level classes are defined in `shared/components.css`. These compose design tokens into reusable styles:
+Component-level classes are defined in `web/design-system/components.css`. These compose design tokens into reusable styles:
 
 | Class | Purpose |
 |-------|---------|

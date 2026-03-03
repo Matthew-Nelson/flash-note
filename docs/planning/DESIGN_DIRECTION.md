@@ -275,9 +275,9 @@ The marketing site gets a **display treatment**: larger typography, more whitesp
 ## Implementation Plan
 
 ### Phase 1: Token Migration
-1. Create `shared/design-tokens-teal.css` with the new palette
-2. Create `shared/tailwind-preset-teal.js` mapping to new tokens
-3. Update `shared/components.css` to remove gradient patterns and use flat colors
+1. Create `web/design-system/design-tokens-teal.css` with the new palette
+2. Create `web/design-system/tailwind-preset-teal.js` mapping to new tokens
+3. Update `web/design-system/components.css` to remove gradient patterns and use flat colors
 4. Install Plus Jakarta Sans (Google Fonts) in extension, web, and any HTML templates
 
 ### Phase 2: Extension Update
