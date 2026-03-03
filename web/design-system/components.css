@@ -5,7 +5,7 @@
  * Requires design-tokens.css to be imported first.
  *
  * Usage:
- *   @import '../../shared/components.css';
+ *   @import '../design-system/components.css';
  */
 
 /* ============================================

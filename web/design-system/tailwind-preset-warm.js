@@ -1,11 +1,11 @@
 /**
- * FlashNote Tailwind Preset
+ * FlashNote Tailwind Preset - Warm Wellness Theme
  *
- * Shared Tailwind configuration for consistency between web and extension.
- * Import this preset in both tailwind.config files.
+ * Tailwind configuration for the Warm Wellness color scheme.
+ * Uses emerald/teal/amber instead of cyan/violet/pink.
  *
  * Usage:
- *   presets: [require('../shared/tailwind-preset.js')]
+ *   presets: [require('./design-system/tailwind-preset-warm.js')]
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -13,53 +13,76 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Brand colors using CSS custom properties
-        // This allows theme switching to work with Tailwind classes
+        // Brand colors - Warm Wellness palette
         brand: {
-          cyan: {
-            50: 'var(--fn-cyan-50)',
-            100: 'var(--fn-cyan-100)',
-            200: 'var(--fn-cyan-200)',
-            300: 'var(--fn-cyan-300)',
-            400: 'var(--fn-cyan-400)',
-            500: 'var(--fn-cyan-500)',
-            600: 'var(--fn-cyan-600)',
-            700: 'var(--fn-cyan-700)',
-            800: 'var(--fn-cyan-800)',
-            900: 'var(--fn-cyan-900)',
+          // Primary - Emerald (healing/growth)
+          emerald: {
+            50: 'var(--fn-emerald-50)',
+            100: 'var(--fn-emerald-100)',
+            200: 'var(--fn-emerald-200)',
+            300: 'var(--fn-emerald-300)',
+            400: 'var(--fn-emerald-400)',
+            500: 'var(--fn-emerald-500)',
+            600: 'var(--fn-emerald-600)',
+            700: 'var(--fn-emerald-700)',
+            800: 'var(--fn-emerald-800)',
+            900: 'var(--fn-emerald-900)',
           },
-          violet: {
-            50: 'var(--fn-violet-50)',
-            100: 'var(--fn-violet-100)',
-            200: 'var(--fn-violet-200)',
-            300: 'var(--fn-violet-300)',
-            400: 'var(--fn-violet-400)',
-            500: 'var(--fn-violet-500)',
-            600: 'var(--fn-violet-600)',
-            700: 'var(--fn-violet-700)',
-            800: 'var(--fn-violet-800)',
-            900: 'var(--fn-violet-900)',
+          // Secondary - Teal (clinical + modern)
+          teal: {
+            50: 'var(--fn-teal-50)',
+            100: 'var(--fn-teal-100)',
+            200: 'var(--fn-teal-200)',
+            300: 'var(--fn-teal-300)',
+            400: 'var(--fn-teal-400)',
+            500: 'var(--fn-teal-500)',
+            600: 'var(--fn-teal-600)',
+            700: 'var(--fn-teal-700)',
+            800: 'var(--fn-teal-800)',
+            900: 'var(--fn-teal-900)',
           },
-          pink: {
-            50: 'var(--fn-pink-50)',
-            100: 'var(--fn-pink-100)',
-            200: 'var(--fn-pink-200)',
-            300: 'var(--fn-pink-300)',
-            400: 'var(--fn-pink-400)',
-            500: 'var(--fn-pink-500)',
-            600: 'var(--fn-pink-600)',
-            700: 'var(--fn-pink-700)',
-            800: 'var(--fn-pink-800)',
-            900: 'var(--fn-pink-900)',
+          // Accent - Amber (warm highlights)
+          amber: {
+            50: 'var(--fn-amber-50)',
+            100: 'var(--fn-amber-100)',
+            200: 'var(--fn-amber-200)',
+            300: 'var(--fn-amber-300)',
+            400: 'var(--fn-amber-400)',
+            500: 'var(--fn-amber-500)',
+            600: 'var(--fn-amber-600)',
+            700: 'var(--fn-amber-700)',
+            800: 'var(--fn-amber-800)',
+            900: 'var(--fn-amber-900)',
           },
         },
-        // Semantic colors using CSS custom properties for theme switching
+        // Warm neutral - Stone
+        stone: {
+          50: 'var(--fn-stone-50)',
+          100: 'var(--fn-stone-100)',
+          200: 'var(--fn-stone-200)',
+          300: 'var(--fn-stone-300)',
+          400: 'var(--fn-stone-400)',
+          500: 'var(--fn-stone-500)',
+          600: 'var(--fn-stone-600)',
+          700: 'var(--fn-stone-700)',
+          800: 'var(--fn-stone-800)',
+          900: 'var(--fn-stone-900)',
+        },
+        // Warm backgrounds - Cream
+        cream: {
+          50: 'var(--fn-cream-50)',
+          100: 'var(--fn-cream-100)',
+          200: 'var(--fn-cream-200)',
+          300: 'var(--fn-cream-300)',
+        },
+        // Semantic colors using CSS custom properties
         fn: {
           bg: {
             primary: 'var(--fn-bg-primary)',
             secondary: 'var(--fn-bg-secondary)',
             tertiary: 'var(--fn-bg-tertiary)',
             inverse: 'var(--fn-bg-inverse)',
+            card: 'var(--fn-bg-card)',
           },
           text: {
             primary: 'var(--fn-text-primary)',
@@ -73,6 +96,7 @@ module.exports = {
           },
           accent: {
             primary: 'var(--fn-accent-primary)',
+            'primary-hover': 'var(--fn-accent-primary-hover)',
             secondary: 'var(--fn-accent-secondary)',
             tertiary: 'var(--fn-accent-tertiary)',
           },
@@ -90,6 +114,11 @@ module.exports = {
             light: 'var(--fn-warning-light)',
             DEFAULT: 'var(--fn-warning)',
             dark: 'var(--fn-warning-dark)',
+          },
+          info: {
+            light: 'var(--fn-info-light)',
+            DEFAULT: 'var(--fn-info)',
+            dark: 'var(--fn-info-dark)',
           },
         },
       },
@@ -133,12 +162,12 @@ module.exports = {
         'fn-lg': 'var(--fn-shadow-lg)',
         'fn-xl': 'var(--fn-shadow-xl)',
         'fn-glow': '0 0 20px var(--fn-accent-glow)',
-        'fn-glow-lg': '0 0 40px var(--fn-accent-glow)',
+        'fn-glow-lg': '0 0 30px var(--fn-accent-glow)',
         'fn-focus': 'var(--fn-focus-ring)',
       },
       animation: {
         'fn-pulse-glow': 'fn-pulse-glow 2s ease-in-out infinite',
-        'fn-gradient-shift': 'fn-gradient-shift 3s ease infinite',
+        'fn-gradient-shift': 'fn-gradient-shift 8s ease infinite', // Slower!
         'fn-fade-in': 'fn-fade-in 0.3s ease-out',
         'fn-fade-in-up': 'fn-fade-in-up 0.3s ease-out',
         'fn-slide-in-right': 'fn-slide-in-right 0.3s ease-out',
@@ -160,10 +189,12 @@ module.exports = {
         'fn-in-out': 'var(--fn-ease-in-out)',
       },
       backgroundImage: {
-        // Gradient utilities for brand styling
+        // Primary gradient - emerald to teal (2 colors, cleaner)
         'fn-gradient-primary': 'linear-gradient(135deg, var(--fn-accent-primary), var(--fn-accent-secondary))',
-        'fn-gradient-full': 'linear-gradient(135deg, var(--fn-accent-primary), var(--fn-accent-secondary), var(--fn-accent-tertiary))',
-        'fn-gradient-animated': 'linear-gradient(135deg, var(--fn-accent-primary) 0%, var(--fn-accent-secondary) 50%, var(--fn-accent-tertiary) 100%)',
+        // Warm gradient - emerald to amber
+        'fn-gradient-warm': 'linear-gradient(135deg, var(--fn-accent-primary), var(--fn-accent-tertiary))',
+        // Subtle gradient for backgrounds
+        'fn-gradient-subtle': 'var(--fn-gradient-subtle)',
       },
     },
   },

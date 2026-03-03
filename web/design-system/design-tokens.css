@@ -5,7 +5,7 @@
  * Import this file in both applications to ensure visual coherence.
  *
  * Usage:
- *   @import '../../shared/design-tokens.css';
+ *   @import '../design-system/design-tokens.css';
  */
 
 /* ============================================

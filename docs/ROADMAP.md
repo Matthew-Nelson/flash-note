@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** March 2, 2026
+**Last Updated:** March 3, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -475,8 +475,8 @@ Completed in PR cleanup commit series (March 2026). All legacy code and document
 - [x] Update `reference/FLASHNOTE_HANDOFF.md` architecture sections
 - [x] Update `PRE_LAUNCH_CHECKLIST.md` (remove Chrome Web Store items)
 - [x] Update `SUCCESS_METRICS.md` (consolidate for web-only, remove backend/extension metrics)
-- [ ] Refactor `/shared` design system into `web/design-system/` — no longer "shared" between packages; move to web root alongside `tailwind.config.ts` and update import paths
-- [ ] Update `STRIPE_TODOS.md` (remove extension sync item) — skipped, not critical for launch/beta
+- [x] Refactor `/shared` design system into `web/design-system/` — no longer "shared" between packages; move to web root alongside `tailwind.config.ts` and update import paths
+- [x] Update `STRIPE_TODOS.md` (remove extension sync item) — no extension sync item exists in the file; already clean
 
 ---
 
@@ -495,9 +495,9 @@ Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
 | Create `docs/planning/DESIGN_SYSTEM.md` | ❌ |
 | Create `docs/planning/COMPONENT_PATTERNS.md` | ❌ |
 | Add Rules 11-14 (a11y) to `CLAUDE.md` | ❌ |
-| Create `shared/design-tokens-teal.css` (replace warm tokens) | ❌ |
-| Create `shared/tailwind-preset-teal.js` (replace warm preset) | ❌ |
-| Rewrite `shared/components.css` (flat teal, no gradients) | ❌ |
+| Create `web/design-system/design-tokens-teal.css` (replace warm tokens) | ❌ |
+| Create `web/design-system/tailwind-preset-teal.js` (replace warm preset) | ❌ |
+| Rewrite `web/design-system/components.css` (flat teal, no gradients) | ❌ |
 | Update `web/tailwind.config.ts` → teal preset | ❌ |
 | Update `web/src/app/globals.css` (remove `.text-gradient`, gradient utilities) | ❌ |
 | Swap font: Inter → Plus Jakarta Sans in `layout.tsx` | ❌ |
