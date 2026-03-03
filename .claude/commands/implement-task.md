@@ -28,8 +28,9 @@ Run these steps yourself (not delegated):
 
 1. Capture project root — use this for all subsequent path references:
    ```bash
-   PROJECT_ROOT=$(git rev-parse --show-toplevel)
+   git rev-parse --show-toplevel
    ```
+   Store the output as `PROJECT_ROOT`.
 
 2. Check working tree:
    ```bash
@@ -45,11 +46,15 @@ Run these steps yourself (not delegated):
    ```
    If not `main`, STOP and tell the user to switch to main first.
 
-4. Create temp directory:
+4. Create temp directory — use `date +%s` to get a timestamp, then use the literal value:
    ```bash
-   mkdir -p /tmp/flashnote-$(date +%s)
+   date +%s
    ```
-   Store the resulting absolute path as `WORKFLOW_DIR`.
+   Then:
+   ```bash
+   mkdir -p /tmp/flashnote-<TIMESTAMP>
+   ```
+   Store the full path as `WORKFLOW_DIR`.
 
 5. Create feature branch — derive a slug from the task description (lowercase, hyphens, max 50 chars):
    ```bash
@@ -237,14 +242,14 @@ Run these commands yourself — do NOT delegate to agents. Use `PROJECT_ROOT` fr
 **Conditional dependency install** (only if package.json or lockfile changed):
 ```bash
 git diff main..HEAD --name-only | grep -qE '(package\.json|pnpm-lock\.yaml)' && \
-  cd $PROJECT_ROOT/web && pnpm install --frozen-lockfile
+  cd <PROJECT_ROOT>/web && pnpm install --frozen-lockfile
 ```
 
 **Always run:**
 ```bash
-cd $PROJECT_ROOT/web && pnpm test:ci
-cd $PROJECT_ROOT/web && pnpm exec tsc --noEmit
-cd $PROJECT_ROOT/web && pnpm lint
+cd <PROJECT_ROOT>/web && pnpm test:ci
+cd <PROJECT_ROOT>/web && pnpm exec tsc --noEmit
+cd <PROJECT_ROOT>/web && pnpm lint
 ```
 
 Check: all tests pass, coverage thresholds met (95%), zero TypeScript errors, zero lint errors.
