@@ -127,6 +127,45 @@ describe('getRequestContext', () => {
     });
   });
 
+  describe('TRUSTED_PROXY_COUNT=2 (multi-hop proxy)', () => {
+    beforeEach(() => {
+      mockConfig.TRUSTED_PROXY_COUNT = 2;
+    });
+
+    it('skips two trusted hops and returns the third-to-last IP', async () => {
+      // "1.2.3.4, 10.0.0.1, 35.191.0.1" → targetIndex=max(0, 3-1-2)=0 → "1.2.3.4"
+      mockGet.mockImplementation((name) => {
+        if (name === 'x-forwarded-for') return '1.2.3.4, 10.0.0.1, 35.191.0.1';
+        return null;
+      });
+
+      const ctx = await getRequestContext();
+      expect(ctx.ipAddress).toBe('1.2.3.4');
+    });
+
+    it('falls back to leftmost when fewer IPs than expected hops', async () => {
+      // "1.2.3.4, 35.191.0.1" → targetIndex=max(0, 2-1-2)=max(0,-1)=0 → "1.2.3.4"
+      mockGet.mockImplementation((name) => {
+        if (name === 'x-forwarded-for') return '1.2.3.4, 35.191.0.1';
+        return null;
+      });
+
+      const ctx = await getRequestContext();
+      expect(ctx.ipAddress).toBe('1.2.3.4');
+    });
+
+    it('ignores spoofed IPs with two trusted proxy hops', async () => {
+      // "fake, 1.2.3.4, 10.0.0.1, 35.191.0.1" → targetIndex=max(0, 4-1-2)=1 → "1.2.3.4"
+      mockGet.mockImplementation((name) => {
+        if (name === 'x-forwarded-for') return '10.0.0.99, 1.2.3.4, 10.0.0.1, 35.191.0.1';
+        return null;
+      });
+
+      const ctx = await getRequestContext();
+      expect(ctx.ipAddress).toBe('1.2.3.4');
+    });
+  });
+
   describe('TRUSTED_PROXY_COUNT=0 (local dev, no proxy chain)', () => {
     beforeEach(() => {
       mockConfig.TRUSTED_PROXY_COUNT = 0;

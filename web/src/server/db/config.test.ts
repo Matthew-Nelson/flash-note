@@ -444,6 +444,60 @@ describe('Server Config', () => {
       mockExit.mockRestore();
       mockConsoleError.mockRestore();
     });
+
+    it('should reject a float value like "1.5" (.int() constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '1.5';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject a negative value like "-1" (.min(0) constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '-1';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject a value exceeding the upper bound (.max(10) constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '99';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
   });
 
   describe('constants', () => {
