@@ -46,15 +46,14 @@ Run these steps yourself (not delegated):
    ```
    If not `main`, STOP and tell the user to switch to main first.
 
-4. Create temp directory — use `date +%s` to get a timestamp, then use the literal value:
+4. Create workflow directory (clean slate — remove stale files from any interrupted prior run):
    ```bash
-   date +%s
+   rm -rf .claude/workflow
    ```
-   Then:
    ```bash
-   mkdir -p /tmp/flashnote-<TIMESTAMP>
+   mkdir -p .claude/workflow
    ```
-   Store the full path as `WORKFLOW_DIR`.
+   `WORKFLOW_DIR` = `<PROJECT_ROOT>/.claude/workflow` for all subsequent references.
 
 5. Create feature branch — derive a slug from the task description (lowercase, hyphens, max 50 chars):
    ```bash

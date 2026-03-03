@@ -51,6 +51,7 @@ next-env.d.ts
 tmp/
 temp/
 .cache/
+.claude/workflow/
 
 # Extension build artifacts
 extension/dist/
