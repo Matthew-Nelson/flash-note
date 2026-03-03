@@ -1,7 +1,7 @@
 ---
 name: task-planner
 description: Creates implementation plans for FlashNote tasks. Used by the /implement-task workflow.
-model: sonnet
+model: opus
 tools: Read, Grep, Glob, Write
 ---
 
