@@ -150,6 +150,9 @@ describe('auth service', () => {
       // findUserByEmail returns null
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       vi.mocked(bcrypt.compare).mockResolvedValueOnce(false as never);
+      mockRecordFailedAttempt.mockResolvedValueOnce({
+        isLocked: false, failedAttempts: 0, isPermanentlyLocked: false, lockedUntil: null,
+      });
 
       const result = await login('nobody@example.com', 'password123', context);
 
@@ -159,6 +162,25 @@ describe('auth service', () => {
       expect(vi.mocked(bcrypt.compare).mock.calls[0][1]).toBe(
         '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.VTtYq1IpHBBUGK'
       );
+      // recordFailedAttempt MUST be called even for non-existent user (timing equalization)
+      expect(mockRecordFailedAttempt).toHaveBeenCalledWith(null, context);
+      expect(mockRecordFailedAttempt).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls recordFailedAttempt with null userId when user does not exist (timing equalization)', async () => {
+      // findUserByEmail returns null
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(false as never);
+      mockRecordFailedAttempt.mockResolvedValueOnce({
+        isLocked: false, failedAttempts: 0, isPermanentlyLocked: false, lockedUntil: null,
+      });
+
+      const result = await login('nobody@example.com', 'password123', context);
+
+      expect(result.success).toBe(false);
+      // recordFailedAttempt MUST be called even for non-existent user (timing equalization)
+      expect(mockRecordFailedAttempt).toHaveBeenCalledWith(null, context);
+      expect(mockRecordFailedAttempt).toHaveBeenCalledTimes(1);
     });
 
     it('returns invalid_credentials on wrong password', async () => {
@@ -175,6 +197,7 @@ describe('auth service', () => {
       if (!result.success) {
         expect(result.error).toBe('invalid_credentials');
       }
+      // recordFailedAttempt called with real user ID (not null) when user exists
       expect(mockRecordFailedAttempt).toHaveBeenCalledWith('test-user-id', context);
     });
 
