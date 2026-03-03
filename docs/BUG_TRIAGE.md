@@ -5,7 +5,7 @@ Two rounds of parallel audits covering 17 areas: auth flows, cookies, sessions, 
 redirects, DAL, Server Actions, client-side state, rate limiting, webhooks, env vars,
 LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, and CSP.
 
-**Status**: Fixing in progress
+**Status**: Fixing in progress (BUG-1 fixed)
 
 ---
 
@@ -13,7 +13,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
 
 ### P0 — Fix Immediately
 
-- [ ] **BUG-1**: `expireSessionAction` throws in Server Component render — user lockout
+- [x] **BUG-1**: `expireSessionAction` throws in Server Component render — user lockout
   - Blocks: BUG-2, BUG-5
 
 ### P1 — Fix Before Production
