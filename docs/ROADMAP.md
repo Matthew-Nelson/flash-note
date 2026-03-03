@@ -18,7 +18,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 0/5 sub-phases | Design system migration, all pages |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 1/5 sub-phases | UI-2: Layout Shell + Sidebar |
 | **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
@@ -492,17 +492,17 @@ Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
 
 | Item | Status |
 |------|--------|
-| Create `docs/planning/DESIGN_SYSTEM.md` | ❌ |
-| Create `docs/planning/COMPONENT_PATTERNS.md` | ❌ |
-| Add Rules 11-14 (a11y) to `CLAUDE.md` | ❌ |
-| Create `web/design-system/design-tokens-teal.css` (replace warm tokens) | ❌ |
-| Create `web/design-system/tailwind-preset-teal.js` (replace warm preset) | ❌ |
-| Rewrite `web/design-system/components.css` (flat teal, no gradients) | ❌ |
-| Update `web/tailwind.config.ts` → teal preset | ❌ |
-| Update `web/src/app/globals.css` (remove `.text-gradient`, gradient utilities) | ❌ |
-| Swap font: Inter → Plus Jakarta Sans in `layout.tsx` | ❌ |
-| Update tests affected by token/CSS changes | ❌ |
-| **Verify**: `pnpm build` succeeds. Font loads. Tailwind resolves new tokens. Tests pass. | |
+| Create `docs/planning/DESIGN_SYSTEM.md` | ✅ |
+| Create `docs/planning/COMPONENT_PATTERNS.md` | ✅ |
+| Add Rules 11-14 (a11y) to `CLAUDE.md` | ✅ |
+| Create `web/design-system/design-tokens-teal.css` (replace warm tokens) | ✅ |
+| Create `web/design-system/tailwind-preset-teal.js` (replace warm preset) | ✅ |
+| Rewrite `web/design-system/components.css` (flat teal, no gradients) | ✅ |
+| Update `web/tailwind.config.ts` → teal preset | ✅ |
+| Update `web/src/app/globals.css` (remove `.text-gradient`, gradient utilities) | ✅ |
+| Swap font: Inter → Plus Jakarta Sans in `layout.tsx` | ✅ |
+| Update tests affected by token/CSS changes | ✅ (no test changes needed) |
+| **Verify**: `pnpm build` succeeds. Font loads. Tailwind resolves new tokens. Tests pass. | ✅ |
 
 ### UI-2: Layout Shell + Sidebar
 
@@ -548,7 +548,7 @@ Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
 | Redesign pricing page (teal card styling) | ❌ |
 | Update terms, privacy, BAA pages (typography/colors) | ❌ |
 | Redesign settings page (new card/form styling) | ❌ |
-| Delete old design files (`design-tokens-warm.css`, `tailwind-preset-warm.js`) | ❌ |
+| Delete old design files (`design-tokens-warm.css`, `tailwind-preset-warm.js`) | ✅ (pulled into UI-1) |
 | Final test sweep — catch any remaining test failures from cumulative changes | ❌ |
 | **Verify**: All pages use new design. Build succeeds. Full test suite passes. | |
 

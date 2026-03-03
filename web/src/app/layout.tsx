@@ -1,10 +1,15 @@
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
-import { Inter } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const plusJakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--fn-font-sans',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'FlashNote - AI SOAP Notes for Physical Therapists',
@@ -32,7 +37,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body className={plusJakartaSans.variable}>
         <a
           href="#main-content"
           className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-fn-bg-primary focus:text-fn-accent-primary focus:font-medium focus:underline"

@@ -1,14 +1,9 @@
-/* Import shared design tokens (Warm Wellness theme) and components */
-@import '../../design-system/design-tokens-warm.css';
+@import '../../design-system/design-tokens-teal.css';
 @import '../../design-system/components.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* ============================================
-   WEB-SPECIFIC BASE STYLES
-   ============================================ */
 
 body {
   font-family: var(--fn-font-sans);
@@ -16,53 +11,6 @@ body {
   background-color: var(--fn-bg-primary);
 }
 
-/* ============================================
-   GRADIENT TEXT UTILITY
-   For brand-styled headings and emphasis
-   ============================================ */
-
-.text-gradient {
-  background: linear-gradient(
-    135deg,
-    var(--fn-accent-primary) 0%,
-    var(--fn-accent-secondary) 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.text-gradient-animated {
-  background: linear-gradient(
-    135deg,
-    var(--fn-accent-primary) 0%,
-    var(--fn-accent-secondary) 100%
-  );
-  background-size: 200% 200%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  animation: fn-gradient-shift 8s ease infinite;
-}
-
-/* ============================================
-   GRADIENT BORDER UTILITY
-   For accent-bordered elements
-   ============================================ */
-
-.border-gradient {
-  border: 2px solid transparent;
-  background-image: linear-gradient(var(--fn-card-bg, white), var(--fn-card-bg, white)),
-    linear-gradient(
-      135deg,
-      var(--fn-accent-primary),
-      var(--fn-accent-secondary)
-    );
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-}
-
-/* Global focus-visible fallback for interactive elements without custom focus styles */
 @layer base {
   :focus-visible {
     outline: 2px solid var(--fn-accent-primary);
