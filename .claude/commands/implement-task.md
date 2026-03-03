@@ -1,6 +1,6 @@
 ---
 description: Multi-agent workflow — plan, review, implement, code review, and PR
-allowed-tools: Agent, Read, Edit, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), Bash(rm:*), Bash(ls:*), AskUserQuestion
+allowed-tools: Agent, Read, Edit, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), Bash(rm:*), Bash(ls:*)
 ---
 
 Execute a multi-agent implementation workflow for the following task:
@@ -16,9 +16,9 @@ You are an orchestrator. Coordinate specialized agents through 5 phases. Follow 
 1. **Do not implement anything yourself.** Delegate all code changes to agents.
 2. **Read every agent output file before spawning the next agent.** Verify the output makes sense. If it looks wrong, stop and report to the user.
 3. **Enforce iteration limits.** Plan review: 2 rounds max. Code review: 2 rounds max. Never exceed these.
-4. **Every AskUserQuestion is a hard stop.** When you need to ask the user a question, AskUserQuestion MUST be the ONLY tool call in your response — do not combine it with any other tool calls in the same message. After calling it, do NOT call any other tools, spawn agents, or run commands until you have received the user's actual response. This applies everywhere — pre-flight, checkpoints, QUESTION handling. Never assume a default answer. If you receive an empty response, ask again.
+4. **User input = full stop.** When you need the user's input — at a checkpoint, for a dirty tree, for a QUESTION from an agent, or for any other reason — output your question as plain text and **make zero tool calls in that response**. No Agent spawns, no Bash commands, no Read calls, nothing. Just the question text. Then wait for the user to type their reply. Parse their reply and continue. **Never assume a default answer. Never skip waiting for a reply.**
 5. **Run quality gates yourself** — do not delegate test/coverage/typecheck commands to agents.
-6. **If an agent writes a `QUESTION:` line in its output**, stop and ask the user that question via AskUserQuestion before continuing.
+6. **If an agent writes a `QUESTION:` line in its output**, present that question to the user (see rule 4) and pass their answer to the next agent.
 
 ## Agents
 
@@ -36,7 +36,7 @@ Spawn each agent using the Agent tool with `subagent_type` set to the agent name
 
 ## Pre-flight
 
-Run these steps yourself (not delegated). **Each step is sequential — do NOT run the next step until the current step is fully resolved, including any user questions.**
+Run these steps yourself (not delegated). **Each step is sequential — do NOT run the next step until the current step is fully resolved, including any user input.**
 
 ### Step 1: Get project root
 ```bash
@@ -50,18 +50,19 @@ git status --porcelain
 ```
 If the output is empty, the tree is clean — proceed to Step 3.
 
-If the output is NOT empty (dirty tree), call AskUserQuestion:
-- question: "Working tree has uncommitted changes. How should we proceed?"
-- header: "Dirty tree"
-- multiSelect: false
-- options:
-  1. "Stash and continue" — Stash changes and proceed with the workflow
-  2. "Abort" — Stop the workflow
+If the output is NOT empty (dirty tree), ask the user **(rule 4 — no tool calls, just text)**:
 
-**STOP. Do NOT proceed to Step 3 until the user responds.**
+> Working tree has uncommitted changes. How should we proceed?
+>
+> 1. **Stash and continue** — I'll stash your changes and proceed
+> 2. **Abort** — Stop the workflow
+>
+> Reply with 1 or 2.
 
-- **Stash and continue** → run `git stash push -m "implement-task: auto-stash"`, record that a stash was created, then proceed to Step 3.
-- **Abort** → stop the workflow entirely.
+**Wait for user reply. Do NOT proceed to Step 3.**
+
+- **1 / Stash** → run `git stash push -m "implement-task: auto-stash"`, record that a stash was created, then proceed to Step 3.
+- **2 / Abort** → stop the workflow entirely.
 
 ### Step 3: Check branch
 ```bash
@@ -73,18 +74,21 @@ Must be `main`. If not, STOP and tell the user to switch to main first.
 ```bash
 ls .flashnote-workflow 2>/dev/null
 ```
-If the command succeeds (directory exists — prior run artifacts found), call AskUserQuestion:
-- question: "Found artifacts from a previous workflow run in .flashnote-workflow/. Delete them?"
-- header: "Prior run"
-- multiSelect: false
-- options:
-  1. "Delete and continue" — Remove old artifacts and start fresh
-  2. "Abort" — Stop so I can inspect the artifacts
+If the command succeeds (directory exists — prior run artifacts found), ask the user **(rule 4)**:
 
-**STOP. Do NOT proceed until the user responds.**
+> Found artifacts from a previous workflow run in `.flashnote-workflow/`. Delete them?
+>
+> 1. **Delete and continue** — Remove old artifacts and start fresh
+> 2. **Abort** — Stop so I can inspect them
+>
+> Reply with 1 or 2.
 
-- **Delete and continue** → run `rm -rf .flashnote-workflow`, then proceed.
-- **Abort** → stop the workflow.
+**Wait for user reply. Do NOT proceed.**
+
+- **1 / Delete** → run `rm -rf .flashnote-workflow`, then proceed.
+- **2 / Abort** → stop the workflow.
+
+If the directory does not exist, proceed directly.
 
 Then create the directory:
 ```bash
@@ -108,7 +112,7 @@ Spawn `task-planner` with prompt:
 >
 > Write your plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan.md`
 
-Read `.flashnote-workflow/plan.md` when complete. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/plan.md` when complete. Check for `QUESTION:` lines — if found, present each question to the user (rule 4), wait for their answers, then pass those answers to the planner in a revision prompt.
 
 ---
 
@@ -122,7 +126,7 @@ Spawn `task-reviewer` with prompt:
 >
 > Write your review to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`
 
-Read `.flashnote-workflow/review-round-1.md`. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/review-round-1.md`. Check for `QUESTION:` lines — if found, present to user (rule 4) and wait.
 
 - **APPROVED** → proceed to Checkpoint 1.
 - **NEEDS_REVISION** → continue below.
@@ -146,25 +150,31 @@ Then spawn `task-reviewer` for round 2:
 
 Determine the approved plan file: use `plan-final.md` if it exists, otherwise `plan.md`. Track this as `PLAN_FILE` for the rest of the workflow.
 
-Read `.flashnote-workflow/<PLAN_FILE>`. Present a summary:
-- Files to be modified/created
-- Core approach (2-3 sentences)
-- Risks or reviewer notes
+Read `.flashnote-workflow/<PLAN_FILE>`. Then ask the user **(rule 4 — no tool calls, just this text)**:
 
-**Immediately** call AskUserQuestion:
-- question: "The plan has been reviewed and approved. Ready to proceed with implementation?"
-- header: "Plan"
-- multiSelect: false
-- options:
-  1. "Proceed" — Implement according to the approved plan
-  2. "Abort" — Stop the workflow and clean up
-  3. "Provide feedback" — I want changes before implementation
+> ## Plan Summary
+>
+> **Files:** [list files to modify/create]
+>
+> **Approach:** [2-3 sentence summary]
+>
+> **Reviewer notes:** [any risks or concerns, or "None"]
+>
+> ---
+>
+> The plan has been reviewed and approved. Ready to proceed?
+>
+> 1. **Proceed** — Implement according to the plan
+> 2. **Abort** — Stop the workflow and clean up
+> 3. **Provide feedback** — I want changes before implementation
+>
+> Reply with 1, 2, or 3. If choosing 3, include your feedback.
 
-**STOP. Do NOT spawn agents, run commands, or do any work until the user responds.**
+**Wait for user reply. Do NOT spawn agents or run commands.**
 
-- **Proceed** → Phase 3
-- **Abort** → Abort/Cleanup
-- **Provide feedback** → get notes, spawn `task-planner` to revise, re-run review round 2, return to this checkpoint
+- **1 / Proceed** → Phase 3
+- **2 / Abort** → Abort/Cleanup
+- **3 / Feedback** → parse their feedback, spawn `task-planner` to revise, re-run review round 2, return to this checkpoint
 
 ---
 
@@ -176,7 +186,7 @@ Spawn `task-implementer` with prompt:
 >
 > Write your summary to: `<PROJECT_ROOT>/.flashnote-workflow/implementation-summary.md`
 
-Read `.flashnote-workflow/implementation-summary.md`. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/implementation-summary.md`. Check for `QUESTION:` lines — if found, present to user (rule 4) and wait.
 
 ---
 
@@ -261,27 +271,36 @@ Then spawn `task-code-reviewer` for round 2:
 
 Run `git diff --stat main..HEAD`. Read the implementation summary and latest code review.
 
-Present:
-- Files changed (diff stat)
-- What was implemented
-- Code review result
-- Quality gate status
-- Branch name: `FEATURE_BRANCH`
+Then ask the user **(rule 4 — no tool calls, just this text)**:
 
-**Immediately** call AskUserQuestion:
-- question: "Implementation complete and all checks pass. Ready to push and create a PR?"
-- header: "Pre-Push"
-- multiSelect: false
-- options:
-  1. "Proceed" — Push and create a pull request
-  2. "Abort" — Discard the feature branch and clean up
-  3. "Request changes" — I want fixes before pushing
+> ## Pre-Push Summary
+>
+> **Files changed:**
+> [paste diff stat]
+>
+> **What was implemented:** [brief summary]
+>
+> **Code review:** [APPROVED / APPROVED_WITH_NOTES + any notes]
+>
+> **Quality gate:** All checks passing
+>
+> **Branch:** `FEATURE_BRANCH`
+>
+> ---
+>
+> Ready to push and create a PR?
+>
+> 1. **Proceed** — Push and create a pull request
+> 2. **Abort** — Discard the feature branch and clean up
+> 3. **Request changes** — I want fixes before pushing
+>
+> Reply with 1, 2, or 3. If choosing 3, include what you want changed.
 
-**STOP. Do NOT proceed until the user responds.**
+**Wait for user reply. Do NOT proceed.**
 
-- **Proceed** → Phase 5
-- **Abort** → Abort/Cleanup
-- **Request changes** → get notes, spawn `task-fixer`, re-run quality gate, return to this checkpoint
+- **1 / Proceed** → Phase 5
+- **2 / Abort** → Abort/Cleanup
+- **3 / Request changes** → parse their notes, spawn `task-fixer`, re-run quality gate, return to this checkpoint
 
 ---
 
@@ -313,13 +332,16 @@ Present:
 
 ## Abort/Cleanup
 
-When the user chooses "Abort", AskUserQuestion:
-- question: "How should the feature branch be handled?"
-- header: "Cleanup"
-- multiSelect: false
-- options:
-  1. "Delete branch" — Discard all work on the feature branch
-  2. "Keep branch" — Switch to main but keep the feature branch for inspection
+When the user chooses "Abort", ask **(rule 4)**:
+
+> How should the feature branch be handled?
+>
+> 1. **Delete branch** — Discard all work
+> 2. **Keep branch** — Switch to main but keep `FEATURE_BRANCH` for inspection
+>
+> Reply with 1 or 2.
+
+**Wait for user reply.**
 
 Then run:
 
@@ -327,12 +349,12 @@ Then run:
 git checkout -f main
 ```
 
-If user chose "Delete branch":
+If user chose 1 (Delete):
 ```bash
 git branch -D <FEATURE_BRANCH>
 ```
 
-If user chose "Keep branch", tell them: "Branch `<FEATURE_BRANCH>` preserved. Last commit: `<SHA>`."
+If user chose 2 (Keep), tell them: "Branch `<FEATURE_BRANCH>` preserved. Last commit: `<SHA>`."
 
 ```bash
 rm -rf .flashnote-workflow
@@ -351,7 +373,7 @@ If `git stash pop` fails (conflict), tell the user: "Stash could not be applied 
 | Situation | Action |
 |---|---|
 | Agent output looks fundamentally wrong | Stop, report to user |
-| Agent writes `QUESTION:` lines | Stop, ask user via AskUserQuestion, pass answer to next agent |
+| Agent writes `QUESTION:` lines | Present question to user (rule 4), wait for reply, pass answer to next agent |
 | Quality gate fails after 2 fix attempts | Stop, report failing output to user |
 | Critical security issues unfixed after round 2 | Stop, report to user |
 | `gh pr create` fails | Report error, leave branch pushed for manual PR |
