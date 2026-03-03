@@ -32,8 +32,8 @@ export default function DashboardError({
           <Button onClick={reset}>
             Try Again
           </Button>
-          <Link href="/dashboard" className="link text-sm">
-            Return to Dashboard
+          <Link href="/login" className="link text-sm">
+            Return to sign in
           </Link>
         </div>
       </div>
