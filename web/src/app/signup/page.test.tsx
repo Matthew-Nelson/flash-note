@@ -58,6 +58,13 @@ describe('SignupPage', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeInTheDocument();
   });
 
+  it('logs "hello world" to the console on mount', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    render(<SignupPage />);
+    expect(consoleSpy).toHaveBeenCalledWith('hello world');
+    consoleSpy.mockRestore();
+  });
+
   it('validates empty fields client-side and does not call registerAction', async () => {
     const user = userEvent.setup();
     render(<SignupPage />);
