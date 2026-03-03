@@ -48,6 +48,11 @@ const envSchema = z.object({
   // Registration mode — controls who can sign up
   REGISTRATION_MODE: z.enum(['open', 'closed', 'invite']).default('open'),
 
+  // Number of trusted reverse proxy hops prepended to x-forwarded-for.
+  // Cloud Run: 1 (the GFE/load balancer appends real IP at position n-1).
+  // Set to 0 for local dev without a proxy (falls back to rightmost entry).
+  TRUSTED_PROXY_COUNT: z.coerce.number().int().min(0).default(1),
+
   // LLM provider configuration
   LLM_PROVIDER: z.enum(['gemini', 'claude']).default('gemini'),
   GEMINI_API_KEY: z.string().min(1).optional(),
