@@ -1,6 +1,6 @@
 ---
 description: Multi-agent workflow — plan, review, implement, code review, and PR
-allowed-tools: Agent, Read, Write, Edit, Grep, Glob, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), AskUserQuestion
+allowed-tools: Agent, Read, Write, Edit, Grep, Glob, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), Bash(rm:*), Bash(ls:*), Bash(cd:*), AskUserQuestion
 ---
 
 Execute a multi-agent implementation workflow for the following task:
@@ -14,7 +14,7 @@ Execute a multi-agent implementation workflow for the following task:
 You are an orchestrator. Coordinate specialized agents through 5 phases. Follow these rules:
 
 1. **Do not implement anything yourself.** Delegate all work to agents.
-2. **Pass context between agents via temp files** in `/tmp/flashnote-workflow/`. Run `mkdir -p /tmp/flashnote-workflow` first.
+2. **Create a unique temp directory first.** Run `mkdir -p /tmp/flashnote-workflow-$(date +%s)`. Store the resulting absolute path as `WORKFLOW_DIR` and use it for ALL temp files throughout the workflow. When passing paths to agents, substitute the actual path — agents do not know the `<WORKFLOW_DIR>` placeholder.
 3. **Read every agent output file before spawning the next agent.** Verify the output makes sense. If it looks wrong, stop and report to the user.
 4. **Enforce iteration limits.** Plan review: 2 rounds max. Code review: 2 rounds max. Never exceed these.
 5. **Pause at human checkpoints** (after plan review, before commit). Present a clear summary and ask the user before proceeding.
@@ -42,7 +42,7 @@ Launch a **sonnet agent**:
 >    - Order of operations
 >    - `docs/ROADMAP.md` update: which line item to mark done
 > 7. If you encounter ambiguity that affects the approach, write it as a `QUESTION:` line — do not guess
-> 8. Write the plan to `/tmp/flashnote-workflow/plan.md`
+> 8. Write the plan to exactly `<WORKFLOW_DIR>/plan.md` — this exact path and filename, no variations
 >
 > Task: $ARGUMENTS
 
@@ -54,14 +54,14 @@ Tools: `Read, Grep, Glob, Write`
 
 ### Round 1
 
-Read `/tmp/flashnote-workflow/plan.md`. Check for `QUESTION:` lines — if found, ask the user before proceeding.
+Read `<WORKFLOW_DIR>/plan.md`. Check for `QUESTION:` lines — if found, ask the user before proceeding.
 
 Launch an **opus agent**:
 
 > You are a senior engineer reviewing an implementation plan for a HIPAA-regulated healthcare app.
 >
 > Read `CLAUDE.md` first for mandatory engineering rules.
-> Read the plan at `/tmp/flashnote-workflow/plan.md` and the source files it references.
+> Read the plan at `<WORKFLOW_DIR>/plan.md` and the source files it references.
 >
 > Evaluate:
 > - **Correctness**: Will this work? Are file paths and references accurate?
@@ -74,7 +74,7 @@ Launch an **opus agent**:
 >
 > If you have questions about intent or requirements that would change your review, write them as `QUESTION:` lines.
 >
-> Write your review to `/tmp/flashnote-workflow/review-round-1.md` with this structure:
+> Write your review to `<WORKFLOW_DIR>/review-round-1.md` with this structure:
 > ```
 > VERDICT: APPROVED
 > ```
@@ -91,22 +91,22 @@ Tools: `Read, Grep, Glob, Write`
 
 ### Handling Round 1 Result
 
-Read `/tmp/flashnote-workflow/review-round-1.md`. Check for `QUESTION:` lines — ask the user if found.
+Read `<WORKFLOW_DIR>/review-round-1.md`. Check for `QUESTION:` lines — ask the user if found.
 
 - If verdict is `APPROVED` → proceed to Human Checkpoint 1.
 - If `NEEDS_REVISION` → launch a **sonnet agent** to revise:
 
-> Read your original plan (`/tmp/flashnote-workflow/plan.md`) and the review feedback (`/tmp/flashnote-workflow/review-round-1.md`).
+> Read your original plan (`<WORKFLOW_DIR>/plan.md`) and the review feedback (`<WORKFLOW_DIR>/review-round-1.md`).
 > Revise the plan to address all valid feedback. Only change what was called out.
-> Write the revised plan to `/tmp/flashnote-workflow/plan-final.md`
+> Write the revised plan to `<WORKFLOW_DIR>/plan-final.md`
 
 Tools: `Read, Grep, Glob, Write`
 
 Then launch an **opus agent** for final check:
 
-> Final plan review. Read the revised plan (`/tmp/flashnote-workflow/plan-final.md`) and original feedback (`/tmp/flashnote-workflow/review-round-1.md`).
+> Final plan review. Read the revised plan (`<WORKFLOW_DIR>/plan-final.md`) and original feedback (`<WORKFLOW_DIR>/review-round-1.md`).
 > Verify the revision addresses the feedback.
-> Write to `/tmp/flashnote-workflow/review-round-2.md`:
+> Write to `<WORKFLOW_DIR>/review-round-2.md`:
 > ```
 > VERDICT: APPROVED
 > ```
@@ -128,7 +128,7 @@ Tools: `Read, Grep, Glob, Write`
 
 **⛔ STOP. DO NOT PROCEED TO PHASE 3 UNTIL THE USER RESPONDS.**
 
-Read `/tmp/flashnote-workflow/plan-final.md` (or `plan.md` if final doesn't exist). Extract:
+Read `<WORKFLOW_DIR>/plan-final.md` (or `plan.md` if final doesn't exist). Extract:
 - List of files to be modified/created
 - The core approach in 2-3 sentences
 - Any risks or reviewer notes
@@ -148,7 +148,7 @@ Present to the user:
 > **Risks/Notes:**
 > [From reviewer]
 >
-> Full plan: `/tmp/flashnote-workflow/plan-final.md`
+> Full plan: `<WORKFLOW_DIR>/plan-final.md`
 
 Now call AskUserQuestion with these exact parameters:
 - question: "The plan has been reviewed and approved. Ready to proceed with implementation?"
@@ -162,7 +162,7 @@ Now call AskUserQuestion with these exact parameters:
 DO NOT continue to Phase 3 until you receive the user's response. Wait here.
 
 - If **Proceed** → continue to Phase 3
-- If **Abort** → clean up `/tmp/flashnote-workflow/`, stop the workflow, report to user
+- If **Abort** → clean up `<WORKFLOW_DIR>/`, stop the workflow, report to user
 - If **Provide feedback** → get the user's notes (they can provide them in the response), spawn a sonnet agent to revise the plan to address the notes, then re-run Phase 2 Round 2 review, then return to this checkpoint
 
 ---
@@ -176,7 +176,7 @@ Launch a **sonnet agent** with `isolation: worktree`:
 > You are an expert developer implementing an approved plan for FlashNote.
 >
 > Read `CLAUDE.md` first — mandatory engineering rules apply.
-> Read the approved plan at `/tmp/flashnote-workflow/[final plan file]`.
+> Read the approved plan at `<WORKFLOW_DIR>/[final plan file]`.
 >
 > **Key patterns you MUST follow:**
 > - All data access goes through the DAL (`web/src/server/dal/`). Never import `db` or `pool` in actions, components, or pages.
@@ -198,7 +198,7 @@ Launch a **sonnet agent** with `isolation: worktree`:
 >
 > When done, commit all changes in the worktree with a descriptive message so the orchestrator can retrieve them.
 >
-> Write a summary to `/tmp/flashnote-workflow/implementation-summary.md`:
+> Write a summary to `<WORKFLOW_DIR>/implementation-summary.md`:
 > - **Worktree path**: the absolute path from `pwd` at the start
 > - **Base commit hash**: the hash from `git rev-parse HEAD` before your changes
 > - Files modified/created (full paths)
@@ -213,7 +213,7 @@ Tools: `Read, Write, Edit, Grep, Glob, Bash`
 
 After the implementation agent returns, **you (the orchestrator) must**:
 
-1. Read `/tmp/flashnote-workflow/implementation-summary.md`
+1. Read `<WORKFLOW_DIR>/implementation-summary.md`
 2. Extract these three values — all subsequent phases depend on them:
    - **`WORKTREE_PATH`** — the absolute worktree directory path
    - **`WORKTREE_BRANCH`** — the branch name
@@ -226,7 +226,13 @@ After the implementation agent returns, **you (the orchestrator) must**:
 
 ## Quality Gate 1: Post-Implementation
 
-**Run these commands yourself (do not delegate to an agent):**
+**Install dependencies first** — the worktree only contains tracked files, so `node_modules` does not exist:
+
+```bash
+cd <WORKTREE_PATH>/web && pnpm install --frozen-lockfile
+```
+
+**Then run these commands yourself (do not delegate to an agent):**
 
 ```bash
 cd <WORKTREE_PATH>/web && pnpm test --run --coverage
@@ -262,7 +268,7 @@ After the fix agent completes, **re-run all quality gate checks** (using `cd <WO
 
 ### Round 1
 
-Read `/tmp/flashnote-workflow/implementation-summary.md`. Launch an **opus agent**:
+Read `<WORKFLOW_DIR>/implementation-summary.md`. Launch an **opus agent**:
 
 > You are a strict code reviewer for a HIPAA-regulated healthcare app.
 >
@@ -279,7 +285,7 @@ Read `/tmp/flashnote-workflow/implementation-summary.md`. Launch an **opus agent
 > - **Test quality**: Tests exercise real behavior (Rule 6). Tests use shared helpers from `web/src/test/dal-helpers.ts`, not custom mocking.
 > - **Code quality**: No dead code, no over-engineering
 >
-> Write to `/tmp/flashnote-workflow/code-review-round-1.md`:
+> Write to `<WORKFLOW_DIR>/code-review-round-1.md`:
 > ```
 > VERDICT: CODE_APPROVED
 > ```
@@ -298,17 +304,17 @@ Tools: `Read, Grep, Glob, Bash(git:*)`
 
 ### Handling Round 1 Result
 
-Read `/tmp/flashnote-workflow/code-review-round-1.md`.
+Read `<WORKFLOW_DIR>/code-review-round-1.md`.
 
 - If `CODE_APPROVED` → proceed to Quality Gate 2.
 - If `CHANGES_REQUESTED` → launch a **sonnet agent** to fix:
 
-> Fix the issues in `/tmp/flashnote-workflow/code-review-round-1.md`.
+> Fix the issues in `<WORKFLOW_DIR>/code-review-round-1.md`.
 > Fix all critical and major issues. Fix minor issues if straightforward.
 >
 > All source files are in the worktree at `<WORKTREE_PATH>`. Use absolute paths when reading/editing files. Run commands with `cd <WORKTREE_PATH>/web && ...`. Commit fixes in the worktree.
 >
-> Write summary to `/tmp/flashnote-workflow/fixes-summary.md`.
+> Write summary to `<WORKFLOW_DIR>/fixes-summary.md`.
 
 Tools: `Read, Write, Edit, Grep, Glob, Bash`
 
@@ -316,9 +322,9 @@ Tools: `Read, Write, Edit, Grep, Glob, Bash`
 
 Then launch an **opus agent** for final review:
 
-> Final code review. Read the original issues (`/tmp/flashnote-workflow/code-review-round-1.md`) and the fixes summary (`/tmp/flashnote-workflow/fixes-summary.md`).
+> Final code review. Read the original issues (`<WORKFLOW_DIR>/code-review-round-1.md`) and the fixes summary (`<WORKFLOW_DIR>/fixes-summary.md`).
 > Verify fixes via `cd <WORKTREE_PATH> && git diff <BASE_HASH>..HEAD`.
-> Write to `/tmp/flashnote-workflow/code-review-round-2.md`:
+> Write to `<WORKFLOW_DIR>/code-review-round-2.md`:
 > ```
 > VERDICT: CODE_APPROVED
 > ```
@@ -354,7 +360,7 @@ If any check fails after the code review fixes, **stop and report to the user**.
 
 **⛔ STOP. DO NOT COMMIT OR CREATE PR UNTIL THE USER RESPONDS.**
 
-Run `cd <WORKTREE_PATH> && git diff --stat <BASE_HASH>..HEAD` to get the file change summary. Read `/tmp/flashnote-workflow/implementation-summary.md` and `/tmp/flashnote-workflow/code-review-round-2.md` (or `code-review-round-1.md` if round 2 wasn't needed).
+Run `cd <WORKTREE_PATH> && git diff --stat <BASE_HASH>..HEAD` to get the file change summary. Read `<WORKFLOW_DIR>/implementation-summary.md` and `<WORKFLOW_DIR>/code-review-round-2.md` (or `code-review-round-1.md` if round 2 wasn't needed).
 
 Present to the user:
 
@@ -390,7 +396,7 @@ Now call AskUserQuestion with these exact parameters:
 DO NOT continue to Phase 5 until you receive the user's response. Wait here.
 
 - If **Proceed** → continue to Phase 5
-- If **Abort** → report status to user, clean up `/tmp/flashnote-workflow/`, exit gracefully (worktree remains for manual inspection if needed)
+- If **Abort** → report status to user, clean up `<WORKFLOW_DIR>/`, exit gracefully (worktree remains for manual inspection if needed)
 - If **Request changes** → get the user's change description (from their response notes), spawn a sonnet agent to fix (with worktree context as above), then re-run Quality Gate 2 checks, then return to this checkpoint
 
 ---
@@ -456,7 +462,7 @@ git worktree remove <WORKTREE_PATH> 2>/dev/null; git worktree prune
 git worktree list
 
 # Clean up temp files
-rm -rf /tmp/flashnote-workflow/
+rm -rf <WORKFLOW_DIR>/
 ```
 
 ---
@@ -485,7 +491,7 @@ git worktree remove <path>     # Remove the worktree by path
 git worktree prune             # Clean up dangling worktree refs
 
 # Clean up temp workflow files
-rm -rf /tmp/flashnote-workflow/
+rm -rf <WORKFLOW_DIR>/
 
 # Verify clean state
 git status                     # Should show clean working tree
