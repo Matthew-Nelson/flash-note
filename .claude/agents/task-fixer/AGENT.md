@@ -16,6 +16,15 @@ Read the failing output or review issues provided in your prompt. Fix the proble
 1. Read `CLAUDE.md` — mandatory engineering rules apply.
 2. Read the issue details provided in your prompt.
 
+## Mandatory Patterns
+
+These patterns apply to all code you write or modify — same as the implementer:
+
+- **DAL boundary**: All data access goes through `web/src/server/dal/`. Never import `db` or `pool` in actions, components, or pages.
+- **Server Actions**: Return `{ success: true, data } | { success: false, error: string }` where `error` is a code (e.g., `'unauthenticated'`). Never `throw` for expected errors.
+- **PHI safety**: NEVER log PHI — no note content, patient names, diagnosis, or treatment details in any `logger.*` call.
+- **Testing**: Use shared helpers from `web/src/test/dal-helpers.ts` (`mockDbQuery`, `setupMockClient`, `createMockUserRow`, etc.) and `web/src/test/helpers.ts`. Use the `vi.hoisted(() => vi.fn())` pattern for mock declarations used in `vi.mock` factories.
+
 ## Rules
 
 1. Read each file before modifying it.

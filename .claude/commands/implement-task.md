@@ -319,7 +319,90 @@ Then ask the user **(rule 4 — no tool calls, just this text)**:
    git push -u origin <FEATURE_BRANCH>
    ```
 
-3. Create PR using `gh pr create`. Include a summary of what changed, the approach taken, code review notes, and a test plan. Keep the title under 70 chars.
+3. Create PR using `gh pr create` with a thorough description and smoke testing plan. Use the template below.
+
+### PR Title
+
+Conventional Commits format: `<type>(<scope>): <short imperative description>` (under 70 chars).
+
+### PR Body
+
+Use a HEREDOC to pass the body to `gh pr create`:
+
+```bash
+gh pr create --title "<title>" --body "$(cat <<'EOF'
+## Summary
+
+<1-3 sentences: what this PR does and why. Reference the task description.>
+
+## Changes
+
+<Group changes logically. Explain design decisions and anything non-obvious.>
+
+- **<Area>**: <what changed and why>
+- **<Area>**: <what changed and why>
+
+## Smoke Testing
+
+### Prerequisites
+
+<Setup needed before testing — env vars, migrations, dependencies, etc.>
+
+```bash
+pnpm --filter web install
+pnpm --filter web dev
+```
+
+### Scenario 1: <Happy path — the main thing this PR enables>
+
+**Steps:**
+1. <Concrete step with exact action or command>
+2. <Next step>
+3. <Next step>
+
+**Expected result:** <What the reviewer should see — be specific>
+
+### Scenario 2: <Edge case or error handling>
+
+**Steps:**
+1. <Steps to trigger the edge case>
+
+**Expected result:** <What should happen — graceful error, fallback, etc.>
+
+### Scenario 3: <Regression check — existing functionality still works>
+
+**Steps:**
+1. <Steps to verify nothing broke>
+
+**Expected result:** <Same behavior as before this PR>
+
+### Automated Tests
+
+```bash
+pnpm --filter web test:ci
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+```
+
+<Note which tests are new vs existing and what they cover.>
+
+## Code Review
+
+<Summarize the code review verdict and any reviewer notes from Phase 4.>
+
+## Notes for Reviewers
+
+<Optional: areas of uncertainty, follow-up work, known limitations.>
+EOF
+)"
+```
+
+**Smoke testing guidelines:**
+- **Copy-paste ready**: Every command should be runnable as-is. No unexplained placeholders.
+- **Include expected output**: Don't say "it should work" — describe what success looks like (UI state, terminal output, HTTP response).
+- **Cover the triad**: happy path, edge/error case, regression. These three catch the vast majority of issues.
+- **Healthcare context**: If the change touches auth, session handling, or data access, include a scenario verifying that unauthenticated/unauthorized access is properly denied.
+- **Adapt to the change**: Backend → curl commands. Frontend → describe clicks and visual results. DAL → reference the test output.
 
 4. **Report the PR URL to the user.**
 
