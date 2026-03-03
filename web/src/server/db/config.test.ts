@@ -406,6 +406,100 @@ describe('Server Config', () => {
     });
   });
 
+  describe('TRUSTED_PROXY_COUNT', () => {
+    it('should default to 1 when env var is absent', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      delete env.TRUSTED_PROXY_COUNT;
+
+      const { config } = await import('./config');
+      expect(config.TRUSTED_PROXY_COUNT).toBe(1);
+    });
+
+    it('should coerce string "2" to integer 2', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '2';
+
+      const { config } = await import('./config');
+      expect(config.TRUSTED_PROXY_COUNT).toBe(2);
+    });
+
+    it('should reject a non-integer string value', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = 'abc';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject a float value like "1.5" (.int() constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '1.5';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject a negative value like "-1" (.min(0) constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '-1';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+
+    it('should reject a value exceeding the upper bound (.max(10) constraint)', async () => {
+      env.DATABASE_URL = 'postgres://localhost:5432/flashnote';
+      env.NODE_ENV = 'test';
+      env.USE_MOCK_AI = 'true';
+      env.TRUSTED_PROXY_COUNT = '99';
+
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+
+      mockExit.mockRestore();
+      mockConsoleError.mockRestore();
+    });
+  });
+
   describe('constants', () => {
     it('should export BCRYPT_ROUNDS as 12', async () => {
       env.DATABASE_URL = 'postgres://localhost:5432/flashnote';

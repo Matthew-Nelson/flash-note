@@ -563,6 +563,7 @@ Next.js runs on Google Cloud Run as a containerized Node.js process. This is NOT
 - **Rate limiting must be Redis-backed.** Use Upstash `@upstash/ratelimit`. In-memory rate limiters would only apply to the single instance that receives the request — ineffective when scaled to multiple instances.
 - **Proxy runs on Node.js runtime.** Next.js 16's `proxy.ts` runs on the Node.js runtime (not Edge). While Node.js modules like `pg` and `bcryptjs` are technically available, the proxy intentionally avoids DB queries — it only checks cookie existence for fast optimistic redirects. Full session validation (DB lookup, lockout check) happens in Server Components and Server Actions via the DAL.
 - **Plan for container restarts.** Cloud Run may restart containers for updates, scaling, or health checks. Don't store durable state in memory. The database is the source of truth for all persistent state.
+- **Trusted proxy count for rate limiting**: Cloud Run's load balancer appends the real client IP to `x-forwarded-for` but does NOT strip client-supplied values. The `TRUSTED_PROXY_COUNT` env var (default: `1`) controls how many proxy hops to skip from the right when extracting the client IP. Set to `0` for local dev without a proxy. Do not take the leftmost IP — it is attacker-controlled.
 
 ## Next.js Proxy Responsibilities
 

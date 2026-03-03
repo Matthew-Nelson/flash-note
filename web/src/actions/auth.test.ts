@@ -110,6 +110,7 @@ vi.mock('@/server/db/config', () => ({
     WEB_URL: 'http://localhost:3000',
     EMAIL_FROM_NAME: 'FlashNote',
     EMAIL_FROM_ADDRESS: 'noreply@flashnote.test',
+    TRUSTED_PROXY_COUNT: 1,
   },
 }));
 
