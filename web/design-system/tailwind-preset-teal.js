@@ -1,11 +1,12 @@
 /**
- * FlashNote Tailwind Preset - Warm Wellness Theme
+ * FlashNote Tailwind Preset - Refined Teal Theme
  *
- * Tailwind configuration for the Warm Wellness color scheme.
- * Uses emerald/teal/amber instead of cyan/violet/pink.
+ * Maps all CSS custom properties from design-tokens-teal.css to Tailwind
+ * utility class names. No backgroundImage key — gradients are removed
+ * as a design direction (intentional omission).
  *
  * Usage:
- *   presets: [require('./design-system/tailwind-preset-warm.js')]
+ *   presets: [require('./design-system/tailwind-preset-teal.js')]
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -13,69 +14,69 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Brand colors - Warm Wellness palette
-        brand: {
-          // Primary - Emerald (healing/growth)
-          emerald: {
-            50: 'var(--fn-emerald-50)',
-            100: 'var(--fn-emerald-100)',
-            200: 'var(--fn-emerald-200)',
-            300: 'var(--fn-emerald-300)',
-            400: 'var(--fn-emerald-400)',
-            500: 'var(--fn-emerald-500)',
-            600: 'var(--fn-emerald-600)',
-            700: 'var(--fn-emerald-700)',
-            800: 'var(--fn-emerald-800)',
-            900: 'var(--fn-emerald-900)',
-          },
-          // Secondary - Teal (clinical + modern)
-          teal: {
-            50: 'var(--fn-teal-50)',
-            100: 'var(--fn-teal-100)',
-            200: 'var(--fn-teal-200)',
-            300: 'var(--fn-teal-300)',
-            400: 'var(--fn-teal-400)',
-            500: 'var(--fn-teal-500)',
-            600: 'var(--fn-teal-600)',
-            700: 'var(--fn-teal-700)',
-            800: 'var(--fn-teal-800)',
-            900: 'var(--fn-teal-900)',
-          },
-          // Accent - Amber (warm highlights)
-          amber: {
-            50: 'var(--fn-amber-50)',
-            100: 'var(--fn-amber-100)',
-            200: 'var(--fn-amber-200)',
-            300: 'var(--fn-amber-300)',
-            400: 'var(--fn-amber-400)',
-            500: 'var(--fn-amber-500)',
-            600: 'var(--fn-amber-600)',
-            700: 'var(--fn-amber-700)',
-            800: 'var(--fn-amber-800)',
-            900: 'var(--fn-amber-900)',
-          },
+        'fn-primary': {
+          DEFAULT: 'var(--fn-primary)',
+          hover: 'var(--fn-primary-hover)',
+          light: 'var(--fn-primary-light)',
+          50: 'var(--fn-primary-50)',
         },
-        // Warm neutral - Stone
-        stone: {
-          50: 'var(--fn-stone-50)',
-          100: 'var(--fn-stone-100)',
-          200: 'var(--fn-stone-200)',
-          300: 'var(--fn-stone-300)',
-          400: 'var(--fn-stone-400)',
-          500: 'var(--fn-stone-500)',
-          600: 'var(--fn-stone-600)',
-          700: 'var(--fn-stone-700)',
-          800: 'var(--fn-stone-800)',
-          900: 'var(--fn-stone-900)',
+        'fn-accent': {
+          DEFAULT: 'var(--fn-accent)',
+          light: 'var(--fn-accent-light)',
         },
-        // Warm backgrounds - Cream
-        cream: {
-          50: 'var(--fn-cream-50)',
-          100: 'var(--fn-cream-100)',
-          200: 'var(--fn-cream-200)',
-          300: 'var(--fn-cream-300)',
+        'fn-soap': {
+          subjective: 'var(--fn-soap-subjective)',
+          objective: 'var(--fn-soap-objective)',
+          assessment: 'var(--fn-soap-assessment)',
+          plan: 'var(--fn-soap-plan)',
         },
-        // Semantic colors using CSS custom properties
+        'fn-sidebar': {
+          bg: 'var(--fn-sidebar-bg)',
+          text: 'var(--fn-sidebar-text)',
+          'text-active': 'var(--fn-sidebar-text-active)',
+          hover: 'rgba(255,255,255,0.08)',
+          active: 'rgba(255,255,255,0.12)',
+        },
+        'fn-bg': {
+          surface: 'var(--fn-bg-surface)',
+          card: 'var(--fn-bg-card)',
+          primary: 'var(--fn-bg-primary)',
+          secondary: 'var(--fn-bg-secondary)',
+          tertiary: 'var(--fn-bg-tertiary)',
+          inverse: 'var(--fn-bg-inverse)',
+        },
+        'fn-text': {
+          primary: 'var(--fn-text-primary)',
+          secondary: 'var(--fn-text-secondary)',
+          muted: 'var(--fn-text-muted)',
+          inverse: 'var(--fn-text-inverse)',
+        },
+        'fn-border': {
+          DEFAULT: 'var(--fn-border-color)',
+          subtle: 'var(--fn-border-subtle)',
+        },
+        'fn-success': {
+          DEFAULT: 'var(--fn-success)',
+          light: 'var(--fn-success-light)',
+          dark: 'var(--fn-success-dark)',
+        },
+        'fn-error': {
+          DEFAULT: 'var(--fn-error)',
+          light: 'var(--fn-error-light)',
+          dark: 'var(--fn-error-dark)',
+        },
+        'fn-warning': {
+          DEFAULT: 'var(--fn-warning)',
+          light: 'var(--fn-warning-light)',
+          dark: 'var(--fn-warning-dark)',
+        },
+        'fn-info': {
+          DEFAULT: 'var(--fn-info)',
+          light: 'var(--fn-info-light)',
+          dark: 'var(--fn-info-dark)',
+        },
+        // Legacy fn.* alias block — preserves existing pages that use
+        // bg-fn-bg-card, text-fn-text-primary, border-fn-border, etc.
         fn: {
           bg: {
             primary: 'var(--fn-bg-primary)',
@@ -98,7 +99,6 @@ module.exports = {
             primary: 'var(--fn-accent-primary)',
             'primary-hover': 'var(--fn-accent-primary-hover)',
             secondary: 'var(--fn-accent-secondary)',
-            tertiary: 'var(--fn-accent-tertiary)',
           },
           success: {
             light: 'var(--fn-success-light)',
@@ -127,16 +127,24 @@ module.exports = {
         mono: ['var(--fn-font-mono)'],
       },
       fontSize: {
+        'fn-2xs': 'var(--fn-text-2xs)',
         'fn-xs': 'var(--fn-text-xs)',
         'fn-sm': 'var(--fn-text-sm)',
         'fn-base': 'var(--fn-text-base)',
         'fn-lg': 'var(--fn-text-lg)',
         'fn-xl': 'var(--fn-text-xl)',
         'fn-2xl': 'var(--fn-text-2xl)',
-        'fn-3xl': 'var(--fn-text-3xl)',
-        'fn-4xl': 'var(--fn-text-4xl)',
+      },
+      letterSpacing: {
+        'fn-tight': 'var(--fn-tracking-tight)',
+        'fn-normal': 'var(--fn-tracking-normal)',
+        'fn-wide': 'var(--fn-tracking-wide)',
+        'fn-wider': 'var(--fn-tracking-wider)',
       },
       spacing: {
+        'fn-sidebar': 'var(--fn-sidebar-width)',
+        'fn-context-panel': 'var(--fn-context-panel-width)',
+        'fn-content-max': 'var(--fn-content-max-width)',
         'fn-1': 'var(--fn-space-1)',
         'fn-2': 'var(--fn-space-2)',
         'fn-3': 'var(--fn-space-3)',
@@ -154,26 +162,28 @@ module.exports = {
         'fn-md': 'var(--fn-radius-md)',
         'fn-lg': 'var(--fn-radius-lg)',
         'fn-xl': 'var(--fn-radius-xl)',
+        'fn-badge': 'var(--fn-radius-badge)',
       },
       boxShadow: {
         'fn-sm': 'var(--fn-shadow-sm)',
         'fn-base': 'var(--fn-shadow-base)',
         'fn-md': 'var(--fn-shadow-md)',
         'fn-lg': 'var(--fn-shadow-lg)',
-        'fn-xl': 'var(--fn-shadow-xl)',
-        'fn-glow': '0 0 20px var(--fn-accent-glow)',
-        'fn-glow-lg': '0 0 30px var(--fn-accent-glow)',
         'fn-focus': 'var(--fn-focus-ring)',
       },
+      width: {
+        'fn-sidebar': 'var(--fn-sidebar-width)',
+        'fn-context-panel': 'var(--fn-context-panel-width)',
+      },
+      maxWidth: {
+        'fn-content': 'var(--fn-content-max-width)',
+      },
       animation: {
-        'fn-pulse-glow': 'fn-pulse-glow 2s ease-in-out infinite',
-        'fn-gradient-shift': 'fn-gradient-shift 8s ease infinite', // Slower!
         'fn-fade-in': 'fn-fade-in 0.3s ease-out',
         'fn-fade-in-up': 'fn-fade-in-up 0.3s ease-out',
         'fn-slide-in-right': 'fn-slide-in-right 0.3s ease-out',
         'fn-shimmer': 'fn-shimmer 2s linear infinite',
         'fn-spin': 'fn-spin 1s linear infinite',
-        'fn-spin-slow': 'fn-spin 3s linear infinite',
         'fn-breathe': 'fn-breathe 2s ease-in-out infinite',
         'fn-blink': 'fn-blink 1s step-end infinite',
       },
@@ -187,14 +197,6 @@ module.exports = {
         'fn-in': 'var(--fn-ease-in)',
         'fn-out': 'var(--fn-ease-out)',
         'fn-in-out': 'var(--fn-ease-in-out)',
-      },
-      backgroundImage: {
-        // Primary gradient - emerald to teal (2 colors, cleaner)
-        'fn-gradient-primary': 'linear-gradient(135deg, var(--fn-accent-primary), var(--fn-accent-secondary))',
-        // Warm gradient - emerald to amber
-        'fn-gradient-warm': 'linear-gradient(135deg, var(--fn-accent-primary), var(--fn-accent-tertiary))',
-        // Subtle gradient for backgrounds
-        'fn-gradient-subtle': 'var(--fn-gradient-subtle)',
       },
     },
   },
