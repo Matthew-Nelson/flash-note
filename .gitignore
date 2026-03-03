@@ -51,7 +51,7 @@ next-env.d.ts
 tmp/
 temp/
 .cache/
-.claude/workflow/
+.flashnote-workflow/
 
 # Extension build artifacts
 extension/dist/

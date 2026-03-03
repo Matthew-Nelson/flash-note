@@ -16,7 +16,7 @@ You are an orchestrator. Coordinate specialized agents through 5 phases. Follow 
 1. **Do not implement anything yourself.** Delegate all code changes to agents.
 2. **Read every agent output file before spawning the next agent.** Verify the output makes sense. If it looks wrong, stop and report to the user.
 3. **Enforce iteration limits.** Plan review: 2 rounds max. Code review: 2 rounds max. Never exceed these.
-4. **Every AskUserQuestion is a hard stop.** After calling AskUserQuestion, do NOT call any other tools, spawn agents, or run commands until you have received the user's actual response. This applies everywhere — pre-flight, checkpoints, QUESTION handling. Never assume a default answer.
+4. **Every AskUserQuestion is a hard stop.** When you need to ask the user a question, AskUserQuestion MUST be the ONLY tool call in your response — do not combine it with any other tool calls in the same message. After calling it, do NOT call any other tools, spawn agents, or run commands until you have received the user's actual response. This applies everywhere — pre-flight, checkpoints, QUESTION handling. Never assume a default answer. If you receive an empty response, ask again.
 5. **Run quality gates yourself** — do not delegate test/coverage/typecheck commands to agents.
 6. **If an agent writes a `QUESTION:` line in its output**, stop and ask the user that question via AskUserQuestion before continuing.
 
@@ -71,10 +71,10 @@ Must be `main`. If not, STOP and tell the user to switch to main first.
 
 ### Step 4: Create workflow directory
 ```bash
-ls .claude/workflow 2>/dev/null
+ls .flashnote-workflow 2>/dev/null
 ```
 If the command succeeds (directory exists — prior run artifacts found), call AskUserQuestion:
-- question: "Found artifacts from a previous workflow run in .claude/workflow/. Delete them?"
+- question: "Found artifacts from a previous workflow run in .flashnote-workflow/. Delete them?"
 - header: "Prior run"
 - multiSelect: false
 - options:
@@ -83,12 +83,12 @@ If the command succeeds (directory exists — prior run artifacts found), call A
 
 **STOP. Do NOT proceed until the user responds.**
 
-- **Delete and continue** → run `rm -rf .claude/workflow`, then proceed.
+- **Delete and continue** → run `rm -rf .flashnote-workflow`, then proceed.
 - **Abort** → stop the workflow.
 
 Then create the directory:
 ```bash
-mkdir -p .claude/workflow
+mkdir -p .flashnote-workflow
 ```
 
 ### Step 5: Create feature branch
@@ -106,9 +106,9 @@ Spawn `task-planner` with prompt:
 
 > Plan this task: $ARGUMENTS
 >
-> Write your plan to: `<PROJECT_ROOT>/.claude/workflow/plan.md`
+> Write your plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan.md`
 
-Read `.claude/workflow/plan.md` when complete. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/plan.md` when complete. Check for `QUESTION:` lines.
 
 ---
 
@@ -118,11 +118,11 @@ Read `.claude/workflow/plan.md` when complete. Check for `QUESTION:` lines.
 
 Spawn `task-reviewer` with prompt:
 
-> Review the plan at `<PROJECT_ROOT>/.claude/workflow/plan.md`.
+> Review the plan at `<PROJECT_ROOT>/.flashnote-workflow/plan.md`.
 >
-> Write your review to: `<PROJECT_ROOT>/.claude/workflow/review-round-1.md`
+> Write your review to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`
 
-Read `.claude/workflow/review-round-1.md`. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/review-round-1.md`. Check for `QUESTION:` lines.
 
 - **APPROVED** → proceed to Checkpoint 1.
 - **NEEDS_REVISION** → continue below.
@@ -131,14 +131,14 @@ Read `.claude/workflow/review-round-1.md`. Check for `QUESTION:` lines.
 
 Spawn `task-planner` with prompt:
 
-> Revise the plan at `<PROJECT_ROOT>/.claude/workflow/plan.md` based on the review at `<PROJECT_ROOT>/.claude/workflow/review-round-1.md`.
-> Address all issues flagged. Write the revised plan to: `<PROJECT_ROOT>/.claude/workflow/plan-final.md`
+> Revise the plan at `<PROJECT_ROOT>/.flashnote-workflow/plan.md` based on the review at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`.
+> Address all issues flagged. Write the revised plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md`
 
 Then spawn `task-reviewer` for round 2:
 
-> Final review. Read the revised plan at `<PROJECT_ROOT>/.claude/workflow/plan-final.md` and the original feedback at `<PROJECT_ROOT>/.claude/workflow/review-round-1.md`.
+> Final review. Read the revised plan at `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md` and the original feedback at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`.
 > This is the final gate — verdict must be APPROVED or APPROVED_WITH_NOTES. Do NOT request another revision.
-> Write to: `<PROJECT_ROOT>/.claude/workflow/review-round-2.md`
+> Write to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-2.md`
 
 ---
 
@@ -146,7 +146,7 @@ Then spawn `task-reviewer` for round 2:
 
 Determine the approved plan file: use `plan-final.md` if it exists, otherwise `plan.md`. Track this as `PLAN_FILE` for the rest of the workflow.
 
-Read `.claude/workflow/<PLAN_FILE>`. Present a summary:
+Read `.flashnote-workflow/<PLAN_FILE>`. Present a summary:
 - Files to be modified/created
 - Core approach (2-3 sentences)
 - Risks or reviewer notes
@@ -172,11 +172,11 @@ Read `.claude/workflow/<PLAN_FILE>`. Present a summary:
 
 Spawn `task-implementer` with prompt:
 
-> Implement the plan at `<PROJECT_ROOT>/.claude/workflow/<PLAN_FILE>`.
+> Implement the plan at `<PROJECT_ROOT>/.flashnote-workflow/<PLAN_FILE>`.
 >
-> Write your summary to: `<PROJECT_ROOT>/.claude/workflow/implementation-summary.md`
+> Write your summary to: `<PROJECT_ROOT>/.flashnote-workflow/implementation-summary.md`
 
-Read `.claude/workflow/implementation-summary.md`. Check for `QUESTION:` lines.
+Read `.flashnote-workflow/implementation-summary.md`. Check for `QUESTION:` lines.
 
 ---
 
@@ -216,7 +216,7 @@ All must pass: tests green, 95%+ coverage, zero TS errors, zero lint errors.
 >
 > [paste the failing output verbatim]
 >
-> Write summary to: `<PROJECT_ROOT>/.claude/workflow/fix-summary.md`
+> Write summary to: `<PROJECT_ROOT>/.flashnote-workflow/fix-summary.md`
 
 After the fixer returns, **re-run ALL quality gate checks**. Max 2 fix attempts total — if still failing, stop and report to user.
 
@@ -229,11 +229,11 @@ After the fixer returns, **re-run ALL quality gate checks**. Max 2 fix attempts 
 Spawn `task-code-reviewer` with prompt:
 
 > Review the code changes on this branch.
-> Implementation context: `<PROJECT_ROOT>/.claude/workflow/implementation-summary.md`
+> Implementation context: `<PROJECT_ROOT>/.flashnote-workflow/implementation-summary.md`
 >
-> Write your review to: `<PROJECT_ROOT>/.claude/workflow/code-review-round-1.md`
+> Write your review to: `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md`
 
-Read `.claude/workflow/code-review-round-1.md`.
+Read `.flashnote-workflow/code-review-round-1.md`.
 
 - **CODE_APPROVED** → proceed to Checkpoint 2.
 - **CHANGES_REQUESTED** → continue below.
@@ -242,18 +242,18 @@ Read `.claude/workflow/code-review-round-1.md`.
 
 Spawn `task-fixer` with prompt:
 
-> Fix the issues in `<PROJECT_ROOT>/.claude/workflow/code-review-round-1.md`.
+> Fix the issues in `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md`.
 >
-> Write summary to: `<PROJECT_ROOT>/.claude/workflow/fixes-summary.md`
+> Write summary to: `<PROJECT_ROOT>/.flashnote-workflow/fixes-summary.md`
 
 Re-run the Quality Gate (all 4 checks).
 
 Then spawn `task-code-reviewer` for round 2:
 
-> Final review. Read original issues at `<PROJECT_ROOT>/.claude/workflow/code-review-round-1.md` and fixes at `<PROJECT_ROOT>/.claude/workflow/fixes-summary.md`.
+> Final review. Read original issues at `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md` and fixes at `<PROJECT_ROOT>/.flashnote-workflow/fixes-summary.md`.
 > Verify via `git diff main..HEAD`.
 > This is the final gate — verdict must be CODE_APPROVED or CODE_APPROVED_WITH_NOTES. Do NOT request another round.
-> Write to: `<PROJECT_ROOT>/.claude/workflow/code-review-round-2.md`
+> Write to: `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-2.md`
 
 ---
 
@@ -306,7 +306,7 @@ Present:
 
 5. Clean up:
    ```bash
-   rm -rf .claude/workflow
+   rm -rf .flashnote-workflow
    ```
 
 ---
@@ -335,7 +335,7 @@ git branch -D <FEATURE_BRANCH>
 If user chose "Keep branch", tell them: "Branch `<FEATURE_BRANCH>` preserved. Last commit: `<SHA>`."
 
 ```bash
-rm -rf .claude/workflow
+rm -rf .flashnote-workflow
 ```
 
 If a stash was created during pre-flight:
