@@ -18,7 +18,8 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | **← Start here.** Monitoring PR 1 (Pino Logger) |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 0/5 sub-phases | Design system migration, all pages |
+| **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
 | — | [Business / Legal / Ops](./PRE_LAUNCH_CHECKLIST.md) | ~20% | Form LLC |
@@ -26,6 +27,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 **Why this order:**
 - **Phase 0** handles infrastructure and framework-agnostic fixes that apply regardless of the migration. Unblocks the Google Cloud BAA and hardens the database schema. No wasted work — everything here transfers.
 - **Phase 1** is the architectural pivot. Express backend and Chrome extension are removed; everything consolidates into a single Next.js app on Cloud Run. This is the largest body of work and the foundation for everything after.
+- **UI Overhaul** happens before deployment so beta users see the professional Refined Teal design from day one. Design system migration, sidebar layout, WCAG AA compliance. Features stubbed as "coming soon" until Phase 2 backend lands.
 - **Deployment Readiness** is the bridge between "code passes tests locally" and "app is live and accepting users." Monitoring, pipeline hardening, infrastructure provisioning, staging verification, and Stripe live mode — everything needed to go from code-complete to production.
 - **Phase 2** is the competitive pivot — patients, notes, templates. Blocked on deployment readiness and HIPAA infrastructure.
 - **Phase 3** is important but non-differentiating. Testing, accessibility, clinic features — all scoped to the new architecture and sequenced after the app is live.
@@ -476,6 +478,80 @@ Completed in PR cleanup commit series (March 2026). All legacy code and document
 - [ ] Refactor `/shared` design system into `web/design-system/` — no longer "shared" between packages; move to web root alongside `tailwind.config.ts` and update import paths
 - [ ] Update `STRIPE_TODOS.md` (remove extension sync item) — skipped, not critical for launch/beta
 - [ ] Remove Sentry from all components (replaced by GCP-native monitoring — see [planning/MONITORING_SETUP.md](./planning/MONITORING_SETUP.md))
+
+---
+
+## UI Overhaul: Refined Teal
+
+Design system migration from "Warm Wellness" (emerald/cream/Inter) to "Refined Teal" (teal/slate/Plus Jakarta Sans). Fixes WCAG AA contrast failures, adds sidebar layout, and matches the mockups in `docs/design/`.
+
+Design spec: [planning/DESIGN_SYSTEM.md](./planning/DESIGN_SYSTEM.md) | Component patterns: [planning/COMPONENT_PATTERNS.md](./planning/COMPONENT_PATTERNS.md)
+
+Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
+
+### UI-1: Foundation (Docs + Tokens)
+
+| Item | Status |
+|------|--------|
+| Create `docs/planning/DESIGN_SYSTEM.md` | ❌ |
+| Create `docs/planning/COMPONENT_PATTERNS.md` | ❌ |
+| Add Rules 11-14 (a11y) to `CLAUDE.md` | ❌ |
+| Create `shared/design-tokens-teal.css` (replace warm tokens) | ❌ |
+| Create `shared/tailwind-preset-teal.js` (replace warm preset) | ❌ |
+| Rewrite `shared/components.css` (flat teal, no gradients) | ❌ |
+| Update `web/tailwind.config.ts` → teal preset | ❌ |
+| Update `web/src/app/globals.css` (remove `.text-gradient`, gradient utilities) | ❌ |
+| Swap font: Inter → Plus Jakarta Sans in `layout.tsx` | ❌ |
+| Update tests affected by token/CSS changes | ❌ |
+| **Verify**: `pnpm build` succeeds. Font loads. Tailwind resolves new tokens. Tests pass. | |
+
+### UI-2: Layout Shell + Sidebar
+
+| Item | Status |
+|------|--------|
+| Create `Sidebar` component (dark nav, section labels, CTA, user footer) | ❌ |
+| Create `TopBar` component (back button, title, action slot) | ❌ |
+| Rewrite `dashboard/layout.tsx` (sidebar layout replacing top nav) | ❌ |
+| Sidebar links: Dashboard, New Note, Settings (working) | ❌ |
+| Sidebar links: Notes, Patients, Templates ("Coming soon" stub) | ❌ |
+| Update skip link styling for new layout | ❌ |
+| Update tests for layout/sidebar changes | ❌ |
+| **Verify**: Sidebar renders. Navigation works. Auth enforced. Responsive. Tests pass. | |
+
+### UI-3: Dashboard + Note Generation + Note Result
+
+| Item | Status |
+|------|--------|
+| Rewrite note form (2-col grid, patient selector stub, hero textarea, context panel stub) | ❌ |
+| Create `SoapSection` component (accent bar header, copy/edit buttons, edit mode) | ❌ |
+| Rewrite `GeneratedNote` (SOAP section cards, metadata, copy all) | ❌ |
+| Create `Rating` widget (star feedback) | ❌ |
+| Rewrite dashboard page layout | ❌ |
+| Update UI primitives (Button, Card, Input, Alert, Badge, Spinner) | ❌ |
+| Update tests for dashboard/note component changes | ❌ |
+| **Verify**: Note form matches mockup. SOAP sections render. Copy/edit work. Tests pass. | |
+
+### UI-4: Auth Pages
+
+| Item | Status |
+|------|--------|
+| Update `AuthLayout` (surface bg, teal primary, no gradient text) | ❌ |
+| Reskin all 6 auth page forms (new input/button/alert styles) | ❌ |
+| Update `SessionAlert` styling | ❌ |
+| Update tests for auth component changes | ❌ |
+| **Verify**: All auth pages render. Auth flow tests pass. | |
+
+### UI-5: Marketing + Settings + Cleanup
+
+| Item | Status |
+|------|--------|
+| Redesign landing page (new colors, typography, teal CTAs) | ❌ |
+| Redesign pricing page (teal card styling) | ❌ |
+| Update terms, privacy, BAA pages (typography/colors) | ❌ |
+| Redesign settings page (new card/form styling) | ❌ |
+| Delete old design files (`design-tokens-warm.css`, `tailwind-preset-warm.js`) | ❌ |
+| Final test sweep — catch any remaining test failures from cumulative changes | ❌ |
+| **Verify**: All pages use new design. Build succeeds. Full test suite passes. | |
 
 ---
 

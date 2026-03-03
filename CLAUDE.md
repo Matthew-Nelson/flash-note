@@ -499,6 +499,61 @@ return result.rows[0];
 return result.rows[0]!;
 ```
 
+### Rule 11: Every Interactive Element Must Have an Accessible Name
+
+Buttons with only icons need `aria-label`. Form inputs need `<label>` with `htmlFor`. Links need descriptive text content (not "click here").
+
+```tsx
+// CORRECT
+<button aria-label="Copy to clipboard" onClick={handleCopy}>
+  <CopyIcon aria-hidden="true" />
+</button>
+
+// WRONG
+<button onClick={handleCopy}>
+  <CopyIcon />
+</button>
+```
+
+*Root cause: P1 audit finding — 30+ icon-only buttons missing accessible names across dashboard and auth pages.*
+
+### Rule 12: Color Contrast Must Meet WCAG AA
+
+4.5:1 ratio for normal text, 3:1 for large text (18px+ bold or 24px+) and UI components. No gradient text on light backgrounds. Verify with a contrast checker before shipping.
+
+```css
+/* CORRECT: Solid color with sufficient contrast */
+.text-primary { color: #0D6E6E; } /* 5.2:1 on white */
+
+/* WRONG: Gradient text fails contrast */
+.text-gradient { background: linear-gradient(...); -webkit-background-clip: text; }
+/* Varies 2.3:1 to 4.1:1 — fails WCAG AA */
+```
+
+*Root cause: P0 audit finding — gradient text (`.text-gradient`) achieves only 2.3:1 contrast on white backgrounds, affecting the brand name, links, and status indicators site-wide.*
+
+### Rule 13: Dynamic Content Must Use aria-live Regions
+
+Loading indicators, error messages, success confirmations, and copy-to-clipboard feedback must be announced to assistive technology. Use `aria-live="polite"` for non-urgent updates, `aria-live="assertive"` for errors. The live region container must exist in the DOM before content changes (not conditionally rendered).
+
+```tsx
+// CORRECT: Region exists, content changes inside it
+<div aria-live="polite" aria-atomic="true">
+  {copySuccess && <span>Copied to clipboard</span>}
+</div>
+
+// WRONG: Region conditionally rendered (screen reader misses it)
+{copySuccess && <div aria-live="polite">Copied to clipboard</div>}
+```
+
+*Root cause: P2 audit finding — no live regions for dynamic content (loading states, copy confirmation, error messages). Silent clipboard failure was rated P0.*
+
+### Rule 14: Pages Must Have Semantic Landmarks and Sequential Headings
+
+Every page must have a single `<main id="main-content">` landmark (targeted by the skip-to-main link in root layout). Use `<nav>` for navigation, `<header>` for page headers. Each page has exactly one `<h1>`. Heading levels must be sequential — no skipping (h1 → h3). Decorative SVGs must have `aria-hidden="true"`.
+
+*Root cause: P1 audit findings — no `<main>` on 8 pages, heading levels skipped, 30+ decorative SVGs announced by screen readers.*
+
 ## Cloud Run Runtime Constraints
 
 Next.js runs on Google Cloud Run as a containerized Node.js process. This is NOT a serverless-function-per-request model (like Vercel) — Cloud Run maintains long-lived container instances. However, some constraints still apply:
