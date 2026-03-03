@@ -72,15 +72,16 @@ export async function login(
   const validPassword = await bcrypt.compare(password, hashToCompare);
 
   if (!user || !validPassword) {
-    if (user) {
-      // Record failed attempt — may trigger lockout
-      try {
-        await recordFailedAttempt(user.id, context);
-      } catch (error) {
-        // TODO: Replace with Pino structured logger when available
-        // eslint-disable-next-line no-console
-        console.error('Lockout service error during failed attempt recording:', error);
-      }
+    // Timing equalization: always call recordFailedAttempt regardless of whether
+    // the user exists. When user is null, recordFailedAttempt executes the same
+    // primary DB round-trip against a nil UUID (no rows match) to equalize the
+    // dominant cost of both paths.
+    try {
+      await recordFailedAttempt(user?.id ?? null, context);
+    } catch (error) {
+      // TODO: Replace with Pino structured logger when available
+      // eslint-disable-next-line no-console
+      console.error('Lockout service error during failed attempt recording:', error);
     }
     return { success: false, error: 'invalid_credentials' };
   }
