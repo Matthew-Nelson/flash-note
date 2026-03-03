@@ -41,7 +41,7 @@ describe('DashboardError', () => {
     render(<DashboardError error={error} reset={reset} />);
 
     const link = screen.getByText('Return to sign in');
-    expect(link.closest('a')).toHaveAttribute('href', '/login');
+    expect(link.closest('a')).toHaveAttribute('href', '/login?reason=session_expired');
   });
 
   it('logs error digest for observability', () => {
