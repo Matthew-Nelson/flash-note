@@ -8,7 +8,7 @@ import { DeleteAccountSection } from './DeleteAccountSection';
 
 export default async function SettingsPage() {
   const session = await getSession();
-  if (!session) redirect('/login');
+  if (!session) redirect('/login?reason=session_expired');
 
   return (
     <>
