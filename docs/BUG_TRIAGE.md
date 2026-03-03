@@ -5,7 +5,7 @@ Two rounds of parallel audits covering 17 areas: auth flows, cookies, sessions, 
 redirects, DAL, Server Actions, client-side state, rate limiting, webhooks, env vars,
 LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, and CSP.
 
-**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4 fixed)
+**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4, BUG-5 fixed)
 
 ---
 
@@ -26,7 +26,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
 ### P2 — Fix Soon
 
 - [x] **BUG-4**: Login timing side-channel enables email enumeration
-- [ ] **BUG-5**: Dashboard error boundary links back to dashboard (UX dead end)
+- [x] **BUG-5**: Dashboard error boundary links back to dashboard (UX dead end)
   - Blocked by: BUG-1
 - [ ] **BUG-6**: Locked-account audit log failure is silent (Rule 9 violation)
 - [ ] **BUG-7**: DB pool leaks connections on every HMR reload in dev mode

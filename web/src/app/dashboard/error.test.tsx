@@ -34,14 +34,14 @@ describe('DashboardError', () => {
     expect(reset).toHaveBeenCalledOnce();
   });
 
-  it('renders link to dashboard', () => {
+  it('renders link to login page to escape the error loop', () => {
     const error = new Error('test error');
     const reset = vi.fn();
 
     render(<DashboardError error={error} reset={reset} />);
 
-    const link = screen.getByText('Return to Dashboard');
-    expect(link.closest('a')).toHaveAttribute('href', '/dashboard');
+    const link = screen.getByText('Return to sign in');
+    expect(link.closest('a')).toHaveAttribute('href', '/login');
   });
 
   it('logs error digest for observability', () => {
