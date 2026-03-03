@@ -32,14 +32,14 @@ The brand gradient (emerald-500 / teal-500) fails WCAG AA contrast requirements 
 | `.status-trial` gradient text on white | ~2.3:1 | 4.5:1 | Extension settings, dashboard |
 | BETA badge `text-stone-400` on cream bg | ~2.4:1 | 4.5:1 | Nav header across 11+ pages |
 | `.error-message` red on light red bg | ~3.4:1 | 4.5:1 | All form error displays |
-| ~~Focus ring at 12% opacity (`--fn-accent-glow-light`)~~ | ~~Nearly invisible~~ | ~~Clearly visible~~ | Fixed: opacity bumped to 18% in `shared/design-tokens-warm.css:214` |
+| ~~Focus ring at 12% opacity (`--fn-accent-glow-light`)~~ | ~~Nearly invisible~~ | ~~Clearly visible~~ | Fixed: opacity bumped to 18% in `web/design-system/design-tokens-warm.css:214` |
 
 **Fix:** Darken text-use variants of brand colors (e.g., emerald-700/teal-700 passes 4.5:1). Keep lighter gradient for backgrounds with white text, but verify the darkest point of the gradient passes. Define separate `--fn-accent-text` tokens for text-on-light usage.
 
 **Files to modify:**
-- `shared/design-tokens-warm.css` -- add high-contrast text token variants
-- `shared/components.css` -- update `.link`, `.status-trial`, `.error-message`
-- `shared/tailwind-preset-warm.js` -- add contrast-safe text color utilities
+- `web/design-system/design-tokens-warm.css` -- add high-contrast text token variants
+- `web/design-system/components.css` -- update `.link`, `.status-trial`, `.error-message`
+- `web/design-system/tailwind-preset-warm.js` -- add contrast-safe text color utilities
 - `extension/src/sidepanel/index.css` -- sync after shared changes
 - All web pages using `text-gradient` or `text-fn-accent-primary` as text color
 
@@ -146,13 +146,13 @@ No page provides a "skip to main content" link. Keyboard-only users must tab thr
 
 | Issue | File | Details |
 |-------|------|---------|
-| `outline: none` on `.input-field:focus` | `shared/components.css:142` | Replaced with `box-shadow` only. Box-shadow is invisible in Windows High Contrast Mode. |
-| No `:focus-visible` on `.btn-primary`, `.btn-secondary` | `shared/components.css` | No focus indicator defined at all for buttons |
+| `outline: none` on `.input-field:focus` | `web/design-system/components.css:142` | Replaced with `box-shadow` only. Box-shadow is invisible in Windows High Contrast Mode. |
+| No `:focus-visible` on `.btn-primary`, `.btn-secondary` | `web/design-system/components.css` | No focus indicator defined at all for buttons |
 | View transitions lose focus | `extension/.../App.tsx:215`, `NoteGenerator.tsx` | When content swaps (e.g., generator -> result), focus drops to `<body>` |
 
 **Fix:**
 - Add `outline: 2px solid transparent` alongside box-shadow on all `:focus` rules (transparent outline becomes visible in High Contrast Mode)
-- Add `:focus-visible` styles to all interactive components in `shared/components.css`
+- Add `:focus-visible` styles to all interactive components in `web/design-system/components.css`
 - Use `useEffect` + `ref.focus()` to move focus to the new view's heading or first interactive element on view transitions
 
 ---
@@ -316,9 +316,9 @@ Both apps use a single top-level `ErrorBoundary`. A rendering crash in `NoteGene
 
 **Severity: P2 -- Maintenance hazard**
 
-`extension/src/sidepanel/index.css` is 772 lines, with ~400+ lines duplicating `shared/components.css`. The extension redeclares `.btn-primary`, `.btn-secondary`, `.card`, `.input-field`, `.link`, etc. with subtly different values. The web app correctly imports `shared/components.css`; the extension does not.
+`extension/src/sidepanel/index.css` is 772 lines, with ~400+ lines duplicating `web/design-system/components.css`. The extension redeclares `.btn-primary`, `.btn-secondary`, `.card`, `.input-field`, `.link`, etc. with subtly different values. The web app correctly imports `web/design-system/components.css`; the extension does not. (extension deleted — this finding is obsolete)
 
-**Fix:** Refactor `extension/src/sidepanel/index.css` to import `shared/components.css` and only contain extension-specific overrides and animations.
+**Fix:** Refactor `extension/src/sidepanel/index.css` to import `web/design-system/components.css` and only contain extension-specific overrides and animations. (extension deleted — this finding is obsolete)
 
 ---
 
@@ -451,7 +451,7 @@ Landing page CTA buttons (`web/.../page.tsx:47`) use `flex` without `flex-wrap`.
 
 Neither app supports dark mode. The design token architecture (`:root` semantic tokens) is well-positioned for it, but no `.dark` class or `prefers-color-scheme: dark` rules exist.
 
-**Fix:** Define dark-mode token overrides in `shared/design-tokens-warm.css` under a `.dark` or `@media (prefers-color-scheme: dark)` block. PTs often work early mornings and late evenings -- dark mode reduces eye strain.
+**Fix:** Define dark-mode token overrides in `web/design-system/design-tokens-warm.css` under a `.dark` or `@media (prefers-color-scheme: dark)` block. PTs often work early mornings and late evenings -- dark mode reduces eye strain.
 
 ---
 
@@ -525,10 +525,10 @@ No `@media print` rules exist. For a healthcare documentation tool, PTs or compl
 ## Implementation Notes
 
 ### Shared Design System Changes (affects both apps)
-Most P0 and P1 accessibility fixes should start in `shared/`:
-- `shared/design-tokens-warm.css` -- contrast-safe color tokens
-- `shared/components.css` -- focus styles, ARIA-ready patterns
-- `shared/tailwind-preset-warm.js` -- utility classes for accessible colors
+Most P0 and P1 accessibility fixes should start in `web/design-system/`:
+- `web/design-system/design-tokens-warm.css` -- contrast-safe color tokens
+- `web/design-system/components.css` -- focus styles, ARIA-ready patterns
+- `web/design-system/tailwind-preset-warm.js` -- utility classes for accessible colors
 
 ### Extension-Specific
 - Deduplicate `extension/src/sidepanel/index.css` by importing shared styles

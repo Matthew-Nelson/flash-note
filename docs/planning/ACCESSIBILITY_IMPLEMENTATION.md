@@ -34,7 +34,7 @@ This plan adds WCAG AA accessibility compliance tooling and fixes across the web
 
 | Priority | Issue | Location |
 |----------|-------|----------|
-| P0 | `--fn-text-muted` (#78716c) on `--fn-bg-primary` (#fdfcfb) likely fails 4.5:1 contrast | `shared/design-tokens-warm.css:64,71` |
+| P0 | `--fn-text-muted` (#78716c) on `--fn-bg-primary` (#fdfcfb) likely fails 4.5:1 contrast | `web/design-system/design-tokens-warm.css:64,71` |
 | P0 | Disabled button text (`--fn-text-muted` + `opacity: 0.7`) definitely fails contrast | Various button components |
 | P1 | Icon-only buttons missing `aria-label` | `NoteGenerator.tsx`, `ResultDisplay.tsx`, `dashboard/page.tsx` (copy, back, settings, dismiss buttons) |
 | P1 | Some interactive elements lack `:focus-visible` styles | Nav links, dismiss buttons, checkboxes |
@@ -134,7 +134,7 @@ No changes needed. The existing `pnpm lint` step in `.github/workflows/ci.yml` (
 
 ### 2.1 Color Contrast (P0)
 
-File: `shared/design-tokens-warm.css`
+File: `web/design-system/design-tokens-warm.css`
 
 Verify and fix these contrast pairs against `--fn-bg-primary` (#fdfcfb):
 
@@ -503,7 +503,7 @@ pnpm --filter @flashnote/web add -D @axe-core/react
 | `extension/eslint.config.mjs` | Extension ESLint flat config — add jsx-a11y here |
 | `web/src/test/setup.ts` | Web test setup — add vitest-axe matchers here |
 | `extension/src/test/setup.ts` | Extension test setup — add vitest-axe matchers here |
-| `shared/design-tokens-warm.css` | Color tokens — fix contrast values here |
+| `web/design-system/design-tokens-warm.css` | Color tokens — fix contrast values here |
 | `web/src/app/globals.css` | Global CSS — add focus-visible base styles here |
 | `web/src/app/layout.tsx` | Root layout — add skip nav + AxeDevTools here |
 | `.github/workflows/ci.yml` | CI workflow — no changes needed (lint + test) |

@@ -572,7 +572,7 @@ Each PR is independently shippable. PR 1 is structural with no user-facing featu
 | Web API methods | `web/src/lib/api.ts:376-399` (getUsage pattern) |
 | Web page component | `web/src/app/dashboard/page.tsx` |
 | UI components | `web/src/components/ui/` (Button, Input, Card, Alert) |
-| Design tokens | `shared/design-tokens-warm.css` |
+| Design tokens | `web/design-system/design-tokens-warm.css` |
 
 ---
 
