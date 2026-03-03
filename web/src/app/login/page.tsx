@@ -36,6 +36,7 @@ function LoginContent() {
       return;
     }
 
+    console.log('Login form submitted');
     setIsSubmitting(true);
 
     try {
