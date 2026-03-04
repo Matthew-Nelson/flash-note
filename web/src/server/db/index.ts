@@ -34,7 +34,6 @@ export const db = globalForDb._flashnoteDb ?? new Pool({
 // Only attach on first creation to avoid duplicate listeners on HMR reloads.
 if (isNewPool) {
   db.on('error', (err) => {
-    // eslint-disable-next-line no-console
     console.error('PostgreSQL pool error:', err);
   });
 }
@@ -57,11 +56,9 @@ const SHUTDOWN_TIMEOUT_MS = 5000;
 
 if (isNewPool) {
   const shutdownHandler = (signal: string) => {
-    // eslint-disable-next-line no-console
     console.error(`Received ${signal}: draining database pool`);
 
     const forceExit = setTimeout(() => {
-      // eslint-disable-next-line no-console
       console.error('Pool drain timed out, forcing exit');
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
@@ -72,12 +69,10 @@ if (isNewPool) {
 
     db.end()
       .then(() => {
-        // eslint-disable-next-line no-console
         console.error('Database pool drained successfully');
         process.exit(0);
       })
       .catch((err) => {
-        // eslint-disable-next-line no-console
         console.error('Error draining database pool:', err);
         process.exit(1);
       });

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from 'vitest';
 
 // Mock server-only (it throws in non-server contexts)
 vi.mock('server-only', () => ({}));
@@ -139,8 +139,8 @@ describe('db/index', () => {
   });
 
   describe('graceful shutdown', () => {
-    let processOnSpy: ReturnType<typeof vi.spyOn>;
-    let processExitSpy: ReturnType<typeof vi.spyOn>;
+    let processOnSpy: MockInstance;
+    let processExitSpy: MockInstance;
 
     beforeEach(() => {
       processOnSpy = vi.spyOn(process, 'on');
@@ -162,7 +162,7 @@ describe('db/index', () => {
 
     it('does not register duplicate signal handlers when globalThis cache is populated', async () => {
       await import('./index');
-      const sigTermCalls = processOnSpy.mock.calls.filter(([sig]) => sig === 'SIGTERM');
+      const sigTermCalls = processOnSpy.mock.calls.filter((call) => call[0] === 'SIGTERM');
       expect(sigTermCalls).toHaveLength(1);
 
       vi.resetModules();
@@ -182,7 +182,7 @@ describe('db/index', () => {
       processOnSpy = vi.spyOn(process, 'on');
       await import('./index');
 
-      const sigTermCallsAfter = processOnSpy.mock.calls.filter(([sig]) => sig === 'SIGTERM');
+      const sigTermCallsAfter = processOnSpy.mock.calls.filter((call) => call[0] === 'SIGTERM');
       expect(sigTermCallsAfter).toHaveLength(0);
     });
 
@@ -190,7 +190,7 @@ describe('db/index', () => {
       mockPool.end = vi.fn().mockResolvedValueOnce(undefined);
 
       await import('./index');
-      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+      const sigTermHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGTERM')?.[1] as () => void;
       expect(sigTermHandler).toBeDefined();
 
       sigTermHandler();
@@ -206,7 +206,7 @@ describe('db/index', () => {
       mockPool.end = vi.fn().mockRejectedValueOnce(new Error('drain failed'));
 
       await import('./index');
-      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+      const sigTermHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGTERM')?.[1] as () => void;
 
       sigTermHandler();
 
@@ -222,7 +222,7 @@ describe('db/index', () => {
       mockPool.end = vi.fn().mockReturnValue(new Promise(() => {}));
 
       await import('./index');
-      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+      const sigTermHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGTERM')?.[1] as () => void;
 
       sigTermHandler();
 
@@ -238,7 +238,7 @@ describe('db/index', () => {
       mockPool.end = vi.fn().mockResolvedValueOnce(undefined);
 
       await import('./index');
-      const sigIntHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGINT')?.[1] as () => void;
+      const sigIntHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGINT')?.[1] as () => void;
       expect(sigIntHandler).toBeDefined();
 
       sigIntHandler();
