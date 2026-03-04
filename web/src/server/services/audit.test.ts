@@ -168,13 +168,12 @@ describe('AuditService', () => {
         status: 'SUCCESS',
       });
 
-      expect(console.error).toHaveBeenCalledWith('Audit log failed:', {
+      expect(console.error).toHaveBeenCalledWith('Audit log failed:', dbError, {
         source: 'service_audit',
         errorType: 'audit_write_failed',
         userId: 'user-123',
         action: AuditAction.LOGIN,
         status: 'SUCCESS',
-        err: 'Database connection failed',
       });
     });
 

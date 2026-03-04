@@ -34,13 +34,12 @@ class AuditService {
       // can group and alert on audit failures (especially security-critical events).
       // TODO: Replace with Pino structured logger when available
       // eslint-disable-next-line no-console
-      console.error('Audit log failed:', {
+      console.error('Audit log failed:', error, {
         source: 'service_audit',
         errorType: 'audit_write_failed',
         userId: entry.userId,
         action: entry.action,
         status: entry.status,
-        err: error instanceof Error ? error.message : String(error),
       });
     }
   }
