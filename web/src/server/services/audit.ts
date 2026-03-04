@@ -29,10 +29,19 @@ class AuditService {
     try {
       await db.query(AUDIT_INSERT, buildParams(entry));
     } catch (error) {
-      // Don't throw — audit failures shouldn't break the app
-      // Structured logger (Pino) replaces console.error in a later phase
+      // Don't throw — audit failures shouldn't break the app.
+      // Rule 9: log at error level with structured context so Cloud Error Reporting
+      // can group and alert on audit failures (especially security-critical events).
+      // TODO: Replace with Pino structured logger when available
       // eslint-disable-next-line no-console
-      console.error('Audit log failed:', error);
+      console.error('Audit log failed:', {
+        source: 'service_audit',
+        errorType: 'audit_write_failed',
+        userId: entry.userId,
+        action: entry.action,
+        status: entry.status,
+        err: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
