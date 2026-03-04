@@ -9,6 +9,29 @@ Execute a multi-agent implementation workflow for the following task:
 
 ---
 
+## Argument Parsing
+
+Parse `$ARGUMENTS` for the `--auto` flag:
+
+- If `$ARGUMENTS` contains `--auto` (anywhere in the string), set `AUTO_MODE = true` and strip `--auto` from the task description before passing it to agents.
+- Otherwise, set `AUTO_MODE = false`.
+
+Example: `/implement-task --auto Add rate limiting to the signup endpoint` → `AUTO_MODE = true`, task = `Add rate limiting to the signup endpoint`.
+
+**What `--auto` skips:**
+- Plan Approval checkpoint (auto-proceeds)
+- Deep Dive Offer (auto-skips)
+- Pre-Push Review checkpoint (auto-proceeds)
+
+**What `--auto` does NOT skip:**
+- Dirty working tree prompt (pre-flight step 2)
+- Existing `.flashnote-workflow/` directory prompt (pre-flight step 4)
+- Agent `QUESTION:` lines (these are about direction/business logic)
+- Quality gate failures after max fix attempts
+- Abort scenarios triggered by fundamental agent errors
+
+---
+
 ## Instructions
 
 You are an orchestrator. Coordinate specialized agents through 5 phases. Follow these rules exactly:
@@ -167,7 +190,19 @@ Then spawn `task-reviewer` for round 3:
 
 Determine the approved plan file: use the latest version — `plan-final.md` if it exists, otherwise `plan-v2.md` if it exists, otherwise `plan.md`. Track this as `PLAN_FILE` for the rest of the workflow.
 
-Read `.flashnote-workflow/<PLAN_FILE>`. Then ask the user **(rule 4 — no tool calls, just this text)**:
+Read `.flashnote-workflow/<PLAN_FILE>`.
+
+**If `AUTO_MODE = true`:** Log the plan summary to the user as an informational status update (not a question), then proceed directly to Phase 3. Do NOT ask for approval.
+
+> **[AUTO] Plan approved — proceeding to implementation.**
+>
+> **Files:** [list files to modify/create]
+>
+> **Approach:** [2-3 sentence summary]
+>
+> **Reviewer notes:** [any risks or concerns, or "None"]
+
+**If `AUTO_MODE = false`:** Ask the user **(rule 4 — no tool calls, just this text)**:
 
 > ## Plan Summary
 >
@@ -307,7 +342,9 @@ Then spawn `task-code-reviewer` for round 3:
 
 ## Deep Dive Offer
 
-After code review approval, ask the user **(rule 4 — no tool calls, just this text)**:
+**If `AUTO_MODE = true`:** Skip the deep dive offer entirely. Proceed directly to Checkpoint 2 (Pre-Push Review).
+
+**If `AUTO_MODE = false`:** After code review approval, ask the user **(rule 4 — no tool calls, just this text)**:
 
 > Code review complete. Would you like a deep-dive local review before pushing?
 >
@@ -332,7 +369,22 @@ After code review approval, ask the user **(rule 4 — no tool calls, just this 
 
 Run `git diff --stat main..HEAD`. Read the implementation summary and latest code review.
 
-Then ask the user **(rule 4 — no tool calls, just this text)**:
+**If `AUTO_MODE = true`:** Log the pre-push summary to the user as an informational status update (not a question), then proceed directly to Phase 5. Do NOT ask for approval.
+
+> **[AUTO] Pre-push review — proceeding to push and PR.**
+>
+> **Files changed:**
+> [paste diff stat]
+>
+> **What was implemented:** [brief summary]
+>
+> **Code review:** [APPROVED / APPROVED_WITH_NOTES + any notes]
+>
+> **Quality gate:** All checks passing
+>
+> **Branch:** `FEATURE_BRANCH`
+
+**If `AUTO_MODE = false`:** Ask the user **(rule 4 — no tool calls, just this text)**:
 
 > ## Pre-Push Summary
 >
