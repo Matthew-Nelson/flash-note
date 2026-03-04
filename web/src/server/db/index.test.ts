@@ -174,7 +174,11 @@ describe('db/index', () => {
         default: { Pool: MockPool },
       }));
 
-      // Spy again after module reset
+      // Restore the previous spy before creating a new one. Chaining
+      // vi.spyOn() on an already-spied method (spy2 wrapping spy1) causes
+      // Vitest to call process.on internally during spy installation, which
+      // lands on spy2 and produces a phantom call in the assertion below.
+      processOnSpy.mockRestore();
       processOnSpy = vi.spyOn(process, 'on');
       await import('./index');
 
