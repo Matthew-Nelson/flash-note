@@ -10,14 +10,22 @@ vi.mock('./config', () => ({
   },
 }));
 
-// Mock pg to avoid real DB connections
-const mockPool = {
-  on: vi.fn(),
-  connect: vi.fn(),
-  query: vi.fn(),
-};
-
-const MockPool = vi.fn(() => mockPool);
+// Mock pg to avoid real DB connections.
+// vi.hoisted ensures these are available when the vi.mock factory executes
+// (vi.mock calls are hoisted to the top of the file, before other declarations).
+const { mockPool, MockPool } = vi.hoisted(() => {
+  const mockPool = {
+    on: vi.fn(),
+    connect: vi.fn(),
+    query: vi.fn(),
+  };
+  // Must be a regular function (not an arrow function) so it can be used as a
+  // constructor with `new`. The source does: const { Pool } = pg; new Pool(...)
+  const MockPool = vi.fn(function () {
+    return mockPool;
+  });
+  return { mockPool, MockPool };
+});
 
 vi.mock('pg', () => ({
   default: {
