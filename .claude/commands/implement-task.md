@@ -1,6 +1,6 @@
 ---
 description: Multi-agent workflow — plan, review, implement, code review, and PR
-allowed-tools: Agent, Read, Edit, Grep, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), Bash(rm:*), Bash(ls:*)
+allowed-tools: Agent, Read, Edit, Grep, Skill, Bash(git:*), Bash(gh:*), Bash(pnpm:*), Bash(mkdir:*), Bash(rm:*), Bash(ls:*)
 ---
 
 Execute a multi-agent implementation workflow for the following task:
@@ -15,7 +15,7 @@ You are an orchestrator. Coordinate specialized agents through 5 phases. Follow 
 
 1. **Do not implement anything yourself.** Delegate all code changes to agents.
 2. **Read every agent output file before spawning the next agent.** Verify the output makes sense. If it looks wrong, stop and report to the user.
-3. **Enforce iteration limits.** Plan review: 2 rounds max. Code review: 2 rounds max. Never exceed these.
+3. **Enforce iteration limits.** Plan review: 3 rounds max. Code review: 3 rounds max. Never exceed these.
 4. **User input = full stop.** When you need the user's input — at a checkpoint, for a dirty tree, for a QUESTION from an agent, or for any other reason — output your question as plain text and **make zero tool calls in that response**. No Agent spawns, no Bash commands, no Read calls, nothing. Just the question text. Then wait for the user to type their reply. Parse their reply and continue. **Never assume a default answer. Never skip waiting for a reply.**
 5. **Run quality gates yourself** — do not delegate test/coverage/typecheck commands to agents.
 6. **If an agent writes a `QUESTION:` line in its output**, present that question to the user (see rule 4) and pass their answer to the next agent.
@@ -116,7 +116,7 @@ Read `.flashnote-workflow/plan.md` when complete. Check for `QUESTION:` lines �
 
 ---
 
-## Phase 2: Plan Review (2 rounds max)
+## Phase 2: Plan Review (3 rounds max)
 
 ### Round 1
 
@@ -131,24 +131,41 @@ Read `.flashnote-workflow/review-round-1.md`. Check for `QUESTION:` lines — if
 - **APPROVED** → proceed to Checkpoint 1.
 - **NEEDS_REVISION** → continue below.
 
-### Revision (only if NEEDS_REVISION)
+### Round 1 Revision (only if NEEDS_REVISION)
 
 Spawn `task-planner` with prompt:
 
 > Revise the plan at `<PROJECT_ROOT>/.flashnote-workflow/plan.md` based on the review at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`.
-> Address all issues flagged. Write the revised plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md`
+> Address all issues flagged. Write the revised plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan-v2.md`
 
 Then spawn `task-reviewer` for round 2:
 
-> Final review. Read the revised plan at `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md` and the original feedback at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`.
+> Review the revised plan at `<PROJECT_ROOT>/.flashnote-workflow/plan-v2.md` against the original feedback at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md`.
+> Verify all issues were addressed. Write to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-2.md`
+
+Read `.flashnote-workflow/review-round-2.md`.
+
+- **APPROVED** → proceed to Checkpoint 1.
+- **NEEDS_REVISION** → continue below.
+
+### Round 2 Revision (only if NEEDS_REVISION)
+
+Spawn `task-planner` with prompt:
+
+> Revise the plan at `<PROJECT_ROOT>/.flashnote-workflow/plan-v2.md` based on the review at `<PROJECT_ROOT>/.flashnote-workflow/review-round-2.md`.
+> Address all remaining issues. Write the revised plan to: `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md`
+
+Then spawn `task-reviewer` for round 3:
+
+> Final review. Read the revised plan at `<PROJECT_ROOT>/.flashnote-workflow/plan-final.md` and all prior feedback at `<PROJECT_ROOT>/.flashnote-workflow/review-round-1.md` and `<PROJECT_ROOT>/.flashnote-workflow/review-round-2.md`.
 > This is the final gate — verdict must be APPROVED or APPROVED_WITH_NOTES. Do NOT request another revision.
-> Write to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-2.md`
+> Write to: `<PROJECT_ROOT>/.flashnote-workflow/review-round-3.md`
 
 ---
 
 ## ===== CHECKPOINT: Plan Approval =====
 
-Determine the approved plan file: use `plan-final.md` if it exists, otherwise `plan.md`. Track this as `PLAN_FILE` for the rest of the workflow.
+Determine the approved plan file: use the latest version — `plan-final.md` if it exists, otherwise `plan-v2.md` if it exists, otherwise `plan.md`. Track this as `PLAN_FILE` for the rest of the workflow.
 
 Read `.flashnote-workflow/<PLAN_FILE>`. Then ask the user **(rule 4 — no tool calls, just this text)**:
 
@@ -232,7 +249,7 @@ After the fixer returns, **re-run ALL quality gate checks**. Max 2 fix attempts 
 
 ---
 
-## Phase 4: Code Review (2 rounds max)
+## Phase 4: Code Review (3 rounds max)
 
 ### Round 1
 
@@ -245,25 +262,69 @@ Spawn `task-code-reviewer` with prompt:
 
 Read `.flashnote-workflow/code-review-round-1.md`.
 
-- **CODE_APPROVED** → proceed to Checkpoint 2.
+- **CODE_APPROVED** → proceed to Deep Dive Offer.
 - **CHANGES_REQUESTED** → continue below.
 
-### Fixes (only if CHANGES_REQUESTED)
+### Round 1 Fixes (only if CHANGES_REQUESTED)
 
 Spawn `task-fixer` with prompt:
 
 > Fix the issues in `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md`.
 >
-> Write summary to: `<PROJECT_ROOT>/.flashnote-workflow/fixes-summary.md`
+> Write summary to: `<PROJECT_ROOT>/.flashnote-workflow/fixes-round-1-summary.md`
 
 Re-run the Quality Gate (all 4 checks).
 
 Then spawn `task-code-reviewer` for round 2:
 
-> Final review. Read original issues at `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md` and fixes at `<PROJECT_ROOT>/.flashnote-workflow/fixes-summary.md`.
+> Review the code changes. Read original issues at `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md` and fixes at `<PROJECT_ROOT>/.flashnote-workflow/fixes-round-1-summary.md`.
+> Verify via `git diff main..HEAD`.
+> Write to: `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-2.md`
+
+Read `.flashnote-workflow/code-review-round-2.md`.
+
+- **CODE_APPROVED** → proceed to Deep Dive Offer.
+- **CHANGES_REQUESTED** → continue below.
+
+### Round 2 Fixes (only if CHANGES_REQUESTED)
+
+Spawn `task-fixer` with prompt:
+
+> Fix the issues in `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-2.md`.
+>
+> Write summary to: `<PROJECT_ROOT>/.flashnote-workflow/fixes-round-2-summary.md`
+
+Re-run the Quality Gate (all 4 checks).
+
+Then spawn `task-code-reviewer` for round 3:
+
+> Final review. Read all prior issues at `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-1.md` and `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-2.md`, and latest fixes at `<PROJECT_ROOT>/.flashnote-workflow/fixes-round-2-summary.md`.
 > Verify via `git diff main..HEAD`.
 > This is the final gate — verdict must be CODE_APPROVED or CODE_APPROVED_WITH_NOTES. Do NOT request another round.
-> Write to: `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-2.md`
+> Write to: `<PROJECT_ROOT>/.flashnote-workflow/code-review-round-3.md`
+
+---
+
+## Deep Dive Offer
+
+After code review approval, ask the user **(rule 4 — no tool calls, just this text)**:
+
+> Code review complete. Would you like a deep-dive local review before pushing?
+>
+> The deep dive uses the `local-review` skill — a more aggressive, multi-agent review that checks CLAUDE.md compliance, bugs, security (OWASP top 10), type safety, and code simplification across all changes.
+>
+> 1. **Skip** — Proceed to Pre-Push Review
+> 2. **Deep dive** — Run local-review before pushing
+>
+> Reply with 1 or 2.
+
+**Wait for user reply. Do NOT proceed.**
+
+- **1 / Skip** → proceed to Checkpoint 2 (Pre-Push Review).
+- **2 / Deep dive** → run the `local-review:local-review` skill using the Skill tool. After it completes:
+  - If it reports **Critical** issues: spawn `task-fixer` with the critical issues, re-run the Quality Gate, then proceed to Checkpoint 2.
+  - If it reports **Warning** or **Simplification** issues only: present the findings to the user and ask whether to fix them or proceed as-is.
+  - If it reports no significant issues: proceed to Checkpoint 2.
 
 ---
 
@@ -344,35 +405,42 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 
 ## Smoke Testing
 
+<Smoke tests are MANUAL verification steps that a reviewer runs locally against a running application — not unit test commands. The reviewer should start the app, interact with it (via browser, curl, CLI, etc.), and confirm the change works end-to-end.>
+
+<IMPORTANT: Do NOT write smoke test scenarios that just run unit tests (e.g., `pnpm test -- --grep "..."`). Those belong in the "Automated Tests" section at the bottom, not in smoke testing. Smoke tests verify real behavior by interacting with the running application.>
+
+<If the change is purely internal (e.g., a refactor, test-only change, or infrastructure change with no observable behavior), state this explicitly: "This change has no user-facing behavior to smoke test. Verification is limited to automated tests below." Do not fabricate smoke test scenarios that are actually unit test commands.>
+
 ### Prerequisites
 
-<Setup needed before testing — env vars, migrations, dependencies, etc.>
+<Any setup needed before testing — local server running, database seeded, environment variables, test accounts, etc.>
 
 ```bash
 pnpm --filter web install
 pnpm --filter web dev
 ```
 
-### Scenario 1: <Happy path — the main thing this PR enables>
+### Test Scenarios
 
-**Steps:**
-1. <Concrete step with exact action or command>
-2. <Next step>
-3. <Next step>
+#### Scenario 1: <Happy path — the main thing this PR enables>
 
-**Expected result:** <What the reviewer should see — be specific>
+- [ ] **Step 1:** <Concrete step — a URL to visit, a button to click, a curl command to run against localhost>
+- [ ] **Step 2:** <Next step>
+- [ ] **Step 3:** <Verify expected result>
 
-### Scenario 2: <Edge case or error handling>
+**Expected result:** <What the reviewer should see in their browser, terminal, or network tab>
 
-**Steps:**
-1. <Steps to trigger the edge case>
+#### Scenario 2: <Edge case or error handling>
 
-**Expected result:** <What should happen — graceful error, fallback, etc.>
+- [ ] **Step 1:** <Steps to trigger the edge case against the running app>
+- [ ] **Step 2:** <Verify expected result>
 
-### Scenario 3: <Regression check — existing functionality still works>
+**Expected result:** <What should happen — graceful error, fallback, correct UI state, etc.>
 
-**Steps:**
-1. <Steps to verify nothing broke>
+#### Scenario 3: <Regression check — make sure nothing broke>
+
+- [ ] **Step 1:** <Steps to verify existing functionality still works in the running app>
+- [ ] **Step 2:** <Verify expected result>
 
 **Expected result:** <Same behavior as before this PR>
 
@@ -384,7 +452,7 @@ pnpm --filter web exec tsc --noEmit
 pnpm --filter web lint
 ```
 
-<Note which tests are new vs existing and what they cover.>
+<Note which tests are new vs. existing, and what they cover. This is where unit/integration test commands belong — NOT in the smoke testing scenarios above.>
 
 ## Code Review
 
@@ -398,11 +466,14 @@ EOF
 ```
 
 **Smoke testing guidelines:**
-- **Copy-paste ready**: Every command should be runnable as-is. No unexplained placeholders.
-- **Include expected output**: Don't say "it should work" — describe what success looks like (UI state, terminal output, HTTP response).
+- **Smoke tests are manual, local verification against a running app.** The reviewer should start the dev server, open a browser or run curl, and interact with the actual application. Smoke tests are NOT unit test commands — those belong in "Automated Tests."
+- **If there's nothing to smoke test, say so.** Some changes (pure refactors, test-only changes, internal plumbing) have no observable behavior to verify manually. Write: "This change has no user-facing behavior to smoke test. Verification is limited to automated tests below." Do not disguise unit test commands as smoke test scenarios.
+- **Use checkboxes.** Every smoke test step should be a checkbox (`- [ ]`) so the reviewer can track progress.
+- **Copy-paste ready**: Every command should be runnable as-is. No placeholders like `<your-token-here>` without explaining how to get the value.
+- **Include expected output**: Don't say "it should work" — show what success looks like (UI state, terminal output, HTTP response).
 - **Cover the triad**: happy path, edge/error case, regression. These three catch the vast majority of issues.
 - **Healthcare context**: If the change touches auth, session handling, or data access, include a scenario verifying that unauthenticated/unauthorized access is properly denied.
-- **Adapt to the change**: Backend → curl commands. Frontend → describe clicks and visual results. DAL → reference the test output.
+- **Adapt to the stack**: Backend → curl commands. Frontend → describe clicks and visual results. DAL → reference the test output. For library/internal changes, show a minimal usage example or state that smoke testing is N/A.
 
 4. **Report the PR URL to the user.**
 
@@ -458,6 +529,6 @@ If `git stash pop` fails (conflict), tell the user: "Stash could not be applied 
 | Agent output looks fundamentally wrong | Stop, report to user |
 | Agent writes `QUESTION:` lines | Present question to user (rule 4), wait for reply, pass answer to next agent |
 | Quality gate fails after 2 fix attempts | Stop, report failing output to user |
-| Critical security issues unfixed after round 2 | Stop, report to user |
+| Critical security issues unfixed after round 3 | Stop, report to user |
 | `gh pr create` fails | Report error, leave branch pushed for manual PR |
 | Workflow aborted at any checkpoint | Run Abort/Cleanup |
