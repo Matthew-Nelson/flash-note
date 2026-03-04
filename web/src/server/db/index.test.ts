@@ -107,13 +107,12 @@ describe('db/index', () => {
       default: { Pool: MockPool },
     }));
 
-    const originalNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = 'production';
+    vi.stubEnv('NODE_ENV', 'production');
     try {
       await import('./index');
       expect(globalForDb._flashnoteDb).toBeUndefined();
     } finally {
-      process.env.NODE_ENV = originalNodeEnv;
+      vi.unstubAllEnvs();
     }
   });
 
