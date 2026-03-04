@@ -25,7 +25,13 @@ export default defineConfig({
         'src/lib/types/**',   // Pure type definitions, no runtime code
         'src/server/types.ts', // Pure type definitions + enum (tested via consumers)
         'src/server/db/migrate.ts', // CLI script, not unit-testable
-        'src/**/index.ts',    // Barrel re-export files
+        'src/components/auth/index.ts',
+        'src/components/notes/index.ts',
+        'src/components/ui/index.ts',
+        'src/lib/schemas/index.ts',
+        'src/lib/types/index.ts',
+        'src/server/dal/index.ts',
+        'src/server/services/llm/index.ts', // Barrel re-export files
       ],
       thresholds: {
         lines: 95,
