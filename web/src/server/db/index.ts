@@ -6,13 +6,19 @@ import { config } from './config';
 
 const { Pool } = pg;
 
+const globalForDb = globalThis as unknown as { _flashnoteDb?: pg.Pool };
+
 /**
  * Singleton PostgreSQL connection pool.
  *
  * Cloud Run runs the app as a long-lived container — pg.Pool works normally.
  * No serverless driver or connection pooler needed.
+ *
+ * In dev mode, Next.js HMR re-evaluates modules on code changes. The globalThis
+ * cache prevents creating a new pool on each reload, avoiding connection exhaustion.
  */
-export const db = new Pool({
+const isNewPool = !globalForDb._flashnoteDb;
+export const db = globalForDb._flashnoteDb ?? new Pool({
   connectionString: config.DATABASE_URL,
   max: 20,
   idleTimeoutMillis: 30000,
@@ -25,11 +31,17 @@ export const db = new Pool({
 });
 
 // Pool error handler — prevents unhandled promise rejections from crashing the process.
-// Structured logger (Pino) replaces console.error in a later phase.
-db.on('error', (err) => {
-  // eslint-disable-next-line no-console
-  console.error('PostgreSQL pool error:', err);
-});
+// Only attach on first creation to avoid duplicate listeners on HMR reloads.
+if (isNewPool) {
+  db.on('error', (err) => {
+    // eslint-disable-next-line no-console
+    console.error('PostgreSQL pool error:', err);
+  });
+}
+
+if (process.env.NODE_ENV !== 'production') {
+  globalForDb._flashnoteDb = db;
+}
 
 /**
  * Get a dedicated PoolClient for multi-step transactions.
