@@ -158,7 +158,7 @@ describe('AuditService', () => {
       ).resolves.not.toThrow();
     });
 
-    it('should log error to console when database query fails', async () => {
+    it('should log error to console with structured context when database query fails', async () => {
       const dbError = new Error('Database connection failed');
       mockDbQuery.mockRejectedValueOnce(dbError);
 
@@ -168,7 +168,13 @@ describe('AuditService', () => {
         status: 'SUCCESS',
       });
 
-      expect(console.error).toHaveBeenCalledWith('Audit log failed:', dbError);
+      expect(console.error).toHaveBeenCalledWith('Audit log failed:', dbError, {
+        source: 'service_audit',
+        errorType: 'audit_write_failed',
+        userId: 'user-123',
+        action: AuditAction.LOGIN,
+        status: 'SUCCESS',
+      });
     });
 
     it('should not break application flow when audit fails', async () => {
