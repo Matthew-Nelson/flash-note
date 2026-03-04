@@ -44,6 +44,50 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 /**
+ * Graceful shutdown: drain the pool when Cloud Run sends SIGTERM.
+ *
+ * Requires NEXT_MANUAL_SIG_HANDLE=true to prevent Next.js from handling
+ * the signal before this code runs. Only registered on first pool creation
+ * to avoid duplicate listeners on HMR reloads.
+ *
+ * Timeout ensures shutdown completes within Cloud Run's 10-second grace
+ * period even if checked-out clients never return.
+ */
+const SHUTDOWN_TIMEOUT_MS = 5000;
+
+if (isNewPool) {
+  const shutdownHandler = (signal: string) => {
+    // eslint-disable-next-line no-console
+    console.error(`Received ${signal}: draining database pool`);
+
+    const forceExit = setTimeout(() => {
+      // eslint-disable-next-line no-console
+      console.error('Pool drain timed out, forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    // Prevent the timeout from keeping the event loop alive if pool.end()
+    // resolves before it fires.
+    forceExit.unref();
+
+    db.end()
+      .then(() => {
+        // eslint-disable-next-line no-console
+        console.error('Database pool drained successfully');
+        process.exit(0);
+      })
+      .catch((err) => {
+        // eslint-disable-next-line no-console
+        console.error('Error draining database pool:', err);
+        process.exit(1);
+      });
+  };
+
+  process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
+  process.on('SIGINT', () => shutdownHandler('SIGINT'));
+}
+
+/**
  * Get a dedicated PoolClient for multi-step transactions.
  * Caller is responsible for BEGIN/COMMIT/ROLLBACK and client.release().
  */

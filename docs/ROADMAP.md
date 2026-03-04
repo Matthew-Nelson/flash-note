@@ -136,7 +136,7 @@ Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED
 | H-11 | Missing CHECK constraint on subscription_status | ✅ Done (migration 013) |
 | H-12 | Non-null assertions on query results | ❌ Fix during Phase 1.1 (DAL foundation) |
 | H-13 | Invite code doesn't deactivate | ✅ Done (migration 014) |
-| H-14 | No graceful shutdown | ✅ Done (`44319a8`). Cloud Run handles shutdown signals for Next.js. |
+| H-14 | No graceful shutdown | ✅ Done. SIGTERM/SIGINT handler drains DB pool with 5s timeout. `NEXT_MANUAL_SIG_HANDLE=true` in Dockerfile. |
 | H-15 | No process-level error handlers | ✅ Done (`44319a8`). Next.js instrumentation hook (`onRequestError`) handles this. |
 | H-16 | XML delimiter not escaped (prompt injection) | ✅ Done (escapeDelimiterTags + detection patterns) |
 | H-17 | Backend errors displayed to users (extension) | 🗑️ Moot — extension removed |

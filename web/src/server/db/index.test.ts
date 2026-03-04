@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock server-only (it throws in non-server contexts)
 vi.mock('server-only', () => ({}));
@@ -18,6 +18,7 @@ const { mockPool, MockPool } = vi.hoisted(() => {
     on: vi.fn(),
     connect: vi.fn(),
     query: vi.fn(),
+    end: vi.fn(),
   };
   // Must be a regular function (not an arrow function) so it can be used as a
   // constructor with `new`. The source does: const { Pool } = pg; new Pool(...)
@@ -135,5 +136,113 @@ describe('db/index', () => {
     // Second import reuses the cached pool — isNewPool is false, so on() is NOT called again
     await import('./index');
     expect(mockPool.on).toHaveBeenCalledTimes(1);
+  });
+
+  describe('graceful shutdown', () => {
+    let processOnSpy: ReturnType<typeof vi.spyOn>;
+    let processExitSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      processOnSpy = vi.spyOn(process, 'on');
+      processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    });
+
+    afterEach(() => {
+      processOnSpy.mockRestore();
+      processExitSpy.mockRestore();
+      process.removeAllListeners('SIGTERM');
+      process.removeAllListeners('SIGINT');
+    });
+
+    it('registers SIGTERM and SIGINT handlers on new pool', async () => {
+      await import('./index');
+      expect(processOnSpy).toHaveBeenCalledWith('SIGTERM', expect.any(Function));
+      expect(processOnSpy).toHaveBeenCalledWith('SIGINT', expect.any(Function));
+    });
+
+    it('does not register duplicate signal handlers when globalThis cache is populated', async () => {
+      await import('./index');
+      const sigTermCalls = processOnSpy.mock.calls.filter(([sig]) => sig === 'SIGTERM');
+      expect(sigTermCalls).toHaveLength(1);
+
+      vi.resetModules();
+      vi.mock('server-only', () => ({}));
+      vi.mock('./config', () => ({
+        config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
+      }));
+      vi.mock('pg', () => ({
+        default: { Pool: MockPool },
+      }));
+
+      // Spy again after module reset
+      processOnSpy = vi.spyOn(process, 'on');
+      await import('./index');
+
+      const sigTermCallsAfter = processOnSpy.mock.calls.filter(([sig]) => sig === 'SIGTERM');
+      expect(sigTermCallsAfter).toHaveLength(0);
+    });
+
+    it('calls pool.end() and exits with 0 on SIGTERM', async () => {
+      mockPool.end = vi.fn().mockResolvedValueOnce(undefined);
+
+      await import('./index');
+      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+      expect(sigTermHandler).toBeDefined();
+
+      sigTermHandler();
+
+      // Allow the Promise chain to resolve
+      await vi.waitFor(() => {
+        expect(mockPool.end).toHaveBeenCalled();
+        expect(processExitSpy).toHaveBeenCalledWith(0);
+      });
+    });
+
+    it('exits with 1 when pool.end() rejects', async () => {
+      mockPool.end = vi.fn().mockRejectedValueOnce(new Error('drain failed'));
+
+      await import('./index');
+      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+
+      sigTermHandler();
+
+      await vi.waitFor(() => {
+        expect(processExitSpy).toHaveBeenCalledWith(1);
+      });
+    });
+
+    it('force-exits after timeout if pool.end() does not resolve', async () => {
+      vi.useFakeTimers();
+
+      // pool.end() never resolves
+      mockPool.end = vi.fn().mockReturnValue(new Promise(() => {}));
+
+      await import('./index');
+      const sigTermHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGTERM')?.[1] as () => void;
+
+      sigTermHandler();
+
+      // Advance past the shutdown timeout (5000ms)
+      await vi.advanceTimersByTimeAsync(5000);
+
+      expect(processExitSpy).toHaveBeenCalledWith(1);
+
+      vi.useRealTimers();
+    });
+
+    it('handles SIGINT the same as SIGTERM', async () => {
+      mockPool.end = vi.fn().mockResolvedValueOnce(undefined);
+
+      await import('./index');
+      const sigIntHandler = processOnSpy.mock.calls.find(([sig]) => sig === 'SIGINT')?.[1] as () => void;
+      expect(sigIntHandler).toBeDefined();
+
+      sigIntHandler();
+
+      await vi.waitFor(() => {
+        expect(mockPool.end).toHaveBeenCalled();
+        expect(processExitSpy).toHaveBeenCalledWith(0);
+      });
+    });
   });
 });
