@@ -96,6 +96,27 @@ describe('db/index', () => {
     expect(MockPool).toHaveBeenCalledTimes(1);
   });
 
+  it('does not write pool to globalThis in production', async () => {
+    vi.resetModules();
+
+    vi.mock('server-only', () => ({}));
+    vi.mock('./config', () => ({
+      config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
+    }));
+    vi.mock('pg', () => ({
+      default: { Pool: MockPool },
+    }));
+
+    const originalNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      await import('./index');
+      expect(globalForDb._flashnoteDb).toBeUndefined();
+    } finally {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
+  });
+
   it('does not attach duplicate error handlers when globalThis cache is populated', async () => {
     // First import — attaches error handler once
     await import('./index');
