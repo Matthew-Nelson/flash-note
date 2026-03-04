@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useTransition } from 'react';
+import { logoutAction } from '@/actions/auth';
 import { Button } from '@/components/ui';
 
 export default function DashboardError({
@@ -11,12 +11,31 @@ export default function DashboardError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [isPending, startTransition] = useTransition();
+
   useEffect(() => {
     // Log error digest for observability — never log error.message (Rule 7)
     // TODO: Replace with Pino logger when available
     // eslint-disable-next-line no-console
     console.error('Dashboard error:', error.digest ?? 'no-digest');
   }, [error]);
+
+  function handleSignOut() {
+    startTransition(async () => {
+      try {
+        // Notify client components to clear PHI state before logout — Rule 4
+        window.dispatchEvent(new CustomEvent('flashnote:logout'));
+        // Clear clipboard to remove any PHI (copied SOAP notes) — Rule 4
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText('').catch(() => {});
+        }
+        await logoutAction();
+      } catch {
+        // Server unreachable — navigate to homepage (no auth required)
+        window.location.href = '/login';
+      }
+    });
+  }
 
   return (
     <div className="flex items-center justify-center py-32">
@@ -32,9 +51,15 @@ export default function DashboardError({
           <Button onClick={reset}>
             Try Again
           </Button>
-          <Link href="/login" className="link text-sm">
-            Return to sign in
-          </Link>
+          <div aria-live="polite" aria-atomic="true">
+            <button
+              onClick={handleSignOut}
+              disabled={isPending}
+              className="link text-sm"
+            >
+              {isPending ? 'Signing out...' : 'Return to sign in'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
