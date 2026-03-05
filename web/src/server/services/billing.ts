@@ -221,6 +221,17 @@ class BillingService {
           await this.handleInvoicePaymentFailed(event.data.object);
           break;
         }
+
+        default: {
+          // eslint-disable-next-line no-console
+          console.warn('Unhandled Stripe webhook event type:', {
+            source: 'service_billing',
+            errorType: 'unhandled_webhook_event_type',
+            eventId: event.id,
+            eventType: event.type,
+          });
+          break;
+        }
       }
     } catch (handlerError) {
       // Handler failed — delete idempotency record so Stripe retry will be processed
