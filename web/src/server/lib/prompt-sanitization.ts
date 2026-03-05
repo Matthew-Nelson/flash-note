@@ -78,6 +78,7 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
  *
  * Removes any opening or closing tags that match our delimiter tag names,
  * including tags with attributes (e.g., `<clinician_notes x="">`).
+ * Also strips unclosed tags (no closing `>`) at end of line/string (BUG-11).
  * Medical notation like `<90°` is preserved since it doesn't match tag names.
  */
 export function escapeDelimiterTags(content: string): string {
