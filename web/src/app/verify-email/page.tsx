@@ -99,7 +99,7 @@ function VerifyEmailContent() {
 
           {status === 'already_verified' && (
             <div className="text-center">
-              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-cyan-50">
+              <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-primary-light">
                 <svg className="h-6 w-6 text-fn-accent-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>

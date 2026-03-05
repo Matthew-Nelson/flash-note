@@ -120,10 +120,10 @@ function Section({
 
 function GoalStatusBadge({ status }: { status: GoalItem['status'] }) {
   const styles: Record<GoalItem['status'], string> = {
-    not_started: 'bg-fn-surface text-fn-text-secondary',
-    progressing: 'bg-blue-100 text-blue-800',
-    met: 'bg-green-100 text-green-800',
-    discontinued: 'bg-red-100 text-red-800',
+    not_started: 'bg-fn-bg-secondary text-fn-text-secondary',
+    progressing: 'bg-fn-info-light text-fn-info-dark',
+    met: 'bg-fn-success-light text-fn-success-dark',
+    discontinued: 'bg-fn-error-light text-fn-error-dark',
   };
   const labels: Record<GoalItem['status'], string> = {
     not_started: 'Not Started',
@@ -197,7 +197,7 @@ function BillingSection({ billing }: { billing: BillingData }) {
           <p className="text-xs text-fn-text-secondary mb-2">Suggested codes (no times provided):</p>
           <div className="flex flex-wrap gap-2">
             {billing.suggestedCodes!.map((code: BillingSuggestedCode, i: number) => (
-              <span key={i} className="inline-flex items-center gap-1.5 px-2 py-1 bg-fn-surface rounded text-xs border border-fn-border">
+              <span key={i} className="inline-flex items-center gap-1.5 px-2 py-1 bg-fn-bg-secondary rounded text-xs border border-fn-border">
                 <span className="font-mono font-medium">{code.cptCode}</span>
                 <span className="text-fn-text-secondary">{code.description}</span>
               </span>
@@ -211,7 +211,7 @@ function BillingSection({ billing }: { billing: BillingData }) {
           <p className="text-xs text-fn-text-secondary mb-1.5">Suggested modifiers:</p>
           <div className="flex flex-wrap gap-1.5">
             {billing.suggestedModifiers!.map((mod: string, i: number) => (
-              <span key={i} className="font-mono text-xs px-2 py-0.5 bg-fn-surface rounded border border-fn-border">
+              <span key={i} className="font-mono text-xs px-2 py-0.5 bg-fn-bg-secondary rounded border border-fn-border">
                 {mod}
               </span>
             ))}
