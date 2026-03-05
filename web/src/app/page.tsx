@@ -7,8 +7,8 @@ export default function Home() {
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-gradient">FlashNote</span>
-            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
+            <span className="text-2xl font-bold text-fn-primary">FlashNote</span>
+            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
           </Link>
           <div className="flex items-center space-x-6">
             <Link
@@ -39,7 +39,7 @@ export default function Home() {
           <h1 className="text-5xl font-bold text-fn-text-primary mb-6">
             Write PT Notes in Seconds,
             <br />
-            <span className="text-gradient">Not Hours</span>
+            <span className="text-fn-primary">Not Hours</span>
           </h1>
           <p className="text-xl text-fn-text-secondary mb-8 max-w-2xl mx-auto">
             FlashNote uses AI to transform your shorthand notes into complete,
@@ -71,7 +71,7 @@ export default function Home() {
           </h2>
           <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
             <div className="text-center">
-              <div className="w-16 h-16 bg-fn-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-fn-primary rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-white">1</span>
               </div>
               <h3 className="text-xl font-semibold text-fn-text-primary mb-2">Type Shorthand</h3>
@@ -80,7 +80,7 @@ export default function Home() {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-fn-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-fn-primary rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-white">2</span>
               </div>
               <h3 className="text-xl font-semibold text-fn-text-primary mb-2">AI Generates</h3>
@@ -89,7 +89,7 @@ export default function Home() {
               </p>
             </div>
             <div className="text-center">
-              <div className="w-16 h-16 bg-fn-gradient-primary rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-fn-primary rounded-full flex items-center justify-center mx-auto mb-4">
                 <span className="text-2xl font-bold text-white">3</span>
               </div>
               <h3 className="text-xl font-semibold text-fn-text-primary mb-2">Copy to EMR</h3>
@@ -148,7 +148,7 @@ export default function Home() {
             Save hours every week for less than a coffee per day
           </p>
           <div className="inline-block card p-8 shadow-fn-lg">
-            <div className="text-5xl font-bold text-gradient">
+            <div className="text-5xl font-bold text-fn-primary">
               $29<span className="text-xl font-normal text-fn-text-muted">/month</span>
             </div>
             <p className="text-fn-text-secondary mt-2">Unlimited SOAP notes</p>

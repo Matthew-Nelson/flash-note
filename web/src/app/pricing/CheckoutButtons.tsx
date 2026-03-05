@@ -186,7 +186,7 @@ export function CheckoutButtons({
             <h2 className="text-xl font-semibold text-fn-text-primary mb-2">Annual</h2>
             <p className="text-fn-text-secondary mb-6">Best value for committed users</p>
             <div className="mb-6">
-              <span className="text-5xl font-bold text-gradient">$24</span>
+              <span className="text-5xl font-bold text-fn-primary">$24</span>
               <span className="text-fn-text-muted">/month</span>
               <p className="text-fn-text-muted text-sm mt-1">Billed annually ($290/year)</p>
             </div>

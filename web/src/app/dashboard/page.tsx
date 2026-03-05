@@ -123,7 +123,7 @@ export default async function DashboardPage() {
             <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
               Usage This Month
             </h2>
-            <div className="text-4xl font-bold text-gradient mb-2">
+            <div className="text-4xl font-bold text-fn-primary mb-2">
               {usage.notesGenerated}
             </div>
             <p className="text-fn-text-secondary">
