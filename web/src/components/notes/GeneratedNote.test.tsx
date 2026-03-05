@@ -504,8 +504,9 @@ describe('GeneratedNote', () => {
     fireEvent.click(copyButton);
 
     await vi.waitFor(() => {
-      // The live region should now contain the announcement text
-      const liveRegion = document.querySelector('[aria-live="polite"][aria-atomic="true"]');
+      // The live region is a sibling of the button inside CopyButton's wrapper div.
+      // Query from the button's parent to scope to the correct CopyButton instance.
+      const liveRegion = copyButton.parentElement?.querySelector('[aria-live="polite"][aria-atomic="true"]');
       expect(liveRegion).toHaveTextContent('Copied to clipboard');
     });
   });
