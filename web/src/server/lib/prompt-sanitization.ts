@@ -67,6 +67,10 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
   // Attempts to break XML delimiter boundaries (H-16)
   /<\s*\/?\s*clinician_notes[^>]*>/i,
   /<\s*\/?\s*patient_context[^>]*>/i,
+
+  // Unclosed delimiter tags (no closing '>') — BUG-11
+  /<\s*\/?\s*clinician_notes[^>]*$/im,
+  /<\s*\/?\s*patient_context[^>]*$/im,
 ];
 
 /**
@@ -80,6 +84,8 @@ export function escapeDelimiterTags(content: string): string {
   let sanitized = content;
   for (const tagName of DELIMITER_TAG_NAMES) {
     sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*>`, 'gi'), '');
+    // Also strip unclosed tags (no closing '>') at end of line/string (BUG-11)
+    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*$`, 'gim'), '');
   }
   return sanitized;
 }

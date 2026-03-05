@@ -138,7 +138,7 @@ Full audit: [compliance/CONSOLIDATED_AUDIT_2026_02.md](./compliance/CONSOLIDATED
 | H-13 | Invite code doesn't deactivate | ✅ Done (migration 014) |
 | H-14 | No graceful shutdown | ✅ Done. SIGTERM/SIGINT handler drains DB pool with 5s timeout. `NEXT_MANUAL_SIG_HANDLE=true` in Dockerfile. |
 | H-15 | No process-level error handlers | ✅ Done (`44319a8`). Next.js instrumentation hook (`onRequestError`) handles this. |
-| H-16 | XML delimiter not escaped (prompt injection) | ✅ Done (escapeDelimiterTags + detection patterns) |
+| H-16 | XML delimiter not escaped (prompt injection) | ✅ Done (escapeDelimiterTags + detection patterns). BUG-11 fix: unclosed tag stripping added. |
 | H-17 | Backend errors displayed to users (extension) | 🗑️ Moot — extension removed |
 | H-18 | CASCADE DELETE on sessions/usage | ✅ Done (migration 015) |
 
