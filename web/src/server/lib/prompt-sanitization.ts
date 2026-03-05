@@ -69,8 +69,8 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
   /<\s*\/?\s*patient_context[^>]*>/i,
 
   // Unclosed delimiter tags (no closing '>') — BUG-11
-  /<\s*\/?\s*clinician_notes[^>]*$/im,
-  /<\s*\/?\s*patient_context[^>]*$/im,
+  /<\s*\/?\s*clinician_notes[^>\n]*$/im,
+  /<\s*\/?\s*patient_context[^>\n]*$/im,
 ];
 
 /**
@@ -85,7 +85,7 @@ export function escapeDelimiterTags(content: string): string {
   for (const tagName of DELIMITER_TAG_NAMES) {
     sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*>`, 'gi'), '');
     // Also strip unclosed tags (no closing '>') at end of line/string (BUG-11)
-    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*$`, 'gim'), '');
+    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>\\n]*$`, 'gim'), '');
   }
   return sanitized;
 }
