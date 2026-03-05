@@ -36,7 +36,7 @@ export default function Home() {
       <main id="main-content" tabIndex={-1}>
         {/* Hero Section */}
         <section className="container mx-auto px-6 py-20 text-center">
-          <h1 className="text-5xl font-bold text-fn-text-primary mb-6">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-fn-text-primary mb-6">
             Write PT Notes in Seconds,
             <br />
             <span className="text-fn-primary">Not Hours</span>
