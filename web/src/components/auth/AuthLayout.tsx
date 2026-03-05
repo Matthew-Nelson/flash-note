@@ -13,8 +13,8 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center items-center gap-2">
-          <span className="text-3xl font-bold text-gradient">FlashNote</span>
-          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">BETA</span>
+          <span className="text-3xl font-bold text-fn-primary">FlashNote</span>
+          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
         </Link>
         {title && (
           <h2 className="mt-4 text-center text-2xl font-bold text-fn-text-primary">

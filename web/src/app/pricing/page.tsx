@@ -11,7 +11,7 @@ const STRIPE_PRICE_ANNUAL = process.env.NEXT_PUBLIC_STRIPE_PRICE_ANNUAL ?? '';
 
 function CheckIcon() {
   return (
-    <svg className="w-5 h-5 text-fn-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+    <svg className="w-5 h-5 text-fn-success flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
       <path
         fillRule="evenodd"
         d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -38,8 +38,8 @@ function PricingContent({
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-gradient">FlashNote</span>
-            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-stone-400 text-stone-400">
+            <span className="text-2xl font-bold text-fn-primary">FlashNote</span>
+            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">
               BETA
             </span>
           </Link>

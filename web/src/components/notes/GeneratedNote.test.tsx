@@ -489,4 +489,36 @@ describe('GeneratedNote', () => {
 
     expect(screen.getByText('Generated in 2.3s')).toBeInTheDocument();
   });
+
+  it('has a persistent aria-live region that announces copy success', async () => {
+    mockWriteText.mockResolvedValue(undefined);
+
+    render(<GeneratedNote note={buildNote()} />);
+
+    // The aria-live region should exist BEFORE any click (Rule 13: container must pre-exist)
+    const liveRegions = document.querySelectorAll('[aria-live="polite"]');
+    expect(liveRegions.length).toBeGreaterThan(0);
+
+    // Click copy
+    const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
+    fireEvent.click(copyButton);
+
+    await vi.waitFor(() => {
+      // The live region is a sibling of the button inside CopyButton's wrapper div.
+      // Query from the button's parent to scope to the correct CopyButton instance.
+      const liveRegion = copyButton.parentElement?.querySelector('[aria-live="polite"][aria-atomic="true"]');
+      expect(liveRegion).toHaveTextContent('Copied to clipboard');
+    });
+  });
+
+  it('CopyButton SVGs have aria-hidden for accessibility', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    // Find a copy button and verify its SVG children are aria-hidden
+    const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
+    const svgs = copyButton.querySelectorAll('svg');
+    svgs.forEach(svg => {
+      expect(svg).toHaveAttribute('aria-hidden', 'true');
+    });
+  });
 });

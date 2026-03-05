@@ -12,7 +12,7 @@ export default function TermsOfServicePage() {
       {/* Navigation */}
       <nav className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-gradient">
+          <Link href="/" className="text-2xl font-bold text-fn-primary">
             FlashNote
           </Link>
           <div className="flex items-center space-x-6">
