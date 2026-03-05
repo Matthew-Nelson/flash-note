@@ -502,6 +502,7 @@ Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
 | Update `web/src/app/globals.css` (remove `.text-gradient`, gradient utilities) | ✅ |
 | Swap font: Inter → Plus Jakarta Sans in `layout.tsx` | ✅ |
 | Update tests affected by token/CSS changes | ✅ (no test changes needed) |
+| Fix 9 undefined/broken CSS classes (BUG-UI-1 through BUG-UI-10, excl. BUG-UI-8) | ✅ |
 | **Verify**: `pnpm build` succeeds. Font loads. Tailwind resolves new tokens. Tests pass. | ✅ |
 
 ### UI-2: Layout Shell + Sidebar
