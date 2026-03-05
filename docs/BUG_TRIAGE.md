@@ -5,7 +5,7 @@ Two rounds of parallel audits covering 17 areas: auth flows, cookies, sessions, 
 redirects, DAL, Server Actions, client-side state, rate limiting, webhooks, env vars,
 LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, and CSP.
 
-**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4, BUG-5, BUG-6, BUG-7, BUG-8 fixed)
+**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4, BUG-5, BUG-6, BUG-7, BUG-8, BUG-9 fixed)
 
 ---
 
@@ -34,7 +34,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
 
 ### P3 — Track for Later
 
-- [ ] **BUG-9**: Missing rate limit on billing checkout action
+- [x] **BUG-9**: Missing rate limit on billing checkout action
 - [ ] **BUG-10**: Unknown Stripe webhook event types silently dropped
 - [ ] **BUG-11**: Prompt sanitization regex doesn't catch unclosed delimiter tags
 

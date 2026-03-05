@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/server/lib/get-session';
 import { getBillingService, SubscriptionExistsError } from '@/server/services/billing';
+import { checkRateLimit, checkoutRateLimit } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
 import type { ActionResult } from '@/lib/types/actions';
 
@@ -43,6 +44,12 @@ export async function createCheckoutAction(
   const raw = Object.fromEntries(formData);
   const parsed = checkoutSchema.safeParse(raw);
   if (!parsed.success) return { success: false, error: 'invalid_price_id' };
+
+  // Rate limit by userId (authenticated endpoint)
+  const rl = await checkRateLimit(checkoutRateLimit, session.userId);
+  if (!rl.success) {
+    return { success: false, error: 'rate_limit_exceeded' };
+  }
 
   try {
     const checkoutUrl = await getBillingService().createCheckoutSession(

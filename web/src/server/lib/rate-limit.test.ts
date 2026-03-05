@@ -17,6 +17,7 @@ const {
   inviteCodeValidateRateLimit,
   orgJoinRateLimit,
   generateRateLimit,
+  checkoutRateLimit,
   apiRateLimit,
 } = await import('./rate-limit');
 
@@ -107,6 +108,7 @@ describe('rate-limit', () => {
       expect(inviteCodeValidateRateLimit).toBeNull();
       expect(orgJoinRateLimit).toBeNull();
       expect(generateRateLimit).toBeNull();
+      expect(checkoutRateLimit).toBeNull();
       expect(apiRateLimit).toBeNull();
     });
   });
