@@ -34,13 +34,57 @@ export const db = globalForDb._flashnoteDb ?? new Pool({
 // Only attach on first creation to avoid duplicate listeners on HMR reloads.
 if (isNewPool) {
   db.on('error', (err) => {
-    // eslint-disable-next-line no-console
     console.error('PostgreSQL pool error:', err);
   });
 }
 
 if (process.env.NODE_ENV !== 'production') {
   globalForDb._flashnoteDb = db;
+}
+
+/**
+ * Graceful shutdown: drain the pool when Cloud Run sends SIGTERM.
+ *
+ * Requires NEXT_MANUAL_SIG_HANDLE=true to prevent Next.js from handling
+ * the signal before this code runs. Only registered on first pool creation
+ * to avoid duplicate listeners on HMR reloads.
+ *
+ * Timeout ensures shutdown completes within Cloud Run's 10-second grace
+ * period even if checked-out clients never return.
+ */
+const SHUTDOWN_TIMEOUT_MS = 5000;
+
+if (isNewPool) {
+  let isShuttingDown = false;
+
+  const shutdownHandler = (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.warn(`Received ${signal}: draining database pool`);
+
+    const forceExit = setTimeout(() => {
+      console.error('Pool drain timed out, forcing exit');
+      process.exit(1);
+    }, SHUTDOWN_TIMEOUT_MS);
+
+    // Prevent the timeout from keeping the event loop alive if pool.end()
+    // resolves before it fires.
+    forceExit.unref();
+
+    db.end()
+      .then(() => {
+        console.warn('Database pool drained successfully');
+        process.exit(0);
+      })
+      .catch((err) => {
+        console.error('Error draining database pool:', err);
+        process.exit(1);
+      });
+  };
+
+  process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
+  process.on('SIGINT', () => shutdownHandler('SIGINT'));
 }
 
 /**

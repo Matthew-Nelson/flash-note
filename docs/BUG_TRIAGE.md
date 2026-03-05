@@ -5,7 +5,7 @@ Two rounds of parallel audits covering 17 areas: auth flows, cookies, sessions, 
 redirects, DAL, Server Actions, client-side state, rate limiting, webhooks, env vars,
 LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, and CSP.
 
-**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4, BUG-5, BUG-6, BUG-7 fixed)
+**Status**: Fixing in progress (BUG-1, BUG-2, BUG-3, BUG-4, BUG-5, BUG-6, BUG-7, BUG-8 fixed)
 
 ---
 
@@ -30,7 +30,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
   - Blocked by: BUG-1
 - [x] **BUG-6**: Locked-account audit log failure is silent (Rule 9 violation)
 - [x] **BUG-7**: DB pool leaks connections on every HMR reload in dev mode
-- [ ] **BUG-8**: No graceful shutdown handler — dirty Cloud Run container stops
+- [x] **BUG-8**: No graceful shutdown handler — dirty Cloud Run container stops
 
 ### P3 — Track for Later
 
