@@ -138,6 +138,7 @@ function makeEvent(type: string, dataObject: unknown): unknown {
 describe('BillingService', () => {
   let consoleErrorSpy: MockInstance;
   let consoleLogSpy: MockInstance;
+  let consoleWarnSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -146,11 +147,13 @@ describe('BillingService', () => {
     mockAuditLog.mockResolvedValue(undefined);
     consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
     consoleErrorSpy.mockRestore();
     consoleLogSpy.mockRestore();
+    consoleWarnSpy.mockRestore();
   });
 
   // -------------------------------------------------------------------------
@@ -466,6 +469,35 @@ describe('BillingService', () => {
       await expect(
         billingService.handleWebhook(Buffer.from('{}'), 'sig')
       ).rejects.toThrow('DB error');
+    });
+
+    it('logs warn and completes successfully for unknown event types (BUG-10)', async () => {
+      const event = makeEvent('charge.dispute.created', { id: 'ch_123' });
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      // Should not throw, should not call any handler
+      expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(mockStripeSubscriptionsRetrieve).not.toHaveBeenCalled();
+
+      // Should log at warn level with structured context
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        'Unhandled Stripe webhook event type:',
+        expect.objectContaining({
+          source: 'service_billing',
+          errorType: 'unhandled_webhook_event_type',
+          eventId: 'evt-123',
+          eventType: 'charge.dispute.created',
+        })
+      );
+
+      // Should still mark as processed (idempotency)
+      expect(mockTryMarkWebhookProcessed).toHaveBeenCalledWith('evt-123', 'charge.dispute.created');
+
+      // Should NOT delete idempotency record (no handler failure)
+      expect(mockDeleteProcessedWebhookEvent).not.toHaveBeenCalled();
     });
   });
 

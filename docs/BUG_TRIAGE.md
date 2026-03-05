@@ -35,7 +35,7 @@ LLM prompt injection, streaming/Suspense, DB connection pool, email/token URLs, 
 ### P3 — Track for Later
 
 - [x] **BUG-9**: Missing rate limit on billing checkout action
-- [ ] **BUG-10**: Unknown Stripe webhook event types silently dropped
+- [x] **BUG-10**: Unknown Stripe webhook event types silently dropped
 - [ ] **BUG-11**: Prompt sanitization regex doesn't catch unclosed delimiter tags
 
 ---
