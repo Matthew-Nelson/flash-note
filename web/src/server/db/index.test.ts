@@ -248,5 +248,20 @@ describe('db/index', () => {
         expect(processExitSpy).toHaveBeenCalledWith(0);
       });
     });
+
+    it('ignores second signal if shutdown is already in progress', async () => {
+      // pool.end() never resolves — keeps shutdown in progress
+      mockPool.end = vi.fn().mockReturnValue(new Promise(() => {}));
+
+      await import('./index');
+      const sigTermHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGTERM')?.[1] as () => void;
+      const sigIntHandler = processOnSpy.mock.calls.find((call) => call[0] === 'SIGINT')?.[1] as () => void;
+
+      sigTermHandler();
+      sigIntHandler();
+
+      // pool.end() should only be called once despite two signals
+      expect(mockPool.end).toHaveBeenCalledTimes(1);
+    });
   });
 });

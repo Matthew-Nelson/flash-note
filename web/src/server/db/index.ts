@@ -55,8 +55,13 @@ if (process.env.NODE_ENV !== 'production') {
 const SHUTDOWN_TIMEOUT_MS = 5000;
 
 if (isNewPool) {
+  let isShuttingDown = false;
+
   const shutdownHandler = (signal: string) => {
-    console.error(`Received ${signal}: draining database pool`);
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    console.warn(`Received ${signal}: draining database pool`);
 
     const forceExit = setTimeout(() => {
       console.error('Pool drain timed out, forcing exit');
@@ -69,7 +74,7 @@ if (isNewPool) {
 
     db.end()
       .then(() => {
-        console.error('Database pool drained successfully');
+        console.warn('Database pool drained successfully');
         process.exit(0);
       })
       .catch((err) => {
