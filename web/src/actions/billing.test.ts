@@ -6,6 +6,7 @@ import type { SessionData } from '@/server/types';
 const mockGetSession = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreatePortalSession = vi.hoisted(() => vi.fn());
+const mockCheckRateLimit = vi.hoisted(() => vi.fn());
 
 // Hoist the error classes so they're available in both the mock factory and test assertions.
 // These are real classes (not mocked) so instanceof checks work correctly.
@@ -36,6 +37,11 @@ vi.mock('@/server/db/config', () => ({
     STRIPE_PRICE_MONTHLY: 'price_monthly_test',
     STRIPE_PRICE_ANNUAL: 'price_annual_test',
   },
+}));
+
+vi.mock('@/server/lib/rate-limit', () => ({
+  checkRateLimit: mockCheckRateLimit,
+  checkoutRateLimit: 'mock-checkout-limiter',
 }));
 
 // Import actions after all mocks are set
@@ -78,6 +84,7 @@ describe('createCheckoutAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
 
   it('returns unauthenticated when no session', async () => {
@@ -155,6 +162,41 @@ describe('createCheckoutAction', () => {
 
     expect(result).toEqual({ success: false, error: 'billing_error' });
   });
+
+  it('returns rate_limit_exceeded when rate limited', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCheckRateLimit.mockResolvedValue({ success: false, limit: 5, remaining: 0, reset: 0 });
+
+    const result = await createCheckoutAction(makeFormData());
+
+    expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+  });
+
+  it('calls checkRateLimit with checkout limiter and userId', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCreateCheckoutSession.mockResolvedValue('https://checkout.stripe.com/sess');
+
+    await createCheckoutAction(makeFormData());
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('mock-checkout-limiter', 'user-1');
+  });
+
+  it('does not call billing service when rate limited', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCheckRateLimit.mockResolvedValue({ success: false, limit: 5, remaining: 0, reset: 0 });
+
+    await createCheckoutAction(makeFormData());
+
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it('checks rate limit after validation (does not rate-limit invalid requests)', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+
+    await createCheckoutAction(makeFormData({ priceId: '' }));
+
+    expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -165,6 +207,7 @@ describe('createPortalAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
 
   it('returns unauthenticated when no session', async () => {
@@ -223,6 +266,7 @@ describe('H-1: price ID allowlist', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
+    mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
 
   it('accepts STRIPE_PRICE_MONTHLY from config', async () => {

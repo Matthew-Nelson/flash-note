@@ -62,6 +62,9 @@ export const orgJoinRateLimit = createLimiter(5, '15 m', 'org_join');
 /** 30 requests per 1 min, keyed by IP:userId */
 export const generateRateLimit = createLimiter(30, '1 m', 'generate');
 
+/** 5 requests per 1 hour, keyed by userId */
+export const checkoutRateLimit = createLimiter(5, '1 h', 'checkout');
+
 // --- Global rate limiter ---
 
 /** 100 requests per 1 min, keyed by IP */
