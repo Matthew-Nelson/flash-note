@@ -46,7 +46,7 @@ HIPAA's Security Rule mandates audit controls as part of the Technical Safeguard
 
 ### Full AuditAction Enum Reference
 
-All audit actions are defined in `backend/src/types/index.ts`:
+All audit actions are defined in `web/src/server/types.ts`:
 
 ```typescript
 export enum AuditAction {

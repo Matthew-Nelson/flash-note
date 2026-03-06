@@ -12,9 +12,9 @@
 FlashNote processes Protected Health Information (PHI) and is legally classified as a **Business Associate** under HIPAA. The core technical implementation is complete — the web signup flow includes BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records.
 
 **Remaining items:**
-- ❌ `/baa` web page does not exist (signup forms link to it — users get 404)
-- ❌ Legal documents need attorney review before production use
-- ❌ LLC formation needed to fill template placeholders
+- `/baa` web page is live but showing "PENDING LEGAL REVIEW" — awaiting legal counsel to finalize
+- Legal documents need attorney review before production use
+- LLC formation needed to fill template placeholders
 
 ---
 
@@ -99,7 +99,7 @@ Both serve different legal purposes under different laws:
 
 > **Updated March 2026:** All technical implementation items below are complete. The web signup flow includes BAA acceptance (PR #47). The Chrome extension was removed in the web-only architecture consolidation (PR #91).
 
-### Web Signup Flow (`web/src/app/(auth)/signup/page.tsx`) — ✅ IMPLEMENTED
+### Web Signup Flow (`web/src/app/signup/page.tsx`) — ✅ IMPLEMENTED
 
 **What's implemented:**
 - ✅ Confirm password field with validation
