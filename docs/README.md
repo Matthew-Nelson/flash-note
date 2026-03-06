@@ -23,26 +23,24 @@ Each task is tracked in **exactly one file**. No duplication.
 
 | Component | Service | Notes |
 |-----------|---------|-------|
-| Backend API | Google Cloud Run | HIPAA-eligible, managed scaling |
+| Web Application | Google Cloud Run | Single Next.js app (frontend + backend), HIPAA-eligible, managed scaling |
 | Database | Google Cloud SQL (PostgreSQL) | HIPAA-eligible, managed backups |
-| Web / Landing Page | Vercel | Free tier, Next.js optimized |
 | LLM | Google Gemini (via Vertex AI for prod) | HIPAA-eligible with BAA |
 | Payments | Stripe | Checkout, webhooks, customer portal |
-| Error Monitoring | Sentry | All three components instrumented |
+| Error Tracking | Sentry (`@sentry/nextjs`) | Client and server instrumented |
 
 ---
 
 ## Folder Structure
 
 ### `/guides` - How-To Documentation
-Operational guides and API documentation for developers.
+Operational guides for developers.
 
 | Document | Description |
 |----------|-------------|
-| [API.md](./guides/API.md) | REST API endpoint reference |
-| [ENVIRONMENT_VARIABLES.md](./guides/ENVIRONMENT_VARIABLES.md) | Environment variable management across all contexts |
-| [EXTENSION_DEPLOYMENT.md](./guides/EXTENSION_DEPLOYMENT.md) | Chrome Web Store deployment guide |
 | [LLC_FORMATION_GUIDE.md](./guides/LLC_FORMATION_GUIDE.md) | Business entity formation walkthrough |
+
+> **Archived guides** (from pre-migration architecture): [API.md](./archive/guides/API.md), [ENVIRONMENT_VARIABLES.md](./archive/guides/ENVIRONMENT_VARIABLES.md), [EXTENSION_DEPLOYMENT.md](./archive/guides/EXTENSION_DEPLOYMENT.md)
 
 ### `/planning` - Planning & Research
 Design specs, research, and competitive analysis.
@@ -60,7 +58,9 @@ Design specs, research, and competitive analysis.
 | [OAUTH_ANALYSIS.md](./planning/OAUTH_ANALYSIS.md) | OAuth/social login implementation analysis |
 | [TRUST_BUILDING_STRATEGY.md](./planning/TRUST_BUILDING_STRATEGY.md) | Product strategy for clinician trust |
 | [RETENTION_STRATEGY.md](./planning/RETENTION_STRATEGY.md) | Churn reduction and switching cost strategy |
-| [IDEA_DUMPING_GROUND.md](./planning/IDEA_DUMPING_GROUND.md) | Unstructured feature ideas and brainstorming |
+| [DESIGN_DIRECTION.md](./planning/DESIGN_DIRECTION.md) | Visual design direction |
+| [DESIGN_SYSTEM.md](./planning/DESIGN_SYSTEM.md) | Design system specification |
+| [COMPONENT_PATTERNS.md](./planning/COMPONENT_PATTERNS.md) | React component patterns |
 
 ### `/compliance` - Security & HIPAA
 Testing, security, and compliance requirements.

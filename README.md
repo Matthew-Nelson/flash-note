@@ -1,32 +1,28 @@
 # FlashNote
 
-AI-powered SOAP note generation for Physical Therapists.
+AI-powered SOAP note generation for Physical Therapists. HIPAA-compliant healthcare software deployed on Google Cloud Run.
 
-## Overview
+## What It Is
 
-FlashNote is a browser extension that helps physical therapists write documentation faster using AI. Therapists enter shorthand notes, and the AI expands them into complete, insurance-compliant SOAP notes.
+FlashNote is a web application that helps Physical Therapists generate complete, insurance-compliant SOAP notes from shorthand input. Therapists enter abbreviated clinical notes, and the AI expands them into structured documentation.
 
-## Project Structure
-
-```
-flashnote/
-├── backend/        # Node.js + Express API
-├── extension/      # Chrome Extension (React + Vite)
-├── web/            # Landing page + dashboard (Next.js)
-└── docs/           # Legal documents (Privacy Policy, ToS, BAA)
-```
+Single Next.js 16 application with an integrated server-side backend — no separate API server or browser extension.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Backend | Node.js 20+, Express, TypeScript |
-| Database | PostgreSQL |
-| Auth | JWT (jsonwebtoken) + bcryptjs |
-| LLM | Google Gemini API |
-| Extension | React 18+, Vite, Tailwind CSS |
-| Web | Next.js, Tailwind CSS |
+| Layer | Technology |
+|-------|------------|
+| Framework | Next.js 16 (App Router, Server Components, Server Actions) |
+| Language | TypeScript (strict mode) |
+| Database | PostgreSQL on Google Cloud SQL |
+| Auth | Cookie-based sessions (opaque tokens, bcryptjs) |
+| Validation | Zod |
+| Rate Limiting | Upstash Redis (`@upstash/ratelimit`) |
+| LLM | Google Gemini 2.5 Flash via Vertex AI |
 | Payments | Stripe |
+| Styling | Tailwind CSS |
+| Error Tracking | Sentry (`@sentry/nextjs`) |
+| Deployment | Google Cloud Run (containerized) |
 
 ## Getting Started
 
@@ -34,63 +30,50 @@ flashnote/
 
 - Node.js 20+
 - PostgreSQL 15+
-- pnpm (recommended) or npm
+- pnpm
 
-### Development Setup
-
-1. **Clone the repository**
-   ```bash
-   git clone git@github.com:Matthew-Nelson/flash-note.git
-   cd flash-note
-   ```
-
-2. **Install dependencies**
-   ```bash
-   # Install all workspace dependencies
-   pnpm install
-   ```
-
-3. **Set up environment variables**
-   ```bash
-   cp backend/.env.example backend/.env
-   # Edit backend/.env with your values
-   ```
-
-4. **Start the database**
-   ```bash
-   # Run migrations
-   cd backend && pnpm db:migrate
-   ```
-
-5. **Start development servers**
-   ```bash
-   # Terminal 1: Backend API
-   cd backend && pnpm dev
-
-   # Terminal 2: Extension (for development)
-   cd extension && pnpm dev
-
-   # Terminal 3: Web (landing page)
-   cd web && pnpm dev
-   ```
-
-### Building for Production
+### Setup
 
 ```bash
-# Build all packages
-pnpm build
-
-# Build individual packages
-cd backend && pnpm build
-cd extension && pnpm build
-cd web && pnpm build
+git clone git@github.com:Matthew-Nelson/flash-note.git
+cd flash-note/web
+pnpm install
+cp .env.example .env.local   # Edit with your values
+pnpm db:migrate
+pnpm dev
 ```
 
-## Documentation
+### Commands
 
-- [Handoff Document](./docs/FLASHNOTE_HANDOFF.md) - Complete project specification
-- [API Documentation](./docs/API.md) - API endpoints and usage
-- [Extension Architecture](./docs/EXTENSION.md) - Browser extension details
+```bash
+cd web
+pnpm dev          # Start dev server
+pnpm build        # Production build
+pnpm test         # Run tests
+pnpm db:migrate   # Run database migrations
+```
+
+## Project Structure
+
+```
+web/src/
+  app/              # Next.js App Router (pages, layouts, API routes)
+  components/       # React components (ui/, auth/, notes/)
+  lib/              # Shared utilities, Zod schemas, types (client + server safe)
+  server/           # Server-only code (DAL, services, DB, prompts)
+  actions/          # Server Actions (auth, notes, billing)
+  test/             # Test setup, helpers, factories
+```
+
+## Engineering Guide
+
+See [CLAUDE.md](./CLAUDE.md) for the full engineering guide including:
+- Architecture decisions and rationale
+- HIPAA compliance requirements
+- Mandatory engineering rules
+- Security requirements
+- Database schema
+- Code patterns and conventions
 
 ## License
 

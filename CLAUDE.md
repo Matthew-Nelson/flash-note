@@ -91,7 +91,8 @@ These decisions are the result of deliberate analysis. Don't re-litigate them wi
 - Zod for validation
 - bcryptjs for password hashing
 - Upstash Redis for rate limiting (`@upstash/ratelimit`)
-- Pino structured logger + `@google-cloud/pino-logging-gcp-config` (Cloud Logging integration)
+- `@sentry/nextjs` for error tracking (active)
+- Pino structured logger + `@google-cloud/pino-logging-gcp-config` (planned -- not yet installed)
 - Tailwind CSS for styling
 - Stripe for billing
 - Google Vertex AI for LLM (Gemini 2.5 Flash)
@@ -102,31 +103,43 @@ These decisions are the result of deliberate analysis. Don't re-litigate them wi
 ```
 web/src/
   app/                    # Next.js App Router
-    (auth)/               # Auth route group (login, signup, reset, verify)
-    (marketing)/          # Public pages (landing, pricing, terms, privacy, baa)
+    login/                # Auth pages (flat directories, no route group)
+    signup/
+    forgot-password/
+    reset-password/
+    verify-email/
+    resend-verification/
+    check-email/
+    pricing/              # Public pages
+    terms/
+    privacy/
+    baa/
     dashboard/            # Protected routes
       settings/
       loading.tsx         # Streaming fallback
       error.tsx           # Error boundary
+      not-found.tsx       # 404 within dashboard
     api/
       webhooks/stripe/    # Stripe webhook Route Handler
-      telemetry/          # Client-side error reporting endpoint
+      health/             # Health check endpoint
+      cleanup/webhook-events/  # Webhook event cleanup
     layout.tsx            # Root layout
-    loading.tsx           # Global loading
-    error.tsx             # Global error boundary
-    not-found.tsx         # 404 page
+    error.tsx             # Root error boundary
+    not-found.tsx         # Root 404 page
+    global-error.tsx      # Global error boundary (fatal/render errors)
   components/             # React components (shared UI)
-    ui/                   # Primitives (Button, Card, Spinner, etc.)
-    auth/                 # Auth-related UI (login form, etc.)
+    ui/                   # Primitives (Button, Card, Input, Spinner, Alert, Badge, etc.)
+    auth/                 # Auth-related UI (AuthLayout, LogoutButton, SessionAlert, etc.)
+    notes/                # Note generation UI (NoteGenerationForm, GeneratedNote)
   lib/                    # Shared utilities (client + server safe)
-    schemas/              # Zod validation schemas (auth, notes, billing, config)
+    schemas/              # Zod validation schemas (auth, notes)
     types/                # TypeScript type definitions
     utils/                # Pure utility functions
   server/                 # Server-only code (enforced by 'server-only' package)
     dal/                  # Data Access Layer (DB queries, row transforms)
-    services/             # Business logic (auth, billing, email, AI, lockout, token, usage, audit)
+    services/             # Business logic (auth, billing, email, lockout, token, audit, note-generation, subscription, llm/)
     db/                   # Database connection pool + migration runner
-    lib/                  # Server utilities (logger, etc.)
+    lib/                  # Server utilities (session cookie, rate limiting, request context, validation, etc.)
     prompts/              # LLM prompt templates
   actions/                # Server Actions (grouped by domain: auth, notes, billing)
   test/                   # Test setup, helpers, factories
@@ -136,8 +149,7 @@ web/src/
 - `server/` imports are forbidden from Client Components. Enforced by the `server-only` npm package — importing it from a Client Component is a build error.
 - `lib/` is shared code that may be used on either client or server. No DB imports, no Node.js-only APIs.
 - `actions/` contains Server Actions (`'use server'` files). Each action calls `server/` for business logic — actions are thin wrappers that handle cookie I/O, call services, and return results.
-- `loading.tsx` and `error.tsx` at each route level provide streaming fallbacks and error boundaries.
-- Route groups `(auth)` and `(marketing)` share layouts without affecting URL structure.
+- `loading.tsx` and `error.tsx` at route levels provide streaming fallbacks and error boundaries. The root level uses `global-error.tsx`.
 
 ## Database Schema
 
@@ -172,7 +184,7 @@ All state-changing operations use Server Actions:
 ```typescript
 'use server';
 
-import { getSession } from '@/server/dal/session';
+import { getSession } from '@/server/lib/get-session';
 import { z } from 'zod';
 
 const schema = z.object({ /* ... */ });
@@ -407,7 +419,7 @@ The Data Access Layer (DAL) is the single point of authorization enforcement. Th
 ```typescript
 // CORRECT: Server Component calls DAL
 import { getUser } from '@/server/dal/users';
-import { getSession } from '@/server/dal/session';
+import { getSession } from '@/server/lib/get-session';
 
 export default async function DashboardPage() {
   const session = await getSession();
@@ -580,14 +592,21 @@ The proxy (`proxy.ts`) runs on every matched request on the Node.js runtime. Kee
 - Act as a security boundary (it's a UX optimization layer)
 - Handle CSRF (Server Actions handle this automatically; Route Handlers need explicit protection)
 
-## Error Monitoring (GCP-Native)
+## Error Monitoring
 
-**Visibility into production errors is critical.** Silent failures in healthcare software are unacceptable. All error monitoring uses GCP-native tooling: Pino structured logger → Cloud Logging → Cloud Error Reporting. No third-party error monitoring vendors.
+**Visibility into production errors is critical.** Silent failures in healthcare software are unacceptable.
 
-Full setup plan: [docs/planning/MONITORING_SETUP.md](docs/planning/MONITORING_SETUP.md)
+### Current State
 
-### Logging Stack
+Currently using `console.*` for server-side logging and `@sentry/nextjs` for error tracking (client and server). Next.js instrumentation (`instrumentation.ts`) captures unhandled Server Component/Action errors via Sentry.
 
+### PLANNED -- NOT YET IMPLEMENTED: GCP-Native Logging
+
+> The following describes the **target architecture** for logging. Migration from `console.*` + Sentry to Pino + Cloud Logging is planned but not yet started (see ROADMAP). Until this migration is complete, use `console.error()` for error logging and Sentry for error tracking.
+
+The planned stack: Pino structured logger + `@google-cloud/pino-logging-gcp-config` -> Cloud Logging -> Cloud Error Reporting. Full setup plan: [docs/planning/MONITORING_SETUP.md](docs/planning/MONITORING_SETUP.md)
+
+**Planned logging stack:**
 - **Server-side**: Pino structured logger with `@google-cloud/pino-logging-gcp-config`. Logs flow automatically to Cloud Logging. Cloud Error Reporting groups errors from structured `error`-level log entries.
 - **Client-side**: `POST /api/telemetry` endpoint receives client errors, logs them server-side through the same Pino pipeline.
 - **Next.js instrumentation**: `onRequestError` hook in `instrumentation.ts` captures unhandled Server Component/Action errors.
@@ -611,10 +630,10 @@ Log at `error` level (which surfaces in Cloud Error Reporting) when:
 - **Transient background operations** - Polling failures, optional refreshes that retry automatically → `warn` level
 - **High-frequency expected conditions** - Rate limiting during normal operation → `info` level
 
-### How to Log Errors
+### How to Log Errors (Planned -- use `console.error()` until Pino migration)
 
 ```typescript
-import { logger } from '@/server/lib/logger';
+// PLANNED: import { logger } from '@/server/lib/logger';
 
 try {
   await riskyOperation();
