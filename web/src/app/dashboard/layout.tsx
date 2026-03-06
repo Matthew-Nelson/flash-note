@@ -21,7 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-fn-bg-secondary">
-      <nav className="bg-fn-bg-primary border-b border-fn-border-color">
+      <nav className="bg-fn-bg-primary border-b border-fn-border" aria-label="Main navigation">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <Link href="/" className="flex items-center gap-2">

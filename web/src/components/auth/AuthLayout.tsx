@@ -17,9 +17,9 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
           <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
         </Link>
         {title && (
-          <h2 className="mt-4 text-center text-2xl font-bold text-fn-text-primary">
+          <h1 className="mt-4 text-center text-2xl font-bold text-fn-text-primary">
             {title}
-          </h2>
+          </h1>
         )}
         {subtitle && (
           <p className="mt-2 text-center text-sm text-fn-text-secondary">

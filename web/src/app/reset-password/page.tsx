@@ -111,11 +111,11 @@ function ResetPasswordContent() {
       <AuthLayout>
         <div className="text-center">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-error-light">
-            <svg className="h-6 w-6 text-fn-error" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-6 w-6 text-fn-error" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </div>
-          <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Invalid or Expired Link</h3>
+          <h1 className="mt-4 text-lg font-medium text-fn-text-primary">Invalid or Expired Link</h1>
           <p className="mt-2 text-fn-text-secondary">
             This password reset link is invalid or has expired.
           </p>
@@ -123,8 +123,8 @@ function ResetPasswordContent() {
             Password reset links expire after 15 minutes for security.
           </p>
           <div className="mt-6">
-            <Link href="/forgot-password">
-              <Button variant="secondary" className="w-full">Request a new reset link</Button>
+            <Link href="/forgot-password" className="btn-secondary block w-full text-center px-4 py-2">
+              Request a new reset link
             </Link>
           </div>
         </div>
@@ -137,11 +137,11 @@ function ResetPasswordContent() {
       <AuthLayout>
         <div className="text-center">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-success-light">
-            <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Password Reset Successfully</h3>
+          <h1 className="mt-4 text-lg font-medium text-fn-text-primary">Password Reset Successfully</h1>
           <p className="mt-2 text-fn-text-secondary">
             Your password has been updated. You can now log in with your new password.
           </p>
@@ -149,8 +149,8 @@ function ResetPasswordContent() {
             For security, all your existing sessions have been logged out.
           </p>
           <div className="mt-6">
-            <Link href="/login">
-              <Button className="w-full">Sign in</Button>
+            <Link href="/login" className="btn-primary block w-full text-center px-4 py-2">
+              Sign in
             </Link>
           </div>
         </div>

@@ -70,11 +70,11 @@ export default function ForgotPasswordPage() {
       {status === 'success' ? (
         <div className="text-center">
           <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-success-light">
-            <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Check your email</h3>
+          <h2 className="mt-4 text-lg font-medium text-fn-text-primary">Check your email</h2>
           <p className="mt-2 text-fn-text-secondary">
             If an account exists with that email, we&apos;ve sent a password reset link.
           </p>
@@ -82,8 +82,8 @@ export default function ForgotPasswordPage() {
             The link will expire in 15 minutes for security.
           </p>
           <div className="mt-6">
-            <Link href="/login">
-              <Button variant="secondary" className="w-full">Return to login</Button>
+            <Link href="/login" className="btn-secondary block w-full text-center px-4 py-2">
+              Return to login
             </Link>
           </div>
         </div>

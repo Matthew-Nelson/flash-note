@@ -169,11 +169,13 @@ export function NoteGenerationForm() {
         </div>
 
         {/* Error display */}
-        {errorCode && (
-          <Alert variant="error" className="mb-5" aria-live="assertive">
-            {NOTE_ERROR_MESSAGES[errorCode] ?? NOTE_ERROR_FALLBACK}
-          </Alert>
-        )}
+        <div aria-live="assertive">
+          {errorCode && (
+            <Alert variant="error" className="mb-5">
+              {NOTE_ERROR_MESSAGES[errorCode] ?? NOTE_ERROR_FALLBACK}
+            </Alert>
+          )}
+        </div>
 
         {/* Submit button */}
         <Button

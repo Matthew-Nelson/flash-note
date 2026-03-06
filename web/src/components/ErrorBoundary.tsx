@@ -44,8 +44,8 @@ export default class ErrorBoundary extends Component<Props, State> {
 
       return (
         <div className="flex flex-col items-center justify-center min-h-[400px] p-8 text-center">
-          <div className="w-20 h-20 mb-6 text-red-500">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <div className="w-20 h-20 mb-6 text-fn-error">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -55,20 +55,20 @@ export default class ErrorBoundary extends Component<Props, State> {
             </svg>
           </div>
 
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <h2 className="text-xl font-semibold text-fn-text-primary mb-2">
             Something went wrong
           </h2>
 
-          <p className="text-gray-600 mb-6 max-w-md">
+          <p className="text-fn-text-secondary mb-6 max-w-md">
             We encountered an unexpected error. Please try refreshing the page or contact support if the problem persists.
           </p>
 
           {process.env.NODE_ENV === 'development' && this.state.error && (
             <details className="text-left w-full max-w-lg mb-6">
-              <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700">
+              <summary className="text-sm text-fn-text-muted cursor-pointer hover:text-fn-text-secondary">
                 Error details (development only)
               </summary>
-              <pre className="mt-2 p-4 bg-gray-100 rounded-lg text-xs overflow-auto max-h-48">
+              <pre className="mt-2 p-4 bg-fn-bg-secondary rounded-lg text-xs overflow-auto max-h-48">
                 {this.state.error.message}
                 {'\n\n'}
                 {this.state.error.stack}
@@ -79,13 +79,13 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="flex gap-4">
             <button
               onClick={this.handleReset}
-              className="px-6 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              className="btn-primary px-6 py-2"
             >
               Try Again
             </button>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+              className="btn-secondary px-6 py-2"
             >
               Refresh Page
             </button>

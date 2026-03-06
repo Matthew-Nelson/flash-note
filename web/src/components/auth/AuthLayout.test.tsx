@@ -18,12 +18,12 @@ describe('AuthLayout', () => {
 
   it('should render title when provided', () => {
     render(<AuthLayout title="Create your account">content</AuthLayout>);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Create your account');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Create your account');
   });
 
   it('should not render heading when title is omitted', () => {
     render(<AuthLayout>content</AuthLayout>);
-    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
   });
 
   it('should render subtitle when provided', () => {
