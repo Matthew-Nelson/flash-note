@@ -32,7 +32,7 @@ const mockCreateToken = vi.hoisted(() => vi.fn());
 const mockSendVerificationEmail = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/services/audit', () => ({
-  auditService: { log: mockAuditLog },
+  auditService: { log: mockAuditLog, logWithClient: mockAuditLog },
 }));
 
 vi.mock('./lockout', () => ({
@@ -356,7 +356,7 @@ describe('auth service', () => {
       expect(mockClient.release).toHaveBeenCalled();
     });
 
-    it('fires audit logs after commit, not inside transaction', async () => {
+    it('fires audit logs inside the transaction via logWithClient (Rule 9)', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
 
       setupMockClient();
@@ -376,11 +376,13 @@ describe('auth service', () => {
 
       await register('new@example.com', 'Password1', context);
 
-      // REGISTER and LEGAL_CONSENT_ACCEPTED should both be called
+      // REGISTER and LEGAL_CONSENT_ACCEPTED should both be called via logWithClient
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({ action: 'REGISTER' })
       );
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({ action: 'LEGAL_CONSENT_ACCEPTED' })
       );
     });
@@ -452,8 +454,9 @@ describe('auth service', () => {
       // Verify markCodeAsUsed was called (7th client query = UPDATE invite_codes)
       expect(mockClientQuery.mock.calls[6][0]).toContain('UPDATE invite_codes');
 
-      // Verify INVITE_CODE_REDEEMED audit was logged
+      // Verify INVITE_CODE_REDEEMED audit was logged via logWithClient
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({
           action: 'INVITE_CODE_REDEEMED',
           metadata: { codeId: 'code-1' },
@@ -515,16 +518,18 @@ describe('auth service', () => {
       // Verify updateUserOrganization was called (10th client query = UPDATE users SET organization_id)
       expect(mockClientQuery.mock.calls[9][0]).toContain('organization_id');
 
-      // Verify ORG_MEMBER_JOINED audit was logged
+      // Verify ORG_MEMBER_JOINED audit was logged via logWithClient
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({
           action: 'ORG_MEMBER_JOINED',
           metadata: { organizationId: 'org-1', source: 'registration' },
         })
       );
 
-      // Verify INVITE_CODE_REDEEMED audit was also logged
+      // Verify INVITE_CODE_REDEEMED audit was also logged via logWithClient
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({
           action: 'INVITE_CODE_REDEEMED',
           metadata: { codeId: 'code-2' },

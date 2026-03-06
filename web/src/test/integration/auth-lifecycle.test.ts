@@ -45,7 +45,7 @@ const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 vi.mock('@/server/services/audit', () => ({
   auditService: {
     log: mockAuditLog,
-    logWithClient: vi.fn().mockResolvedValue(undefined),
+    logWithClient: mockAuditLog,
   },
 }));
 
@@ -100,7 +100,7 @@ describe('auth service integration', () => {
       expect(mockClient.release).toHaveBeenCalled();
     });
 
-    it('fires REGISTER + LEGAL_CONSENT_ACCEPTED audit logs after commit', async () => {
+    it('fires REGISTER + LEGAL_CONSENT_ACCEPTED audit logs inside transaction (Rule 9)', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       const mockClient = { query: mockClientQuery, release: vi.fn() };
@@ -120,9 +120,11 @@ describe('auth service integration', () => {
       await register('new@example.com', 'Password1!', context);
 
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({ action: 'REGISTER', status: 'SUCCESS' })
       );
       expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.anything(), // client
         expect.objectContaining({ action: 'LEGAL_CONSENT_ACCEPTED', status: 'SUCCESS' })
       );
     });
