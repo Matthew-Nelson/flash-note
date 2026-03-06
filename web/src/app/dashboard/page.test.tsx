@@ -31,9 +31,13 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
-// Mock NoteGenerationForm (Client Component — avoid rendering complexity in server component tests)
-vi.mock('@/components/notes', () => ({
-  NoteGenerationForm: () => <div data-testid="note-generation-form" />,
+// Mock TopBar (Client Component)
+vi.mock('@/components/TopBar', () => ({
+  TopBar: ({ title }: { title: string }) => (
+    <header data-testid="top-bar">
+      <h1>{title}</h1>
+    </header>
+  ),
 }));
 
 // Mock billing actions — prevents transitive import of billing service → config (no DATABASE_URL in test env)
@@ -117,23 +121,42 @@ describe('DashboardPage', () => {
     expect(screen.queryByText(/Organization:/)).not.toBeInTheDocument();
   });
 
-  it('renders NoteGenerationForm as the primary product feature', async () => {
+  it('does not render NoteGenerationForm (form moved to /dashboard/notes/new)', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
     render(await DashboardPage());
 
-    expect(screen.getByTestId('note-generation-form')).toBeInTheDocument();
+    expect(screen.queryByTestId('note-generation-form')).not.toBeInTheDocument();
   });
 
-  it('renders h1 "Dashboard" and h2 "Generate a SOAP Note"', async () => {
+  it('renders "Generate a SOAP Note" link to /dashboard/notes/new', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
     render(await DashboardPage());
 
+    const link = screen.getByRole('link', { name: /generate a soap note/i });
+    expect(link).toHaveAttribute('href', '/dashboard/notes/new');
+  });
+
+  it('renders TopBar with title "Dashboard"', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+    render(await DashboardPage());
+
+    expect(screen.getByTestId('top-bar')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Generate a SOAP Note' })).toBeInTheDocument();
+  });
+
+  it('renders main#main-content', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+    render(await DashboardPage());
+
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
   });
 
   it('does not render Getting Started card', async () => {

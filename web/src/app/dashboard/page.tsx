@@ -6,7 +6,7 @@ import { getSession } from '@/server/lib/get-session';
 import { getUsageForUser } from '@/server/dal/usage';
 import type { SessionData } from '@/server/types';
 import { Card, CardContent, SubscriptionBadge } from '@/components/ui';
-import { NoteGenerationForm } from '@/components/notes';
+import { TopBar } from '@/components/TopBar';
 import { ManageSubscriptionButton } from './ManageSubscriptionButton';
 import { CheckoutSuccessAlert } from './CheckoutSuccessAlert';
 
@@ -103,68 +103,75 @@ export default async function DashboardPage() {
   const usage = await getUsageForUser(session.userId, session.organizationId);
 
   return (
-    <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-8">
-      {/* Checkout success alert — requires Suspense because it uses useSearchParams */}
-      <Suspense fallback={null}>
-        <CheckoutSuccessAlert />
-      </Suspense>
+    <>
+      <TopBar title="Dashboard" />
+      <main id="main-content" tabIndex={-1} className="flex-1 p-6">
+        {/* Checkout success alert — requires Suspense because it uses useSearchParams */}
+        <Suspense fallback={null}>
+          <CheckoutSuccessAlert />
+        </Suspense>
 
-      <h1 className="text-2xl font-bold text-fn-text-primary mb-2">Dashboard</h1>
-      <h2 className="text-xl font-semibold text-fn-text-primary mb-6">Generate a SOAP Note</h2>
+        {/* Quick action: generate a new note */}
+        <div className="mb-6">
+          <Link
+            href="/dashboard/notes/new"
+            className="btn-primary inline-flex items-center gap-2 px-5 py-3"
+          >
+            Generate a SOAP Note
+          </Link>
+        </div>
 
-      {/* Note generation form — primary product feature */}
-      <NoteGenerationForm />
-
-      {/* Usage and subscription status */}
-      <div className="grid md:grid-cols-2 gap-6 mt-8">
-        {/* Usage Card */}
-        <Card>
-          <CardContent>
-            <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
-              Usage This Month
-            </h2>
-            <div className="text-4xl font-bold text-fn-primary mb-2">
-              {usage.notesGenerated}
-            </div>
-            <p className="text-fn-text-secondary">
-              SOAP notes generated in {formatMonth(usage.currentMonth)}
-            </p>
-            {usage.organization && (
-              <p className="text-fn-text-secondary text-sm mt-2">
-                Organization: {usage.organization.name}
+        {/* Usage and subscription status */}
+        <div className="grid md:grid-cols-2 gap-6">
+          {/* Usage Card */}
+          <Card>
+            <CardContent>
+              <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
+                Usage This Month
+              </h2>
+              <div className="text-4xl font-bold text-fn-primary mb-2">
+                {usage.notesGenerated}
+              </div>
+              <p className="text-fn-text-secondary">
+                SOAP notes generated in {formatMonth(usage.currentMonth)}
               </p>
-            )}
-          </CardContent>
-        </Card>
+              {usage.organization && (
+                <p className="text-fn-text-secondary text-sm mt-2">
+                  Organization: {usage.organization.name}
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Subscription Card */}
-        <Card>
+          {/* Subscription Card */}
+          <Card>
+            <CardContent>
+              <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
+                Subscription
+              </h2>
+              <div className="mb-4">
+                <SubscriptionBadge status={session.subscriptionStatus} />
+              </div>
+              <SubscriptionContent session={session} />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Support */}
+        <Card className="mt-8">
           <CardContent>
             <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
-              Subscription
+              Need Help?
             </h2>
-            <div className="mb-4">
-              <SubscriptionBadge status={session.subscriptionStatus} />
-            </div>
-            <SubscriptionContent session={session} />
+            <p className="text-fn-text-secondary mb-4">
+              Our support team is here to help you get the most out of FlashNote.
+            </p>
+            <a href="mailto:support@flashnote.co" className="link">
+              Contact Support
+            </a>
           </CardContent>
         </Card>
-      </div>
-
-      {/* Support */}
-      <Card className="mt-8">
-        <CardContent>
-          <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
-            Need Help?
-          </h2>
-          <p className="text-fn-text-secondary mb-4">
-            Our support team is here to help you get the most out of FlashNote.
-          </p>
-          <a href="mailto:support@flashnote.co" className="link">
-            Contact Support
-          </a>
-        </CardContent>
-      </Card>
-    </main>
+      </main>
+    </>
   );
 }

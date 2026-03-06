@@ -68,7 +68,7 @@ Dark navigation panel. 240px fixed width, dark teal background.
 
   {/* CTA Button */}
   <div className="px-3 py-4">
-    <Link href="/dashboard?new=true"
+    <Link href="/dashboard/notes/new"
       className="flex items-center justify-center gap-2 w-full py-2.5 rounded-fn-base
                  bg-fn-primary-DEFAULT text-white text-fn-sm font-semibold
                  hover:bg-fn-accent-primary-hover transition-colors">
@@ -78,14 +78,14 @@ Dark navigation panel. 240px fixed width, dark teal background.
   </div>
 
   {/* User Footer */}
+  {/* Note: currentPath is NOT a prop. Active state uses usePathname() inside the component. */}
   <div className="px-3 py-4 border-t border-white/10">
     <div className="flex items-center gap-3 px-2">
       <div className="w-8 h-8 rounded-full bg-fn-primary-DEFAULT flex items-center justify-center text-white text-fn-xs font-semibold">
-        MN
+        {user.email.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-fn-sm font-medium text-fn-sidebar-text-active truncate">Matt Nelson</p>
-        <p className="text-fn-2xs text-fn-sidebar-text truncate">matt@example.com</p>
+        <p className="text-fn-sm text-fn-sidebar-text-active truncate">{user.email}</p>
       </div>
     </div>
   </div>
