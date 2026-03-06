@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 import { getSession } from '@/server/lib/get-session';
 import { getBillingService, SubscriptionExistsError } from '@/server/services/billing';
-import { checkRateLimit, checkoutRateLimit } from '@/server/lib/rate-limit';
+import { checkRateLimit, checkoutRateLimit, portalRateLimit } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
 import type { ActionResult } from '@/lib/types/actions';
 
@@ -80,6 +80,11 @@ export async function createPortalAction(): Promise<ActionResult<{ portalUrl: st
   const session = await getSession();
   if (!session) return { success: false, error: 'unauthenticated' };
   if (!session.emailVerified) return { success: false, error: 'email_not_verified' };
+
+  const rl = await checkRateLimit(portalRateLimit, session.userId);
+  if (!rl.success) {
+    return { success: false, error: 'rate_limit_exceeded' };
+  }
 
   try {
     const portalUrl = await getBillingService().createPortalSession(session.userId);

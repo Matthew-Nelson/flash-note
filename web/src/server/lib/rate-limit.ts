@@ -65,6 +65,9 @@ export const generateRateLimit = createLimiter(30, '1 m', 'generate');
 /** 5 requests per 1 hour, keyed by userId */
 export const checkoutRateLimit = createLimiter(5, '1 h', 'checkout');
 
+/** 10 requests per 1 hour, keyed by userId */
+export const portalRateLimit = createLimiter(10, '1 h', 'portal');
+
 // --- Global rate limiter ---
 
 /** 100 requests per 1 min, keyed by IP */

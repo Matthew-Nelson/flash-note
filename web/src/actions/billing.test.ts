@@ -42,6 +42,7 @@ vi.mock('@/server/db/config', () => ({
 vi.mock('@/server/lib/rate-limit', () => ({
   checkRateLimit: mockCheckRateLimit,
   checkoutRateLimit: 'mock-checkout-limiter',
+  portalRateLimit: 'mock-portal-limiter',
 }));
 
 // Import actions after all mocks are set
@@ -255,6 +256,33 @@ describe('createPortalAction', () => {
     const result = await createPortalAction();
 
     expect(result).toEqual({ success: false, error: 'billing_error' });
+  });
+
+  it('returns rate_limit_exceeded when rate limited', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCheckRateLimit.mockResolvedValue({ success: false, limit: 10, remaining: 0, reset: 0 });
+
+    const result = await createPortalAction();
+
+    expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+  });
+
+  it('calls checkRateLimit with portal limiter and userId', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCreatePortalSession.mockResolvedValue('https://billing.stripe.com/portal');
+
+    await createPortalAction();
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('mock-portal-limiter', 'user-1');
+  });
+
+  it('does not call billing service when rate limited', async () => {
+    mockGetSession.mockResolvedValue(createSession());
+    mockCheckRateLimit.mockResolvedValue({ success: false, limit: 10, remaining: 0, reset: 0 });
+
+    await createPortalAction();
+
+    expect(mockCreatePortalSession).not.toHaveBeenCalled();
   });
 });
 
