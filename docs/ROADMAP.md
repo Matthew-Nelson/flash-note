@@ -18,7 +18,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 1/6 phases | Phase A: Structural Foundation |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 2/6 phases | Phase B: Note Experience |
 | **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
@@ -513,16 +513,16 @@ See [UI_OVERHAUL_PLAN.md — Phase A](./planning/UI_OVERHAUL_PLAN.md#phase-a-str
 
 | Item | Status |
 |------|--------|
-| Extract `MarketingNav`, `Footer`, `BetaBadge` shared components | ❌ |
-| Create `Sidebar` component (dark teal, section labels, nav items, user footer) | ❌ |
-| Create `TopBar` component (back button, title, action slot) | ❌ |
-| Rewrite `dashboard/layout.tsx` (sidebar layout replacing top nav) | ❌ |
-| Create `/dashboard/notes/new` route (move NoteGenerationForm here) | ❌ |
-| Create stub pages: `/dashboard/notes`, `/dashboard/patients`, `/dashboard/templates` | ❌ |
-| Mobile sidebar: hamburger toggle with off-canvas drawer | ❌ |
-| Update marketing pages to use shared MarketingNav + Footer | ❌ |
-| Update all tests for new route structure and components | ❌ |
-| **Verify**: Sidebar renders. Navigation works. Form at new route. Mobile responsive. Tests pass. | |
+| Extract `MarketingNav`, `Footer`, `BetaBadge` shared components | ✅ |
+| Create `Sidebar` component (dark teal, section labels, nav items, user footer) | ✅ |
+| Create `TopBar` component (back button, title, action slot) | ✅ |
+| Rewrite `dashboard/layout.tsx` (sidebar layout replacing top nav) | ✅ |
+| Create `/dashboard/notes/new` route (move NoteGenerationForm here) | ✅ |
+| Create stub pages: `/dashboard/notes`, `/dashboard/patients`, `/dashboard/templates` | ✅ |
+| Mobile sidebar: hamburger toggle with off-canvas drawer | ✅ |
+| Update marketing pages to use shared MarketingNav + Footer | ✅ |
+| Update all tests for new route structure and components | ✅ |
+| **Verify**: Sidebar renders. Navigation works. Form at new route. Mobile responsive. Tests pass. | ✅ |
 
 ### Phase B: Note Experience
 
@@ -573,6 +573,7 @@ See [UI_OVERHAUL_PLAN.md — Phase D](./planning/UI_OVERHAUL_PLAN.md#phase-d-aut
 | Landing page: fix responsive hero CTAs (flex-wrap) | ❌ |
 | Pricing page: teal card styling refinement | ❌ |
 | Legal pages: heading hierarchy + readability fixes | ❌ |
+| MarketingNav mobile hamburger (slide-out drawer at `md` breakpoint) | Deferred from Phase A |
 | Update tests for page changes | ❌ |
 | **Verify**: Trust signals visible. Auth pages consistent. Responsive at 375px. Tests pass. | |
 
