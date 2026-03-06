@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { DashboardShell, useSidebar } from './DashboardShell';
 
 // Mock Sidebar to isolate DashboardShell tests
-const mockOnClose = vi.hoisted(() => vi.fn());
 vi.mock('./Sidebar', () => ({
   Sidebar: ({
     user,
@@ -15,10 +14,15 @@ vi.mock('./Sidebar', () => ({
     onClose: () => void;
   }) => (
     <div
+      role="button"
+      tabIndex={0}
       data-testid="sidebar"
       data-email={user.email}
       data-open={isOpen}
       onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') onClose();
+      }}
     />
   ),
 }));

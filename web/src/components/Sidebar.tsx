@@ -50,13 +50,7 @@ function NavItem({
   );
 }
 
-function SidebarContent({
-  user,
-  onClose,
-}: {
-  user: { email: string };
-  onClose: () => void;
-}) {
+function SidebarContent({ user }: { user: { email: string } }) {
   const pathname = usePathname();
   const initial = user.email.charAt(0).toUpperCase();
 
@@ -187,7 +181,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
     <>
       {/* Desktop sidebar — always visible at lg+ */}
       <div className="hidden lg:flex">
-        <SidebarContent user={user} onClose={onClose} />
+        <SidebarContent user={user} />
       </div>
 
       {/* Mobile overlay backdrop */}
@@ -205,7 +199,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <SidebarContent user={user} onClose={onClose} />
+        <SidebarContent user={user} />
       </div>
     </>
   );
