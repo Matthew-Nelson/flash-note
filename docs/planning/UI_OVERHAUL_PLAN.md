@@ -82,7 +82,30 @@ Define once, use everywhere. Prevents stacking context conflicts.
 
 Five phases, each independently committable as a single PR. Each phase has explicit entry criteria, scope, file list, and verification criteria.
 
+**Visual diff requirement:** At the end of every phase, after the code review passes and before pushing, capture the standard screenshot set and commit them alongside the code. Full procedure below.
+
 Dependencies: `A --> B --> C` (sequential), `D` (parallel with B/C), `E` (after all others).
+
+---
+
+### Post-Phase Screenshot Capture
+
+Every UI phase must end with a Playwright screenshot capture. This creates a visual timeline for comparing the UI across phases.
+
+**When:** After code review passes, before push and PR.
+
+**Procedure:**
+1. Start the dev server (`pnpm --filter web dev`)
+2. Use Playwright MCP to capture the screenshots listed in `docs/screenshots/SCREENSHOT_MANIFEST.md`
+3. Follow the exact capture steps, filenames, and viewports in the manifest
+4. Save to `docs/screenshots/phase-{x}/` (e.g., `phase-a/`, `phase-b/`)
+5. Visually inspect screenshots and flag any issues
+6. Kill the dev server
+7. Commit screenshots: `git add docs/screenshots/phase-{x}/ && git commit -m "docs: add Phase {X} UI screenshots"`
+
+**Test account:** `test2@example.com` / `Test1234!`
+
+**Manifest location:** `docs/screenshots/SCREENSHOT_MANIFEST.md` — defines the standard set of 9 screenshots (landing, login, dashboard, new note, notes list, settings, mobile dashboard, mobile sidebar, pricing authenticated). Update the manifest if a phase adds new pages worth capturing.
 
 ```
 Phase A: Structural Foundation
