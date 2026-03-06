@@ -2,23 +2,8 @@ import 'server-only';
 
 import type pg from 'pg';
 
-import { db } from '@/server/db';
-import { sanitizeIpAddress } from '@/server/lib/request-utils';
+import { insertAuditLog, insertAuditLogWithClient } from '@/server/dal/audit-logs';
 import type { AuditLogEntry } from '@/server/types';
-
-const AUDIT_INSERT = `INSERT INTO audit_logs (user_id, action, status, metadata, ip_address, user_agent)
-         VALUES ($1, $2, $3, $4, $5, $6)`;
-
-function buildParams(entry: AuditLogEntry): unknown[] {
-  return [
-    entry.userId,
-    entry.action,
-    entry.status,
-    JSON.stringify(entry.metadata ?? {}),
-    sanitizeIpAddress(entry.ipAddress),
-    entry.userAgent ?? null,
-  ];
-}
 
 class AuditService {
   /**
@@ -27,7 +12,7 @@ class AuditService {
    */
   async log(entry: AuditLogEntry): Promise<void> {
     try {
-      await db.query(AUDIT_INSERT, buildParams(entry));
+      await insertAuditLog(entry);
     } catch (error) {
       // Don't throw — audit failures shouldn't break the app.
       // Rule 9: log at error level with structured context so Cloud Error Reporting
@@ -50,7 +35,7 @@ class AuditService {
    * atomically with the action it documents.
    */
   async logWithClient(client: pg.PoolClient, entry: AuditLogEntry): Promise<void> {
-    await client.query(AUDIT_INSERT, buildParams(entry));
+    await insertAuditLogWithClient(client, entry);
   }
 }
 
