@@ -35,7 +35,7 @@ function PricingContent({
   return (
     <div className="min-h-screen bg-fn-bg-primary">
       {/* Navigation */}
-      <nav className="container mx-auto px-6 py-4">
+      <nav aria-label="Main" className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl font-bold text-fn-primary">FlashNote</span>

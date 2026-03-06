@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
   return (
     <div className="min-h-screen bg-fn-bg-primary">
       {/* Navigation */}
-      <nav className="container mx-auto px-6 py-4">
+      <nav aria-label="Main" className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-2xl font-bold text-fn-primary">
             FlashNote
@@ -44,7 +44,7 @@ export default function PrivacyPolicyPage() {
           <h1 className="text-4xl font-bold text-fn-text-primary mb-2">Privacy Policy</h1>
           <p className="text-fn-text-muted mb-8">Version 0.1 &mdash; Draft</p>
 
-          <div className="bg-fn-bg-secondary border border-fn-border-color rounded-fn-md p-6">
+          <div className="bg-fn-bg-secondary border border-fn-border rounded-fn-md p-6">
             <p className="text-fn-text-primary font-semibold mb-2">PENDING LEGAL REVIEW</p>
             <p className="text-fn-text-secondary mb-4">
               Our Privacy Policy is currently being finalized by legal counsel. The final
@@ -76,7 +76,7 @@ function Footer() {
             </p>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4">Product</h4>
+            <p className="font-semibold text-white mb-4">Product</p>
             <ul className="space-y-2 text-sm text-fn-text-inverse/70">
               <li>
                 <Link href="/pricing" className="hover:text-white transition-colors">
@@ -86,7 +86,7 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4">Support</h4>
+            <p className="font-semibold text-white mb-4">Support</p>
             <ul className="space-y-2 text-sm text-fn-text-inverse/70">
               <li>
                 <a href="mailto:support@flashnote.co" className="hover:text-white transition-colors">
@@ -96,7 +96,7 @@ function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-white mb-4">Legal</h4>
+            <p className="font-semibold text-white mb-4">Legal</p>
             <ul className="space-y-2 text-sm text-fn-text-inverse/70">
               <li>
                 <Link href="/privacy" className="hover:text-white transition-colors">

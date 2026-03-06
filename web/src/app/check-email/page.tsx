@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { Button } from '@/components/ui';
 import { AuthLayout } from '@/components/auth';
 
 export default function CheckEmailPage() {
@@ -16,7 +15,7 @@ export default function CheckEmailPage() {
     >
       <div className="text-center">
         <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-fn-success-light">
-          <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-6 w-6 text-fn-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
         </div>
@@ -27,8 +26,8 @@ export default function CheckEmailPage() {
           The link will expire in 24 hours.
         </p>
         <div className="mt-6">
-          <Link href="/resend-verification">
-            <Button variant="secondary" className="w-full">Didn&apos;t receive the email? Resend</Button>
+          <Link href="/resend-verification" className="btn-secondary block w-full text-center px-4 py-2">
+            Didn&apos;t receive the email? Resend
           </Link>
         </div>
       </div>

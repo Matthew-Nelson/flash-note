@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
-import { Button, LoadingSpinner } from '@/components/ui';
+import { LoadingSpinner } from '@/components/ui';
 import { verifyEmailAction } from '@/actions/auth';
 
 function VerifyEmailContent() {
@@ -65,9 +65,9 @@ function VerifyEmailContent() {
           <span className="text-3xl font-bold text-fn-primary">FlashNote</span>
           <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
         </Link>
-        <h2 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
+        <h1 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
           Email Verification
-        </h2>
+        </h1>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md" aria-live="polite">
@@ -88,7 +88,7 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Email Verified!</h3>
+              <h2 className="mt-4 text-lg font-medium text-fn-text-primary">Email Verified!</h2>
               <p className="mt-2 text-fn-text-secondary">{message}</p>
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can now use all features in FlashNote.
@@ -104,7 +104,7 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Already Verified</h3>
+              <h2 className="mt-4 text-lg font-medium text-fn-text-primary">Already Verified</h2>
               <p className="mt-2 text-fn-text-secondary">{message}</p>
               <p className="mt-4 text-sm text-fn-text-muted">
                 You can use all features in FlashNote.
@@ -120,11 +120,11 @@ function VerifyEmailContent() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </div>
-              <h3 className="mt-4 text-lg font-medium text-fn-text-primary">Verification Failed</h3>
+              <h2 className="mt-4 text-lg font-medium text-fn-text-primary">Verification Failed</h2>
               <p className="mt-2 text-fn-text-secondary">{message}</p>
               <div className="mt-6">
-                <Link href="/resend-verification">
-                  <Button variant="secondary" className="w-full">Request a new verification link</Button>
+                <Link href="/resend-verification" className="btn-secondary block w-full text-center px-4 py-2">
+                  Request a new verification link
                 </Link>
               </div>
             </div>

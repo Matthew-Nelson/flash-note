@@ -38,7 +38,7 @@ export default function DashboardError({
   }
 
   return (
-    <div className="flex items-center justify-center py-32">
+    <main id="main-content" tabIndex={-1} className="flex items-center justify-center py-32">
       <div className="text-center max-w-md px-6">
         <h1 className="text-2xl font-bold text-fn-text-primary mb-4">
           Something went wrong
@@ -62,6 +62,6 @@ export default function DashboardError({
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

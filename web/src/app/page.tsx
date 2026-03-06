@@ -4,7 +4,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-fn-bg-primary">
       {/* Navigation */}
-      <nav className="container mx-auto px-6 py-4">
+      <nav aria-label="Main" className="container mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl font-bold text-fn-primary">FlashNote</span>
@@ -173,7 +173,7 @@ export default function Home() {
               </p>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Product</h4>
+              <p className="font-semibold text-white mb-4">Product</p>
               <ul className="space-y-2 text-sm text-fn-text-inverse/70">
                 <li>
                   <Link href="/pricing" className="hover:text-white transition-colors">
@@ -188,7 +188,7 @@ export default function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Support</h4>
+              <p className="font-semibold text-white mb-4">Support</p>
               <ul className="space-y-2 text-sm text-fn-text-inverse/70">
                 <li>
                   <Link href="/help" className="hover:text-white transition-colors">
@@ -203,7 +203,7 @@ export default function Home() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-white mb-4">Legal</h4>
+              <p className="font-semibold text-white mb-4">Legal</p>
               <ul className="space-y-2 text-sm text-fn-text-inverse/70">
                 <li>
                   <Link href="/privacy" className="hover:text-white transition-colors">

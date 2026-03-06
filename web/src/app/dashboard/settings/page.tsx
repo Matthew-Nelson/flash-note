@@ -14,7 +14,7 @@ export default async function SettingsPage() {
     <>
       {/* Breadcrumb */}
       <div className="container mx-auto px-6 py-4">
-        <nav className="text-sm text-fn-text-secondary">
+        <nav aria-label="Breadcrumb" className="text-sm text-fn-text-secondary">
           <Link href="/dashboard" className="link">Dashboard</Link>
           <span className="mx-2">/</span>
           <span className="text-fn-text-primary">Settings</span>
@@ -42,7 +42,7 @@ export default async function SettingsPage() {
                   <p className="text-fn-text-primary">
                     {session.emailVerified ? (
                       <span className="inline-flex items-center gap-1 text-fn-success">
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                         </svg>
                         Verified
