@@ -9,7 +9,7 @@ interface SpinnerProps extends HTMLAttributes<HTMLDivElement> {
 const sizeClasses: Record<SpinnerSize, string> = {
   sm: 'w-4 h-4 border-2',
   md: 'w-6 h-6 border-2',
-  lg: 'w-8 h-8 border-3',
+  lg: 'w-8 h-8 border-4',
 };
 
 export function Spinner({ size = 'md', className = '', ...props }: SpinnerProps) {
@@ -17,12 +17,10 @@ export function Spinner({ size = 'md', className = '', ...props }: SpinnerProps)
     <div
       role="status"
       aria-label="Loading"
-      className={`${sizeClasses[size]} rounded-full border-fn-bg-tertiary border-t-current animate-spin ${className}`}
+      className={`${sizeClasses[size]} rounded-full animate-spin ${className}`}
       style={{
+        borderColor: 'var(--fn-bg-tertiary)',
         borderTopColor: 'currentColor',
-        borderRightColor: 'transparent',
-        borderBottomColor: 'transparent',
-        borderLeftColor: 'transparent',
       }}
       {...props}
     />
@@ -31,7 +29,7 @@ export function Spinner({ size = 'md', className = '', ...props }: SpinnerProps)
 
 export function LoadingSpinner({ className = '' }: { className?: string }) {
   return (
-    <div className={`loading-spinner ${className}`}>
+    <div className={`loading-spinner ${className}`} role="status" aria-label="Loading">
       <div className="loading-dots">
         <span></span>
         <span></span>

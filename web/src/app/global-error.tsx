@@ -28,7 +28,7 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body>
-        <div style={{
+        <main id="main-content" style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -41,7 +41,7 @@ export default function GlobalError({
           <h1 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '0.5rem' }}>
             Something went wrong
           </h1>
-          <p style={{ color: '#6b7280', marginBottom: '1.5rem', maxWidth: '28rem' }}>
+          <p style={{ color: '#64748B', marginBottom: '1.5rem', maxWidth: '28rem' }}>
             We encountered an unexpected error. Please try again or contact support
             if the problem persists.
           </p>
@@ -49,7 +49,7 @@ export default function GlobalError({
             onClick={reset}
             style={{
               padding: '0.5rem 1.5rem',
-              backgroundColor: '#4f46e5',
+              backgroundColor: '#0D6E6E',
               color: 'white',
               border: 'none',
               borderRadius: '0.5rem',
@@ -60,7 +60,7 @@ export default function GlobalError({
           >
             Try Again
           </button>
-        </div>
+        </main>
       </body>
     </html>
   );
