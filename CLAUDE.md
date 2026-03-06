@@ -124,7 +124,9 @@ web/src/
       health/             # Health check endpoint
       cleanup/webhook-events/  # Webhook event cleanup
     layout.tsx            # Root layout
-    global-error.tsx      # Global error boundary
+    error.tsx             # Root error boundary
+    not-found.tsx         # Root 404 page
+    global-error.tsx      # Global error boundary (fatal/render errors)
   components/             # React components (shared UI)
     ui/                   # Primitives (Button, Card, Input, Spinner, Alert, Badge, etc.)
     auth/                 # Auth-related UI (AuthLayout, LogoutButton, SessionAlert, etc.)

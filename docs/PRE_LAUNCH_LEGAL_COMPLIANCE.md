@@ -218,7 +218,7 @@ ALTER TABLE users ADD COLUMN baa_version VARCHAR(50); -- e.g., "1.0-2026-02-02"
 Technical implementation is **substantially complete**. The web signup flow includes BAA acceptance checkboxes, confirm password fields, legal links, and backend storage of acceptance records (`legal_acceptances` table, migration 008).
 
 **Remaining items** (tracked elsewhere):
-- Create `/baa` web page → [ROADMAP.md](./ROADMAP.md) launch blockers
+- `/baa` web page is live (pending final legal review of BAA document content)
 - Customize legal doc placeholders (blocked on LLC formation) → [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) §1-2
 - Attorney review ($500 budget) → [PRE_LAUNCH_CHECKLIST.md](./PRE_LAUNCH_CHECKLIST.md) §2
 
