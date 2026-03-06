@@ -97,11 +97,11 @@ export function getConfiguredProvider(config: LLMFactoryConfig): LLMProvider {
   // Build a stable key from config values that affect provider construction
   const configKey = JSON.stringify([
     config.provider,
-    config.geminiApiKey,
+    !!config.geminiApiKey,
     config.geminiModel,
     config.geminiApiUrl,
     config.geminiUseADC,
-    config.claudeApiKey,
+    !!config.claudeApiKey,
     config.claudeModel,
   ]);
 

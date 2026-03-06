@@ -22,7 +22,8 @@ function buildParams(entry: AuditLogEntry): unknown[] {
 
 /**
  * Insert an audit log entry using the shared pool.
- * For fire-and-forget logging where audit failure shouldn't break the operation.
+ * Throws on failure — callers that need fire-and-forget semantics (e.g. AuditService.log)
+ * must wrap this in their own try/catch.
  */
 export async function insertAuditLog(entry: AuditLogEntry): Promise<void> {
   await db.query(AUDIT_INSERT, buildParams(entry));

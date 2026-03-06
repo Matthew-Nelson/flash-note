@@ -3,7 +3,7 @@
  *
  * Tests provider creation, configuration validation, and error handling.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createLLMProvider, getConfiguredProvider } from './provider-factory';
 import { GeminiProvider } from './gemini-provider';
 import { ClaudeProvider } from './claude-provider';
@@ -204,6 +204,53 @@ describe('LLM Provider Factory', () => {
       });
 
       expect(claudeProvider.name).toBe('claude');
+    });
+  });
+
+  describe('getConfiguredProvider caching', () => {
+    let freshGetConfiguredProvider: typeof getConfiguredProvider;
+
+    beforeEach(async () => {
+      vi.resetModules();
+      const mod = await import('./provider-factory');
+      freshGetConfiguredProvider = mod.getConfiguredProvider;
+    });
+
+    const geminiConfig = {
+      provider: 'gemini' as const,
+      geminiApiKey: 'cache-test-key',
+      geminiModel: 'gemini-2.5-flash',
+      geminiApiUrl: 'https://generativelanguage.googleapis.com/v1beta',
+    };
+
+    it('should return the same instance for identical config', () => {
+      const first = freshGetConfiguredProvider(geminiConfig);
+      const second = freshGetConfiguredProvider(geminiConfig);
+
+      expect(second).toBe(first);
+    });
+
+    it('should return a new instance when config changes', () => {
+      const first = freshGetConfiguredProvider(geminiConfig);
+      const second = freshGetConfiguredProvider({
+        provider: 'claude',
+        claudeApiKey: 'cache-test-key',
+        claudeModel: 'claude-sonnet-4-20250514',
+      });
+
+      expect(second).not.toBe(first);
+      expect(second.name).toBe('claude');
+    });
+
+    it('should invalidate cache when model changes', () => {
+      const first = freshGetConfiguredProvider(geminiConfig);
+      const second = freshGetConfiguredProvider({
+        ...geminiConfig,
+        geminiModel: 'gemini-2.0-flash',
+      });
+
+      expect(second).not.toBe(first);
+      expect(second.model).toBe('gemini-2.0-flash');
     });
   });
 });

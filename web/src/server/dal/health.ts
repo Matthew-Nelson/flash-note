@@ -18,7 +18,12 @@ export async function checkDbHealth(): Promise<boolean> {
       ),
     ]);
     return true;
-  } catch {
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('DB health check failed:', error, {
+      source: 'dal_health',
+      errorType: 'db_health_check_failed',
+    });
     return false;
   }
 }
