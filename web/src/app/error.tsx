@@ -1,13 +1,23 @@
 'use client';
 
+import * as Sentry from '@sentry/nextjs';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 export default function Error({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    Sentry.captureException(error);
+    // Log error digest for observability — never log error.message (Rule 7)
+    // eslint-disable-next-line no-console
+    console.error('Root error boundary:', error.digest ?? 'no-digest');
+  }, [error]);
+
   return (
     <main id="main-content" tabIndex={-1} className="min-h-screen bg-fn-bg-secondary flex flex-col items-center justify-center px-6">
       <div className="text-center max-w-md">
