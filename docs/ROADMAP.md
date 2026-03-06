@@ -18,7 +18,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 1/5 sub-phases | UI-2: Layout Shell + Sidebar |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 1/6 phases | Phase A: Structural Foundation |
 | **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
@@ -27,7 +27,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 **Why this order:**
 - **Phase 0** handles infrastructure and framework-agnostic fixes that apply regardless of the migration. Unblocks the Google Cloud BAA and hardens the database schema. No wasted work — everything here transfers.
 - **Phase 1** is the architectural pivot. Express backend and Chrome extension are removed; everything consolidates into a single Next.js app on Cloud Run. This is the largest body of work and the foundation for everything after.
-- **UI Overhaul** happens before deployment so beta users see the professional Refined Teal design from day one. Design system migration, sidebar layout, WCAG AA compliance. Features stubbed as "coming soon" until Phase 2 backend lands.
+- **UI Overhaul** happens before deployment so beta users see the professional Refined Teal design from day one. Sidebar layout, note experience redesign, dashboard home, auth/marketing reskin, polish pass. Features stubbed as "coming soon" until Phase 2 backend lands. Full plan: [planning/UI_OVERHAUL_PLAN.md](./planning/UI_OVERHAUL_PLAN.md)
 - **Deployment Readiness** is the bridge between "code passes tests locally" and "app is live and accepting users." Monitoring, pipeline hardening, infrastructure provisioning, staging verification, and Stripe live mode — everything needed to go from code-complete to production.
 - **Phase 2** is the competitive pivot — patients, notes, templates. Blocked on deployment readiness and HIPAA infrastructure.
 - **Phase 3** is important but non-differentiating. Testing, accessibility, clinic features — all scoped to the new architecture and sequenced after the app is live.
@@ -484,11 +484,11 @@ Completed in PR cleanup commit series (March 2026). All legacy code and document
 
 Design system migration from "Warm Wellness" (emerald/cream/Inter) to "Refined Teal" (teal/slate/Plus Jakarta Sans). Fixes WCAG AA contrast failures, adds sidebar layout, and matches the mockups in `docs/design/`.
 
-Design spec: [planning/DESIGN_SYSTEM.md](./planning/DESIGN_SYSTEM.md) | Component patterns: [planning/COMPONENT_PATTERNS.md](./planning/COMPONENT_PATTERNS.md)
+Design spec: [planning/DESIGN_SYSTEM.md](./planning/DESIGN_SYSTEM.md) | Component patterns: [planning/COMPONENT_PATTERNS.md](./planning/COMPONENT_PATTERNS.md) | **Full implementation plan: [planning/UI_OVERHAUL_PLAN.md](./planning/UI_OVERHAUL_PLAN.md)**
 
-Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
+Dependencies: `UI-1 (done) → A → B → C`, `A → D (parallel with B/C)`, `all → E`
 
-### UI-1: Foundation (Docs + Tokens)
+### UI-1: Foundation (Docs + Tokens) — DONE
 
 | Item | Status |
 |------|--------|
@@ -505,53 +505,92 @@ Dependencies: `UI-1 → UI-2 → UI-3 (parallel with UI-4) → UI-5`
 | Fix 9 undefined/broken CSS classes (BUG-UI-1 through BUG-UI-10, excl. BUG-UI-8) | ✅ |
 | **Verify**: `pnpm build` succeeds. Font loads. Tailwind resolves new tokens. Tests pass. | ✅ |
 
-### UI-2: Layout Shell + Sidebar
+### Phase A: Structural Foundation
+
+Replace top-nav with sidebar layout. Establish route structure. Extract shared components.
+
+See [UI_OVERHAUL_PLAN.md — Phase A](./planning/UI_OVERHAUL_PLAN.md#phase-a-structural-foundation) for full implementation spec.
 
 | Item | Status |
 |------|--------|
-| Create `Sidebar` component (dark nav, section labels, CTA, user footer) | ❌ |
+| Extract `MarketingNav`, `Footer`, `BetaBadge` shared components | ❌ |
+| Create `Sidebar` component (dark teal, section labels, nav items, user footer) | ❌ |
 | Create `TopBar` component (back button, title, action slot) | ❌ |
 | Rewrite `dashboard/layout.tsx` (sidebar layout replacing top nav) | ❌ |
-| Sidebar links: Dashboard, New Note, Settings (working) | ❌ |
-| Sidebar links: Notes, Patients, Templates ("Coming soon" stub) | ❌ |
-| Update skip link styling for new layout | ❌ |
-| Update tests for layout/sidebar changes | ❌ |
-| **Verify**: Sidebar renders. Navigation works. Auth enforced. Responsive. Tests pass. | |
+| Create `/dashboard/notes/new` route (move NoteGenerationForm here) | ❌ |
+| Create stub pages: `/dashboard/notes`, `/dashboard/patients`, `/dashboard/templates` | ❌ |
+| Mobile sidebar: hamburger toggle with off-canvas drawer | ❌ |
+| Update marketing pages to use shared MarketingNav + Footer | ❌ |
+| Update all tests for new route structure and components | ❌ |
+| **Verify**: Sidebar renders. Navigation works. Form at new route. Mobile responsive. Tests pass. | |
 
-### UI-3: Dashboard + Note Generation + Note Result
+### Phase B: Note Experience
 
-| Item | Status |
-|------|--------|
-| Rewrite note form (2-col grid, patient selector stub, hero textarea, context panel stub) | ❌ |
-| Create `SoapSection` component (accent bar header, copy/edit buttons, edit mode) | ❌ |
-| Rewrite `GeneratedNote` (SOAP section cards, metadata, copy all) | ❌ |
-| Create `Rating` widget (star feedback) | ❌ |
-| Rewrite dashboard page layout | ❌ |
-| Update UI primitives (Button, Card, Input, Alert, Badge, Spinner) | ❌ |
-| Update tests for dashboard/note component changes | ❌ |
-| **Verify**: Note form matches mockup. SOAP sections render. Copy/edit work. Tests pass. | |
+Redesign note generation form and SOAP note display. Core product differentiation.
 
-### UI-4: Auth Pages
+See [UI_OVERHAUL_PLAN.md — Phase B](./planning/UI_OVERHAUL_PLAN.md#phase-b-note-experience) for full implementation spec.
 
 | Item | Status |
 |------|--------|
-| Update `AuthLayout` (surface bg, teal primary, no gradient text) | ❌ |
-| Reskin all 6 auth page forms (new input/button/alert styles) | ❌ |
-| Update `SessionAlert` styling | ❌ |
-| Update tests for auth component changes | ❌ |
-| **Verify**: All auth pages render. Auth flow tests pass. | |
+| Redesign `NoteGenerationForm` (2-col fields, patient stub, context panel stub) | ❌ |
+| Rewrite `GeneratedNote` (SOAP section cards with colored accent bars) | ❌ |
+| Fix copy button touch targets (44px minimum) and layout shift | ❌ |
+| Add inline editing per SOAP section (edit/save/cancel) | ❌ |
+| Add "Copy All" primary action in top action bar | ❌ |
+| Add note metadata bar (date, type badge, generation time) | ❌ |
+| Add star rating widget | ❌ |
+| Update tests for redesigned components | ❌ |
+| **Verify**: Accent bars visible. Copy/edit work. Touch targets 44px+. Tests pass. | |
 
-### UI-5: Marketing + Settings + Cleanup
+### Phase C: Dashboard Home
+
+Replace "form is the dashboard" with stats, trial banner, and quick action cards.
+
+See [UI_OVERHAUL_PLAN.md — Phase C](./planning/UI_OVERHAUL_PLAN.md#phase-c-dashboard-home) for full implementation spec.
 
 | Item | Status |
 |------|--------|
-| Redesign landing page (new colors, typography, teal CTAs) | ❌ |
-| Redesign pricing page (teal card styling) | ❌ |
-| Update terms, privacy, BAA pages (typography/colors) | ❌ |
-| Redesign settings page (new card/form styling) | ❌ |
-| Delete old design files (`design-tokens-warm.css`, `tailwind-preset-warm.js`) | ✅ (pulled into UI-1) |
-| Final test sweep — catch any remaining test failures from cumulative changes | ❌ |
-| **Verify**: All pages use new design. Build succeeds. Full test suite passes. | |
+| Rewrite dashboard page (KPI stats row, trial banner, quick action cards) | ❌ |
+| Replace dashboard `loading.tsx` spinner with content-shaped skeleton | ❌ |
+| Quick action: "Generate SOAP Note" links to `/dashboard/notes/new` | ❌ |
+| Quick actions: "Add Patient" and "Browse Templates" as "Coming soon" stubs | ❌ |
+| Update tests for new dashboard layout | ❌ |
+| **Verify**: Dashboard shows stats + actions (not form). Skeleton loader. Tests pass. | |
+
+### Phase D: Auth + Marketing Pages
+
+Reskin auth and marketing pages with refined teal styling. Can run parallel with B/C.
+
+See [UI_OVERHAUL_PLAN.md — Phase D](./planning/UI_OVERHAUL_PLAN.md#phase-d-auth--marketing-pages) for full implementation spec.
+
+| Item | Status |
+|------|--------|
+| Refine `AuthLayout` card styling (shadow, padding, consistency) | ❌ |
+| Verify all auth page forms use consistent input/button/link styling | ❌ |
+| Landing page: add trust signals section (HIPAA badge, encryption) | ❌ |
+| Landing page: enhance before/after with SOAP accent colors | ❌ |
+| Landing page: add testimonial placeholder section | ❌ |
+| Landing page: fix responsive hero CTAs (flex-wrap) | ❌ |
+| Pricing page: teal card styling refinement | ❌ |
+| Legal pages: heading hierarchy + readability fixes | ❌ |
+| Update tests for page changes | ❌ |
+| **Verify**: Trust signals visible. Auth pages consistent. Responsive at 375px. Tests pass. | |
+
+### Phase E: Polish Pass
+
+Fix interaction issues, touch targets, loading states, and responsive edge cases app-wide.
+
+See [UI_OVERHAUL_PLAN.md — Phase E](./planning/UI_OVERHAUL_PLAN.md#phase-e-polish-pass) for full implementation spec.
+
+| Item | Status |
+|------|--------|
+| Touch target audit: all interactive elements 44px+ | ❌ |
+| Cursor audit: `cursor-pointer` on all clickable elements | ❌ |
+| Replace remaining spinner loading states with skeletons | ❌ |
+| Responsive audit at 375px viewport (all pages) | ❌ |
+| Add print stylesheet for generated notes | ❌ |
+| Verify all transitions 150-300ms, `prefers-reduced-motion` respected | ❌ |
+| **Verify**: Full test suite passes. Build succeeds. No horizontal scroll at 375px. | |
 
 ---
 

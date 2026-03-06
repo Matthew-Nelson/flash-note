@@ -165,16 +165,18 @@ Grid-based form rows. Single-column (`form-row-full`) and two-column (`form-row`
 
 ---
 
-## 5. SOAP Section
+## 5. Note Section
 
-Card with colored accent bar header. Each SOAP section (S/O/A/P) has a unique accent color.
+Card with uniform teal accent bar. Generic — works for SOAP sections or any future dynamic section names.
+
+> **Design decision:** All sections use the same `--fn-primary` accent color. Sections may become dynamic/variable with custom templates and non-SOAP formats, so per-section color mapping is intentionally avoided.
 
 ```tsx
-{/* accent is one of: fn-soap-subjective, fn-soap-objective, fn-soap-assessment, fn-soap-plan */}
-<section className="card" aria-labelledby="soap-subjective-heading">
+{/* Uniform teal accent on all sections — not per-section colors */}
+<section className="card border-l-[3px] border-fn-primary" aria-labelledby="soap-subjective-heading">
   <div className="flex items-center justify-between px-4 py-3 border-b border-fn-border">
     <div className="flex items-center gap-3">
-      <div className="w-[3px] h-5 rounded-full bg-fn-soap-subjective" aria-hidden="true" />
+      <div className="w-[3px] h-5 rounded-full bg-fn-primary" aria-hidden="true" />
       <h3 id="soap-subjective-heading" className="text-fn-base font-semibold text-fn-text-primary">
         Subjective
       </h3>
@@ -361,14 +363,14 @@ Star rating for note quality feedback. Interactive fill/hover states.
 
 ## 13. Edit Mode
 
-SOAP section inline editing. Textarea replaces content, save/cancel actions appear, editing badge shown.
+Note section inline editing. Textarea replaces content, save/cancel actions appear, editing badge shown.
 
 ```tsx
-{/* Editing state */}
-<section className="card ring-2 ring-fn-primary-DEFAULT bg-fn-primary-50">
+{/* Editing state — uniform teal accent, same as non-editing */}
+<section className="card border-l-[3px] border-fn-primary ring-2 ring-fn-primary-DEFAULT bg-fn-primary-50">
   <div className="flex items-center justify-between px-4 py-3 border-b border-fn-border">
     <div className="flex items-center gap-3">
-      <div className="w-[3px] h-5 rounded-full bg-fn-soap-subjective" aria-hidden="true" />
+      <div className="w-[3px] h-5 rounded-full bg-fn-primary" aria-hidden="true" />
       <h3 className="text-fn-base font-semibold text-fn-text-primary">Subjective</h3>
       <span className="badge bg-fn-primary-light text-fn-primary-DEFAULT text-fn-2xs">Editing</span>
     </div>
