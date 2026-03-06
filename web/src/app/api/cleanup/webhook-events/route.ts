@@ -1,3 +1,5 @@
+import { timingSafeEqual } from 'node:crypto';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupOldWebhookEvents } from '@/server/dal/webhooks';
 import { config } from '@/server/db/config';
@@ -14,7 +16,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get('authorization');
   const expectedSecret = config.CLEANUP_SECRET;
 
-  if (!expectedSecret || authHeader !== `Bearer ${expectedSecret}`) {
+  const expectedValue = `Bearer ${expectedSecret}`;
+  if (
+    !expectedSecret ||
+    !authHeader ||
+    authHeader.length !== expectedValue.length ||
+    !timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedValue))
+  ) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

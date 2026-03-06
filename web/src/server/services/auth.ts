@@ -137,8 +137,7 @@ export async function login(
 /**
  * Register a new user account.
  *
- * Transaction: user + legal acceptances + invite code redemption + org join + session
- * Audit logs fire AFTER commit (try-catch each, error-level on failure).
+ * Transaction: user + legal acceptances + invite code redemption + org join + session + audit logs (Rule 9).
  * Verification email is non-blocking (try-catch, user can resend).
  */
 export async function register(
@@ -224,6 +223,46 @@ export async function register(
     const session = await createSession(user.id, context, client);
     sessionToken = session.token;
 
+    // Audit logs INSIDE the transaction (Rule 9: atomic with the action they document)
+    await auditService.logWithClient(client, {
+      userId: user.id,
+      action: AuditAction.REGISTER,
+      status: 'SUCCESS',
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+
+    await auditService.logWithClient(client, {
+      userId: user.id,
+      action: AuditAction.LEGAL_CONSENT_ACCEPTED,
+      status: 'SUCCESS',
+      metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
+      ipAddress: context.ipAddress,
+      userAgent: context.userAgent,
+    });
+
+    if (redeemedCodeId) {
+      await auditService.logWithClient(client, {
+        userId: user.id,
+        action: AuditAction.INVITE_CODE_REDEEMED,
+        status: 'SUCCESS',
+        metadata: { codeId: redeemedCodeId },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
+    }
+
+    if (joinedOrganizationId) {
+      await auditService.logWithClient(client, {
+        userId: user.id,
+        action: AuditAction.ORG_MEMBER_JOINED,
+        status: 'SUCCESS',
+        metadata: { organizationId: joinedOrganizationId, source: 'registration' },
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+      });
+    }
+
     await client.query('COMMIT');
   } catch (error) {
     try { await client.query('ROLLBACK'); } catch { /* connection may be unusable */ }
@@ -234,46 +273,6 @@ export async function register(
     throw error;
   } finally {
     client.release();
-  }
-
-  // Audit logs OUTSIDE the transaction (fire-and-forget — auditService.log swallows errors)
-  await auditService.log({
-    userId: user.id,
-    action: AuditAction.REGISTER,
-    status: 'SUCCESS',
-    ipAddress: context.ipAddress,
-    userAgent: context.userAgent,
-  });
-
-  await auditService.log({
-    userId: user.id,
-    action: AuditAction.LEGAL_CONSENT_ACCEPTED,
-    status: 'SUCCESS',
-    metadata: { documentVersions: LEGAL_DOCUMENT_VERSIONS },
-    ipAddress: context.ipAddress,
-    userAgent: context.userAgent,
-  });
-
-  if (redeemedCodeId) {
-    await auditService.log({
-      userId: user.id,
-      action: AuditAction.INVITE_CODE_REDEEMED,
-      status: 'SUCCESS',
-      metadata: { codeId: redeemedCodeId },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
-  }
-
-  if (joinedOrganizationId) {
-    await auditService.log({
-      userId: user.id,
-      action: AuditAction.ORG_MEMBER_JOINED,
-      status: 'SUCCESS',
-      metadata: { organizationId: joinedOrganizationId, source: 'registration' },
-      ipAddress: context.ipAddress,
-      userAgent: context.userAgent,
-    });
   }
 
   // Send verification email (non-blocking — user can resend)
