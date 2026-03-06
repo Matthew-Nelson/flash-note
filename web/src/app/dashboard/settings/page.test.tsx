@@ -29,6 +29,15 @@ vi.mock('@/components/ui', () => ({
   CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
+// Mock TopBar (Client Component)
+vi.mock('@/components/TopBar', () => ({
+  TopBar: ({ title, backHref }: { title: string; backHref?: string }) => (
+    <header data-testid="top-bar" data-back-href={backHref}>
+      <h1>{title}</h1>
+    </header>
+  ),
+}));
+
 function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
   return {
     sessionId: 'session-uuid',
@@ -55,6 +64,17 @@ describe('SettingsPage', () => {
 
     await expect(SettingsPage()).rejects.toThrow('NEXT_REDIRECT');
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+  });
+
+  it('renders TopBar with title "Account Settings" and backHref "/dashboard"', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+
+    render(await SettingsPage());
+
+    const topBar = screen.getByTestId('top-bar');
+    expect(topBar).toBeInTheDocument();
+    expect(topBar).toHaveAttribute('data-back-href', '/dashboard');
+    expect(screen.getByRole('heading', { level: 1, name: 'Account Settings' })).toBeInTheDocument();
   });
 
   it('renders user email in account info', async () => {
@@ -105,22 +125,27 @@ describe('SettingsPage', () => {
     expect(screen.getByTestId('delete-account-section')).toBeInTheDocument();
   });
 
-  it('renders back to dashboard link', async () => {
+  it('does not render breadcrumb navigation', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await SettingsPage());
 
-    const link = screen.getByText(/Back to Dashboard/);
-    expect(link).toBeInTheDocument();
-    expect(link.closest('a')).toHaveAttribute('href', '/dashboard');
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
   });
 
-  it('renders breadcrumb navigation', async () => {
+  it('does not render "Back to Dashboard" link', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await SettingsPage());
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Settings')).toBeInTheDocument();
+    expect(screen.queryByText(/Back to Dashboard/)).not.toBeInTheDocument();
+  });
+
+  it('renders main#main-content', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+
+    render(await SettingsPage());
+
+    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
   });
 });

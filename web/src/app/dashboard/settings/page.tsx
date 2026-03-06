@@ -1,9 +1,9 @@
-import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
 import { Card, CardContent } from '@/components/ui';
 import { PasswordResetSection } from '@/components/auth';
+import { TopBar } from '@/components/TopBar';
 import { DeleteAccountSection } from './DeleteAccountSection';
 
 export default async function SettingsPage() {
@@ -12,19 +12,8 @@ export default async function SettingsPage() {
 
   return (
     <>
-      {/* Breadcrumb */}
-      <div className="container mx-auto px-6 py-4">
-        <nav aria-label="Breadcrumb" className="text-sm text-fn-text-secondary">
-          <Link href="/dashboard" className="link">Dashboard</Link>
-          <span className="mx-2">/</span>
-          <span className="text-fn-text-primary">Settings</span>
-        </nav>
-      </div>
-
-      {/* Main Content */}
-      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 pb-8">
-        <h1 className="text-2xl font-bold text-fn-text-primary mb-8">Account Settings</h1>
-
+      <TopBar title="Account Settings" backHref="/dashboard" />
+      <main id="main-content" tabIndex={-1} className="flex-1 p-6">
         <div className="max-w-2xl space-y-6">
           {/* Account Information */}
           <Card>
@@ -82,13 +71,6 @@ export default async function SettingsPage() {
               <DeleteAccountSection />
             </CardContent>
           </Card>
-
-          {/* Back to Dashboard */}
-          <div className="pt-4">
-            <Link href="/dashboard" className="link text-sm">
-              &larr; Back to Dashboard
-            </Link>
-          </div>
         </div>
       </main>
     </>

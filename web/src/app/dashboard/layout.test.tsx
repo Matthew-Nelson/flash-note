@@ -10,9 +10,11 @@ vi.mock('@/server/lib/get-session', () => ({
   getSession: (): Promise<SessionData | null> => mockGetSession(),
 }));
 
-// Mock LogoutButton (client component)
-vi.mock('@/components/auth', () => ({
-  LogoutButton: () => <button>Sign out</button>,
+// Mock DashboardShell (Client Component)
+vi.mock('@/components/DashboardShell', () => ({
+  DashboardShell: ({ user, children }: { user: { email: string }; children: React.ReactNode }) => (
+    <div data-testid="dashboard-shell" data-email={user.email}>{children}</div>
+  ),
 }));
 
 function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
@@ -54,41 +56,16 @@ describe('DashboardLayout', () => {
     expect(redirect).toHaveBeenCalledWith('/resend-verification');
   });
 
-  it('renders user email in nav', async () => {
+  it('renders DashboardShell with user email from session', async () => {
     mockGetSession.mockResolvedValue(createMockSession({ email: 'jane@clinic.com' }));
 
     render(await DashboardLayout({ children: <div>child</div> }));
 
-    expect(screen.getByText('jane@clinic.com')).toBeInTheDocument();
+    const shell = screen.getByTestId('dashboard-shell');
+    expect(shell).toHaveAttribute('data-email', 'jane@clinic.com');
   });
 
-  it('renders sign-out button', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-
-    render(await DashboardLayout({ children: <div>child</div> }));
-
-    expect(screen.getByText('Sign out')).toBeInTheDocument();
-  });
-
-  it('renders settings link', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-
-    render(await DashboardLayout({ children: <div>child</div> }));
-
-    const settingsLink = screen.getByRole('link', { name: /go to settings/i });
-    expect(settingsLink).toHaveAttribute('href', '/dashboard/settings');
-  });
-
-  it('renders FlashNote logo link', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-
-    render(await DashboardLayout({ children: <div>child</div> }));
-
-    expect(screen.getByText('FlashNote')).toBeInTheDocument();
-    expect(screen.getByText('FlashNote').closest('a')).toHaveAttribute('href', '/');
-  });
-
-  it('renders children', async () => {
+  it('renders children inside DashboardShell', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await DashboardLayout({ children: <div>Dashboard content</div> }));

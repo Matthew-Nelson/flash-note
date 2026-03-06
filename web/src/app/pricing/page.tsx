@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import { Suspense } from 'react';
 import { getSession } from '@/server/lib/get-session';
 import type { SessionData } from '@/server/types';
+import { MarketingNav } from '@/components/MarketingNav';
+import { Footer } from '@/components/Footer';
 import { CheckoutButtons } from './CheckoutButtons';
 
 // Stripe price IDs — NEXT_PUBLIC_ vars are inlined at build time by Next.js.
@@ -34,39 +35,7 @@ function PricingContent({
 
   return (
     <div className="min-h-screen bg-fn-bg-primary">
-      {/* Navigation */}
-      <nav aria-label="Main" className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-fn-primary">FlashNote</span>
-            <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">
-              BETA
-            </span>
-          </Link>
-          <div className="flex items-center space-x-6">
-            {isAuthenticated ? (
-              <Link
-                href="/dashboard"
-                className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
-              >
-                Dashboard
-              </Link>
-            ) : (
-              <>
-                <Link
-                  href="/login"
-                  className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
-                >
-                  Sign In
-                </Link>
-                <Link href="/signup" className="btn-primary px-4 py-2">
-                  Get Started
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+      <MarketingNav showDashboardLink={isAuthenticated} />
 
       <main id="main-content" tabIndex={-1}>
         {/* Pricing Section */}
@@ -147,6 +116,8 @@ function PricingContent({
           </div>
         </section>
       </main>
+
+      <Footer />
     </div>
   );
 }
