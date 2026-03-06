@@ -1,3 +1,5 @@
+export * from './audit-logs';
+export * from './health';
 export * from './users';
 export * from './sessions';
 export * from './organizations';

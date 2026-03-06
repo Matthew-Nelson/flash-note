@@ -74,10 +74,42 @@ export function createLLMProvider(
 }
 
 /**
+ * Module-level singleton cache for the configured LLM provider.
+ *
+ * The provider instance holds an ADC token cache (GeminiProvider) that avoids
+ * re-fetching short-lived OAuth2 tokens from the metadata server on every request.
+ * Creating a new instance per request means the token cache is always cold.
+ *
+ * The provider is stateless beyond the token cache — safe for concurrent use.
+ * Config values come from env vars which are static for the lifetime of the process.
+ */
+let cachedProvider: LLMProvider | null = null;
+let cachedConfigKey: string | null = null;
+
+/**
  * Create the configured LLM provider from a config object.
  *
- * This is the main entry point for getting a provider instance.
+ * Returns a cached singleton when called with the same config. The cache is
+ * invalidated if config values change (shouldn't happen in production, but
+ * handles test scenarios and config reloads gracefully).
  */
 export function getConfiguredProvider(config: LLMFactoryConfig): LLMProvider {
-  return createLLMProvider(config.provider, config);
+  // Build a stable key from config values that affect provider construction
+  const configKey = JSON.stringify([
+    config.provider,
+    config.geminiApiKey,
+    config.geminiModel,
+    config.geminiApiUrl,
+    config.geminiUseADC,
+    config.claudeApiKey,
+    config.claudeModel,
+  ]);
+
+  if (cachedProvider && cachedConfigKey === configKey) {
+    return cachedProvider;
+  }
+
+  cachedProvider = createLLMProvider(config.provider, config);
+  cachedConfigKey = configKey;
+  return cachedProvider;
 }

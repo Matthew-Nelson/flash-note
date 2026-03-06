@@ -29,6 +29,5 @@ export type {
   ApiSuccessResponse,
   ApiErrorResponse,
   ApiResponse,
-  UsageResponse,
   SessionEndReason,
 } from './client';

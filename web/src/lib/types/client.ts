@@ -65,15 +65,6 @@ export interface ApiErrorResponse {
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 /**
- * Usage data returned from GET /usage/me
- */
-export interface UsageResponse {
-  currentMonth: string;
-  notesGenerated: number;
-  organization: { name: string; role: string } | null;
-}
-
-/**
  * Reasons for session ending - used by SessionAlert component
  */
 export type SessionEndReason =
