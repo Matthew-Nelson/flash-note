@@ -1,10 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GeneratedNote } from './GeneratedNote';
 import type { GenerateNoteResponse } from '@/actions/notes';
 
-// Mock navigator.clipboard
+// Mock navigator.clipboard — set once at module level to establish the property descriptor.
 const mockWriteText = vi.fn();
 Object.defineProperty(navigator, 'clipboard', {
   value: { writeText: mockWriteText },
@@ -28,6 +28,22 @@ function buildNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
 describe('GeneratedNote', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Restore navigator.clipboard after vi.clearAllMocks() in case any test set it to undefined.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: mockWriteText },
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  afterEach(() => {
+    // Ensure navigator.clipboard is always restored to the mock after each test,
+    // including tests that temporarily set it to undefined.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: mockWriteText },
+      writable: true,
+      configurable: true,
+    });
   });
 
   it('renders all four SOAP sections', () => {
@@ -310,7 +326,8 @@ describe('GeneratedNote', () => {
     render(<GeneratedNote note={note} />);
 
     expect(screen.getAllByText('Total').length).toBeGreaterThan(0);
-    expect(screen.getByText('—')).toBeInTheDocument();
+    // '—' appears in both the xl:block aside and xl:hidden fallback; either is sufficient.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('renders billing charges tfoot when only totalUnits is defined', () => {
@@ -326,8 +343,9 @@ describe('GeneratedNote', () => {
     render(<GeneratedNote note={note} />);
 
     expect(screen.getAllByText('Total').length).toBeGreaterThan(0);
-    expect(screen.getByText('—')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
+    // '—' and '4' each appear in both the xl:block aside and xl:hidden fallback.
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('4').length).toBeGreaterThan(0);
   });
 
   it('renders billing modifiers when present', () => {
@@ -346,12 +364,16 @@ describe('GeneratedNote', () => {
   });
 
   it('renders alerts list when present', () => {
+    // hasSuggestions is gated on uncertainAreas/billing/goals — alerts alone does not trigger it.
+    // Include uncertainAreas to ensure the suggestions panel renders and alerts are visible.
     const note = buildNote({
       alerts: ['Medicare patient? Add GP modifier.', 'Check 8-minute rule for billing.'],
+      uncertainAreas: ['Check documentation completeness.'],
     });
 
     render(<GeneratedNote note={note} />);
 
+    // Both the xl:block aside and xl:hidden fallback render; use getAllByText.
     expect(screen.getAllByText('Alerts').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Medicare patient? Add GP modifier.').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Check 8-minute rule for billing.').length).toBeGreaterThan(0);
@@ -400,12 +422,13 @@ describe('GeneratedNote', () => {
 
     render(<GeneratedNote note={note} />);
 
+    // Goals render in both xl:block aside and xl:hidden fallback; use getAllByText throughout.
     expect(screen.getAllByText('Goals').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Short-Term:', { exact: false }).length).toBeGreaterThan(0);
-    expect(screen.getByText('Improve ROM to 120 degrees')).toBeInTheDocument();
-    expect(screen.getByText('Reduce pain to 3/10')).toBeInTheDocument();
-    expect(screen.getByText('Progressing')).toBeInTheDocument();
-    expect(screen.getByText('Met')).toBeInTheDocument();
+    expect(screen.getAllByText('Improve ROM to 120 degrees').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Reduce pain to 3/10').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Progressing').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Met').length).toBeGreaterThan(0);
   });
 
   it('renders goals section with long-term goals', () => {
@@ -419,10 +442,11 @@ describe('GeneratedNote', () => {
 
     render(<GeneratedNote note={note} />);
 
+    // Goals render in both xl:block aside and xl:hidden fallback; use getAllByText throughout.
     expect(screen.getAllByText('Goals').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Long-Term:', { exact: false }).length).toBeGreaterThan(0);
-    expect(screen.getByText('Return to full activity')).toBeInTheDocument();
-    expect(screen.getByText('Not Started')).toBeInTheDocument();
+    expect(screen.getAllByText('Return to full activity').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Not Started').length).toBeGreaterThan(0);
   });
 
   it('renders goals section with both short-term and long-term goals', () => {
@@ -435,13 +459,14 @@ describe('GeneratedNote', () => {
 
     render(<GeneratedNote note={note} />);
 
+    // Goals render in both xl:block aside and xl:hidden fallback; use getAllByText throughout.
     expect(screen.getAllByText('Goals').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Short-Term:', { exact: false }).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Long-Term:', { exact: false }).length).toBeGreaterThan(0);
-    expect(screen.getByText('Short goal')).toBeInTheDocument();
-    expect(screen.getByText('Long goal')).toBeInTheDocument();
-    expect(screen.getByText('Progressing')).toBeInTheDocument();
-    expect(screen.getByText('Discontinued')).toBeInTheDocument();
+    expect(screen.getAllByText('Short goal').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Long goal').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Progressing').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Discontinued').length).toBeGreaterThan(0);
   });
 
   it('does not render goals section when goals is absent', () => {
@@ -465,7 +490,8 @@ describe('GeneratedNote', () => {
 
     render(<GeneratedNote note={note} />);
 
-    expect(screen.getByText('(75%)')).toBeInTheDocument();
+    // '(75%)' appears in both xl:block aside and xl:hidden fallback; use getAllByText.
+    expect(screen.getAllByText('(75%)').length).toBeGreaterThan(0);
   });
 
   it('does not render percentComplete span when percentComplete is undefined', () => {
@@ -496,10 +522,11 @@ describe('GeneratedNote', () => {
 
     render(<GeneratedNote note={note} />);
 
-    expect(screen.getByText('Not Started')).toBeInTheDocument();
-    expect(screen.getByText('Progressing')).toBeInTheDocument();
-    expect(screen.getByText('Met')).toBeInTheDocument();
-    expect(screen.getByText('Discontinued')).toBeInTheDocument();
+    // Each badge appears in both xl:block aside and xl:hidden fallback; use getAllByText.
+    expect(screen.getAllByText('Not Started').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Progressing').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Met').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Discontinued').length).toBeGreaterThan(0);
   });
 
   it('copy button triggers navigator.clipboard.writeText with section content', async () => {
