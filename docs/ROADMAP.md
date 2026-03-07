@@ -18,7 +18,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 3/6 phases | Phase C: Dashboard Home |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 4/6 phases | Phase D: Auth + Marketing |
 | **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
@@ -550,12 +550,12 @@ See [UI_OVERHAUL_PLAN.md — Phase C](./planning/UI_OVERHAUL_PLAN.md#phase-c-das
 
 | Item | Status |
 |------|--------|
-| Rewrite dashboard page (KPI stats row, trial banner, quick action cards) | ❌ |
-| Replace dashboard `loading.tsx` spinner with content-shaped skeleton | ❌ |
-| Quick action: "Generate SOAP Note" links to `/dashboard/notes/new` | ❌ |
-| Quick actions: "Add Patient" and "Browse Templates" as "Coming soon" stubs | ❌ |
-| Update tests for new dashboard layout | ❌ |
-| **Verify**: Dashboard shows stats + actions (not form). Skeleton loader. Tests pass. | |
+| Rewrite dashboard page (KPI stats row, trial banner, quick action cards) | ✅ |
+| Replace dashboard `loading.tsx` spinner with content-shaped skeleton | ✅ |
+| Quick action: "Generate SOAP Note" links to `/dashboard/notes/new` | ✅ |
+| Quick actions: "Add Patient" and "Browse Templates" as "Coming soon" stubs | ✅ |
+| Update tests for new dashboard layout | ✅ |
+| **Verify**: Dashboard shows stats + actions (not form). Skeleton loader. Tests pass. | ✅ |
 
 ### Phase D: Auth + Marketing Pages
 
