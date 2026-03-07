@@ -284,8 +284,10 @@ describe('NoteGenerationForm', () => {
     // Type in Session Notes field — system error persists, field error clears
     await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), ' more text');
 
+    await waitFor(() => {
+      expect(screen.queryByText('Too short.')).not.toBeInTheDocument();
+    });
     expect(screen.getByRole('alert')).toBeInTheDocument();
-    expect(screen.queryByText('Too short.')).not.toBeInTheDocument();
   });
 
   it('shows Alert for email_not_verified error code', async () => {
@@ -581,6 +583,10 @@ describe('NoteGenerationForm', () => {
       })
     );
 
+    // Wait for button to exit loading state before clicking again
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Generate Professional Note' })).toBeEnabled();
+    });
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
