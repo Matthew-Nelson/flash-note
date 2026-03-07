@@ -78,6 +78,7 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
           className="fixed inset-0 z-30 bg-black/50 md:hidden"
           role="presentation"
           aria-hidden="true"
+          data-testid="menu-backdrop"
           onClick={() => setIsOpen(false)}
         />
       )}
