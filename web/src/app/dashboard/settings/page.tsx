@@ -14,11 +14,11 @@ export default async function SettingsPage() {
     <>
       <TopBar title="Account Settings" backHref="/dashboard" />
       <main id="main-content" tabIndex={-1} className="flex-1 p-6">
-        <div className="max-w-2xl space-y-6">
+        <div className="max-w-2xl space-y-8">
           {/* Account Information */}
           <Card>
             <CardContent>
-              <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
+              <h2 className="text-lg font-bold text-fn-text-primary mb-4 pb-3 border-b border-fn-border">
                 Account Information
               </h2>
               <div className="space-y-4">
@@ -52,7 +52,7 @@ export default async function SettingsPage() {
           {/* Change Password */}
           <Card>
             <CardContent>
-              <h2 className="text-lg font-semibold text-fn-text-primary mb-4">
+              <h2 className="text-lg font-bold text-fn-text-primary mb-4 pb-3 border-b border-fn-border">
                 Change Password
               </h2>
               <p className="text-fn-text-secondary mb-4">
@@ -65,7 +65,7 @@ export default async function SettingsPage() {
           {/* Danger Zone */}
           <Card>
             <CardContent>
-              <h2 className="text-lg font-semibold text-fn-error mb-4">
+              <h2 className="text-lg font-bold text-fn-error mb-4 pb-3 border-b border-fn-error/20">
                 Danger Zone
               </h2>
               <DeleteAccountSection />

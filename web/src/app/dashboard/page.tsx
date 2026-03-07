@@ -46,11 +46,18 @@ function TrialBanner({ session }: { session: SessionData }) {
         : 'Your trial has ended. Subscribe to continue.';
     return (
       <div
-        className="rounded-fn-lg bg-fn-primary-light border border-fn-primary/20 px-5 py-3
+        className="rounded-fn-lg bg-fn-amber-50 border border-fn-amber/20 px-5 py-3
                    flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
         role="alert"
       >
-        <p className="text-fn-sm text-fn-text-primary font-medium">{message}</p>
+        <div className="flex items-start sm:items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-fn-amber-light flex items-center justify-center flex-shrink-0">
+            <svg aria-hidden="true" className="w-4 h-4 text-fn-amber-dark" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-fn-sm text-fn-text-primary font-medium">{message}</p>
+        </div>
         <Link
           href="/pricing"
           className="btn-primary inline-flex items-center justify-center px-4 py-2 text-fn-sm whitespace-nowrap"
@@ -205,10 +212,10 @@ export default async function DashboardPage() {
           {/* Notes This Month KPI */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-fn-base bg-fn-primary-light flex items-center justify-center">
+              <div className="w-10 h-10 rounded-fn-base bg-fn-primary-light flex items-center justify-center">
                 <svg
                   aria-hidden="true"
-                  className="w-4 h-4 text-fn-primary"
+                  className="w-5 h-5 text-fn-primary"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -239,10 +246,10 @@ export default async function DashboardPage() {
           {/* Subscription KPI */}
           <div className="card p-5">
             <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-fn-base bg-fn-primary-light flex items-center justify-center">
+              <div className="w-10 h-10 rounded-fn-base bg-fn-primary-light flex items-center justify-center">
                 <svg
                   aria-hidden="true"
-                  className="w-4 h-4 text-fn-primary"
+                  className="w-5 h-5 text-fn-primary"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -265,7 +272,7 @@ export default async function DashboardPage() {
         </div>
 
         {/* Shorthand CTA block */}
-        <div className="card bg-fn-sidebar-bg p-6">
+        <div className="rounded-fn-xl bg-fn-sidebar-bg p-6 shadow-fn-lg">
           <h2 className="text-fn-xl font-bold text-white tracking-fn-tight mb-2">
             Quick Shorthand
           </h2>
@@ -292,7 +299,7 @@ export default async function DashboardPage() {
         {/* Quick action stub cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Add a Patient stub */}
-          <div className="rounded-fn-lg bg-fn-bg-card border border-fn-border p-5 cursor-default">
+          <div className="rounded-fn-lg bg-fn-bg-card border-2 border-dashed border-fn-border p-5 cursor-default opacity-75">
             <div className="w-10 h-10 rounded-fn-base bg-fn-bg-secondary flex items-center justify-center mb-3">
               <svg
                 aria-hidden="true"
@@ -310,11 +317,13 @@ export default async function DashboardPage() {
               </svg>
             </div>
             <h3 className="text-fn-base font-semibold text-fn-text-primary mb-1">Add a Patient</h3>
-            <p className="text-fn-sm text-fn-text-secondary">Coming soon</p>
+            <span className="inline-flex items-center text-fn-2xs font-medium uppercase tracking-wider text-fn-text-muted bg-fn-bg-secondary px-2.5 py-1 rounded-full">
+              Coming Soon
+            </span>
           </div>
 
           {/* Browse Templates stub */}
-          <div className="rounded-fn-lg bg-fn-bg-card border border-fn-border p-5 cursor-default">
+          <div className="rounded-fn-lg bg-fn-bg-card border-2 border-dashed border-fn-border p-5 cursor-default opacity-75">
             <div className="w-10 h-10 rounded-fn-base bg-fn-bg-secondary flex items-center justify-center mb-3">
               <svg
                 aria-hidden="true"
@@ -334,7 +343,9 @@ export default async function DashboardPage() {
             <h3 className="text-fn-base font-semibold text-fn-text-primary mb-1">
               Browse Templates
             </h3>
-            <p className="text-fn-sm text-fn-text-secondary">Coming soon</p>
+            <span className="inline-flex items-center text-fn-2xs font-medium uppercase tracking-wider text-fn-text-muted bg-fn-bg-secondary px-2.5 py-1 rounded-full">
+              Coming Soon
+            </span>
           </div>
         </div>
       </main>

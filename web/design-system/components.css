@@ -19,15 +19,22 @@
   border: 2px solid transparent;
   border-radius: var(--fn-radius-base);
   font-weight: var(--fn-font-semibold);
-  transition: background-color var(--fn-transition-base) var(--fn-ease-default);
+  box-shadow: var(--fn-shadow-sm);
+  transition: background-color var(--fn-transition-base) var(--fn-ease-default),
+              box-shadow var(--fn-transition-base) var(--fn-ease-default),
+              transform var(--fn-transition-base) var(--fn-ease-default);
 }
 
 .btn-primary:hover:not(:disabled) {
   background-color: var(--fn-primary-hover);
+  box-shadow: var(--fn-shadow-md);
+  transform: translateY(-1px);
 }
 
 .btn-primary:active:not(:disabled) {
   background-color: var(--fn-primary-hover);
+  box-shadow: var(--fn-shadow-sm);
+  transform: translateY(0);
 }
 
 .btn-primary:focus-visible {
@@ -50,19 +57,24 @@
   font-weight: var(--fn-font-medium);
   transition: background-color var(--fn-transition-base) var(--fn-ease-default),
               border-color var(--fn-transition-base) var(--fn-ease-default),
-              color var(--fn-transition-base) var(--fn-ease-default);
+              color var(--fn-transition-base) var(--fn-ease-default),
+              box-shadow var(--fn-transition-base) var(--fn-ease-default),
+              transform var(--fn-transition-base) var(--fn-ease-default);
 }
 
 .btn-secondary:hover:not(:disabled) {
   background-color: var(--fn-primary-light);
   border-color: var(--fn-primary);
   color: var(--fn-primary);
+  box-shadow: var(--fn-shadow-sm);
+  transform: translateY(-1px);
 }
 
 .btn-secondary:active:not(:disabled) {
   background-color: var(--fn-primary-light);
   border-color: var(--fn-primary);
   color: var(--fn-primary);
+  transform: translateY(0);
 }
 
 .btn-secondary:focus-visible {
@@ -108,6 +120,13 @@
   cursor: not-allowed;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary:hover:not(:disabled),
+  .btn-secondary:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 /* ============================================
    CARDS
    ============================================ */
@@ -115,13 +134,27 @@
 .card {
   border-radius: var(--fn-radius-lg);
   overflow: hidden;
-  transition: box-shadow var(--fn-transition-slow) var(--fn-ease-default);
   background: var(--fn-card-bg, #ffffff);
   border: 1px solid var(--fn-border-color);
+  box-shadow: var(--fn-shadow-base);
+  transition: box-shadow var(--fn-transition-slow) var(--fn-ease-default),
+              transform var(--fn-transition-slow) var(--fn-ease-default);
 }
 
 .card:hover {
   box-shadow: var(--fn-shadow-lg);
+}
+
+/* Interactive cards get lift on hover */
+.card-interactive:hover {
+  box-shadow: var(--fn-shadow-xl);
+  transform: translateY(-2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-interactive:hover {
+    transform: none;
+  }
 }
 
 .card-header {
@@ -142,6 +175,7 @@
               background var(--fn-transition-base) var(--fn-ease-default);
   background: var(--fn-input-bg);
   border: 2px solid var(--fn-border-color);
+  box-shadow: var(--fn-shadow-inset);
 }
 
 .input-field:focus-visible {
@@ -261,6 +295,8 @@
 
 .link:hover {
   color: var(--fn-primary-hover);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .link:focus-visible {

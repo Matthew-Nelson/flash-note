@@ -75,6 +75,12 @@ module.exports = {
           light: 'var(--fn-info-light)',
           dark: 'var(--fn-info-dark)',
         },
+        'fn-amber': {
+          DEFAULT: 'var(--fn-amber)',
+          light: 'var(--fn-amber-light)',
+          dark: 'var(--fn-amber-dark)',
+          50: 'var(--fn-amber-50)',
+        },
         // Legacy fn.* alias block — preserves existing pages that use
         // bg-fn-bg-card, text-fn-text-primary, border-fn-border, etc.
         fn: {
@@ -119,6 +125,12 @@ module.exports = {
             light: 'var(--fn-info-light)',
             DEFAULT: 'var(--fn-info)',
             dark: 'var(--fn-info-dark)',
+          },
+          amber: {
+            light: 'var(--fn-amber-light)',
+            DEFAULT: 'var(--fn-amber)',
+            dark: 'var(--fn-amber-dark)',
+            50: 'var(--fn-amber-50)',
           },
         },
       },
@@ -169,6 +181,8 @@ module.exports = {
         'fn-base': 'var(--fn-shadow-base)',
         'fn-md': 'var(--fn-shadow-md)',
         'fn-lg': 'var(--fn-shadow-lg)',
+        'fn-xl': 'var(--fn-shadow-xl)',
+        'fn-inset': 'var(--fn-shadow-inset)',
         'fn-focus': 'var(--fn-focus-ring)',
       },
       width: {

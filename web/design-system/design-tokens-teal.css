@@ -63,6 +63,12 @@
   --fn-info-light: #E0F2FE;
   --fn-info-dark: #0284C7;
 
+  /* Warm accent — trial banners, warnings, attention */
+  --fn-amber: #D97706;
+  --fn-amber-light: #FEF3C7;
+  --fn-amber-dark: #92400E;
+  --fn-amber-50: #FFFBEB;
+
   /* Semantic alias tokens (used by existing component CSS and Tailwind classes) */
   --fn-bg-primary: var(--fn-bg-surface);
   --fn-bg-secondary: var(--fn-slate-100);
@@ -121,10 +127,12 @@
   --fn-radius-md: var(--fn-radius-base);
 
   /* Shadows */
-  --fn-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
-  --fn-shadow-base: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
-  --fn-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.04);
-  --fn-shadow-lg: 0 4px 12px rgba(0,0,0,0.08);
+  --fn-shadow-sm: 0 1px 2px rgba(0,0,0,0.06), 0 1px 3px rgba(0,0,0,0.04);
+  --fn-shadow-base: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+  --fn-shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.06);
+  --fn-shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.05);
+  --fn-shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.04);
+  --fn-shadow-inset: inset 0 1px 2px rgba(0,0,0,0.05);
 
   /* Layout dimensions */
   --fn-sidebar-width: 240px;
