@@ -19,7 +19,7 @@ import 'server-only';
  */
 export function sanitizeFieldErrors(
   fieldErrors: Record<string, string[]>,
-  allowedFields: string[] = ['noteType', 'quickNotes', 'patientContext']
+  allowedFields: string[] = ['noteType', 'quickNotes', 'patientContext', 'modality', 'duration']
 ): Record<string, string[]> {
   const sanitized: Record<string, string[]> = {};
 

@@ -537,7 +537,7 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
     !!note.billing ||
     !!note.goals;
 
-  const generatedDate = new Date().toLocaleDateString();
+  const [generatedDate] = useState(() => new Date().toLocaleDateString());
 
   const sections: Array<{ key: string; title: string; value: string }> = [
     { key: 'subjective', title: 'Subjective', value: note.subjective },
@@ -554,7 +554,7 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
           Generated SOAP Note
         </h2>
         <FullCopyButton
-          text={buildFullNoteText(note, editedNote)}
+          text={buildFullNoteText(note, { ...editedNote, ...editingSections })}
           label="Copy full SOAP note"
         />
       </div>

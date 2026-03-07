@@ -162,7 +162,7 @@ export function NoteGenerationForm() {
             <div className="mb-5">
               <label htmlFor="patient" className="label block text-fn-sm mb-1.5">
                 Patient{' '}
-                <span className="text-fn-2xs text-fn-text-muted ml-1">Coming soon</span>
+                <span className="text-fn-2xs text-fn-text-secondary ml-1">Coming soon</span>
               </label>
               <input
                 id="patient"
