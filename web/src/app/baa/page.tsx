@@ -13,7 +13,7 @@ export default function BaaPage() {
       <MarketingNav />
 
       {/* Content */}
-      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-12">
+      <main id="main-content" tabIndex={-1} className="container mx-auto px-6 py-12 leading-relaxed">
         <article className="max-w-3xl mx-auto">
           <h1 className="text-4xl font-bold text-fn-text-primary mb-2">Business Associate Agreement</h1>
           <p className="text-fn-text-muted mb-8">Version 0.1 &mdash; Draft</p>

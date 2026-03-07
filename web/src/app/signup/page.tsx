@@ -143,7 +143,7 @@ export default function SignupPage() {
         />
 
         <div>
-          <label className="flex items-start gap-2 cursor-pointer">
+          <label className="flex items-start gap-2 cursor-pointer py-2 min-h-[44px]">
             <input
               type="checkbox"
               checked={acceptedLegalTerms}
