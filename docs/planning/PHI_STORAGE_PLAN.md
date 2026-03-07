@@ -520,6 +520,13 @@ Features:
 - Save calls `api.saveNote()` (passes `templateId`, content as `NoteSection[]`, `generationTimeMs`), navigates to note detail on success
 - Generate Another clears result (via `usePhiCleanup`) and returns to form
 
+**Migration note:** The UI Overhaul Phase B introduced three temporary UI elements that this chunk replaces:
+1. A disabled patient selector stub (placeholder text: "Patient selection coming soon") -- replaced by the functional search/typeahead patient selector described above.
+2. An "Additional Context" free-text input (internally the `patientContext` field) -- replaced by the stored `patients.context` field that auto-injects into generation. The free-text input is removed; per-session context is no longer manually entered.
+3. A context panel stub on `xl+` (placeholder text: "Select a patient to see context") -- replaced by the functional patient context panel showing `patients.context` for the selected patient.
+
+When implementing this chunk, remove the deprecation code comment in `web/src/components/notes/NoteGenerationForm.tsx` that references this migration. See `docs/planning/UI_OVERHAUL_PLAN.md` ("Additional Context Deprecation Plan") for the full field-by-field transition table.
+
 ### Note List page: `web/src/app/dashboard/notes/page.tsx`
 Paginated table of saved notes. Columns: date, note type badge, template name, patient name (or "Unassigned"), author (for org view), first section preview (~100 chars). Filters: note type dropdown, patient dropdown. **Org scope toggle** for admin/owner users (show "My Notes" vs "All Clinic Notes"). Click → note detail. Archive per row with confirmation.
 
