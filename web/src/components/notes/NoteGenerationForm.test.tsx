@@ -563,7 +563,7 @@ describe('NoteGenerationForm', () => {
     window.dispatchEvent(new CustomEvent('flashnote:logout'));
 
     await waitFor(() => {
-      expect(modalitySelect).toHaveValue('in_person');
+      expect(modalitySelect).toHaveValue('');
     });
 
     expect(durationInput).toHaveValue(null);
