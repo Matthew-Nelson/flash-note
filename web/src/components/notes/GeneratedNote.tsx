@@ -532,6 +532,7 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
   }
 
   const hasSuggestions =
+    (note.alerts && note.alerts.length > 0) ||
     (note.uncertainAreas && note.uncertainAreas.length > 0) ||
     !!note.billing ||
     !!note.goals;

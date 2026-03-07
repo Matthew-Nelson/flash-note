@@ -126,7 +126,7 @@ export function NoteGenerationForm() {
         setActiveStep(2);
       } else {
         setErrorCode(result.error);
-        if (!result.success && result.fieldErrors) {
+        if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
       }

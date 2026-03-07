@@ -364,11 +364,8 @@ describe('GeneratedNote', () => {
   });
 
   it('renders alerts list when present', () => {
-    // hasSuggestions is gated on uncertainAreas/billing/goals — alerts alone does not trigger it.
-    // Include uncertainAreas to ensure the suggestions panel renders and alerts are visible.
     const note = buildNote({
       alerts: ['Medicare patient? Add GP modifier.', 'Check 8-minute rule for billing.'],
-      uncertainAreas: ['Check documentation completeness.'],
     });
 
     render(<GeneratedNote note={note} />);
