@@ -33,7 +33,11 @@ export interface GenerateNoteResponse {
   goals?: GoalsTracking;
   alerts?: string[];
   uncertainAreas?: string[];
-  metadata: { generationTimeMs: number };
+  metadata: {
+    generationTimeMs: number;
+    modality?: 'in_person' | 'telehealth';
+    duration?: number;
+  };
 }
 
 export async function generateNoteAction(
@@ -46,7 +50,7 @@ export async function generateNoteAction(
     return { success: false, error: 'validation_error', fieldErrors: sanitizeFieldErrors(parsed.error.flatten().fieldErrors) };
   }
 
-  const { noteType, quickNotes, patientContext } = parsed.data;
+  const { noteType, quickNotes, patientContext, modality, duration } = parsed.data;
 
   // 2. Auth check
   const session = await getSession();
@@ -115,6 +119,8 @@ export async function generateNoteAction(
       status: 'SUCCESS',
       metadata: {
         noteType,
+        modality,
+        duration,
         inputTokens: result.metadata.inputTokens,
         outputTokens: result.metadata.outputTokens,
         generationTimeMs: result.metadata.generationTimeMs,
@@ -136,7 +142,11 @@ export async function generateNoteAction(
         goals: result.goals,
         alerts: result.alerts,
         uncertainAreas: result.uncertainAreas,
-        metadata: { generationTimeMs: result.metadata.generationTimeMs },
+        metadata: {
+          generationTimeMs: result.metadata.generationTimeMs,
+          modality,
+          duration,
+        },
       },
     };
   } catch (error) {
