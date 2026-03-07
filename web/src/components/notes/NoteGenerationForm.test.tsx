@@ -169,6 +169,10 @@ describe('NoteGenerationForm', () => {
       })
     );
 
+    // Wait for button to exit loading state before clicking again
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Generate Professional Note' })).toBeEnabled();
+    });
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
@@ -194,7 +198,10 @@ describe('NoteGenerationForm', () => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
 
-    // Submit again — error should clear
+    // Wait for button to exit loading state before clicking again
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Generate Professional Note' })).toBeEnabled();
+    });
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
