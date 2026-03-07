@@ -300,7 +300,7 @@ function RatingWidget() {
             onClick={() => handleRate(star)}
             onMouseEnter={() => setHovered(star)}
             onMouseLeave={() => setHovered(null)}
-            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] cursor-pointer transition-transform hover:scale-110"
+            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] cursor-pointer transition-transform hover:scale-110 motion-reduce:hover:scale-100"
           >
             <svg
               className="w-6 h-6"

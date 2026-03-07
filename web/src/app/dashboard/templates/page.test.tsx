@@ -56,12 +56,12 @@ describe('TemplatesPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Templates' })).toBeInTheDocument();
   });
 
-  it('renders "Coming Soon" heading', async () => {
+  it('renders "Custom Templates" heading', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await TemplatesPage());
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Coming Soon' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Custom Templates' })).toBeInTheDocument();
   });
 
   it('renders description text about custom templates', async () => {

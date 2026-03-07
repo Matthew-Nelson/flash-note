@@ -56,12 +56,12 @@ describe('PatientsPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Patients' })).toBeInTheDocument();
   });
 
-  it('renders "Coming Soon" heading', async () => {
+  it('renders "Patient Management" heading', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await PatientsPage());
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Coming Soon' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Patient Management' })).toBeInTheDocument();
   });
 
   it('renders description text about patient management', async () => {

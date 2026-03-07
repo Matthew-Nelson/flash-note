@@ -30,7 +30,7 @@ export default async function TemplatesPage() {
             </svg>
           </div>
           <h2 className="text-fn-lg font-semibold text-fn-text-primary mb-2">
-            Coming Soon
+            Custom Templates
           </h2>
           <span className="inline-flex items-center text-fn-2xs font-semibold uppercase tracking-wider text-fn-primary bg-fn-primary-light px-3 py-1 rounded-full mb-3">
             Coming Soon

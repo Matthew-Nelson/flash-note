@@ -56,12 +56,12 @@ describe('NotesPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Notes' })).toBeInTheDocument();
   });
 
-  it('renders "Coming Soon" heading', async () => {
+  it('renders "Note History" heading', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
     render(await NotesPage());
 
-    expect(screen.getByRole('heading', { level: 2, name: 'Coming Soon' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Note History' })).toBeInTheDocument();
   });
 
   it('renders description text about note history', async () => {

@@ -43,8 +43,21 @@ function StepIndicator({ activeStep }: { activeStep: 1 | 2 }) {
               : 'bg-fn-success text-white'
           }`}
           aria-current={activeStep === 1 ? 'step' : undefined}
+          aria-label={activeStep === 1 ? undefined : 'Step 1 complete'}
         >
-          {activeStep === 1 ? '1' : '✓'}
+          {activeStep === 1 ? (
+            '1'
+          ) : (
+            <svg className="w-3.5 h-3.5" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+              <path
+                d="M2 7l4 4 6-6"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </span>
         <span
           className={`text-fn-sm font-medium ${
@@ -80,7 +93,7 @@ function StepIndicator({ activeStep }: { activeStep: 1 | 2 }) {
 
 export function NoteGenerationForm() {
   const [noteType, setNoteType] = useState<NoteType>('daily_note');
-  const [modality, setModality] = useState<'in_person' | 'telehealth'>('in_person');
+  const [modality, setModality] = useState<'in_person' | 'telehealth' | ''>('');
   const [duration, setDuration] = useState<string>('');
   const [quickNotes, setQuickNotes] = useState('');
   const [patientContext, setPatientContext] = useState('');
@@ -95,7 +108,7 @@ export function NoteGenerationForm() {
     function handleLogout() {
       setQuickNotes('');
       setPatientContext('');
-      setModality('in_person');
+      setModality('');
       setDuration('');
       setGeneratedNote(null);
       setErrorCode(null);
@@ -115,7 +128,7 @@ export function NoteGenerationForm() {
     startTransition(async () => {
       const formData = new FormData();
       formData.set('noteType', noteType);
-      formData.set('modality', modality);
+      if (modality) formData.set('modality', modality);
       // Strip duration when empty — z.coerce.number() on "" coerces to 0, failing .min(1)
       if (duration.trim()) formData.set('duration', duration);
       formData.set('quickNotes', quickNotes.trim());
@@ -210,11 +223,14 @@ export function NoteGenerationForm() {
                   value={modality}
                   onChange={(e) => {
                     const value = e.target.value;
-                    if (value === 'in_person' || value === 'telehealth') setModality(value);
+                    if (value === '' || value === 'in_person' || value === 'telehealth') {
+                      setModality(value);
+                    }
                   }}
                   className="input-field w-full px-3 py-2.5 text-fn-base"
                   disabled={isPending}
                 >
+                  <option value="">-- Select --</option>
                   <option value="in_person">In Person</option>
                   <option value="telehealth">Telehealth</option>
                 </select>
