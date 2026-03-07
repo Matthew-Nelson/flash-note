@@ -495,13 +495,6 @@ function buildFullNoteText(note: GenerateNoteResponse, editedNote: Partial<Recor
   return lines.join('\n');
 }
 
-const NOTE_TYPE_LABELS: Record<string, string> = {
-  daily_note: 'Daily Note',
-  initial_eval: 'Initial Eval',
-  progress_note: 'Progress Note',
-  discharge: 'Discharge',
-};
-
 export function GeneratedNote({ note }: GeneratedNoteProps) {
   const [editingSections, setEditingSections] = useState<Record<string, string>>({});
   const [editedNote, setEditedNote] = useState<Partial<Record<string, string>>>({});
@@ -544,11 +537,6 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
     !!note.goals;
 
   const generatedDate = new Date().toLocaleDateString();
-  const noteTypeLabel = note.metadata ? NOTE_TYPE_LABELS[
-    // Note type is not in metadata in v1 — use a placeholder for now
-    // The form passes it as metadata context in future
-    'daily_note'
-  ] : undefined;
 
   const sections: Array<{ key: string; title: string; value: string }> = [
     { key: 'subjective', title: 'Subjective', value: note.subjective },
@@ -556,9 +544,6 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
     { key: 'assessment', title: 'Assessment', value: note.assessment },
     { key: 'plan', title: 'Plan', value: note.plan },
   ];
-
-  // Suppress unused var warning — noteTypeLabel not used in metadata bar yet
-  void noteTypeLabel;
 
   return (
     <div className="mt-8">
