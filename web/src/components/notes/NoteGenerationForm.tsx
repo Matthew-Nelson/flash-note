@@ -139,7 +139,7 @@ export function NoteGenerationForm() {
   }
 
   const wordCount = quickNotes.trim().split(/\s+/).filter(Boolean).length;
-  const sessionDate = new Date().toLocaleDateString();
+  const [sessionDate] = useState(() => new Date().toLocaleDateString());
 
   return (
     <div>
