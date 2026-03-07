@@ -821,9 +821,12 @@ describe('GeneratedNote', () => {
     await user.type(textarea, 'Edited subjective.');
     await user.click(screen.getByRole('button', { name: 'Save Subjective section' }));
 
-    // Click Copy All
+    // Click Copy All — use userEvent (not fireEvent) so the click runs within the same
+    // userEvent context and uses the same navigator.clipboard mock that userEvent.setup()
+    // configures. fireEvent bypasses this and triggers the userEvent clipboard stub instead
+    // of mockWriteText, causing mockWriteText.mock.calls[0] to be undefined.
     const copyAllButton = screen.getByRole('button', { name: 'Copy full SOAP note' });
-    fireEvent.click(copyAllButton);
+    await user.click(copyAllButton);
 
     await vi.waitFor(() => {
       const [copyText] = mockWriteText.mock.calls[0];
