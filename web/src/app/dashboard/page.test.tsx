@@ -19,10 +19,6 @@ vi.mock('@/server/dal/usage', () => ({
 
 // Mock UI components
 vi.mock('@/components/ui', () => ({
-  Card: ({ children, className }: { children: React.ReactNode; className?: string }) => (
-    <div data-testid="card" className={className}>{children}</div>
-  ),
-  CardContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   SubscriptionBadge: ({ status }: { status: string }) => (
     <span data-testid="subscription-badge">{status}</span>
   ),
@@ -83,169 +79,283 @@ describe('DashboardPage', () => {
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
   });
 
-  it('renders usage count from DAL data', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage({ notesGenerated: 42 }));
-
-    render(await DashboardPage());
-
-    expect(screen.getByText('42')).toBeInTheDocument();
-  });
-
-  it('renders formatted month', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage({ currentMonth: '2026-02' }));
-
-    render(await DashboardPage());
-
-    expect(screen.getByText(/SOAP notes generated in February 2026/)).toBeInTheDocument();
-  });
-
-  it('renders organization name when present', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(
-      createMockUsage({ organization: { name: 'Acme PT', role: 'member' } })
-    );
-
-    render(await DashboardPage());
-
-    expect(screen.getByText('Organization: Acme PT')).toBeInTheDocument();
-  });
-
-  it('does not render organization section when null', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage({ organization: null }));
-
-    render(await DashboardPage());
-
-    expect(screen.queryByText(/Organization:/)).not.toBeInTheDocument();
-  });
-
-  it('does not render NoteGenerationForm (form moved to /dashboard/notes/new)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
-
-    render(await DashboardPage());
-
-    expect(screen.queryByTestId('note-generation-form')).not.toBeInTheDocument();
-  });
-
-  it('renders "Generate a SOAP Note" link to /dashboard/notes/new', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
-
-    render(await DashboardPage());
-
-    const link = screen.getByRole('link', { name: /generate a soap note/i });
-    expect(link).toHaveAttribute('href', '/dashboard/notes/new');
-  });
-
-  it('renders TopBar with title "Dashboard"', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
-
-    render(await DashboardPage());
-
-    expect(screen.getByTestId('top-bar')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
-  });
-
-  it('renders main#main-content', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
-
-    render(await DashboardPage());
-
-    expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
-  });
-
-  it('does not render Getting Started card', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
-
-    render(await DashboardPage());
-
-    expect(screen.queryByText('Getting Started')).not.toBeInTheDocument();
-    expect(screen.queryByText('Navigate to the note generation page')).not.toBeInTheDocument();
-  });
-
-  describe('subscription status messaging', () => {
-    async function renderWithStatus(subscriptionStatus: string) {
-      mockGetSession.mockResolvedValue(
-        createMockSession({ subscriptionStatus: subscriptionStatus as SessionData['subscriptionStatus'] })
-      );
+  describe('TopBar and landmarks', () => {
+    it('renders TopBar with title "Dashboard"', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
       mockGetUsageForUser.mockResolvedValue(createMockUsage());
-      render(await DashboardPage());
-    }
 
-    it('shows trialing message with trial end date', async () => {
-      mockGetSession.mockResolvedValue(
-        createMockSession({ subscriptionStatus: 'trialing', trialEndsAt: new Date('2026-03-15') })
-      );
-      mockGetUsageForUser.mockResolvedValue(createMockUsage());
       render(await DashboardPage());
 
-      expect(screen.getByText(/Your trial ends on/)).toBeInTheDocument();
-      expect(screen.getByText('Upgrade Now')).toBeInTheDocument();
+      expect(screen.getByTestId('top-bar')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
     });
 
-    it('shows active subscription message', async () => {
-      await renderWithStatus('active');
-      expect(
-        screen.getByText('Your subscription is active. Thank you for using FlashNote!')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Manage subscription')).toBeInTheDocument();
+    it('renders main#main-content landmark', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+    });
+  });
+
+  describe('KPI cards', () => {
+    it('renders "Notes This Month" KPI card with usage count from DAL data', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage({ notesGenerated: 42 }));
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('42')).toBeInTheDocument();
+      expect(screen.getByText(/Notes This Month/i)).toBeInTheDocument();
     });
 
-    it('shows past_due message', async () => {
-      await renderWithStatus('past_due');
-      expect(
-        screen.getByText('Your payment is past due. Please update your payment method.')
-      ).toBeInTheDocument();
+    it('renders formatted month in the notes KPI card', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage({ currentMonth: '2026-02' }));
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('February 2026')).toBeInTheDocument();
     });
 
-    it('shows canceled message', async () => {
-      await renderWithStatus('canceled');
-      expect(
-        screen.getByText('Your subscription has been canceled. Subscribe again to continue using FlashNote.')
-      ).toBeInTheDocument();
-      expect(screen.getByText('Subscribe Now')).toBeInTheDocument();
+    it('renders organization name when present in usage data', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(
+        createMockUsage({ organization: { name: 'Acme PT', role: 'member' } })
+      );
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Organization: Acme PT')).toBeInTheDocument();
     });
 
-    it('shows unpaid message', async () => {
-      await renderWithStatus('unpaid');
-      expect(
-        screen.getByText('Your payment failed. Please update your payment method to restore access.')
-      ).toBeInTheDocument();
+    it('does not render organization section when usage.organization is null', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage({ organization: null }));
+
+      render(await DashboardPage());
+
+      expect(screen.queryByText(/Organization:/)).not.toBeInTheDocument();
     });
 
-    it('shows default trial ended message for unknown status', async () => {
-      // Force an unknown status to exercise the default branch
+    it('passes correct args (userId, organizationId) to getUsageForUser', async () => {
+      mockGetSession.mockResolvedValue(
+        createMockSession({ userId: 'user-42', organizationId: 'org-99' })
+      );
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(mockGetUsageForUser).toHaveBeenCalledWith('user-42', 'org-99');
+    });
+  });
+
+  describe('Subscription KPI card', () => {
+    it('renders subscription badge in the subscription KPI card', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'active' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByTestId('subscription-badge')).toHaveTextContent('active');
+    });
+
+    it('shows "Trial active" for trialing status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'trialing' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Trial active')).toBeInTheDocument();
+    });
+
+    it('shows "Your subscription is active." for active status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'active' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Your subscription is active.')).toBeInTheDocument();
+    });
+
+    it('shows "Payment past due" for past_due status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'past_due' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Payment past due')).toBeInTheDocument();
+    });
+
+    it('shows "Subscription canceled" for canceled status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'canceled' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Subscription canceled')).toBeInTheDocument();
+    });
+
+    it('shows "Payment failed" for unpaid status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'unpaid' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByText('Payment failed')).toBeInTheDocument();
+    });
+
+    it('shows "Trial ended" for unknown/expired status', async () => {
       mockGetSession.mockResolvedValue(
         createMockSession({ subscriptionStatus: 'expired' as SessionData['subscriptionStatus'] })
       );
       mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
       render(await DashboardPage());
 
-      expect(
-        screen.getByText('Your trial has ended. Subscribe to continue using FlashNote.')
-      ).toBeInTheDocument();
-    });
-
-    it('renders subscription badge', async () => {
-      await renderWithStatus('active');
-      expect(screen.getByTestId('subscription-badge')).toHaveTextContent('active');
+      expect(screen.getByText('Trial ended')).toBeInTheDocument();
     });
   });
 
-  it('passes correct args to getUsageForUser', async () => {
-    mockGetSession.mockResolvedValue(
-      createMockSession({ userId: 'user-42', organizationId: 'org-99' })
-    );
-    mockGetUsageForUser.mockResolvedValue(createMockUsage());
+  describe('Trial banner', () => {
+    it('shows trial banner with days remaining for trialing status', async () => {
+      // Set trialEndsAt far in the future to ensure days > 0
+      const futureDate = new Date();
+      futureDate.setDate(futureDate.getDate() + 10);
+      mockGetSession.mockResolvedValue(
+        createMockSession({ subscriptionStatus: 'trialing', trialEndsAt: futureDate })
+      );
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
-    render(await DashboardPage());
+      render(await DashboardPage());
 
-    expect(mockGetUsageForUser).toHaveBeenCalledWith('user-42', 'org-99');
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/remaining in your free trial/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /View Plans/i })).toHaveAttribute('href', '/pricing');
+    });
+
+    it('shows past_due banner for past_due status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'past_due' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.length).toBeGreaterThan(0);
+      expect(screen.getByText(/Your payment is past due/)).toBeInTheDocument();
+    });
+
+    it('shows canceled banner for canceled status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'canceled' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/Your subscription has been canceled/)).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Subscribe Now/i })).toHaveAttribute(
+        'href',
+        '/pricing'
+      );
+    });
+
+    it('shows unpaid banner for unpaid status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'unpaid' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      const alerts = screen.getAllByRole('alert');
+      expect(alerts.length).toBeGreaterThan(0);
+      expect(screen.getByText(/Your payment failed/)).toBeInTheDocument();
+    });
+
+    it('shows expired banner for unknown/default status', async () => {
+      mockGetSession.mockResolvedValue(
+        createMockSession({ subscriptionStatus: 'expired' as SessionData['subscriptionStatus'] })
+      );
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      // Banner shows the full "Your trial has ended" message
+      expect(screen.getByText(/Your trial has ended\. Subscribe to continue\./)).toBeInTheDocument();
+    });
+
+    it('does NOT show trial banner for active status', async () => {
+      mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'active' }));
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Shorthand CTA block', () => {
+    it('renders shorthand CTA block with "Quick Shorthand" heading', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('heading', { name: /Quick Shorthand/i })).toBeInTheDocument();
+    });
+
+    it('renders "Generate Professional Note" link pointing to /dashboard/notes/new', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      const link = screen.getByRole('link', { name: /Generate Professional Note/i });
+      expect(link).toHaveAttribute('href', '/dashboard/notes/new');
+    });
+  });
+
+  describe('Quick action stub cards', () => {
+    it('renders "Add a Patient" stub card with "Coming soon" text', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('heading', { name: /Add a Patient/i })).toBeInTheDocument();
+      // Both quick action stubs share the same "Coming soon" text; verify at least one exists
+      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders "Browse Templates" stub card with "Coming soon" text', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.getByRole('heading', { name: /Browse Templates/i })).toBeInTheDocument();
+      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('Negative tests', () => {
+    it('does not render NoteGenerationForm', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.queryByTestId('note-generation-form')).not.toBeInTheDocument();
+    });
+
+    it('does not render "Need Help?" support card', async () => {
+      mockGetSession.mockResolvedValue(createMockSession());
+      mockGetUsageForUser.mockResolvedValue(createMockUsage());
+
+      render(await DashboardPage());
+
+      expect(screen.queryByText('Need Help?')).not.toBeInTheDocument();
+    });
   });
 });
