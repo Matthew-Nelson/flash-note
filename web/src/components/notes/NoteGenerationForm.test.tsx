@@ -49,19 +49,19 @@ describe('NoteGenerationForm', () => {
     expect(screen.getByRole('option', { name: 'Discharge' })).toBeInTheDocument();
   });
 
-  it('renders quickNotes textarea with clinical placeholder text', () => {
+  it('renders Session Notes textarea with clinical placeholder text', () => {
     render(<NoteGenerationForm />);
 
-    const textarea = screen.getByRole('textbox', { name: /Quick Notes/i });
+    const textarea = screen.getByRole('textbox', { name: /Session Notes/i });
     expect(textarea).toBeInTheDocument();
     expect(textarea).toHaveAttribute('placeholder', expect.stringContaining('Pt reports'));
     expect(textarea).toHaveAttribute('aria-required', 'true');
   });
 
-  it('renders patientContext input (optional, no aria-required)', () => {
+  it('renders Additional Context input (optional, no aria-required)', () => {
     render(<NoteGenerationForm />);
 
-    const input = screen.getByRole('textbox', { name: /Patient Context/i });
+    const input = screen.getByRole('textbox', { name: /Additional Context/i });
     expect(input).toBeInTheDocument();
     expect(input).not.toHaveAttribute('aria-required');
     expect(input).not.toHaveAttribute('required');
@@ -73,10 +73,10 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Pt knee pain 5/10');
-    await user.type(screen.getByRole('textbox', { name: /Patient Context/i }), '68yo female');
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Pt knee pain 5/10');
+    await user.type(screen.getByRole('textbox', { name: /Additional Context/i }), '68yo female');
 
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
@@ -94,8 +94,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('generated-note')).toBeInTheDocument();
@@ -113,8 +113,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
@@ -136,8 +136,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Generating/ })).toBeDisabled();
@@ -154,8 +154,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'First notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'First notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('generated-note')).toBeInTheDocument();
@@ -169,7 +169,7 @@ describe('NoteGenerationForm', () => {
       })
     );
 
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
@@ -187,15 +187,15 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
     });
 
     // Submit again — error should clear
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -208,9 +208,9 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    // Leave patientContext empty
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    // Leave Additional Context empty
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
@@ -220,7 +220,7 @@ describe('NoteGenerationForm', () => {
     expect(formData.has('patientContext')).toBe(false);
   });
 
-  it('displays field-level error message under quickNotes when action returns validation_error with fieldErrors', async () => {
+  it('displays field-level error message under Session Notes when action returns validation_error with fieldErrors', async () => {
     mockGenerateNoteAction.mockResolvedValue({
       success: false,
       error: 'validation_error',
@@ -232,15 +232,15 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'short');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'short');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByText('Quick notes must be at least 10 characters.')).toBeInTheDocument();
     });
   });
 
-  it('aria-describedby on quickNotes textarea is set when fieldErrors present, unset when absent', async () => {
+  it('aria-describedby on Session Notes textarea is set when fieldErrors present, unset when absent', async () => {
     mockGenerateNoteAction.mockResolvedValue({
       success: false,
       error: 'validation_error',
@@ -250,20 +250,20 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    const textarea = screen.getByRole('textbox', { name: /Quick Notes/i });
+    const textarea = screen.getByRole('textbox', { name: /Session Notes/i });
 
     // Initially no describedby
     expect(textarea).not.toHaveAttribute('aria-describedby');
 
     await user.type(textarea, 'x');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(textarea).toHaveAttribute('aria-describedby', 'quickNotes-error');
     });
   });
 
-  it('system error persists on quickNotes change; only field errors clear', async () => {
+  it('system error persists on Session Notes change; only field errors clear', async () => {
     mockGenerateNoteAction.mockResolvedValue({
       success: false,
       error: 'ai_error',
@@ -273,16 +273,16 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByText('Too short.')).toBeInTheDocument();
     });
 
-    // Type in quickNotes field — system error persists, field error clears
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), ' more text');
+    // Type in Session Notes field — system error persists, field error clears
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), ' more text');
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.queryByText('Too short.')).not.toBeInTheDocument();
@@ -297,8 +297,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent(
@@ -316,8 +316,8 @@ describe('NoteGenerationForm', () => {
     const select = screen.getByRole('combobox', { name: /Note Type/i });
     await user.selectOptions(select, 'initial_eval');
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Eval notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Eval notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
@@ -334,9 +334,9 @@ describe('NoteGenerationForm', () => {
     render(<NoteGenerationForm />);
 
     // Fill in PHI and generate a note
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some clinical notes');
-    await user.type(screen.getByRole('textbox', { name: /Patient Context/i }), '68yo female');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some clinical notes');
+    await user.type(screen.getByRole('textbox', { name: /Additional Context/i }), '68yo female');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('generated-note')).toBeInTheDocument();
@@ -349,8 +349,8 @@ describe('NoteGenerationForm', () => {
       expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
     });
 
-    expect(screen.getByRole('textbox', { name: /Quick Notes/i })).toHaveValue('');
-    expect(screen.getByRole('textbox', { name: /Patient Context/i })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /Additional Context/i })).toHaveValue('');
   });
 
   it('trims quickNotes whitespace in FormData before submission', async () => {
@@ -359,8 +359,8 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), '  knee pain 5/10  ');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), '  knee pain 5/10  ');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
@@ -379,11 +379,246 @@ describe('NoteGenerationForm', () => {
 
     render(<NoteGenerationForm />);
 
-    await user.type(screen.getByRole('textbox', { name: /Quick Notes/i }), 'Some notes');
-    await user.click(screen.getByRole('button', { name: 'Generate SOAP Note' }));
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
     });
+  });
+
+  // --- New B-2 tests ---
+
+  it('renders modality select with "In Person" and "Telehealth" options', () => {
+    render(<NoteGenerationForm />);
+
+    const select = screen.getByRole('combobox', { name: /Modality/i });
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'In Person' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Telehealth' })).toBeInTheDocument();
+  });
+
+  it('renders duration input with placeholder "45 min"', () => {
+    render(<NoteGenerationForm />);
+
+    const input = screen.getByRole('spinbutton', { name: /Duration/i });
+    expect(input).toBeInTheDocument();
+    expect(input).toHaveAttribute('placeholder', '45 min');
+  });
+
+  it('renders session date as readonly', () => {
+    render(<NoteGenerationForm />);
+
+    const dateInput = screen.getByRole('textbox', { name: /Session Date/i });
+    expect(dateInput).toBeInTheDocument();
+    expect(dateInput).toHaveAttribute('readonly');
+  });
+
+  it('renders patient selector stub as disabled', () => {
+    render(<NoteGenerationForm />);
+
+    const patientInput = screen.getByRole('textbox', { name: /Patient/i });
+    expect(patientInput).toBeDisabled();
+    expect(patientInput).toHaveAttribute('placeholder', 'Patient selection coming soon');
+  });
+
+  it('renders context panel stub with "Select a patient to see context"', () => {
+    render(<NoteGenerationForm />);
+
+    // The aside is in the DOM even on small screens (hidden via CSS)
+    expect(screen.getByText('Select a patient to see context')).toBeInTheDocument();
+  });
+
+  it('renders step indicator showing step 1 initially', () => {
+    render(<NoteGenerationForm />);
+
+    const nav = screen.getByRole('navigation', { name: /Form steps/i });
+    expect(nav).toBeInTheDocument();
+
+    // Step 1 has aria-current="step"
+    const step1Circle = nav.querySelector('[aria-current="step"]');
+    expect(step1Circle).toBeInTheDocument();
+    expect(step1Circle).toHaveTextContent('1');
+  });
+
+  it('step indicator shows step 2 after successful generation', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generated-note')).toBeInTheDocument();
+    });
+
+    const nav = screen.getByRole('navigation', { name: /Form steps/i });
+    const step2Circle = nav.querySelector('[aria-current="step"]');
+    expect(step2Circle).toBeInTheDocument();
+    expect(step2Circle).toHaveTextContent('2');
+  });
+
+  it('submits modality in formData', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    const modalitySelect = screen.getByRole('combobox', { name: /Modality/i });
+    await user.selectOptions(modalitySelect, 'telehealth');
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    const formData = mockGenerateNoteAction.mock.calls[0][0];
+    expect(formData.get('modality')).toBe('telehealth');
+  });
+
+  it('submits duration in formData when provided', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    const durationInput = screen.getByRole('spinbutton', { name: /Duration/i });
+    await user.type(durationInput, '45');
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    const formData = mockGenerateNoteAction.mock.calls[0][0];
+    expect(formData.get('duration')).toBe('45');
+  });
+
+  it('omits duration from formData when empty', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    // Leave duration empty
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    const formData = mockGenerateNoteAction.mock.calls[0][0];
+    expect(formData.has('duration')).toBe(false);
+  });
+
+  it('shows word count instead of character count', () => {
+    render(<NoteGenerationForm />);
+
+    // Word count should be shown — "0 words" initially
+    expect(screen.getByText('0 words')).toBeInTheDocument();
+  });
+
+  it('updates word count as user types', async () => {
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'hello world');
+
+    expect(screen.getByText('2 words')).toBeInTheDocument();
+  });
+
+  it('clears modality and duration on flashnote:logout event', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    // Set modality to telehealth and enter a duration
+    const modalitySelect = screen.getByRole('combobox', { name: /Modality/i });
+    await user.selectOptions(modalitySelect, 'telehealth');
+
+    const durationInput = screen.getByRole('spinbutton', { name: /Duration/i });
+    await user.type(durationInput, '60');
+
+    expect(modalitySelect).toHaveValue('telehealth');
+    expect(durationInput).toHaveValue(60);
+
+    // Dispatch logout event
+    window.dispatchEvent(new CustomEvent('flashnote:logout'));
+
+    await waitFor(() => {
+      expect(modalitySelect).toHaveValue('in_person');
+    });
+
+    expect(durationInput).toHaveValue(null);
+  });
+
+  it('resets step indicator to step 1 on new submission', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('generated-note')).toBeInTheDocument();
+    });
+
+    // Submit again — step should reset to 1 during transition
+    let resolveSecond!: (v: unknown) => void;
+    mockGenerateNoteAction.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSecond = resolve;
+      })
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      const nav = screen.getByRole('navigation', { name: /Form steps/i });
+      const activeCircle = nav.querySelector('[aria-current="step"]');
+      expect(activeCircle).toHaveTextContent('1');
+    });
+
+    resolveSecond(buildSuccessResponse());
+  });
+
+  it('renders "Additional Context" input that is functional', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    const input = screen.getByRole('textbox', { name: /Additional Context/i });
+    await user.type(input, 'test context');
+    expect(input).toHaveValue('test context');
+  });
+
+  it('submits patientContext in formData from "Additional Context" input', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Additional Context/i }), '68yo female');
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    const formData = mockGenerateNoteAction.mock.calls[0][0];
+    // The field name in FormData is still "patientContext" — only the label changed
+    expect(formData.get('patientContext')).toBe('68yo female');
   });
 });
