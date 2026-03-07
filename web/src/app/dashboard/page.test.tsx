@@ -317,25 +317,25 @@ describe('DashboardPage', () => {
   });
 
   describe('Quick action stub cards', () => {
-    it('renders "Add a Patient" stub card with "Coming soon" text', async () => {
+    it('renders "Add a Patient" stub card with "Coming Soon" text', async () => {
       mockGetSession.mockResolvedValue(createMockSession());
       mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
       render(await DashboardPage());
 
       expect(screen.getByRole('heading', { name: /Add a Patient/i })).toBeInTheDocument();
-      // Both quick action stubs share the same "Coming soon" text; verify at least one exists
-      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(1);
+      // Both quick action stubs share the same "Coming Soon" text; verify at least one exists
+      expect(screen.getAllByText('Coming Soon').length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders "Browse Templates" stub card with "Coming soon" text', async () => {
+    it('renders "Browse Templates" stub card with "Coming Soon" text', async () => {
       mockGetSession.mockResolvedValue(createMockSession());
       mockGetUsageForUser.mockResolvedValue(createMockUsage());
 
       render(await DashboardPage());
 
       expect(screen.getByRole('heading', { name: /Browse Templates/i })).toBeInTheDocument();
-      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText('Coming Soon').length).toBeGreaterThanOrEqual(2);
     });
   });
 
