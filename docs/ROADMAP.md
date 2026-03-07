@@ -18,7 +18,7 @@ Work is organized into phases by dependency order. Complete each phase before st
 |-------|-------|----------|-------------|
 | **0** | [Pre-Migration Foundations](#phase-0-pre-migration-foundations) | 20/20 | All code items done; HIPAA ops (encryption, TLS) verified at provisioning |
 | **1** | [Next.js Migration](#phase-1-nextjs-migration) | 9/9 sub-phases | All sub-phases complete |
-| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 2/6 phases | Phase B: Note Experience |
+| **—** | [UI Overhaul](#ui-overhaul-refined-teal) | 3/6 phases | Phase C: Dashboard Home |
 | **—** | [Deployment Readiness](#deployment-readiness) | 0/7 steps | Monitoring PR 1 (Pino Logger) |
 | **2** | [PHI Storage](#phase-2-phi-storage) | Designed, 0/3 PRs | Blocked on deployment readiness + HIPAA infra |
 | **3** | [Quality & Features](#phase-3-quality--features) | Partial | Post-launch (testing, accessibility, clinic features) |
@@ -532,15 +532,15 @@ See [UI_OVERHAUL_PLAN.md — Phase B](./planning/UI_OVERHAUL_PLAN.md#phase-b-not
 
 | Item | Status |
 |------|--------|
-| Redesign `NoteGenerationForm` (2-col fields, patient stub, context panel stub) | ❌ |
-| Rewrite `GeneratedNote` (SOAP section cards with colored accent bars) | ❌ |
-| Fix copy button touch targets (44px minimum) and layout shift | ❌ |
-| Add inline editing per SOAP section (edit/save/cancel) | ❌ |
-| Add "Copy All" primary action in top action bar | ❌ |
-| Add note metadata bar (date, type badge, generation time) | ❌ |
-| Add star rating widget | ❌ |
-| Update tests for redesigned components | ❌ |
-| **Verify**: Accent bars visible. Copy/edit work. Touch targets 44px+. Tests pass. | |
+| Redesign `NoteGenerationForm` (2-col fields, patient stub, context panel stub) | ✅ |
+| Rewrite `GeneratedNote` (SOAP section cards with colored accent bars) | ✅ |
+| Fix copy button touch targets (44px minimum) and layout shift | ✅ |
+| Add inline editing per SOAP section (edit/save/cancel) | ✅ |
+| Add "Copy All" primary action in top action bar | ✅ |
+| Add note metadata bar (date, type badge, generation time) | ✅ |
+| Add star rating widget | ✅ |
+| Update tests for redesigned components | ✅ |
+| **Verify**: Accent bars visible. Copy/edit work. Touch targets 44px+. Tests pass. | ✅ |
 
 ### Phase C: Dashboard Home
 

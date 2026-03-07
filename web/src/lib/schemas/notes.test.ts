@@ -75,4 +75,79 @@ describe('generateNoteSchema', () => {
     const result = generateNoteSchema.safeParse({ quickNotes: 'some valid notes here' });
     expect(result.success).toBe(false);
   });
+
+  // --- Modality ---
+
+  it('accepts valid modality "in_person"', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, modality: 'in_person' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts valid modality "telehealth"', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, modality: 'telehealth' });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts input without modality', () => {
+    const result = generateNoteSchema.safeParse(validInput);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.modality).toBeUndefined();
+    }
+  });
+
+  it('rejects invalid modality', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, modality: 'invalid' });
+    expect(result.success).toBe(false);
+  });
+
+  // --- Duration ---
+
+  it('accepts valid duration', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: '45' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.duration).toBe(45);
+    }
+  });
+
+  it('accepts input without duration', () => {
+    const result = generateNoteSchema.safeParse(validInput);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.duration).toBeUndefined();
+    }
+  });
+
+  it('rejects negative duration', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: '-1' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects duration above 480', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: '481' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-integer duration', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: '45.5' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects non-numeric duration', () => {
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: 'abc' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects empty string duration with min validation error', () => {
+    // Number("") evaluates to 0, which fails .min(1).
+    // This documents the behavior that the client MUST prevent by stripping the field
+    // when the input is empty — otherwise a blank optional field causes a validation error.
+    const result = generateNoteSchema.safeParse({ ...validInput, duration: '' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const fieldErrors = result.error.flatten().fieldErrors;
+      expect(fieldErrors.duration).toBeDefined();
+    }
+  });
 });

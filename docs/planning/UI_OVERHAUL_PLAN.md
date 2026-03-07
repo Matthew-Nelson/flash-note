@@ -790,3 +790,26 @@ These items are explicitly deferred. Do not build them during the UI overhaul.
 | Command palette search | Nice-to-have, not MVP | Post-launch |
 | Notification system | No notifications in v1 | Post-launch |
 | Custom template builder UI | Phase 2 feature | Phase 2: PHI-1 |
+
+### "Additional Context" Field Deprecation Plan
+
+The `NoteGenerationForm` includes a free-text "Additional Context" input field (internally `patientContext`) that allows therapists to provide per-session context (e.g., "68yo female, post-op TKA 6 weeks"). This field is functional and sends data to the server action, where it is passed to the LLM prompt.
+
+**This field is a temporary bridge.** It will be replaced when PHI Storage Phase 2 ships, specifically:
+
+| Current (Phase B) | Replacement (PHI Storage) | PHI Storage PR |
+|--------------------|---------------------------|----------------|
+| "Additional Context" free-text input | Functional patient selector (search/typeahead backed by `api.getPatients()`) | PR 3 (Notes end-to-end) |
+| Per-session manual context entry | Stored `patients.context` field (persisted per-patient, auto-injected into all note generation for that patient) | PR 2 (Patients end-to-end) |
+| `patientContext` in FormData | `patientId` in FormData (patient context resolved server-side from `patients.context`) | PR 3 (Notes end-to-end) |
+
+**What happens at replacement time (PHI Storage PR 3):**
+1. Remove the "Additional Context" text input from `NoteGenerationForm.tsx`
+2. Replace the disabled patient selector stub with the functional patient search/typeahead
+3. Replace the context panel stub with the functional patient context panel (shows stored `patients.context` for the selected patient)
+4. Update the Zod schema: `patientContext` string field becomes `patientId` UUID field (optional -- unassigned notes are still allowed)
+5. Server action resolves patient context from `patients.context` via the DAL, passes it to `generateNote()`
+6. `clinical_notes.patient_context` stores a snapshot of the context used at generation time (audit trail)
+7. Remove the code comment in `NoteGenerationForm.tsx` referencing this deprecation plan
+
+**Reference:** `docs/planning/PHI_STORAGE_PLAN.md` -- Chunk 6 ("New Note page") describes the full patient selector implementation. Chunk 1 defines the `patients.context` column.

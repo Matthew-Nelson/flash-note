@@ -65,6 +65,16 @@ function makeFormData(overrides: Record<string, string> = {}): FormData {
   return data;
 }
 
+function makeFormDataWithOptionals(overrides: Record<string, string | undefined> = {}): FormData {
+  const data = new FormData();
+  data.set('noteType', 'daily_note');
+  data.set('quickNotes', 'pt reports pain 5/10, ROM improving, strength getting better');
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined) data.set(key, value);
+  }
+  return data;
+}
+
 function createSession(overrides: Partial<SessionData> = {}): SessionData {
   return {
     sessionId: 'session-1',
@@ -284,8 +294,8 @@ describe('generateNoteAction', () => {
 
     expect(result.success).toBe(true);
     if (result.success) {
-      // metadata should only have generationTimeMs, not model/tokens
-      expect(result.data.metadata).toEqual({ generationTimeMs: 1500 });
+      // metadata should only have generationTimeMs + optional modality/duration, not model/tokens
+      expect(result.data.metadata).toEqual({ generationTimeMs: 1500, modality: undefined, duration: undefined });
       expect((result.data.metadata as Record<string, unknown>)['model']).toBeUndefined();
       expect((result.data.metadata as Record<string, unknown>)['inputTokens']).toBeUndefined();
     }
@@ -498,5 +508,47 @@ describe('generateNoteAction', () => {
     mockCheckSubscriptionAccess.mockResolvedValue({ allowed: false, reason: 'trial_expired' });
     await generateNoteAction(makeFormData());
     expect(mockCheckRateLimit).not.toHaveBeenCalled();
+  });
+
+  // --- Modality and duration fields ---
+
+  it('includes modality in response metadata', async () => {
+    const result = await generateNoteAction(makeFormDataWithOptionals({ modality: 'in_person' }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.metadata.modality).toBe('in_person');
+    }
+  });
+
+  it('includes duration in response metadata', async () => {
+    const result = await generateNoteAction(makeFormDataWithOptionals({ duration: '45' }));
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.metadata.duration).toBe(45);
+    }
+  });
+
+  it('includes modality and duration in audit metadata', async () => {
+    await generateNoteAction(makeFormDataWithOptionals({ modality: 'telehealth', duration: '60' }));
+
+    expect(mockAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'NOTE_GENERATED',
+        status: 'SUCCESS',
+        metadata: expect.objectContaining({
+          modality: 'telehealth',
+          duration: 60,
+        }),
+      })
+    );
+  });
+
+  it('accepts submission without modality and duration', async () => {
+    const result = await generateNoteAction(makeFormData());
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.metadata.modality).toBeUndefined();
+      expect(result.data.metadata.duration).toBeUndefined();
+    }
   });
 });
