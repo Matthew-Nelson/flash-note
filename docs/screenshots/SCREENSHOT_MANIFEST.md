@@ -52,3 +52,5 @@ When a phase introduces new pages or significant UI changes, add entries to this
 | Phase | Date | PR | Notes |
 |-------|------|----|-------|
 | A | 2026-03-06 | #113 | Sidebar layout, shared MarketingNav/Footer, stub pages |
+| B | 2026-03-06 | #114 | Note experience — SOAP cards, form redesign, inline editing |
+| C | 2026-03-06 | #115 | Dashboard home — KPI cards, trial banner, quick actions, skeleton loader |

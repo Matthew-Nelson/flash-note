@@ -3,11 +3,12 @@ import { render, screen } from '@testing-library/react';
 import Loading from './loading';
 
 describe('Dashboard Loading skeleton', () => {
-  it('renders skeleton placeholder elements (not Spinner)', () => {
+  it('renders skeleton with accessible loading status (not Spinner)', () => {
     render(<Loading />);
-    // Spinner would have role="status" or data-testid="spinner"; skeleton has neither
-    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    // Skeleton uses role="status" for screen reader announcement, but not the Spinner component
     expect(screen.queryByTestId('spinner')).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-label', 'Loading dashboard');
+    expect(screen.getByText('Loading dashboard')).toBeInTheDocument();
   });
 
   it('has animate-pulse class on wrapper', () => {

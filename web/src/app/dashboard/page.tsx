@@ -221,7 +221,7 @@ export default async function DashboardPage() {
                   />
                 </svg>
               </div>
-              <p className="text-fn-2xs font-semibold uppercase tracking-wider text-fn-text-muted">
+              <p className="text-fn-2xs font-semibold uppercase tracking-wider text-fn-text-secondary">
                 Notes This Month
               </p>
             </div>
@@ -255,7 +255,7 @@ export default async function DashboardPage() {
                   />
                 </svg>
               </div>
-              <p className="text-fn-2xs font-semibold uppercase tracking-wider text-fn-text-muted">
+              <p className="text-fn-2xs font-semibold uppercase tracking-wider text-fn-text-secondary">
                 Subscription
               </p>
             </div>

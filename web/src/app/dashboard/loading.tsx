@@ -1,6 +1,7 @@
 export default function Loading() {
   return (
-    <div className="p-6 space-y-6 animate-pulse">
+    <div className="p-6 space-y-6 animate-pulse" role="status" aria-label="Loading dashboard">
+      <span className="sr-only">Loading dashboard</span>
       {/* Banner skeleton */}
       <div className="h-14 rounded-fn-lg bg-fn-bg-secondary" />
       {/* Stats row skeleton */}
