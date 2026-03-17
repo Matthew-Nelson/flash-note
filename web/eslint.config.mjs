@@ -42,7 +42,7 @@ export default tseslint.config(
       'react-hooks/exhaustive-deps': 'error',
       'react-hooks/set-state-in-effect': 'error',
       'react-hooks/purity': 'error',
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': 'error',
     },
     settings: {
       react: {
