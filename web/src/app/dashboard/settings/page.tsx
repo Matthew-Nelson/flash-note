@@ -13,7 +13,7 @@ export default async function SettingsPage() {
   return (
     <>
       <TopBar title="Account Settings" backHref="/dashboard" />
-      <main id="main-content" tabIndex={-1} className="flex-1 p-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6">
         <div className="max-w-2xl space-y-6">
           {/* Account Information */}
           <Card>

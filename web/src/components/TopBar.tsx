@@ -13,7 +13,7 @@ export function TopBar({ title, backHref, children }: TopBarProps) {
   const { openSidebar } = useSidebar();
 
   return (
-    <header className="sticky top-0 z-20 flex items-center justify-between px-6 py-4 border-b border-fn-border bg-fn-bg-card">
+    <header className="sticky top-0 z-20 flex items-center justify-between px-4 sm:px-6 py-4 border-b border-fn-border bg-fn-bg-card">
       <div className="flex items-center gap-3">
         {/* Hamburger — visible on mobile only */}
         <button

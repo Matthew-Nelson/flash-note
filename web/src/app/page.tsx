@@ -163,8 +163,8 @@ export default function Home() {
           <p className="text-xl text-fn-text-secondary mb-8">
             Save hours every week for less than a coffee per day
           </p>
-          <div className="inline-block card p-8 shadow-fn-lg">
-            <div className="text-5xl font-bold text-fn-primary">
+          <div className="inline-block card p-6 sm:p-8 shadow-fn-lg">
+            <div className="text-4xl sm:text-5xl font-bold text-fn-primary">
               $29<span className="text-xl font-normal text-fn-text-secondary">/month</span>
             </div>
             <p className="text-fn-text-secondary mt-2">Unlimited SOAP notes</p>

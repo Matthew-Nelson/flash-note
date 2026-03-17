@@ -191,7 +191,7 @@ export default async function DashboardPage() {
   return (
     <>
       <TopBar title="Dashboard" />
-      <main id="main-content" tabIndex={-1} className="flex-1 p-6 space-y-6">
+      <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6 space-y-6">
         {/* Checkout success alert — requires Suspense because it uses useSearchParams */}
         <Suspense fallback={null}>
           <CheckoutSuccessAlert />
