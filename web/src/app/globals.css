@@ -17,3 +17,66 @@ body {
     outline-offset: 2px;
   }
 }
+
+@media print {
+  /* Page setup */
+  @page {
+    margin: 1in;
+    size: letter;
+  }
+
+  /* Hide all UI chrome */
+  nav,
+  header,
+  aside,
+  footer,
+  [role="group"][aria-label*="Rate"],
+  [aria-label*="suggestions"],
+  .sidebar {
+    display: none !important;
+  }
+
+  /* Hide all buttons */
+  button {
+    display: none !important;
+  }
+
+  /* Reset backgrounds and colors for B&W printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+  }
+
+  /* Remove card styling */
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+  }
+
+  /* SOAP sections: remove colored accent bars, use bold headers */
+  section[aria-labelledby^="section-heading-"] {
+    page-break-inside: avoid;
+    border-left: none !important;
+    margin-bottom: 0.75rem;
+    padding-left: 0 !important;
+  }
+
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure main content fills the page */
+  main {
+    padding: 0 !important;
+    flex: none !important;
+  }
+
+  /* Remove transitions and animations */
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

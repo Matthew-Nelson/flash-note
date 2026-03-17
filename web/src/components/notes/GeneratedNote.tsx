@@ -580,6 +580,34 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
         <span>{(note.metadata.generationTimeMs / 1000).toFixed(1)}s</span>
       </div>
 
+      {/* Print-only clinical header — hidden on screen, visible in print */}
+      <div data-testid="print-header" className="hidden print:block print-only mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm font-medium text-gray-500">FlashNote</span>
+          <span className="text-sm text-gray-500">{generatedDate}</span>
+        </div>
+        <h2 className="text-xl font-bold text-center mb-6">SOAP Note</h2>
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div>
+            <span className="text-sm font-medium">Patient Name: </span>
+            <span className="inline-block border-b border-black w-48">&nbsp;</span>
+          </div>
+          <div>
+            <span className="text-sm font-medium">Date: </span>
+            <span className="inline-block border-b border-black w-48">&nbsp;</span>
+          </div>
+          <div>
+            <span className="text-sm font-medium">Duration: </span>
+            <span className="inline-block border-b border-black w-48">&nbsp;</span>
+          </div>
+          <div>
+            <span className="text-sm font-medium">Modality: </span>
+            <span className="inline-block border-b border-black w-48">&nbsp;</span>
+          </div>
+        </div>
+        <hr className="border-black mb-4" />
+      </div>
+
       {/* SOAP sections + suggestions panel */}
       <div className="flex gap-6">
         {/* Left column: SOAP sections */}
@@ -699,6 +727,20 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
           {note.goals && <GoalsSection goals={note.goals} />}
         </div>
       )}
+
+      {/* Print-only signature block — hidden on screen, visible in print */}
+      <div data-testid="print-footer" className="hidden print:block print-only mt-12">
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <div className="border-b border-black w-full mb-1">&nbsp;</div>
+            <span className="text-sm font-medium">Provider Signature</span>
+          </div>
+          <div>
+            <div className="border-b border-black w-full mb-1">&nbsp;</div>
+            <span className="text-sm font-medium">Date</span>
+          </div>
+        </div>
+      </div>
 
       <p className="text-fn-2xs text-fn-text-secondary mt-4 border-t border-fn-border pt-4">
         Generated in {(note.metadata.generationTimeMs / 1000).toFixed(1)}s
