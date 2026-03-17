@@ -4,7 +4,6 @@
  * Provides:
  * - DOM matchers (@testing-library/jest-dom)
  * - React cleanup after each test
- * - Mock: @sentry/nextjs
  * - Mock: next/navigation
  * - Mock: sessionStorage (spy-able)
  */
@@ -19,14 +18,6 @@ vi.mock('server-only', () => ({}));
 afterEach(() => {
   cleanup();
 });
-
-// Mock @sentry/nextjs
-vi.mock('@sentry/nextjs', () => ({
-  captureException: vi.fn(),
-  captureMessage: vi.fn(),
-  setUser: vi.fn(),
-  withScope: vi.fn((cb: (scope: unknown) => void) => cb({ setExtras: vi.fn() })),
-}));
 
 // Mock next/navigation
 vi.mock('next/navigation', () => ({

@@ -8,6 +8,8 @@ export const onRequestError: Instrumentation.onRequestError = async (
   // Dynamic import to avoid loading Pino during build
   const { logger } = await import('@/server/lib/logger');
 
+  const message = err instanceof Error ? err.message : String(err);
+
   logger.error(
     {
       err,
@@ -17,6 +19,6 @@ export const onRequestError: Instrumentation.onRequestError = async (
       method: request.method,
       url: request.path,
     },
-    `[${context.routeType}] ${err.message}`
+    `[${context.routeType}] ${message}`
   );
 };
