@@ -52,13 +52,14 @@ Plans:
   4. Error boundaries (global-error.tsx, ErrorBoundary.tsx) automatically report to the telemetry endpoint
   5. The instrumentation.ts onRequestError hook logs through Pino instead of Sentry
   6. Sentry is fully removed (no SDK, no config files, no build args, no test mocks) and Pino is the sole error reporting path
-**Plans**: 4 plans
+**Plans**: 5 plans
 
 Plans:
 - [ ] 02-01-PLAN.md — Pino logger singleton, client telemetry library, telemetry endpoint (MON-01, MON-03)
 - [ ] 02-02-PLAN.md — Console migration, error boundary wiring, instrumentation rewrite (MON-02, MON-04, MON-05)
 - [ ] 02-03-PLAN.md — Sentry removal, instrumentation-client rewrite, ESLint tightening (MON-06)
 - [ ] 02-04-PLAN.md — Gap closure: fix 4 TypeScript ESLint type errors for lint-clean gate
+- [ ] 02-05-PLAN.md — Gap closure: add operational logging to happy paths and fix dev transport visibility (MON-01, MON-02)
 
 ### Phase 3: Pipeline & Provisioning
 **Goal**: The deploy pipeline is hardened for safe production deployments and all GCP infrastructure is provisioned and configured
@@ -195,7 +196,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
-| 2. Structured Logging | 3/4 | In progress | - |
+| 2. Structured Logging | 4/5 | In progress | - |
 | 3. Pipeline & Provisioning | 0/3 | Not started | - |
 | 4. Staging Verification | 0/1 | Not started | - |
 | 5. Production Readiness | 0/2 | Not started | - |
