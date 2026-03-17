@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { db } from '@/server/db';
+import { logger } from '@/server/lib/logger';
 import { findActiveMembership } from './organization-members';
 import { findOrganizationById } from './organizations';
 
@@ -86,12 +87,6 @@ export async function incrementUsage(
     );
   } catch (error) {
     // Don't throw — usage tracking failures must not break note generation
-    // TODO: Replace with Pino structured logger when available:
-    //   logger.error({ err: error, source: 'dal_usage', errorType: 'increment_usage_failed', userId }, 'Usage tracking failed');
-    console.error('Usage tracking failed:', error, {
-      source: 'dal_usage',
-      errorType: 'increment_usage_failed',
-      userId,
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_usage', errorType: 'usage_tracking_failed', userId }, 'Usage tracking failed');
   }
 }

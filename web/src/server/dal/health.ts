@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { db } from '@/server/db';
+import { logger } from '@/server/lib/logger';
 
 const HEALTH_CHECK_TIMEOUT_MS = 3000;
 
@@ -19,11 +20,7 @@ export async function checkDbHealth(): Promise<boolean> {
     ]);
     return true;
   } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error('DB health check failed:', error, {
-      source: 'dal_health',
-      errorType: 'db_health_check_failed',
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_health', errorType: 'health_check_failed' }, 'DB health check failed');
     return false;
   }
 }

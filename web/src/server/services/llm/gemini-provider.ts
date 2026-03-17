@@ -7,6 +7,7 @@ import 'server-only';
  * Handles Gemini-specific response formats, error codes, and retry logic.
  */
 
+import { logger } from '@/server/lib/logger';
 import { BaseLLMProvider } from './provider';
 import type { LLMProviderType, LLMRequestConfig, LLMRetryConfig, PTNoteResult } from './types';
 import {
@@ -306,8 +307,7 @@ export class GeminiProvider extends BaseLLMProvider {
 
   private handleHttpError(status: number, headers: Headers, data: GeminiResponse): LLMError {
     // SECURITY: Never log raw error body - may echo back PHI from request
-    // TODO: Replace with Pino structured logger when available
-    console.error('Gemini API HTTP error:', { status });
+    logger.error({ source: 'llm_gemini', errorType: 'http_error', status }, 'Gemini API HTTP error');
 
     const retryAfter = this.parseRetryAfter(headers.get('retry-after'));
 
@@ -330,8 +330,7 @@ export class GeminiProvider extends BaseLLMProvider {
 
   private handleApiError(error: NonNullable<GeminiResponse['error']>): LLMError {
     // SECURITY: Never log error message - may contain PHI
-    // TODO: Replace with Pino structured logger when available
-    console.error('Gemini API error:', { code: error.code, status: error.status });
+    logger.error({ source: 'llm_gemini', errorType: 'api_error', code: error.code, status: error.status }, 'Gemini API error');
 
     if (error.status === 'RESOURCE_EXHAUSTED') {
       return new RateLimitError(this.name);

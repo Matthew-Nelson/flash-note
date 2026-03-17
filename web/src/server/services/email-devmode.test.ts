@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+
 // Mock config WITHOUT RESEND_API_KEY (dev mode — emails logged to console)
 vi.mock('@/server/db/config', () => ({
   config: {
@@ -19,32 +27,38 @@ vi.mock('resend', () => ({
   },
 }));
 
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
+
 import { sendVerificationEmail, sendPasswordResetEmail } from './email';
 
 describe('email service (dev mode — no Resend API key)', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
-  it('logs verification email to console instead of sending', async () => {
+  it('logs verification email via logger instead of sending', async () => {
     await sendVerificationEmail('user@example.com', 'dev-token');
 
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining('EMAIL SERVICE: Resend not configured')
-    );
-    // H-4: email address must be redacted in dev mode too
-    expect(console.log).toHaveBeenCalledWith('To: [redacted]');
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining('Verify your email')
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'email_service',
+        to: '[redacted]',
+        subject: expect.stringContaining('Verify your email'),
+      }),
+      expect.stringContaining('Dev mode')
     );
   });
 
-  it('logs password reset email to console instead of sending', async () => {
+  it('logs password reset email via logger instead of sending', async () => {
     await sendPasswordResetEmail('user@example.com', 'reset-dev-token');
 
-    expect(console.log).toHaveBeenCalledWith('To: [redacted]');
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining('Reset your FlashNote password')
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'email_service',
+        to: '[redacted]',
+        subject: expect.stringContaining('Reset your FlashNote password'),
+      }),
+      expect.stringContaining('Dev mode')
     );
   });
 
@@ -53,9 +67,10 @@ describe('email service (dev mode — no Resend API key)', () => {
 
     // The Resend constructor was never called with a real key,
     // so the resend singleton is null — no API calls made
-    // We verify by checking console.log was used instead
-    expect(console.log).toHaveBeenCalledWith(
-      expect.stringContaining('EMAIL SERVICE')
+    // We verify by checking logger.info was used instead
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'email_service' }),
+      expect.stringContaining('Dev mode')
     );
   });
 });

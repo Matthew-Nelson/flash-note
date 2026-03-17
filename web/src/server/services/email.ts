@@ -1,9 +1,9 @@
-/* eslint-disable no-console -- Dev mode email logging (when Resend not configured) is intentional */
 import 'server-only';
 
 import { Resend } from 'resend';
 
 import { config, isDevelopment, isTest } from '@/server/db/config';
+import { logger } from '@/server/lib/logger';
 
 /**
  * Module-level Resend client singleton.
@@ -172,13 +172,7 @@ async function sendEmail(
     if (!isDevelopment && !isTest) {
       throw new Error('Email service not configured in production');
     }
-    console.log('='.repeat(60));
-    console.log('EMAIL SERVICE: Resend not configured, logging email:');
-    console.log('To: [redacted]');
-    console.log(`Subject: ${subject}`);
-    console.log('-'.repeat(60));
-    console.log(text);
-    console.log('='.repeat(60));
+    logger.info({ source: 'email_service', subject, to: '[redacted]' }, 'Dev mode: email logged (Resend not configured)');
     return;
   }
 
@@ -194,10 +188,7 @@ async function sendEmail(
 
   if (error) {
     const emailError = new Error(`Failed to send email: ${error.message}`, { cause: error });
-    // TODO: Replace with Pino structured logger when available:
-    //   logger.error({ err: emailError, source: 'email_service', errorType: 'send_failed' },
-    //     'Email send failed');
-    console.error('Email send error:', error);
+    logger.error({ err: emailError, source: 'email_service', errorType: 'send_failed' }, 'Email send failed');
     throw emailError;
   }
 }

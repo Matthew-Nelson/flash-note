@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { cleanupOldWebhookEvents } from '@/server/dal/webhooks';
 import { config } from '@/server/db/config';
+import { logger } from '@/server/lib/logger';
 
 /**
  * Webhook event cleanup Route Handler.
@@ -28,14 +29,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   try {
     const deleted = await cleanupOldWebhookEvents(7);
-    // eslint-disable-next-line no-console -- TODO: Replace with Pino logger in Phase 1.7
-    console.log(`Cleaned up ${deleted} old webhook events`);
+    logger.info({ source: 'cleanup_webhook_events', deleted }, 'Cleaned up old webhook events');
     return NextResponse.json({ deleted });
   } catch (error) {
-    console.error('Webhook event cleanup failed:', {
-      source: 'route_cleanup',
-      errorType: error instanceof Error ? error.constructor.name : 'unknown',
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'cleanup_webhook_events', errorType: 'cleanup_failed' }, 'Webhook event cleanup failed');
     return NextResponse.json({ error: 'Cleanup failed' }, { status: 500 });
   }
 }

@@ -4,6 +4,14 @@ import { AuditAction } from '@/server/types';
 // Create a typed mock for the db query function
 const mockDbQuery = vi.fn<(...args: unknown[]) => Promise<{ rows: unknown[] }>>();
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+
 // Mock only the db module — we'll test the real audit service against this mock
 vi.mock('@/server/db', () => ({
   db: {
@@ -11,6 +19,8 @@ vi.mock('@/server/db', () => ({
   },
   getPoolClient: vi.fn(),
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 // Dynamically import after mocks are set up
 let auditService: typeof import('./audit').auditService;
@@ -25,7 +35,7 @@ describe('AuditService', () => {
   beforeEach(() => {
     mockDbQuery.mockReset();
     mockDbQuery.mockResolvedValue({ rows: [] });
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -168,13 +178,18 @@ describe('AuditService', () => {
         status: 'SUCCESS',
       });
 
-      expect(console.error).toHaveBeenCalledWith('Audit log failed:', dbError, {
-        source: 'service_audit',
-        errorType: 'audit_write_failed',
-        userId: 'user-123',
-        action: AuditAction.LOGIN,
-        status: 'SUCCESS',
-      });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          err: dbError,
+          source: 'audit_service',
+          errorType: 'audit_log_failed',
+          audit: true,
+          userId: 'user-123',
+          action: AuditAction.LOGIN,
+          status: 'SUCCESS',
+        }),
+        'Audit log failed'
+      );
     });
 
     it('should not break application flow when audit fails', async () => {
@@ -348,7 +363,7 @@ describe('AuditService', () => {
         })
       ).resolves.not.toThrow();
 
-      expect(console.error).toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalled();
     });
 
     it('should handle connection pool exhaustion gracefully', async () => {

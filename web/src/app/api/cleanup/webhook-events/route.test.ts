@@ -4,6 +4,13 @@ import { NextRequest } from 'next/server';
 // --- vi.hoisted mocks ---
 
 const mockCleanupOldWebhookEvents = vi.hoisted(() => vi.fn());
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
 
 vi.mock('@/server/dal/webhooks', () => ({
   cleanupOldWebhookEvents: mockCleanupOldWebhookEvents,
@@ -14,6 +21,8 @@ vi.mock('@/server/db/config', () => ({
     CLEANUP_SECRET: 'a-32-character-minimum-secret-key',
   },
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 // Import after mocking
 const { POST } = await import('./route');
@@ -51,8 +60,6 @@ function makeRequest(options: {
 describe('POST /api/cleanup/webhook-events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
   it('returns 401 when authorization header is missing', async () => {

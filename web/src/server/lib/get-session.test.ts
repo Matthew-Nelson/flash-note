@@ -4,6 +4,14 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const mockGetSessionToken = vi.fn<() => Promise<string | null>>();
 const mockHashSessionToken = vi.fn<(token: string) => string>();
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+
 vi.mock('./session-cookie', () => ({
   getSessionToken: () => mockGetSessionToken(),
   hashSessionToken: (token: string) => mockHashSessionToken(token),
@@ -24,6 +32,8 @@ vi.mock('@/server/db/config', () => ({
   SESSION_ABSOLUTE_MAX_MS: 7 * 24 * 60 * 60 * 1000, // 7 days
   SESSION_REFRESH_THRESHOLD: 0.5,
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 const { getSession } = await import('./get-session');
 
@@ -193,10 +203,9 @@ describe('getSession', () => {
     // Session is valid — refresh failure should NOT log the user out
     expect(result).not.toBeNull();
     expect(result!.sessionId).toBe('session-uuid');
-    // eslint-disable-next-line no-console
-    expect(console.error).toHaveBeenCalledWith(
-      'Session refresh failed:',
-      expect.any(Error)
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'session', errorType: 'refresh_failed', err: expect.any(Error) }),
+      'Session refresh failed'
     );
   });
 
@@ -208,10 +217,9 @@ describe('getSession', () => {
     const result = await getSession();
 
     expect(result).toBeNull();
-    // eslint-disable-next-line no-console
-    expect(console.error).toHaveBeenCalledWith(
-      'getSession error:',
-      expect.any(Error)
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'session', errorType: 'session_error', err: expect.any(Error) }),
+      'getSession error'
     );
   });
 

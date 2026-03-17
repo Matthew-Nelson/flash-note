@@ -12,6 +12,13 @@ const mockCheckSubscriptionAccess = vi.hoisted(() => vi.fn());
 const mockGenerateNote = vi.hoisted(() => vi.fn());
 const mockIncrementUsage = vi.hoisted(() => vi.fn());
 const mockAuditLog = vi.hoisted(() => vi.fn());
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
 
 vi.mock('@/server/lib/get-session', () => ({
   getSession: mockGetSession,
@@ -42,6 +49,8 @@ vi.mock('@/server/dal/usage', () => ({
 vi.mock('@/server/services/audit', () => ({
   auditService: { log: mockAuditLog },
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 vi.mock('@/server/types', () => ({
   AuditAction: {
@@ -345,9 +354,7 @@ describe('generateNoteAction', () => {
   it('logs audit entry with FAILURE status on generation error', async () => {
     mockGenerateNote.mockRejectedValueOnce(new Error('LLM down'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -369,24 +376,21 @@ describe('generateNoteAction', () => {
       securityMetadata: { suspiciousPatternDetected: true, suspiciousPatternCount: 3 },
     }));
 
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await generateNoteAction(makeFormData());
 
-    expect(warnSpy).toHaveBeenCalledWith('Suspicious prompt patterns detected:', expect.objectContaining({
+    expect(mockLogger.warn).toHaveBeenCalledWith(expect.objectContaining({
       source: 'action_generate_note',
+      audit: true,
       userId: 'user-1',
       noteType: 'daily_note',
       suspiciousPatternCount: 3,
-    }));
-    warnSpy.mockRestore();
+    }), 'Suspicious prompt patterns detected');
   });
 
   it('does not log warn when no suspicious patterns detected', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     await generateNoteAction(makeFormData());
 
-    expect(warnSpy).not.toHaveBeenCalled();
-    warnSpy.mockRestore();
+    expect(mockLogger.warn).not.toHaveBeenCalled();
   });
 
   it('audit metadata never contains PHI (quickNotes, patientContext, note content)', async () => {
@@ -405,9 +409,7 @@ describe('generateNoteAction', () => {
     const { RateLimitError } = await import('@/server/services/llm');
     mockGenerateNote.mockRejectedValueOnce(new RateLimitError('gemini'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'ai_rate_limited' });
   });
@@ -416,9 +418,7 @@ describe('generateNoteAction', () => {
     const { ContentBlockedError } = await import('@/server/services/llm');
     mockGenerateNote.mockRejectedValueOnce(new ContentBlockedError('gemini'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'ai_content_blocked' });
   });
@@ -427,9 +427,7 @@ describe('generateNoteAction', () => {
     const { TimeoutError } = await import('@/server/services/llm');
     mockGenerateNote.mockRejectedValueOnce(new TimeoutError('gemini', 30000));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'ai_timeout' });
   });
@@ -438,9 +436,7 @@ describe('generateNoteAction', () => {
     const { NetworkError } = await import('@/server/services/llm');
     mockGenerateNote.mockRejectedValueOnce(new NetworkError('gemini'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'ai_unavailable' });
   });
@@ -449,9 +445,7 @@ describe('generateNoteAction', () => {
     const { LLMError } = await import('@/server/services/llm');
     mockGenerateNote.mockRejectedValueOnce(new LLMError('parse_error', 'Parse failed', 'gemini'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'ai_error' });
   });
@@ -459,9 +453,7 @@ describe('generateNoteAction', () => {
   it('maps unknown errors to internal_error', async () => {
     mockGenerateNote.mockRejectedValueOnce(new Error('unexpected'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const result = await generateNoteAction(makeFormData());
-    consoleSpy.mockRestore();
 
     expect(result).toEqual({ success: false, error: 'internal_error' });
   });
@@ -469,22 +461,20 @@ describe('generateNoteAction', () => {
   it('logs structured error context on failure (no PHI)', async () => {
     mockGenerateNote.mockRejectedValueOnce(new Error('db connection lost'));
 
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     await generateNoteAction(makeFormData());
 
-    expect(consoleSpy).toHaveBeenCalledWith('Note generation failed:', expect.objectContaining({
-      err: expect.any(Error),  // Verify error object is included for stack trace preservation
+    expect(mockLogger.error).toHaveBeenCalledWith(expect.objectContaining({
+      err: expect.any(Error),
       source: 'action_generate_note',
       errorType: 'internal_error',
       userId: 'user-1',
       noteType: 'daily_note',
-    }));
+    }), 'Note generation failed');
     // Verify no PHI in the log
-    const loggedContext = consoleSpy.mock.calls[0][1] as Record<string, unknown>;
+    const loggedContext = mockLogger.error.mock.calls[0][0] as Record<string, unknown>;
     expect(JSON.stringify(loggedContext)).not.toContain('pt reports');
     // Verify error object is included (not raw message string)
     expect(loggedContext.err).toBeInstanceOf(Error);
-    consoleSpy.mockRestore();
   });
 
   // --- Order of operations ---

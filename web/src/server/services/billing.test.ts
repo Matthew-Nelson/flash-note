@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // --- vi.hoisted mocks (must be before vi.mock factories) ---
 
@@ -36,6 +36,14 @@ const { mockAuditLog } = vi.hoisted(() => ({
   mockAuditLog: vi.fn(),
 }));
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+
 // Mock Stripe — must use a class to work with `new Stripe()`
 vi.mock('stripe', () => ({
   default: class MockStripe {
@@ -68,6 +76,8 @@ vi.mock('@/server/dal/webhooks', () => ({
 vi.mock('@/server/services/audit', () => ({
   auditService: { log: mockAuditLog },
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 vi.mock('@/server/types', () => ({
   AuditAction: {
@@ -136,24 +146,15 @@ function makeEvent(type: string, dataObject: unknown): unknown {
 // ---------------------------------------------------------------------------
 
 describe('BillingService', () => {
-  let consoleErrorSpy: MockInstance;
-  let consoleLogSpy: MockInstance;
-  let consoleWarnSpy: MockInstance;
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockTryMarkWebhookProcessed.mockResolvedValue(true);
     mockDeleteProcessedWebhookEvent.mockResolvedValue(undefined);
     mockAuditLog.mockResolvedValue(undefined);
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleLogSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    // no-op: mocks cleared in beforeEach
   });
 
   // -------------------------------------------------------------------------
@@ -370,7 +371,7 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('duplicate'));
+      expect(mockLogger.info).toHaveBeenCalledWith(expect.objectContaining({ source: 'billing_webhook' }), expect.stringContaining('duplicate'));
     });
   });
 
@@ -483,14 +484,13 @@ describe('BillingService', () => {
       expect(mockStripeSubscriptionsRetrieve).not.toHaveBeenCalled();
 
       // Should log at warn level with structured context
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        'Unhandled Stripe webhook event type:',
+      expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
-          source: 'service_billing',
-          errorType: 'unhandled_webhook_event_type',
-          eventId: 'evt-123',
+          source: 'billing_webhook',
           eventType: 'charge.dispute.created',
-        })
+          eventId: 'evt-123',
+        }),
+        expect.stringContaining('Unhandled Stripe webhook event type')
       );
 
       // Should still mark as processed (idempotency)
@@ -536,9 +536,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('userId'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.stringContaining('userId')
       );
     });
 
@@ -555,9 +555,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('userId'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.stringContaining('userId')
       );
     });
 
@@ -574,9 +574,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('missing customer or subscription'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_checkout_ids' }),
+        expect.stringContaining('missing customer or subscription')
       );
     });
 
@@ -593,9 +593,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('missing customer or subscription'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_checkout_ids' }),
+        expect.stringContaining('missing customer or subscription')
       );
     });
 
@@ -665,9 +665,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Unknown Stripe subscription status'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'unknown_subscription_status' }),
+        expect.stringContaining('Unknown Stripe subscription status')
       );
     });
 
@@ -690,9 +690,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('userId'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.stringContaining('userId')
       );
     });
 
@@ -783,9 +783,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('canceled subscription'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'invoice_canceled_subscription' }),
+        expect.stringContaining('canceled subscription')
       );
     });
 
@@ -837,9 +837,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('userId'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.stringContaining('userId')
       );
     });
 
@@ -853,9 +853,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('non-existent user'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'invoice_user_not_found' }),
+        expect.stringContaining('non-existent user')
       );
     });
 
@@ -928,9 +928,9 @@ describe('BillingService', () => {
       await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
       expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('userId'),
-        expect.anything()
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.stringContaining('userId')
       );
     });
   });

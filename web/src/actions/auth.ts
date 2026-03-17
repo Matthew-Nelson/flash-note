@@ -36,6 +36,7 @@ import { findUserByEmail, findUserById } from '@/server/dal/users';
 import { deleteSession } from '@/server/dal/sessions';
 import { findByCode, validateCodeRedeemable } from '@/server/dal/invite-codes';
 import { auditService } from '@/server/services/audit';
+import { logger } from '@/server/lib/logger';
 import { AuditAction } from '@/server/types';
 import type { ActionResult } from '@/lib/types/actions';
 
@@ -159,12 +160,7 @@ export async function logoutAction(): Promise<void> {
       await deleteSession(session.sessionId);
       sessionDeleted = true;
     } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Failed to delete session during logout:', {
-        sessionId: session.sessionId,
-        userId: session.userId,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_logout', errorType: 'session_delete_failed', audit: true }, 'Failed to delete session during logout');
     }
 
     // Audit — status reflects whether session was actually deleted (fire-and-forget)
@@ -210,11 +206,7 @@ export async function requestPasswordResetAction(formData: FormData): Promise<Ac
       await sendPasswordResetEmail(email, token);
       emailSent = true;
     } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Password reset token/email failed:', {
-        userId: user.id,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_password_reset', errorType: 'token_email_failed' }, 'Password reset token/email failed');
     }
 
     // Audit (fire-and-forget)
@@ -345,11 +337,7 @@ export async function resendVerificationAction(formData: FormData): Promise<Acti
       await sendVerificationEmail(email, token);
       emailSent = true;
     } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      console.error('Verification token/email failed:', {
-        userId: user.id,
-        errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      });
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_resend_verification', errorType: 'token_email_failed' }, 'Verification token/email failed');
     }
 
     // Audit (fire-and-forget)

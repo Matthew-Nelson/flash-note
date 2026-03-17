@@ -3,7 +3,7 @@
  *
  * Tests retry logic, delay calculation, and utility methods.
  */
-import { describe, it, expect, beforeEach, vi, afterEach, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { BaseLLMProvider } from './provider';
 import {
   LLMError,
@@ -17,6 +17,16 @@ import type {
   LLMRetryConfig,
   PTNoteResult,
 } from './types';
+
+// Mock logger
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 // Concrete implementation for testing
 class TestProvider extends BaseLLMProvider {
@@ -69,16 +79,14 @@ const FAST_RETRY_CONFIG: LLMRetryConfig = {
 
 describe('BaseLLMProvider', () => {
   let provider: TestProvider;
-  let consoleWarnSpy: MockInstance;
 
   beforeEach(() => {
     vi.clearAllMocks();
     provider = new TestProvider(FAST_RETRY_CONFIG);
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleWarnSpy.mockRestore();
+    // no-op: mocks cleared in beforeEach
   });
 
   describe('calculateDelay', () => {
@@ -194,7 +202,7 @@ describe('BaseLLMProvider', () => {
 
       expect(result).toBe('success');
       expect(callCount).toBe(2);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('LLM retry attempt:', expect.any(Object));
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.objectContaining({ source: 'llm_service' }), 'LLM retry attempt');
     });
 
     it('should exhaust retries and throw final error', async () => {
@@ -245,13 +253,14 @@ describe('BaseLLMProvider', () => {
         }),
       ).rejects.toThrow(RateLimitError);
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith('LLM retry attempt:', expect.objectContaining({
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.objectContaining({
+        source: 'llm_service',
         provider: 'gemini',
         attempt: expect.any(Number),
         maxRetries: 3,
         errorCode: 'rate_limited',
         delayMs: expect.any(Number),
-      }));
+      }), 'LLM retry attempt');
     });
   });
 

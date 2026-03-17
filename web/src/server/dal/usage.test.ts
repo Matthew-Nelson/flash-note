@@ -5,6 +5,13 @@ import { getUsageForUser, incrementUsage } from './usage';
 // Mock organization-members and organizations DAL modules
 const mockFindActiveMembership = vi.hoisted(() => vi.fn());
 const mockFindOrganizationById = vi.hoisted(() => vi.fn());
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
 
 vi.mock('./organization-members', () => ({
   findActiveMembership: mockFindActiveMembership,
@@ -13,6 +20,8 @@ vi.mock('./organization-members', () => ({
 vi.mock('./organizations', () => ({
   findOrganizationById: mockFindOrganizationById,
 }));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 describe('getUsageForUser', () => {
   beforeEach(() => {
@@ -119,6 +128,7 @@ describe('getUsageForUser', () => {
 describe('incrementUsage', () => {
   beforeEach(() => {
     resetMocks();
+    mockLogger.error.mockClear();
   });
 
   it('executes UPSERT with correct parameters', async () => {
@@ -144,31 +154,31 @@ describe('incrementUsage', () => {
   });
 
   it('swallows errors without throwing', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockDbQuery.mockRejectedValueOnce(new Error('DB connection lost'));
 
     // Should not throw
     await expect(incrementUsage('user-1', 100, 200)).resolves.toBeUndefined();
 
-    expect(consoleSpy).toHaveBeenCalled();
-    consoleSpy.mockRestore();
+    expect(mockLogger.error).toHaveBeenCalled();
   });
 
   it('logs structured context on failure (no PHI)', async () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const dbError = new Error('connection refused');
     mockDbQuery.mockRejectedValueOnce(dbError);
 
     await incrementUsage('user-42', 10, 20);
 
-    // Single console.error call with error object and structured context
-    expect(consoleSpy).toHaveBeenCalledWith('Usage tracking failed:', dbError, {
-      source: 'dal_usage',
-      errorType: 'increment_usage_failed',
-      userId: 'user-42',
-    });
+    // Single logger.error call with structured context
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: dbError,
+        source: 'dal_usage',
+        errorType: 'usage_tracking_failed',
+        userId: 'user-42',
+      }),
+      'Usage tracking failed'
+    );
     // Should only be called once (not split across multiple calls)
-    expect(consoleSpy).toHaveBeenCalledTimes(1);
-    consoleSpy.mockRestore();
+    expect(mockLogger.error).toHaveBeenCalledTimes(1);
   });
 });

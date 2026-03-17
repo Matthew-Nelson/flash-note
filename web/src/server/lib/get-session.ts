@@ -8,6 +8,7 @@ import {
   SESSION_REFRESH_THRESHOLD,
 } from '@/server/db/config';
 import { findSessionByTokenHash, refreshSessionExpiry } from '@/server/dal/sessions';
+import { logger } from '@/server/lib/logger';
 import { getSessionToken, hashSessionToken } from './session-cookie';
 import type { SessionData } from '@/server/types';
 
@@ -52,11 +53,7 @@ export const getSession = cache(async function getSession(): Promise<SessionData
         await refreshSessionExpiry(session.id, newExpiry);
       } catch (refreshError) {
         // Non-critical: session remains valid, just won't be extended this request
-        // TODO: Replace with Pino structured logger when available:
-        //   logger.error({ err: refreshError, source: 'lib_get_session', errorType: 'session_refresh_failed',
-        //     sessionId: session.id }, 'Session refresh failed');
-        // eslint-disable-next-line no-console
-        console.error('Session refresh failed:', refreshError);
+        logger.error({ err: refreshError instanceof Error ? refreshError : new Error(String(refreshError)), source: 'session', errorType: 'refresh_failed' }, 'Session refresh failed');
       }
     }
 
@@ -71,11 +68,7 @@ export const getSession = cache(async function getSession(): Promise<SessionData
     };
   } catch (error) {
     // Fail-closed: DB errors → null → user redirected to login
-    // TODO: Replace with Pino structured logger when available:
-    //   logger.error({ err: error, source: 'lib_get_session', errorType: 'session_validation_failed' },
-    //     'Session validation failed');
-    // eslint-disable-next-line no-console
-    console.error('getSession error:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'session', errorType: 'session_error' }, 'getSession error');
     return null;
   }
 });

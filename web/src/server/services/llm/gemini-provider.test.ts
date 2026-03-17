@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { GeminiProvider } from './gemini-provider';
 import {
   RateLimitError,
@@ -12,6 +12,16 @@ import {
   NetworkError,
 } from './errors';
 import type { LLMRequestConfig, LLMRetryConfig } from './types';
+
+// Mock logger
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -27,8 +37,6 @@ const FAST_RETRY_CONFIG: LLMRetryConfig = {
 
 describe('GeminiProvider', () => {
   let provider: GeminiProvider;
-  let consoleErrorSpy: MockInstance;
-  let consoleWarnSpy: MockInstance;
 
   const requestConfig: LLMRequestConfig = {
     maxTokens: 2000,
@@ -45,19 +53,17 @@ describe('GeminiProvider', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    vi.clearAllMocks();
     provider = new GeminiProvider({
       apiKey: 'test-api-key',
       model: 'gemini-2.5-flash',
       apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
       retryConfig: FAST_RETRY_CONFIG,
     });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    // no-op: mocks cleared in beforeEach
   });
 
   describe('generatePTNote', () => {
@@ -311,10 +317,12 @@ describe('GeminiProvider', () => {
         // Expected
       }
 
-      const logCall = consoleErrorSpy.mock.calls[0];
-      expect(logCall).toBeDefined();
-      expect(logCall[0]).toBe('Gemini API HTTP error:');
-      expect(logCall[1]).toEqual({ status: 500 });
+      expect(mockLogger.error).toHaveBeenCalled();
+      const logCall = mockLogger.error.mock.calls[0];
+      expect(logCall[0]).toEqual(expect.objectContaining({ source: 'llm_gemini', errorType: 'http_error', status: 500 }));
+      // Verify no PHI leaked in log args
+      expect(JSON.stringify(logCall)).not.toContain('John Doe');
+      expect(JSON.stringify(logCall)).not.toContain('1990-01-01');
     });
   });
 
@@ -344,7 +352,7 @@ describe('GeminiProvider', () => {
 
       expect(result.note.subjective).toBe(validPTNoteResponse.subjective);
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('LLM retry attempt:', expect.any(Object));
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.objectContaining({ source: 'llm_service' }), 'LLM retry attempt');
     });
 
     it('should respect retry-after header on 429', async () => {
@@ -374,11 +382,11 @@ describe('GeminiProvider', () => {
       const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteResponse.subjective);
-      const warnCall = consoleWarnSpy.mock.calls.find(
-        (call: unknown[]) => call[0] === 'LLM retry attempt:',
+      const warnCall = mockLogger.warn.mock.calls.find(
+        (call: unknown[]) => typeof call[0] === 'object' && call[0] !== null && 'source' in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).source === 'llm_service',
       );
       expect(warnCall).toBeDefined();
-      expect(warnCall![1]).toHaveProperty('delayMs');
+      expect(warnCall![0]).toHaveProperty('delayMs');
     });
 
     it('should not retry on auth error', async () => {

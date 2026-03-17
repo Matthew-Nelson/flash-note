@@ -7,6 +7,7 @@ import 'server-only';
  * to call a specific tool with a defined input schema.
  */
 
+import { logger } from '@/server/lib/logger';
 import { BaseLLMProvider } from './provider';
 import type { LLMProviderType, LLMRequestConfig, LLMRetryConfig, PTNoteResult } from './types';
 import {
@@ -222,8 +223,7 @@ export class ClaudeProvider extends BaseLLMProvider {
 
   private handleHttpError(status: number, headers: Headers, data: ClaudeResponse): LLMError {
     // SECURITY: Never log raw error body - may echo back PHI from request
-    // TODO: Replace with Pino structured logger when available
-    console.error('Claude API HTTP error:', { status });
+    logger.error({ source: 'llm_claude', errorType: 'http_error', status }, 'Claude API HTTP error');
 
     const retryAfter = this.parseRetryAfter(headers.get('retry-after'));
 
@@ -248,8 +248,7 @@ export class ClaudeProvider extends BaseLLMProvider {
 
   private handleApiError(error: ClaudeErrorObject): LLMError {
     // SECURITY: Never log error message - may contain PHI
-    // TODO: Replace with Pino structured logger when available
-    console.error('Claude API error:', { type: error.type });
+    logger.error({ source: 'llm_claude', errorType: 'api_error', type: error.type }, 'Claude API error');
 
     switch (error.type) {
       case 'invalid_request_error':

@@ -3,6 +3,7 @@ import 'server-only';
 import bcrypt from 'bcryptjs';
 
 import { getPoolClient } from '@/server/db';
+import { logger } from '@/server/lib/logger';
 import { BCRYPT_ROUNDS, LEGAL_DOCUMENT_VERSIONS } from '@/server/db/config';
 import { findUserByEmail, createUserWithClient, updatePassword, resetLockout, updateUserOrganization, markEmailVerified } from '@/server/dal/users';
 import { createSession, deleteSessionsByUserId } from '@/server/dal/sessions';
@@ -79,9 +80,7 @@ export async function login(
     try {
       await recordFailedAttempt(user?.id ?? null, context);
     } catch (error) {
-      // TODO: Replace with Pino structured logger when available
-      // eslint-disable-next-line no-console
-      console.error('Lockout service error during failed attempt recording:', error);
+      logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_auth', errorType: 'lockout_record_failed', audit: true }, 'Lockout service error during failed attempt recording');
     }
     return { success: false, error: 'invalid_credentials' };
   }
@@ -92,9 +91,7 @@ export async function login(
     lockoutStatus = await getAccountLockoutStatus(user.id);
   } catch (error) {
     // Fail-secure: can't check lockout → deny access
-    // TODO: Replace with Pino structured logger when available
-    // eslint-disable-next-line no-console
-    console.error('Lockout service error during status check:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_auth', errorType: 'lockout_check_failed', audit: true }, 'Lockout service error during status check');
     return { success: false, error: 'invalid_credentials' };
   }
 
@@ -118,9 +115,7 @@ export async function login(
   try {
     await resetFailedAttempts(user.id);
   } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    // eslint-disable-next-line no-console
-    console.error('Lockout service error during failed attempts reset:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_auth', errorType: 'lockout_reset_failed', audit: true }, 'Lockout service error during failed attempts reset');
   }
 
   // Create session
@@ -280,9 +275,7 @@ export async function register(
     const verificationToken = await createToken(user.id, 'email_verification');
     await sendVerificationEmail(email, verificationToken);
   } catch (error) {
-    // TODO: Replace with Pino structured logger when available
-    // eslint-disable-next-line no-console
-    console.error('Failed to send verification email:', error);
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'dal_auth', errorType: 'verification_email_failed' }, 'Failed to send verification email');
   }
 
   return {

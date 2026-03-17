@@ -3,6 +3,7 @@
 import { z } from 'zod';
 
 import { getSession } from '@/server/lib/get-session';
+import { logger } from '@/server/lib/logger';
 import { getBillingService, SubscriptionExistsError } from '@/server/services/billing';
 import { checkRateLimit, checkoutRateLimit, portalRateLimit } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
@@ -59,12 +60,7 @@ export async function createCheckoutAction(
     );
     return { success: true, data: { checkoutUrl } };
   } catch (error) {
-    // TODO: Replace with Pino logger in Phase 1.7
-    console.error('createCheckoutAction failed:', {
-      source: 'action_billing',
-      errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      userId: session.userId,
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_checkout', errorType: 'checkout_failed', userId: session.userId }, 'createCheckoutAction failed');
     if (error instanceof SubscriptionExistsError) {
       return { success: false, error: 'subscription_exists' };
     }
@@ -90,11 +86,7 @@ export async function createPortalAction(): Promise<ActionResult<{ portalUrl: st
     const portalUrl = await getBillingService().createPortalSession(session.userId);
     return { success: true, data: { portalUrl } };
   } catch (error) {
-    console.error('createPortalAction failed:', {
-      source: 'action_billing',
-      errorType: error instanceof Error ? error.constructor.name : 'unknown',
-      userId: session.userId,
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_portal', errorType: 'portal_failed', userId: session.userId }, 'createPortalAction failed');
     return { success: false, error: 'billing_error' };
   }
 }

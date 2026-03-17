@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach, type MockInstance } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ClaudeProvider } from './claude-provider';
 import {
   RateLimitError,
@@ -14,6 +14,16 @@ import {
 } from './errors';
 import type { LLMRequestConfig, LLMRetryConfig } from './types';
 
+// Mock logger
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn(),
+}));
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
+
 // Mock fetch globally
 const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
@@ -28,8 +38,6 @@ const FAST_RETRY_CONFIG: LLMRetryConfig = {
 
 describe('ClaudeProvider', () => {
   let provider: ClaudeProvider;
-  let consoleErrorSpy: MockInstance;
-  let consoleWarnSpy: MockInstance;
 
   const requestConfig: LLMRequestConfig = {
     maxTokens: 2000,
@@ -66,18 +74,16 @@ describe('ClaudeProvider', () => {
 
   beforeEach(() => {
     mockFetch.mockReset();
+    vi.clearAllMocks();
     provider = new ClaudeProvider({
       apiKey: 'test-api-key',
       model: 'claude-sonnet-4-20250514',
       retryConfig: FAST_RETRY_CONFIG,
     });
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
   afterEach(() => {
-    consoleErrorSpy.mockRestore();
-    consoleWarnSpy.mockRestore();
+    // no-op: mocks cleared in beforeEach
   });
 
   describe('generatePTNote', () => {
@@ -280,10 +286,11 @@ describe('ClaudeProvider', () => {
         // Expected
       }
 
-      const logCall = consoleErrorSpy.mock.calls[0];
-      expect(logCall).toBeDefined();
-      expect(logCall[0]).toBe('Claude API HTTP error:');
-      expect(logCall[1]).toEqual({ status: 500 });
+      expect(mockLogger.error).toHaveBeenCalled();
+      const logCall = mockLogger.error.mock.calls[0];
+      expect(logCall[0]).toEqual(expect.objectContaining({ source: 'llm_claude', errorType: 'http_error', status: 500 }));
+      // Verify no PHI leaked in log args
+      expect(JSON.stringify(logCall)).not.toContain('John Doe');
     });
   });
 
@@ -306,7 +313,7 @@ describe('ClaudeProvider', () => {
 
       expect(result.note.subjective).toBe(validPTNoteInput.subjective);
       expect(mockFetch).toHaveBeenCalledTimes(2);
-      expect(consoleWarnSpy).toHaveBeenCalledWith('LLM retry attempt:', expect.any(Object));
+      expect(mockLogger.warn).toHaveBeenCalledWith(expect.objectContaining({ source: 'llm_service' }), 'LLM retry attempt');
     });
 
     it('should respect retry-after header', async () => {
@@ -329,11 +336,11 @@ describe('ClaudeProvider', () => {
       const result = await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
 
       expect(result.note.subjective).toBe(validPTNoteInput.subjective);
-      const warnCall = consoleWarnSpy.mock.calls.find(
-        (call: unknown[]) => call[0] === 'LLM retry attempt:',
+      const warnCall = mockLogger.warn.mock.calls.find(
+        (call: unknown[]) => typeof call[0] === 'object' && call[0] !== null && 'source' in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).source === 'llm_service',
       );
       expect(warnCall).toBeDefined();
-      expect(warnCall![1]).toHaveProperty('delayMs');
+      expect(warnCall![0]).toHaveProperty('delayMs');
     });
 
     it('should not retry on auth error', async () => {

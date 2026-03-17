@@ -11,6 +11,7 @@ import {
   NetworkError,
 } from '@/server/services/llm';
 import { getSession } from '@/server/lib/get-session';
+import { logger } from '@/server/lib/logger';
 import { getRequestContext } from '@/server/lib/request-context';
 import {
   checkRateLimit,
@@ -103,13 +104,7 @@ export async function generateNoteAction(
 
     // 8. Security monitoring — log suspicious patterns synchronously before audit
     if (result.securityMetadata.suspiciousPatternDetected) {
-      // TODO: Replace with Pino structured logger when available
-      console.warn('Suspicious prompt patterns detected:', {
-        source: 'action_generate_note',
-        userId: session.userId,
-        noteType,
-        suspiciousPatternCount: result.securityMetadata.suspiciousPatternCount,
-      });
+      logger.warn({ source: 'action_generate_note', errorType: 'suspicious_patterns', audit: true, userId: session.userId, noteType, suspiciousPatternCount: result.securityMetadata.suspiciousPatternCount }, 'Suspicious prompt patterns detected');
     }
 
     // 9. Audit log (errors swallowed internally by auditService.log)
@@ -153,16 +148,8 @@ export async function generateNoteAction(
     // Map LLM errors to error codes
     const errorCode = mapLLMErrorCode(error);
 
-    // TODO: Replace with Pino structured logger when available
     // Log with structured context (no PHI — never log quickNotes, patientContext, or raw error messages)
-    console.error('Note generation failed:', {
-      err: error,
-      source: 'action_generate_note',
-      errorType: errorCode,
-      userId: session.userId,
-      noteType,
-      isLLMError: error instanceof LLMError,
-    });
+    logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'action_generate_note', errorType: errorCode, userId: session.userId, noteType, isLLMError: error instanceof LLMError }, 'Note generation failed');
 
     // Audit failure (errors swallowed internally by auditService.log)
     await auditService.log({

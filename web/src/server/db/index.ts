@@ -3,6 +3,7 @@ import 'server-only';
 import pg from 'pg';
 
 import { config } from './config';
+import { logger } from '@/server/lib/logger';
 
 const { Pool } = pg;
 
@@ -34,7 +35,7 @@ export const db = globalForDb._flashnoteDb ?? new Pool({
 // Only attach on first creation to avoid duplicate listeners on HMR reloads.
 if (isNewPool) {
   db.on('error', (err) => {
-    console.error('PostgreSQL pool error:', err);
+    logger.error({ err, source: 'database', errorType: 'pool_error' }, 'PostgreSQL pool error');
   });
 }
 
@@ -61,10 +62,10 @@ if (isNewPool) {
     if (isShuttingDown) return;
     isShuttingDown = true;
 
-    console.warn(`Received ${signal}: draining database pool`);
+    logger.warn({ source: 'database', signal }, 'Received signal: draining database pool');
 
     const forceExit = setTimeout(() => {
-      console.error('Pool drain timed out, forcing exit');
+      logger.error({ source: 'database', errorType: 'drain_timeout' }, 'Pool drain timed out, forcing exit');
       process.exit(1);
     }, SHUTDOWN_TIMEOUT_MS);
 
@@ -74,11 +75,11 @@ if (isNewPool) {
 
     db.end()
       .then(() => {
-        console.warn('Database pool drained successfully');
+        logger.warn({ source: 'database' }, 'Database pool drained successfully');
         process.exit(0);
       })
       .catch((err) => {
-        console.error('Error draining database pool:', err);
+        logger.error({ err, source: 'database', errorType: 'drain_error' }, 'Error draining database pool');
         process.exit(1);
       });
   };

@@ -4,6 +4,7 @@ import Stripe from 'stripe';
 import { z } from 'zod';
 
 import { config } from '@/server/db/config';
+import { logger } from '@/server/lib/logger';
 import {
   findUserById,
   updateUserSubscription,
@@ -186,8 +187,7 @@ class BillingService {
     // Database-backed idempotency check (atomic INSERT prevents race conditions)
     const isNewEvent = await tryMarkWebhookProcessed(event.id, event.type);
     if (!isNewEvent) {
-      // eslint-disable-next-line no-console
-      console.log(`Skipping duplicate webhook event: ${event.id}`);
+      logger.info({ source: 'billing_webhook', eventId: event.id }, 'Skipping duplicate webhook event');
       return;
     }
 
@@ -223,36 +223,19 @@ class BillingService {
         }
 
         default: {
-          // eslint-disable-next-line no-console
-          console.warn('Unhandled Stripe webhook event type:', {
-            source: 'service_billing',
-            errorType: 'unhandled_webhook_event_type',
-            eventId: event.id,
-            eventType: event.type,
-          });
+          logger.warn({ source: 'billing_webhook', eventType: event.type, eventId: event.id }, 'Unhandled Stripe webhook event type');
           break;
         }
       }
     } catch (handlerError) {
       // Handler failed — delete idempotency record so Stripe retry will be processed
-      console.error('Webhook handler failed:', {
-        source: 'service_billing',
-        errorType: 'handler_failed',
-        eventId: event.id,
-        eventType: event.type,
-      });
+      logger.error({ err: handlerError instanceof Error ? handlerError : new Error(String(handlerError)), source: 'billing_webhook', errorType: 'webhook_handler_failed', eventType: event.type, eventId: event.id }, 'Webhook handler failed');
 
       try {
         await deleteProcessedWebhookEvent(event.id);
       } catch (cleanupError) {
         // Cleanup also failed — event is permanently stuck.
-        console.error('Idempotency cleanup failed:', {
-          source: 'service_billing',
-          errorType: 'idempotency_cleanup_failed',
-          eventId: event.id,
-          eventType: event.type,
-          cleanupErrorType: cleanupError instanceof Error ? cleanupError.constructor.name : 'unknown',
-        });
+        logger.error({ err: cleanupError instanceof Error ? cleanupError : new Error(String(cleanupError)), source: 'billing_webhook', errorType: 'idempotency_cleanup_failed', eventId: event.id, eventType: event.type }, 'Idempotency cleanup failed');
       }
 
       // Re-throw so Stripe receives 500 and schedules a retry
@@ -273,15 +256,7 @@ class BillingService {
     const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
     const subscriptionId = typeof session.subscription === 'string' ? session.subscription : session.subscription?.id;
     if (!customerId || !subscriptionId) {
-      // eslint-disable-next-line no-console
-      console.error('checkout.session.completed missing customer or subscription ID:', {
-        source: 'service_billing',
-        errorType: 'missing_checkout_ids',
-        userId,
-        sessionId: session.id,
-        hasCustomer: !!session.customer,
-        hasSubscription: !!session.subscription,
-      });
+      logger.error({ source: 'billing_webhook', errorType: 'missing_checkout_ids', sessionId: session.id, hasCustomer: !!session.customer, hasSubscription: !!session.subscription }, 'checkout.session.completed missing customer or subscription ID');
       return;
     }
 
@@ -318,13 +293,7 @@ class BillingService {
     // that our schema doesn't support. Skip unknown statuses with error logging.
     const validStatuses = new Set(['trialing', 'active', 'canceled', 'past_due', 'unpaid']);
     if (!validStatuses.has(subscription.status)) {
-      console.error('Unknown Stripe subscription status received:', {
-        source: 'service_billing',
-        errorType: 'unknown_subscription_status',
-        userId,
-        subscriptionId: subscription.id,
-        stripeStatus: subscription.status,
-      });
+      logger.error({ source: 'billing_webhook', errorType: 'unknown_subscription_status', subscriptionId: subscription.id, status: subscription.status }, 'Unknown Stripe subscription status received');
       return;
     }
 
@@ -373,13 +342,7 @@ class BillingService {
     const user = await findUserById(userId);
 
     if (!user) {
-      console.error('invoice.paid received for non-existent user:', {
-        source: 'service_billing',
-        errorType: 'user_not_found',
-        userId,
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-      });
+      logger.error({ source: 'billing_webhook', errorType: 'invoice_user_not_found', customerId: subscription.customer, subscriptionId: subscription.id, invoiceId: invoice.id }, 'invoice.paid received for non-existent user');
       // Fire-and-forget — auditService.log swallows errors internally (never rejects).
       void auditService.log({
         userId,
@@ -399,13 +362,7 @@ class BillingService {
     const reactivatableStatuses = new Set(['past_due', 'trialing', 'unpaid']);
 
     if (currentStatus === 'canceled') {
-      console.error('invoice.paid received for canceled subscription:', {
-        source: 'service_billing',
-        errorType: 'invoice_paid_canceled_subscription',
-        userId,
-        subscriptionId: subscription.id,
-        invoiceId: invoice.id,
-      });
+      logger.error({ source: 'billing_webhook', errorType: 'invoice_canceled_subscription', subscriptionId: subscription.id, invoiceId: invoice.id }, 'invoice.paid received for canceled subscription');
       // Fire-and-forget — auditService.log swallows errors internally (never rejects).
       void auditService.log({
         userId,
@@ -504,15 +461,7 @@ class BillingService {
     eventType: string,
     context: Record<string, unknown>
   ): void {
-    console.error('Webhook missing or invalid userId in metadata:', {
-      source: 'service_billing',
-      errorType: 'missing_user_metadata',
-      eventType,
-      subscriptionId: context['subscriptionId'],
-      sessionId: context['sessionId'],
-      invoiceId: context['invoiceId'],
-      // Note: customerId and invalidUserId intentionally omitted — may contain PII
-    });
+    logger.error({ source: 'billing_webhook', errorType: 'missing_user_metadata', eventType, eventId: context['eventId'] }, 'Webhook missing or invalid userId in metadata');
 
     // Fire-and-forget — auditService.log swallows errors internally (never rejects).
     void auditService.log({

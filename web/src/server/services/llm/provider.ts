@@ -7,6 +7,7 @@ import 'server-only';
  * built-in retry handling for transient errors.
  */
 
+import { logger } from '@/server/lib/logger';
 import type {
   LLMProviderType,
   LLMRequestConfig,
@@ -98,14 +99,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
         const delay = this.calculateDelay(attempt, error.retryAfterMs);
 
         // SECURITY: Log retry attempt without PHI
-        // TODO: Replace with Pino structured logger when available
-        console.warn('LLM retry attempt:', {
-          provider: this.name,
-          attempt: attempt + 1,
-          maxRetries: this.retryConfig.maxRetries,
-          errorCode: error.code,
-          delayMs: delay,
-        });
+        logger.warn({ source: 'llm_service', provider: this.name, attempt: attempt + 1, maxRetries: this.retryConfig.maxRetries, errorCode: error.code, delayMs: delay }, 'LLM retry attempt');
 
         await this.sleep(delay);
       }
