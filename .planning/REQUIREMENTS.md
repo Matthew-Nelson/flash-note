@@ -168,7 +168,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MON-03 | Phase 2 | Pending |
 | MON-04 | Phase 2 | Pending |
 | MON-05 | Phase 2 | Pending |
-| MON-06 | Phase 5 | Pending |
+| MON-06 | Phase 2 | Pending |
 | MON-07 | Phase 10 | Pending |
 | MON-08 | Phase 10 | Pending |
 | MON-09 | Phase 10 | Pending |

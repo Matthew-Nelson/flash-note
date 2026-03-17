@@ -13,10 +13,10 @@ FlashNote is a production Next.js application with auth, billing, note generatio
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion (completed 2026-03-17)
-- [ ] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation
+- [ ] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation, Sentry removal
 - [ ] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning
 - [ ] **Phase 4: Staging Verification** - First staging deploy, Vertex AI ADC, end-to-end smoke tests
-- [ ] **Phase 5: Production Readiness** - Sentry removal, Stripe live mode, beta launch gate
+- [ ] **Phase 5: Production Readiness** - Stripe live mode, beta launch gate
 - [ ] **Phase 6: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements
 - [ ] **Phase 7: Post-PHI Features** - PDF export, per-section copy, auto titles, time-saved tracking, note search
 - [ ] **Phase 8: Retention & Differentiation** - Macro library, Magic Edit, failed payment notifications
@@ -42,20 +42,22 @@ Plans:
 - [ ] 01-02-PLAN.md — Responsive 375px, settings skeleton, and print stylesheet (UIPOL-03, UIPOL-04, UIPOL-05)
 
 ### Phase 2: Structured Logging
-**Goal**: All server-side logging uses structured Pino output, and client-side errors flow through a telemetry endpoint -- establishing the logging foundation required for HIPAA audit compliance
+**Goal**: All server-side logging uses structured Pino output, client-side errors flow through a telemetry endpoint, and Sentry is fully removed -- establishing the logging foundation required for HIPAA audit compliance and eliminating the external error tracking dependency
 **Depends on**: Nothing (can run in parallel with Phase 1, but must complete before Phase 4)
-**Requirements**: MON-01, MON-02, MON-03, MON-04, MON-05
+**Requirements**: MON-01, MON-02, MON-03, MON-04, MON-05, MON-06
 **Success Criteria** (what must be TRUE):
   1. Server logs are structured JSON in production (GCP format) and human-readable in dev (pino-pretty)
-  2. All ~44 console.* calls in production code are replaced with Pino logger calls at appropriate severity levels
+  2. All ~56 console.* calls in production code are replaced with Pino logger calls at appropriate severity levels
   3. Client-side JavaScript errors are captured and appear in server-side Pino logs via the telemetry endpoint
   4. Error boundaries (global-error.tsx, ErrorBoundary.tsx) automatically report to the telemetry endpoint
   5. The instrumentation.ts onRequestError hook logs through Pino instead of Sentry
-**Plans**: TBD
+  6. Sentry is fully removed (no SDK, no config files, no build args, no test mocks) and Pino is the sole error reporting path
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Pino logger singleton, client telemetry library, telemetry endpoint (MON-01, MON-03)
+- [ ] 02-02-PLAN.md — Console migration, error boundary wiring, instrumentation rewrite (MON-02, MON-04, MON-05)
+- [ ] 02-03-PLAN.md — Sentry removal, instrumentation-client rewrite, ESLint tightening (MON-06)
 
 ### Phase 3: Pipeline & Provisioning
 **Goal**: The deploy pipeline is hardened for safe production deployments and all GCP infrastructure is provisioned and configured
@@ -89,14 +91,13 @@ Plans:
 - [ ] 04-01: TBD
 
 ### Phase 5: Production Readiness
-**Goal**: The application is ready for real users with real payments -- Sentry removed, Stripe live, launch gate criteria met
-**Depends on**: Phase 4 (Sentry removal requires Pino verified in staging; Stripe live requires staging smoke tests passing)
-**Requirements**: MON-06, BILL-01, BILL-02, BILL-03, BILL-04, LAUNCH-01, LAUNCH-02, LAUNCH-03, LAUNCH-04
+**Goal**: The application is ready for real users with real payments -- Stripe live, launch gate criteria met
+**Depends on**: Phase 4 (Stripe live requires staging smoke tests passing)
+**Requirements**: BILL-01, BILL-02, BILL-03, BILL-04, LAUNCH-01, LAUNCH-02, LAUNCH-03, LAUNCH-04
 **Success Criteria** (what must be TRUE):
-  1. Sentry is fully removed (no SDK, no config files, no build args, no test mocks) and Pino is the sole error reporting path
-  2. Stripe is in live mode with identity verification complete and production webhook processing real events
-  3. A real $1 payment succeeds, webhook processes correctly, and the charge is refunded
-  4. Cloud Run has min-instances=1, legal docs are published, support email works, and 48 hours pass with no errors
+  1. Stripe is in live mode with identity verification complete and production webhook processing real events
+  2. A real $1 payment succeeds, webhook processes correctly, and the charge is refunded
+  3. Cloud Run has min-instances=1, legal docs are published, support email works, and 48 hours pass with no errors
 **Plans**: TBD
 
 Plans:
@@ -193,7 +194,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
-| 2. Structured Logging | 0/2 | Not started | - |
+| 2. Structured Logging | 0/3 | Not started | - |
 | 3. Pipeline & Provisioning | 0/3 | Not started | - |
 | 4. Staging Verification | 0/1 | Not started | - |
 | 5. Production Readiness | 0/2 | Not started | - |
