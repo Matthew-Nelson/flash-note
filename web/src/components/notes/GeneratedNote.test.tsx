@@ -874,4 +874,65 @@ describe('GeneratedNote', () => {
     const textarea = screen.getByRole('textbox', { name: 'Edit Subjective section content' });
     expect(textarea).toHaveAttribute('aria-label', 'Edit Subjective section content');
   });
+
+  // --- Print layout tests ---
+
+  it('renders a print-only clinical header with hidden print:block classes', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printHeader = screen.getByTestId('print-header');
+    expect(printHeader).toBeInTheDocument();
+    expect(printHeader).toHaveClass('hidden');
+    expect(printHeader).toHaveClass('print:block');
+  });
+
+  it('print header contains blank underline fields for patient name, date, duration, modality', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printHeader = screen.getByTestId('print-header');
+    expect(printHeader).toHaveTextContent('Patient Name');
+    expect(printHeader).toHaveTextContent('Date');
+    expect(printHeader).toHaveTextContent('Duration');
+    expect(printHeader).toHaveTextContent('Modality');
+  });
+
+  it('renders a print-only signature block with hidden print:block classes', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printFooter = screen.getByTestId('print-footer');
+    expect(printFooter).toBeInTheDocument();
+    expect(printFooter).toHaveClass('hidden');
+    expect(printFooter).toHaveClass('print:block');
+  });
+
+  it('signature block contains Provider Signature and Date labels', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printFooter = screen.getByTestId('print-footer');
+    expect(printFooter).toHaveTextContent('Provider Signature');
+    expect(printFooter).toHaveTextContent('Date');
+  });
+
+  it('print-only elements are not visible by default (have hidden class)', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printHeader = screen.getByTestId('print-header');
+    const printFooter = screen.getByTestId('print-footer');
+    expect(printHeader).toHaveClass('hidden');
+    expect(printFooter).toHaveClass('hidden');
+  });
+
+  it('print header contains FlashNote branding', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printHeader = screen.getByTestId('print-header');
+    expect(printHeader).toHaveTextContent('FlashNote');
+  });
+
+  it('print header contains SOAP Note title', () => {
+    render(<GeneratedNote note={buildNote()} />);
+
+    const printHeader = screen.getByTestId('print-header');
+    expect(printHeader).toHaveTextContent('SOAP Note');
+  });
 });
