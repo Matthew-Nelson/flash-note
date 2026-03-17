@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 02-structured-logging
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md]
 started: 2026-03-17T13:45:00Z
@@ -55,17 +55,33 @@ skipped: 0
   reason: "User reported: Only standard Next.js request logs visible (GET / 200 in 668ms). No Pino-formatted output, no source/level/timestamp fields, no colored key-value pairs."
   severity: major
   test: 2
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Two co-occurring issues: (1) Primary — zero logger calls exist in happy paths. All ~25 logger.error calls are in catch blocks, only 3 logger.info calls exist in rare edge-case paths. Normal operations (login, page loads, session validation) produce no log output. (2) Secondary — Turbopack worker threads may not relay pino-pretty stdout to the dev terminal (Next.js issues #84766, #86099)."
+  artifacts:
+    - path: "web/src/server/services/auth.ts"
+      issue: "Only logs errors in catch blocks, no info-level login success/failure logging"
+    - path: "web/src/server/lib/get-session.ts"
+      issue: "Only logs errors, no operational logging for session validation"
+    - path: "web/src/server/db/index.ts"
+      issue: "No startup/pool creation log"
+    - path: "web/src/actions/notes.ts"
+      issue: "No note generation lifecycle logging"
+    - path: "web/src/server/lib/logger.ts"
+      issue: "Transport config may need sync:true or require.resolve for Turbopack compatibility"
+  missing:
+    - "Add operational logger.info/debug calls at key points (auth flow, session validation, note generation, DB pool startup)"
+    - "Verify pino-pretty output appears after adding calls; if not, switch to sync transport in dev"
+  debug_session: ".planning/debug/pino-dev-visibility.md"
 
 - truth: "Telemetry endpoint logs received client errors as structured Pino entries visible in dev terminal"
   status: failed
   reason: "User reported: again we do not see server logs in our terminal output"
   severity: major
   test: 6
-  root_cause: ""
-  artifacts: []
-  missing: []
-  debug_session: ""
+  root_cause: "Same root cause as Test 2. The telemetry route handler at web/src/app/api/telemetry/route.ts does not call logger after receiving valid payloads — it silently returns { ok: true }. Additionally, Turbopack worker thread stdout relay issue may suppress any pino-pretty output."
+  artifacts:
+    - path: "web/src/app/api/telemetry/route.ts"
+      issue: "No debug-level logging on received telemetry events; validation failures silently dropped"
+  missing:
+    - "Add logger.debug/info call in telemetry route after successful validation"
+    - "Same Turbopack transport fix as Test 2"
+  debug_session: ".planning/debug/pino-dev-visibility.md"
