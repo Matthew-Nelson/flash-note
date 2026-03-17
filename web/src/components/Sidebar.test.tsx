@@ -150,4 +150,16 @@ describe('Sidebar', () => {
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it('NavItem links have min-h-[44px] for touch target compliance', () => {
+    renderSidebar();
+    const dashboardLinks = screen.getAllByRole('link', { name: 'Dashboard' });
+    expect(dashboardLinks[0].className).toContain('min-h-[44px]');
+  });
+
+  it('New Note CTA has min-h-[44px] for touch target compliance', () => {
+    renderSidebar();
+    const newNoteLinks = screen.getAllByRole('link', { name: /new note/i });
+    expect(newNoteLinks[0].className).toContain('min-h-[44px]');
+  });
 });

@@ -41,14 +41,14 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
         <div className="hidden md:flex items-center space-x-6">
           <Link
             href="/pricing"
-            className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
+            className="inline-flex items-center min-h-[44px] text-fn-text-secondary hover:text-fn-text-primary transition-colors"
           >
             Pricing
           </Link>
           {showDashboardLink ? (
             <Link
               href="/dashboard"
-              className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
+              className="inline-flex items-center min-h-[44px] text-fn-text-secondary hover:text-fn-text-primary transition-colors"
             >
               Dashboard
             </Link>
@@ -56,11 +56,11 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
             <>
               <Link
                 href="/login"
-                className="text-fn-text-secondary hover:text-fn-text-primary transition-colors"
+                className="inline-flex items-center min-h-[44px] text-fn-text-secondary hover:text-fn-text-primary transition-colors"
               >
                 Sign In
               </Link>
-              <Link href="/signup" className="btn-primary px-4 py-2">
+              <Link href="/signup" className="btn-primary px-4 py-2 min-h-[44px] inline-flex items-center justify-center cursor-pointer">
                 Get Started
               </Link>
             </>
@@ -114,7 +114,7 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
             <Link
               href="/pricing"
               onClick={() => setIsOpen(false)}
-              className="block text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
+              className="block min-h-[44px] flex items-center text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
             >
               Pricing
             </Link>
@@ -122,7 +122,7 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
               <Link
                 href="/dashboard"
                 onClick={() => setIsOpen(false)}
-                className="block text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
+                className="block min-h-[44px] flex items-center text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
               >
                 Dashboard
               </Link>
@@ -131,14 +131,14 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
                 <Link
                   href="/login"
                   onClick={() => setIsOpen(false)}
-                  className="block text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
+                  className="block min-h-[44px] flex items-center text-fn-text-secondary hover:text-fn-text-primary transition-colors py-2"
                 >
                   Sign In
                 </Link>
                 <Link
                   href="/signup"
                   onClick={() => setIsOpen(false)}
-                  className="btn-primary block text-center px-4 py-2"
+                  className="btn-primary block text-center px-4 py-2 min-h-[44px] flex items-center justify-center cursor-pointer"
                 >
                   Get Started
                 </Link>

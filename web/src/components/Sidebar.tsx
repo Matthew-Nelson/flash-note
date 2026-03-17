@@ -35,7 +35,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
-        className="flex items-center gap-3 px-3 py-2 rounded-fn-sm text-fn-sm font-medium
+        className="flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-fn-sm text-fn-sm font-medium
                    text-fn-sidebar-text hover:bg-fn-sidebar-hover transition-colors
                    aria-[current=page]:bg-fn-sidebar-active aria-[current=page]:text-fn-sidebar-text-active"
       >
@@ -86,9 +86,9 @@ function SidebarContent({ user }: { user: { email: string } }) {
       <div className="px-3 pb-4">
         <Link
           href="/dashboard/notes/new"
-          className="flex items-center justify-center gap-2 w-full py-2.5 rounded-fn-base
+          className="flex items-center justify-center gap-2 w-full py-2.5 min-h-[44px] rounded-fn-base
                      bg-fn-primary-DEFAULT text-white text-fn-sm font-semibold
-                     hover:bg-fn-primary-hover transition-colors"
+                     hover:bg-fn-primary-hover transition-colors cursor-pointer"
         >
           <svg
             aria-hidden="true"

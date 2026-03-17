@@ -62,4 +62,14 @@ describe('Footer', () => {
     const year = new Date().getFullYear().toString();
     expect(screen.getByText(new RegExp(year))).toBeInTheDocument();
   });
+
+  it('footer links have min-h-[44px] for touch target compliance', () => {
+    render(<Footer />);
+    const pricingLink = screen.getByRole('link', { name: 'Pricing' });
+    expect(pricingLink.className).toContain('min-h-[44px]');
+    const privacyLink = screen.getByRole('link', { name: 'Privacy Policy' });
+    expect(privacyLink.className).toContain('min-h-[44px]');
+    const baaLink = screen.getByRole('link', { name: 'BAA' });
+    expect(baaLink.className).toContain('min-h-[44px]');
+  });
 });

@@ -125,4 +125,17 @@ describe('MarketingNav', () => {
     expect(backdrop).toHaveAttribute('role', 'presentation');
     expect(backdrop).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('desktop nav links have min-h-[44px] for touch target compliance', () => {
+    render(<MarketingNav />);
+    const pricingLinks = screen.getAllByRole('link', { name: 'Pricing' });
+    // Desktop pricing link is the first one
+    expect(pricingLinks[0].className).toContain('min-h-[44px]');
+  });
+
+  it('Get Started CTA has min-h-[44px] for touch target compliance', () => {
+    render(<MarketingNav />);
+    const ctaLinks = screen.getAllByRole('link', { name: 'Get Started' });
+    expect(ctaLinks[0].className).toContain('min-h-[44px]');
+  });
 });

@@ -51,7 +51,7 @@ export function Alert({ variant, children, onDismiss, className = '', ...props }
         <button
           type="button"
           onClick={onDismiss}
-          className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
+          className="flex-shrink-0 min-w-[44px] min-h-[44px] flex items-center justify-center opacity-70 hover:opacity-100 transition-opacity cursor-pointer"
           aria-label="Dismiss"
         >
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">

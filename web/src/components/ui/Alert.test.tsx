@@ -59,4 +59,25 @@ describe('Alert', () => {
     );
     expect(screen.getByRole('alert').className).toContain('custom-class');
   });
+
+  it('dismiss button should have min-w-[44px] and min-h-[44px] for touch target compliance', () => {
+    render(
+      <Alert variant="info" onDismiss={() => {}}>
+        Dismiss me
+      </Alert>
+    );
+    const btn = screen.getByLabelText('Dismiss');
+    expect(btn.className).toContain('min-w-[44px]');
+    expect(btn.className).toContain('min-h-[44px]');
+  });
+
+  it('dismiss button should have cursor-pointer class', () => {
+    render(
+      <Alert variant="info" onDismiss={() => {}}>
+        Dismiss me
+      </Alert>
+    );
+    const btn = screen.getByLabelText('Dismiss');
+    expect(btn.className).toContain('cursor-pointer');
+  });
 });
