@@ -18,9 +18,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Monitoring & Observability
 
-- [ ] **MON-01**: Server-side logging uses Pino structured logger with GCP JSON format in production and pino-pretty in dev
+- [x] **MON-01**: Server-side logging uses Pino structured logger with GCP JSON format in production and pino-pretty in dev
 - [ ] **MON-02**: All ~44 `console.*` calls across 18 production files replaced with structured Pino logging
-- [ ] **MON-03**: Client-side errors are captured via `/api/telemetry` endpoint and logged server-side through Pino
+- [x] **MON-03**: Client-side errors are captured via `/api/telemetry` endpoint and logged server-side through Pino
 - [ ] **MON-04**: Error boundaries (`global-error.tsx`, `ErrorBoundary.tsx`) report to telemetry endpoint
 - [ ] **MON-05**: `instrumentation.ts` `onRequestError` hook uses Pino instead of Sentry
 - [ ] **MON-06**: Sentry fully removed (config files, SDK dependency, build args, test mocks) after Pino verified in production
@@ -163,9 +163,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UIPOL-04 | Phase 1 | Complete |
 | UIPOL-05 | Phase 1 | Complete |
 | UIPOL-06 | Phase 1 | Complete |
-| MON-01 | Phase 2 | Pending |
+| MON-01 | Phase 2 | Complete |
 | MON-02 | Phase 2 | Pending |
-| MON-03 | Phase 2 | Pending |
+| MON-03 | Phase 2 | Complete |
 | MON-04 | Phase 2 | Pending |
 | MON-05 | Phase 2 | Pending |
 | MON-06 | Phase 2 | Pending |

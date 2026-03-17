@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: completed
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-17T04:40:55.501Z"
-last_activity: 2026-03-17 -- Completed 01-01 (touch targets, cursor-pointer, reduced-motion)
+status: in-progress
+stopped_at: Completed 02-01 (logger & telemetry foundation)
+last_updated: "2026-03-17T05:16:07Z"
+last_activity: 2026-03-17 -- Completed 02-01 (Pino logger singleton, client telemetry, /api/telemetry endpoint)
 progress:
   total_phases: 10
   completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
-  percent: 10
+  total_plans: 5
+  completed_plans: 3
+  percent: 14
 ---
 
 # Project State
@@ -21,32 +21,33 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
-**Current focus:** Phase 1: UI Polish
+**Current focus:** Phase 2: Structured Logging
 
 ## Current Position
 
-Phase: 1 of 10 (UI Polish)
-Plan: 2 of 2 in current phase (complete)
-Status: Phase 1 complete
-Last activity: 2026-03-17 -- Completed 01-01 (touch targets, cursor-pointer, reduced-motion)
+Phase: 2 of 10 (Structured Logging)
+Plan: 1 of 3 in current phase
+Status: Plan 02-01 complete, continuing to 02-02
+Last activity: 2026-03-17 -- Completed 02-01 (Pino logger singleton, client telemetry, /api/telemetry endpoint)
 
-Progress: [#░░░░░░░░░] 10%
+Progress: [##░░░░░░░░] 14%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 2
-- Average duration: ~4min
-- Total execution time: ~8 min
+- Total plans completed: 3
+- Average duration: ~5min
+- Total execution time: ~15 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-ui-polish | 2 | ~8min | ~4min |
+| 02-structured-logging | 1 | 7min | 7min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~4min), 01-02 (4min)
+- Last 5 plans: 01-01 (~4min), 01-02 (4min), 02-01 (7min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -66,6 +67,9 @@ Recent decisions affecting current work:
 - [01-02]: Responsive padding pattern: p-4 sm:p-6 for dashboard page mains, px-4 sm:px-6 for TopBar
 - [01-01]: cursor-pointer applied in both CSS classes and Button.tsx Tailwind for defense-in-depth
 - [01-01]: Reduced-motion spinner exemption uses 1s animation-duration for consistency with CSS spinner definitions
+- [02-01]: Logger reads process.env.NODE_ENV directly (not config.ts) to avoid circular dependency at module init
+- [02-01]: PHI redaction uses 14 field paths matching sentry-sanitization.ts patterns via Pino fast-redact
+- [02-01]: Telemetry endpoint always returns 200 { ok: true } -- never leaks errors, rate limit status, or validation failures
 
 ### Pending Todos
 
@@ -79,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T04:40:55.499Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-structured-logging/02-CONTEXT.md
+Last session: 2026-03-17T05:16:07Z
+Stopped at: Completed 02-01 (logger & telemetry foundation)
+Resume file: .planning/phases/02-structured-logging/02-02-PLAN.md
