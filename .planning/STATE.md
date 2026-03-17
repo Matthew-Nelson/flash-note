@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 02-01 (logger & telemetry foundation)
-last_updated: "2026-03-17T05:16:07Z"
-last_activity: 2026-03-17 -- Completed 02-01 (Pino logger singleton, client telemetry, /api/telemetry endpoint)
+stopped_at: Completed 02-02 (console-to-Pino migration, error boundary telemetry)
+last_updated: "2026-03-17T05:42:31Z"
+last_activity: 2026-03-17 -- Completed 02-02 (42 console.* calls migrated to Pino, 4 error boundaries wired to telemetry)
 progress:
   total_phases: 10
   completed_phases: 1
   total_plans: 5
-  completed_plans: 3
-  percent: 14
+  completed_plans: 4
+  percent: 80
 ---
 
 # Project State
@@ -26,29 +26,29 @@ See: .planning/PROJECT.md (updated 2026-03-16)
 ## Current Position
 
 Phase: 2 of 10 (Structured Logging)
-Plan: 1 of 3 in current phase
-Status: Plan 02-01 complete, continuing to 02-02
-Last activity: 2026-03-17 -- Completed 02-01 (Pino logger singleton, client telemetry, /api/telemetry endpoint)
+Plan: 2 of 3 in current phase
+Status: Plan 02-02 complete, continuing to 02-03
+Last activity: 2026-03-17 -- Completed 02-02 (42 console.* calls migrated to Pino, 4 error boundaries wired to telemetry)
 
-Progress: [##░░░░░░░░] 14%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: ~5min
-- Total execution time: ~15 min
+- Total plans completed: 4
+- Average duration: ~9min
+- Total execution time: ~36 min
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01-ui-polish | 2 | ~8min | ~4min |
-| 02-structured-logging | 1 | 7min | 7min |
+| 02-structured-logging | 2 | 28min | 14min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01 (~4min), 01-02 (4min), 02-01 (7min)
-- Trend: Stable
+- Last 5 plans: 01-01 (~4min), 01-02 (4min), 02-01 (7min), 02-02 (21min)
+- Trend: Stable (02-02 larger scope: 15 production files + 17 test files)
 
 *Updated after each plan completion*
 
@@ -70,6 +70,9 @@ Recent decisions affecting current work:
 - [02-01]: Logger reads process.env.NODE_ENV directly (not config.ts) to avoid circular dependency at module init
 - [02-01]: PHI redaction uses 14 field paths matching sentry-sanitization.ts patterns via Pino fast-redact
 - [02-01]: Telemetry endpoint always returns 200 { ok: true } -- never leaks errors, rate limit status, or validation failures
+- [02-02]: Email dev-mode: 7 console.log calls consolidated into single logger.info (email body excluded from logs)
+- [02-02]: Error boundary componentStack not forwarded to telemetry (Error.stack is sufficient)
+- [02-02]: instrumentation.ts register() removed entirely (was only used for Sentry init)
 
 ### Pending Todos
 
@@ -83,6 +86,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-17T05:16:07Z
-Stopped at: Completed 02-01 (logger & telemetry foundation)
-Resume file: .planning/phases/02-structured-logging/02-02-PLAN.md
+Last session: 2026-03-17T05:42:31Z
+Stopped at: Completed 02-02 (console-to-Pino migration, error boundary telemetry)
+Resume file: .planning/phases/02-structured-logging/02-03-PLAN.md
