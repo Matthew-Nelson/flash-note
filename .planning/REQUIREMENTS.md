@@ -23,7 +23,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **MON-03**: Client-side errors are captured via `/api/telemetry` endpoint and logged server-side through Pino
 - [x] **MON-04**: Error boundaries (`global-error.tsx`, `ErrorBoundary.tsx`) report to telemetry endpoint
 - [x] **MON-05**: `instrumentation.ts` `onRequestError` hook uses Pino instead of Sentry
-- [ ] **MON-06**: Sentry fully removed (config files, SDK dependency, build args, test mocks) after Pino verified in production
+- [x] **MON-06**: Sentry fully removed (config files, SDK dependency, build args, test mocks) after Pino verified in production
 - [ ] **MON-07**: Cloud Logging log sink exports audit-tagged entries to Cloud Storage with 6-year locked retention
 - [ ] **MON-08**: Cloud Monitoring alert policies for error spikes, auth failures, and billing webhook failures
 - [ ] **MON-09**: External uptime monitoring (UptimeRobot) configured for production URL
@@ -168,7 +168,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MON-03 | Phase 2 | Complete |
 | MON-04 | Phase 2 | Complete |
 | MON-05 | Phase 2 | Complete |
-| MON-06 | Phase 2 | Pending |
+| MON-06 | Phase 2 | Complete |
 | MON-07 | Phase 10 | Pending |
 | MON-08 | Phase 10 | Pending |
 | MON-09 | Phase 10 | Pending |
