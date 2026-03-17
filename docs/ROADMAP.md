@@ -1,6 +1,6 @@
 # FlashNote Development Roadmap
 
-**Last Updated:** March 3, 2026
+**Last Updated:** March 17, 2026
 
 This is the **single source of truth** for all technical work status.
 
@@ -585,6 +585,8 @@ See [UI_OVERHAUL_PLAN.md — Phase E](./planning/UI_OVERHAUL_PLAN.md#phase-e-pol
 
 | Item | Status |
 |------|--------|
+| **BUG-UI-11**: Mobile nav menu does not close when navigating (MarketingNav + dashboard sidebar) | ❌ |
+| **BUG-UI-12**: Generated note output on same page as form (UX debt — should scroll or move to separate route) | ❌ |
 | Touch target audit: all interactive elements 44px+ | ❌ |
 | Cursor audit: `cursor-pointer` on all clickable elements | ❌ |
 | Replace remaining spinner loading states with skeletons | ❌ |
