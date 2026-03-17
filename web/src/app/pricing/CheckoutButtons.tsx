@@ -141,7 +141,7 @@ export function CheckoutButtons({
       {/* Pricing cards */}
       <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
         {/* Monthly Plan */}
-        <div className="card p-8">
+        <div className="card p-8 shadow-fn-base">
           <h2 className="text-xl font-semibold text-fn-text-primary mb-2">Monthly</h2>
           <p className="text-fn-text-secondary mb-6">Pay month-to-month, cancel anytime</p>
           <div className="mb-6">
@@ -180,9 +180,9 @@ export function CheckoutButtons({
         {/* Annual Plan */}
         <div className="relative">
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10">
-            <span className="badge badge-active px-4 py-1 text-sm font-semibold">Save 17%</span>
+            <span className="badge bg-fn-primary-light text-fn-primary px-4 py-1 text-sm font-semibold">Save 17%</span>
           </div>
-          <div className="card p-8 border-2 border-fn-accent-secondary">
+          <div className="card p-8 border-2 border-fn-primary shadow-fn-base">
             <h2 className="text-xl font-semibold text-fn-text-primary mb-2">Annual</h2>
             <p className="text-fn-text-secondary mb-6">Best value for committed users</p>
             <div className="mb-6">

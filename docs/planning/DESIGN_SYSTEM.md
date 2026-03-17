@@ -29,9 +29,9 @@ Implementation: `web/design-system/design-tokens-teal.css` + `web/design-system/
 | Token | Value | Section |
 |-------|-------|---------|
 | `--fn-soap-subjective` | `#0D6E6E` | Subjective — teal |
-| `--fn-soap-objective` | `#0EA5E9` | Objective — sky |
-| `--fn-soap-assessment` | `#8B5CF6` | Assessment — violet |
-| `--fn-soap-plan` | `#059669` | Plan — green |
+| `--fn-soap-objective` | `#0369A1` | Objective — sky-800 |
+| `--fn-soap-assessment` | `#7C3AED` | Assessment — violet-600 |
+| `--fn-soap-plan` | `#047857` | Plan — emerald-700 |
 
 ### Neutrals (Slate)
 

@@ -70,4 +70,41 @@ describe('Home (landing page)', () => {
       screen.getByRole('heading', { level: 2, name: 'Simple, Affordable Pricing' })
     ).toBeInTheDocument();
   });
+
+  it('renders trust signals section with HIPAA badge', () => {
+    render(<Home />);
+    expect(screen.getByText('HIPAA Compliant')).toBeInTheDocument();
+  });
+
+  it('renders trust signals section with encryption badge', () => {
+    render(<Home />);
+    expect(screen.getByText('256-bit Encryption')).toBeInTheDocument();
+  });
+
+  it('renders trust signals section with PT badge', () => {
+    render(<Home />);
+    expect(screen.getByText('Built for Physical Therapists')).toBeInTheDocument();
+  });
+
+  it('renders testimonial placeholder section', () => {
+    render(<Home />);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'What Therapists Are Saying' })
+    ).toBeInTheDocument();
+  });
+
+  it('hero CTA container has flex-wrap for responsive layout', () => {
+    const { container } = render(<Home />);
+    // The CTA wrapper should have flex-wrap class
+    const ctaWrapper = container.querySelector('.flex.flex-wrap');
+    expect(ctaWrapper).toBeInTheDocument();
+  });
+
+  it('SOAP labels in "See the Difference" use accent color classes', () => {
+    const { container } = render(<Home />);
+    expect(container.querySelector('.text-fn-soap-subjective')).toBeInTheDocument();
+    expect(container.querySelector('.text-fn-soap-objective')).toBeInTheDocument();
+    expect(container.querySelector('.text-fn-soap-assessment')).toBeInTheDocument();
+    expect(container.querySelector('.text-fn-soap-plan')).toBeInTheDocument();
+  });
 });

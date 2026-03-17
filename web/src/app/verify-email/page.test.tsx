@@ -9,6 +9,10 @@ vi.mock('@/actions/auth', () => ({
   verifyEmailAction: mockVerifyEmailAction,
 }));
 
+vi.mock('@/components/BetaBadge', () => ({
+  BetaBadge: () => <span data-testid="beta-badge">BETA</span>,
+}));
+
 const mockPush = vi.fn();
 
 describe('VerifyEmailPage', () => {

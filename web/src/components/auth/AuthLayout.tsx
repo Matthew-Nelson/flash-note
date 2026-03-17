@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { type ReactNode } from 'react';
+import { BetaBadge } from '../BetaBadge';
 
 interface AuthLayoutProps {
   title?: string;
@@ -14,7 +15,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center items-center gap-2">
           <span className="text-3xl font-bold text-fn-primary">FlashNote</span>
-          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
+          <BetaBadge />
         </Link>
         {title && (
           <h1 className="mt-4 text-center text-2xl font-bold text-fn-text-primary">
@@ -29,7 +30,7 @@ export function AuthLayout({ title, subtitle, footer, children }: AuthLayoutProp
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="card py-8 px-4 sm:px-10">
+        <div className="card shadow-fn-base p-6 sm:p-8">
           {children}
         </div>
         {footer && (

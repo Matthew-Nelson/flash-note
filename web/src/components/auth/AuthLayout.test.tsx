@@ -9,11 +9,16 @@ vi.mock('next/link', () => ({
   ),
 }));
 
+// Mock BetaBadge to isolate AuthLayout tests
+vi.mock('../BetaBadge', () => ({
+  BetaBadge: () => <span data-testid="beta-badge">BETA</span>,
+}));
+
 describe('AuthLayout', () => {
   it('should render FlashNote logo with BETA badge', () => {
     render(<AuthLayout>content</AuthLayout>);
     expect(screen.getByText('FlashNote')).toBeInTheDocument();
-    expect(screen.getByText('BETA')).toBeInTheDocument();
+    expect(screen.getByTestId('beta-badge')).toBeInTheDocument();
   });
 
   it('should render title when provided', () => {
@@ -53,5 +58,11 @@ describe('AuthLayout', () => {
     render(<AuthLayout>content</AuthLayout>);
     const logoLink = screen.getByText('FlashNote').closest('a');
     expect(logoLink).toHaveAttribute('href', '/');
+  });
+
+  it('applies shadow-fn-base to the card container', () => {
+    const { container } = render(<AuthLayout>content</AuthLayout>);
+    const card = container.querySelector('.card');
+    expect(card).toHaveClass('shadow-fn-base');
   });
 });

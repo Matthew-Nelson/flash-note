@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { LoadingSpinner } from '@/components/ui';
+import { BetaBadge } from '@/components/BetaBadge';
 import { verifyEmailAction } from '@/actions/auth';
 
 function VerifyEmailContent() {
@@ -63,7 +64,7 @@ function VerifyEmailContent() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <Link href="/" className="flex justify-center items-center gap-2">
           <span className="text-3xl font-bold text-fn-primary">FlashNote</span>
-          <span className="text-[9px] font-normal px-1.5 leading-4 rounded-full border border-fn-border text-fn-text-secondary">BETA</span>
+          <BetaBadge />
         </Link>
         <h1 className="mt-6 text-center text-2xl font-bold text-fn-text-primary">
           Email Verification
@@ -71,7 +72,7 @@ function VerifyEmailContent() {
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md" aria-live="polite">
-        <div className="card py-8 px-4 sm:px-10">
+        <div className="card shadow-fn-base p-6 sm:p-8">
           {status === 'verifying' && (
             <div className="text-center">
               <div className="flex justify-center">
