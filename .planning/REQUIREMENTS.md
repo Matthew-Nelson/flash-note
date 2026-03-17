@@ -1,7 +1,7 @@
 # Requirements: FlashNote
 
 **Defined:** 2026-03-16
-**Core Value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note — saving 15-30 minutes per patient encounter.
+**Core Value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
 
 ## v1 Requirements
 
@@ -40,8 +40,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **INFRA-08**: Custom domain (flashnote.co) with SSL configured on Cloud Run
 - [ ] **INFRA-09**: First staging deploy succeeds with Pino logs in Cloud Logging and errors in Cloud Error Reporting
 - [ ] **INFRA-10**: Vertex AI ADC verified working in production (note generation uses ADC endpoint, not consumer API key)
-- [ ] **INFRA-11**: Smoke test passes: register → verify email → login → generate note → logout
-- [ ] **INFRA-12**: Smoke test passes: Stripe checkout (test mode) → webhook → subscription active → notes unlocked
+- [ ] **INFRA-11**: Smoke test passes: register -> verify email -> login -> generate note -> logout
+- [ ] **INFRA-12**: Smoke test passes: Stripe checkout (test mode) -> webhook -> subscription active -> notes unlocked
 
 ### Billing (Live Mode)
 
@@ -81,7 +81,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Retention & Differentiation
 
-- [ ] **RET-01**: User can create and manage a personal shorthand/macro library (e.g., `mtjm` → `manual therapy — joint mobilization grade III/IV`)
+- [ ] **RET-01**: User can create and manage a personal shorthand/macro library (e.g., `mtjm` -> `manual therapy -- joint mobilization grade III/IV`)
 - [ ] **RET-02**: Macros are server-stored and available across devices
 - [ ] **RET-03**: User can send a free-text instruction with an existing note for AI re-edit ("Magic Edit") that creates a new version
 
@@ -157,83 +157,83 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UIPOL-01 | TBD | Pending |
-| UIPOL-02 | TBD | Pending |
-| UIPOL-03 | TBD | Pending |
-| UIPOL-04 | TBD | Pending |
-| UIPOL-05 | TBD | Pending |
-| UIPOL-06 | TBD | Pending |
-| MON-01 | TBD | Pending |
-| MON-02 | TBD | Pending |
-| MON-03 | TBD | Pending |
-| MON-04 | TBD | Pending |
-| MON-05 | TBD | Pending |
-| MON-06 | TBD | Pending |
-| MON-07 | TBD | Pending |
-| MON-08 | TBD | Pending |
-| MON-09 | TBD | Pending |
-| INFRA-01 | TBD | Pending |
-| INFRA-02 | TBD | Pending |
-| INFRA-03 | TBD | Pending |
-| INFRA-04 | TBD | Pending |
-| INFRA-05 | TBD | Pending |
-| INFRA-06 | TBD | Pending |
-| INFRA-07 | TBD | Pending |
-| INFRA-08 | TBD | Pending |
-| INFRA-09 | TBD | Pending |
-| INFRA-10 | TBD | Pending |
-| INFRA-11 | TBD | Pending |
-| INFRA-12 | TBD | Pending |
-| BILL-01 | TBD | Pending |
-| BILL-02 | TBD | Pending |
-| BILL-03 | TBD | Pending |
-| BILL-04 | TBD | Pending |
-| BILL-05 | TBD | Pending |
-| LAUNCH-01 | TBD | Pending |
-| LAUNCH-02 | TBD | Pending |
-| LAUNCH-03 | TBD | Pending |
-| LAUNCH-04 | TBD | Pending |
-| PHI-01 | TBD | Pending |
-| PHI-02 | TBD | Pending |
-| PHI-03 | TBD | Pending |
-| PHI-04 | TBD | Pending |
-| PHI-05 | TBD | Pending |
-| PHI-06 | TBD | Pending |
-| PHI-07 | TBD | Pending |
-| PHI-08 | TBD | Pending |
-| PHI-09 | TBD | Pending |
-| PHI-10 | TBD | Pending |
-| POST-01 | TBD | Pending |
-| POST-02 | TBD | Pending |
-| POST-03 | TBD | Pending |
-| POST-04 | TBD | Pending |
-| POST-05 | TBD | Pending |
-| RET-01 | TBD | Pending |
-| RET-02 | TBD | Pending |
-| RET-03 | TBD | Pending |
-| CLINIC-01 | TBD | Pending |
-| CLINIC-02 | TBD | Pending |
-| CLINIC-03 | TBD | Pending |
-| CLINIC-04 | TBD | Pending |
-| CLINIC-05 | TBD | Pending |
-| CLINIC-06 | TBD | Pending |
-| QUAL-01 | TBD | Pending |
-| QUAL-02 | TBD | Pending |
-| QUAL-03 | TBD | Pending |
-| QUAL-04 | TBD | Pending |
-| QUAL-05 | TBD | Pending |
-| QUAL-06 | TBD | Pending |
-| QUAL-07 | TBD | Pending |
-| QUAL-08 | TBD | Pending |
-| PROMPT-01 | TBD | Pending |
-| PROMPT-02 | TBD | Pending |
-| PROMPT-03 | TBD | Pending |
+| UIPOL-01 | Phase 1 | Pending |
+| UIPOL-02 | Phase 1 | Pending |
+| UIPOL-03 | Phase 1 | Pending |
+| UIPOL-04 | Phase 1 | Pending |
+| UIPOL-05 | Phase 1 | Pending |
+| UIPOL-06 | Phase 1 | Pending |
+| MON-01 | Phase 2 | Pending |
+| MON-02 | Phase 2 | Pending |
+| MON-03 | Phase 2 | Pending |
+| MON-04 | Phase 2 | Pending |
+| MON-05 | Phase 2 | Pending |
+| MON-06 | Phase 5 | Pending |
+| MON-07 | Phase 10 | Pending |
+| MON-08 | Phase 10 | Pending |
+| MON-09 | Phase 10 | Pending |
+| INFRA-01 | Phase 3 | Pending |
+| INFRA-02 | Phase 3 | Pending |
+| INFRA-03 | Phase 3 | Pending |
+| INFRA-04 | Phase 3 | Pending |
+| INFRA-05 | Phase 3 | Pending |
+| INFRA-06 | Phase 3 | Pending |
+| INFRA-07 | Phase 3 | Pending |
+| INFRA-08 | Phase 3 | Pending |
+| INFRA-09 | Phase 4 | Pending |
+| INFRA-10 | Phase 4 | Pending |
+| INFRA-11 | Phase 4 | Pending |
+| INFRA-12 | Phase 4 | Pending |
+| BILL-01 | Phase 5 | Pending |
+| BILL-02 | Phase 5 | Pending |
+| BILL-03 | Phase 5 | Pending |
+| BILL-04 | Phase 5 | Pending |
+| BILL-05 | Phase 8 | Pending |
+| LAUNCH-01 | Phase 5 | Pending |
+| LAUNCH-02 | Phase 5 | Pending |
+| LAUNCH-03 | Phase 5 | Pending |
+| LAUNCH-04 | Phase 5 | Pending |
+| PHI-01 | Phase 6 | Pending |
+| PHI-02 | Phase 6 | Pending |
+| PHI-03 | Phase 6 | Pending |
+| PHI-04 | Phase 6 | Pending |
+| PHI-05 | Phase 6 | Pending |
+| PHI-06 | Phase 6 | Pending |
+| PHI-07 | Phase 6 | Pending |
+| PHI-08 | Phase 6 | Pending |
+| PHI-09 | Phase 6 | Pending |
+| PHI-10 | Phase 6 | Pending |
+| POST-01 | Phase 7 | Pending |
+| POST-02 | Phase 7 | Pending |
+| POST-03 | Phase 7 | Pending |
+| POST-04 | Phase 7 | Pending |
+| POST-05 | Phase 7 | Pending |
+| RET-01 | Phase 8 | Pending |
+| RET-02 | Phase 8 | Pending |
+| RET-03 | Phase 8 | Pending |
+| CLINIC-01 | Phase 9 | Pending |
+| CLINIC-02 | Phase 9 | Pending |
+| CLINIC-03 | Phase 9 | Pending |
+| CLINIC-04 | Phase 9 | Pending |
+| CLINIC-05 | Phase 9 | Pending |
+| CLINIC-06 | Phase 9 | Pending |
+| QUAL-01 | Phase 10 | Pending |
+| QUAL-02 | Phase 10 | Pending |
+| QUAL-03 | Phase 10 | Pending |
+| QUAL-04 | Phase 10 | Pending |
+| QUAL-05 | Phase 10 | Pending |
+| QUAL-06 | Phase 10 | Pending |
+| QUAL-07 | Phase 10 | Pending |
+| QUAL-08 | Phase 10 | Pending |
+| PROMPT-01 | Phase 6 | Pending |
+| PROMPT-02 | Phase 6 | Pending |
+| PROMPT-03 | Phase 6 | Pending |
 
 **Coverage:**
-- v1 requirements: 64 total
-- Mapped to phases: 0
-- Unmapped: 64
+- v1 requirements: 71 total
+- Mapped to phases: 71
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-16*
-*Last updated: 2026-03-16 after initial definition*
+*Last updated: 2026-03-16 after roadmap creation*
