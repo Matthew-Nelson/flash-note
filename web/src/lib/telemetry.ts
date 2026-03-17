@@ -65,15 +65,19 @@ export function initClientTelemetry(): void {
     sendTelemetry({
       type: 'unhandled_error',
       message: event.message || 'Unknown error',
-      stack: event.error?.stack,
+      stack: event.error instanceof Error ? event.error.stack : undefined,
       url: window.location.href,
     });
   });
 
   window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
-    const reason = event.reason;
+    const reason: unknown = event.reason as unknown;
     const message =
-      reason instanceof Error ? reason.message : String(reason ?? 'Unknown rejection');
+      reason instanceof Error
+        ? reason.message
+        : typeof reason === 'string'
+          ? reason
+          : 'Unknown rejection';
     const stack = reason instanceof Error ? reason.stack : undefined;
 
     sendTelemetry({

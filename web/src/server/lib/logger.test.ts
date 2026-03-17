@@ -36,7 +36,7 @@ const PHI_PATHS = [
 function createTestLogger() {
   const chunks: string[] = [];
   const stream = new Writable({
-    write(chunk, _encoding, callback) {
+    write(chunk: Buffer, _encoding, callback) {
       chunks.push(chunk.toString());
       callback();
     },
