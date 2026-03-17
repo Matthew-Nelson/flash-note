@@ -31,7 +31,7 @@ export function Button({
 
   return (
     <button
-      className={`${baseClasses} ${sizeClasses[size]} inline-flex items-center justify-center gap-2 ${className}`}
+      className={`${baseClasses} ${sizeClasses[size]} inline-flex items-center justify-center gap-2 min-h-[44px] cursor-pointer ${className}`}
       disabled={isDisabled}
       {...props}
     >

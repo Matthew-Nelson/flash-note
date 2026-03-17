@@ -59,4 +59,24 @@ describe('Button', () => {
     render(<Button className="extra">Styled</Button>);
     expect(screen.getByRole('button').className).toContain('extra');
   });
+
+  it('should have min-h-[44px] for touch target compliance', () => {
+    render(<Button>Touch Target</Button>);
+    expect(screen.getByRole('button').className).toContain('min-h-[44px]');
+  });
+
+  it('should have cursor-pointer class', () => {
+    render(<Button>Pointer</Button>);
+    expect(screen.getByRole('button').className).toContain('cursor-pointer');
+  });
+
+  it('should have min-h-[44px] even with sm size', () => {
+    render(<Button size="sm">Small</Button>);
+    expect(screen.getByRole('button').className).toContain('min-h-[44px]');
+  });
+
+  it('should have cursor-pointer class even when disabled (CSS :disabled handles override)', () => {
+    render(<Button disabled>Disabled</Button>);
+    expect(screen.getByRole('button').className).toContain('cursor-pointer');
+  });
 });

@@ -222,4 +222,13 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+
+  /* Exempt functional spinners — users need loading feedback */
+  .animate-spin,
+  .loading-spinner::before,
+  .loading-spinner-sm,
+  .loading-dots {
+    animation-duration: 1s !important;
+    animation-iteration-count: infinite !important;
+  }
 }
