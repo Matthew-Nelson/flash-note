@@ -33,7 +33,7 @@ export default function Home() {
               See Demo
             </Link>
           </div>
-          <p className="text-sm text-fn-text-muted mt-4">
+          <p className="text-sm text-fn-text-secondary mt-4">
             14-day free trial. No credit card required.
           </p>
         </section>
@@ -149,7 +149,7 @@ export default function Home() {
                 <p className="text-fn-text-secondary italic mb-4">
                   &ldquo;Testimonials from beta testers coming soon.&rdquo;
                 </p>
-                <p className="text-fn-sm text-fn-text-muted">Beta Tester</p>
+                <p className="text-fn-sm text-fn-text-secondary">Beta Tester</p>
               </div>
             ))}
           </div>
@@ -165,7 +165,7 @@ export default function Home() {
           </p>
           <div className="inline-block card p-8 shadow-fn-lg">
             <div className="text-5xl font-bold text-fn-primary">
-              $29<span className="text-xl font-normal text-fn-text-muted">/month</span>
+              $29<span className="text-xl font-normal text-fn-text-secondary">/month</span>
             </div>
             <p className="text-fn-text-secondary mt-2">Unlimited SOAP notes</p>
             <Link

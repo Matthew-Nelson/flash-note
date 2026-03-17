@@ -21,6 +21,14 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isOpen]);
 
+  // Lock body scroll when drawer is open
+  useEffect(() => {
+    if (!isOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, [isOpen]);
+
   return (
     <nav aria-label="Main" className="container mx-auto px-6 py-4">
       <div className="flex items-center justify-between">
@@ -85,6 +93,8 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
 
       {/* Mobile drawer */}
       <div
+        aria-hidden={!isOpen}
+        inert={!isOpen}
         className={`fixed inset-y-0 right-0 z-40 w-64 bg-fn-bg-card border-l border-fn-border md:hidden
                    transition-transform duration-200 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}
       >
@@ -100,7 +110,7 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
             </svg>
           </button>
 
-          <nav className="mt-6 space-y-4">
+          <div className="mt-6 space-y-4">
             <Link
               href="/pricing"
               onClick={() => setIsOpen(false)}
@@ -134,7 +144,7 @@ export function MarketingNav({ showDashboardLink = false }: MarketingNavProps) {
                 </Link>
               </>
             )}
-          </nav>
+          </div>
         </div>
       </div>
     </nav>
