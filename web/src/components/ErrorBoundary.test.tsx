@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import * as Sentry from '@sentry/nextjs';
 import ErrorBoundary from './ErrorBoundary';
+
+const mockReportErrorBoundary = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/telemetry', () => ({
+  reportErrorBoundary: mockReportErrorBoundary,
+}));
 
 // Component that throws on demand
 function ThrowOnRender({ shouldThrow }: { shouldThrow: boolean }) {
@@ -38,17 +42,14 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Try Again')).toBeInTheDocument();
   });
 
-  it('should capture exception with Sentry', () => {
+  it('should report error via telemetry', () => {
     render(
       <ErrorBoundary>
         <ThrowOnRender shouldThrow={true} />
       </ErrorBoundary>
     );
-    expect(Sentry.captureException).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        extra: expect.objectContaining({}),
-      })
+    expect(mockReportErrorBoundary).toHaveBeenCalledWith(
+      expect.any(Error)
     );
   });
 

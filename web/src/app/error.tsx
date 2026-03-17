@@ -1,8 +1,9 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import Link from 'next/link';
 import { useEffect } from 'react';
+
+import { reportErrorBoundary } from '@/lib/telemetry';
 
 export default function Error({
   error,
@@ -12,10 +13,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
-    // Log error digest for observability — never log error.message (Rule 7)
-    // eslint-disable-next-line no-console
-    console.error('Root error boundary:', error.digest ?? 'no-digest');
+    reportErrorBoundary(error, error.digest);
   }, [error]);
 
   return (

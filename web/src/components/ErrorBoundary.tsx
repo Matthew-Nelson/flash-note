@@ -1,7 +1,8 @@
 'use client';
 
-import * as Sentry from '@sentry/nextjs';
 import { Component, type ReactNode } from 'react';
+
+import { reportErrorBoundary } from '@/lib/telemetry';
 
 interface Props {
   children: ReactNode;
@@ -23,13 +24,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    Sentry.captureException(error, {
-      extra: {
-        /* v8 ignore next -- React always provides componentStack; defensive fallback only */
-        componentStack: errorInfo.componentStack ?? undefined,
-      },
-    });
+  componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
+    reportErrorBoundary(error);
   }
 
   handleReset = () => {

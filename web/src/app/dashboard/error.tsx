@@ -2,6 +2,7 @@
 
 import { useEffect, useTransition } from 'react';
 import { logoutAction } from '@/actions/auth';
+import { reportErrorBoundary } from '@/lib/telemetry';
 import { Button } from '@/components/ui';
 
 export default function DashboardError({
@@ -14,10 +15,7 @@ export default function DashboardError({
   const [isPending, startTransition] = useTransition();
 
   useEffect(() => {
-    // Log error digest for observability — never log error.message (Rule 7)
-    // TODO: Replace with Pino logger when available
-    // eslint-disable-next-line no-console
-    console.error('Dashboard error:', error.digest ?? 'no-digest');
+    reportErrorBoundary(error, error.digest);
   }, [error]);
 
   function handleSignOut() {

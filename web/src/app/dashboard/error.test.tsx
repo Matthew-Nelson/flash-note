@@ -5,8 +5,12 @@ import DashboardError from './error';
 
 // Mock logoutAction
 const mockLogoutAction = vi.hoisted(() => vi.fn<() => Promise<void>>());
+const mockReportErrorBoundary = vi.hoisted(() => vi.fn());
 vi.mock('@/actions/auth', () => ({
   logoutAction: (): Promise<void> => mockLogoutAction(),
+}));
+vi.mock('@/lib/telemetry', () => ({
+  reportErrorBoundary: mockReportErrorBoundary,
 }));
 
 // Mock UI components
@@ -181,14 +185,12 @@ describe('DashboardError', () => {
     expect(liveRegion).toHaveAttribute('aria-atomic', 'true');
   });
 
-  it('logs error digest for observability', () => {
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  it('reports error via telemetry', () => {
     const error = Object.assign(new Error('secret details'), { digest: 'abc123' });
     const reset = vi.fn();
 
     render(<DashboardError error={error} reset={reset} />);
 
-    expect(consoleSpy).toHaveBeenCalledWith('Dashboard error:', 'abc123');
-    consoleSpy.mockRestore();
+    expect(mockReportErrorBoundary).toHaveBeenCalledWith(error, 'abc123');
   });
 });

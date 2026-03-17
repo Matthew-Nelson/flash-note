@@ -3,7 +3,7 @@
 /**
  * Global Error Page (App Router)
  *
- * Catches unhandled errors in the root layout and reports them to Sentry.
+ * Catches unhandled errors in the root layout and reports them to telemetry.
  * This is the last-resort error boundary for the entire application.
  *
  * Note: This is separate from the ErrorBoundary component in Providers,
@@ -11,8 +11,9 @@
  * page catches errors that occur in the root layout itself.
  */
 
-import * as Sentry from '@sentry/nextjs';
 import { useEffect } from 'react';
+
+import { reportErrorBoundary } from '@/lib/telemetry';
 
 export default function GlobalError({
   error,
@@ -22,7 +23,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    reportErrorBoundary(error, error.digest);
   }, [error]);
 
   return (
