@@ -11,9 +11,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **UIPOL-01**: All interactive elements have 44px+ touch targets
 - [ ] **UIPOL-02**: All clickable elements have `cursor-pointer`
-- [ ] **UIPOL-03**: Remaining spinner loading states replaced with content-shaped skeletons
-- [ ] **UIPOL-04**: All pages render without horizontal scroll at 375px viewport
-- [ ] **UIPOL-05**: Generated notes have a print stylesheet
+- [x] **UIPOL-03**: Remaining spinner loading states replaced with content-shaped skeletons
+- [x] **UIPOL-04**: All pages render without horizontal scroll at 375px viewport
+- [x] **UIPOL-05**: Generated notes have a print stylesheet
 - [ ] **UIPOL-06**: All transitions are 150-300ms and respect `prefers-reduced-motion`
 
 ### Monitoring & Observability
@@ -159,9 +159,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | UIPOL-01 | Phase 1 | Pending |
 | UIPOL-02 | Phase 1 | Pending |
-| UIPOL-03 | Phase 1 | Pending |
-| UIPOL-04 | Phase 1 | Pending |
-| UIPOL-05 | Phase 1 | Pending |
+| UIPOL-03 | Phase 1 | Complete |
+| UIPOL-04 | Phase 1 | Complete |
+| UIPOL-05 | Phase 1 | Complete |
 | UIPOL-06 | Phase 1 | Pending |
 | MON-01 | Phase 2 | Pending |
 | MON-02 | Phase 2 | Pending |

@@ -12,7 +12,7 @@ FlashNote is a production Next.js application with auth, billing, note generatio
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion
+- [x] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion (completed 2026-03-17)
 - [ ] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation
 - [ ] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning
 - [ ] **Phase 4: Staging Verification** - First staging deploy, Vertex AI ADC, end-to-end smoke tests
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. UI Polish | 0/2 | Not started | - |
+| 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
 | 2. Structured Logging | 0/2 | Not started | - |
 | 3. Pipeline & Provisioning | 0/3 | Not started | - |
 | 4. Staging Verification | 0/1 | Not started | - |
