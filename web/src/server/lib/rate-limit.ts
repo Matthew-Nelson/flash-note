@@ -68,6 +68,11 @@ export const checkoutRateLimit = createLimiter(5, '1 h', 'checkout');
 /** 10 requests per 1 hour, keyed by userId */
 export const portalRateLimit = createLimiter(10, '1 h', 'portal');
 
+// --- Telemetry rate limiters ---
+
+/** 20 requests per 1 min, keyed by IP */
+export const telemetryRateLimit = createLimiter(20, '1 m', 'telemetry');
+
 // --- Global rate limiter ---
 
 /** 100 requests per 1 min, keyed by IP */
