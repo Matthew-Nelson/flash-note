@@ -35,11 +35,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A user can print a generated note and get a clean, readable document without UI chrome
   4. All loading states show content-shaped skeletons instead of spinners
   5. Animations are smooth at 150-300ms and disappear entirely when the user has reduced-motion enabled
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
+- [ ] 01-01-PLAN.md — Touch targets, cursor-pointer, and reduced-motion refinement (UIPOL-01, UIPOL-02, UIPOL-06)
+- [ ] 01-02-PLAN.md — Responsive 375px, settings skeleton, and print stylesheet (UIPOL-03, UIPOL-04, UIPOL-05)
 
 ### Phase 2: Structured Logging
 **Goal**: All server-side logging uses structured Pino output, and client-side errors flow through a telemetry endpoint -- establishing the logging foundation required for HIPAA audit compliance
