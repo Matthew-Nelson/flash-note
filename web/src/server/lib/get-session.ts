@@ -31,11 +31,17 @@ import type { SessionData } from '@/server/types';
 export const getSession = cache(async function getSession(): Promise<SessionData | null> {
   try {
     const token = await getSessionToken();
-    if (!token) return null;
+    if (!token) {
+      logger.debug({ source: 'session' }, 'No session token in cookie');
+      return null;
+    }
 
     const tokenHash = hashSessionToken(token);
     const session = await findSessionByTokenHash(tokenHash);
-    if (!session) return null;
+    if (!session) {
+      logger.debug({ source: 'session' }, 'Session token not found in database');
+      return null;
+    }
 
     // Sliding window refresh
     const now = Date.now();
@@ -56,6 +62,11 @@ export const getSession = cache(async function getSession(): Promise<SessionData
         logger.error({ err: refreshError instanceof Error ? refreshError : new Error(String(refreshError)), source: 'session', errorType: 'refresh_failed' }, 'Session refresh failed');
       }
     }
+
+    logger.debug(
+      { source: 'session', userId: session.user_id, refreshed: refreshNeeded },
+      'Session validated'
+    );
 
     return {
       sessionId: session.id,

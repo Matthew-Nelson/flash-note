@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
+import { logger } from '@/server/lib/logger';
 import { createRequestLogger } from '@/server/lib/request-logger';
 import { telemetryRateLimit, checkRateLimit } from '@/server/lib/rate-limit';
 import { config } from '@/server/db/config';
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     const ip = extractIp(request);
     const { success } = await checkRateLimit(telemetryRateLimit, ip);
     if (!success) {
+      logger.debug({ source: 'telemetry', reason: 'rate_limited' }, 'Telemetry event dropped');
       return NextResponse.json(OK_RESPONSE); // Silent rate limit
     }
 
@@ -72,6 +74,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     // Validate with Zod -- reject silently on failure
     const parsed = telemetrySchema.safeParse(body);
     if (!parsed.success) {
+      logger.debug({ source: 'telemetry', reason: 'validation_failed' }, 'Telemetry event dropped');
       return NextResponse.json(OK_RESPONSE); // Silent validation failure
     }
 

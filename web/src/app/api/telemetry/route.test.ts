@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 // --- vi.hoisted mocks ---
 
 const mockLoggerError = vi.hoisted(() => vi.fn());
+const mockLoggerDebug = vi.hoisted(() => vi.fn());
 const mockLoggerChild = vi.hoisted(() =>
   vi.fn(() => ({
     info: vi.fn(),
@@ -21,7 +22,7 @@ vi.mock('@/server/lib/logger', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: mockLoggerError,
-    debug: vi.fn(),
+    debug: mockLoggerDebug,
     child: mockLoggerChild,
   },
 }));
@@ -248,5 +249,40 @@ describe('POST /api/telemetry', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ ok: true });
     expect(mockLoggerError).not.toHaveBeenCalled();
+  });
+
+  it('logs debug when telemetry event is rate limited', async () => {
+    mockCheckRateLimit.mockResolvedValueOnce({
+      success: false,
+      limit: 20,
+      remaining: 0,
+      reset: Date.now() + 60000,
+    });
+
+    const payload = {
+      type: 'unhandled_error',
+      message: 'Should be rate limited',
+    };
+
+    await POST(makeRequest(payload));
+
+    expect(mockLoggerDebug).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'telemetry', reason: 'rate_limited' }),
+      'Telemetry event dropped'
+    );
+  });
+
+  it('logs debug when telemetry payload fails validation', async () => {
+    const payload = {
+      type: 'xss_attack',
+      message: 'Invalid type',
+    };
+
+    await POST(makeRequest(payload));
+
+    expect(mockLoggerDebug).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'telemetry', reason: 'validation_failed' }),
+      'Telemetry event dropped'
+    );
   });
 });

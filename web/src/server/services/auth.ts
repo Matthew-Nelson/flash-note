@@ -121,6 +121,11 @@ export async function login(
   // Create session
   const session = await createSession(user.id, context);
 
+  logger.info(
+    { source: 'service_auth', userId: user.id, emailVerified: user.emailVerified },
+    'Login successful'
+  );
+
   return {
     success: true,
     user: sanitizeUser(user),
@@ -269,6 +274,11 @@ export async function register(
   } finally {
     client.release();
   }
+
+  logger.info(
+    { source: 'service_auth', userId: user.id, hasInviteCode: !!context.inviteCode, joinedOrg: !!joinedOrganizationId },
+    'Registration successful'
+  );
 
   // Send verification email (non-blocking — user can resend)
   try {

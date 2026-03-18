@@ -92,6 +92,11 @@ export async function generateNoteAction(
   }
 
   // 6. Generate note
+  logger.info(
+    { source: 'action_generate_note', userId: session.userId, noteType },
+    'Note generation started'
+  );
+
   try {
     const result = await generateNote(quickNotes, noteType, patientContext);
 
@@ -100,6 +105,11 @@ export async function generateNoteAction(
       session.userId,
       result.metadata.inputTokens,
       result.metadata.outputTokens
+    );
+
+    logger.info(
+      { source: 'action_generate_note', userId: session.userId, noteType, durationMs: result.metadata.generationTimeMs },
+      'Note generation completed'
     );
 
     // 8. Security monitoring — log suspicious patterns synchronously before audit

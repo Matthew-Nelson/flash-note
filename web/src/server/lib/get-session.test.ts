@@ -64,6 +64,8 @@ describe('getSession', () => {
     mockHashSessionToken.mockReset();
     mockFindSessionByTokenHash.mockReset();
     mockRefreshSessionExpiry.mockReset();
+    mockLogger.debug.mockClear();
+    mockLogger.error.mockClear();
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -229,5 +231,43 @@ describe('getSession', () => {
     const result = await getSession();
 
     expect(result).toBeNull();
+  });
+
+  it('logs debug when no token in cookie', async () => {
+    mockGetSessionToken.mockResolvedValueOnce(null);
+
+    const session = await getSession();
+    expect(session).toBeNull();
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'session' }),
+      'No session token in cookie'
+    );
+  });
+
+  it('logs debug when session not found in database', async () => {
+    mockGetSessionToken.mockResolvedValueOnce('raw-token');
+    mockHashSessionToken.mockReturnValueOnce('hashed-token');
+    mockFindSessionByTokenHash.mockResolvedValueOnce(null);
+
+    const session = await getSession();
+    expect(session).toBeNull();
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'session' }),
+      'Session token not found in database'
+    );
+  });
+
+  it('logs debug with userId on successful validation', async () => {
+    const sessionRow = createMockSessionRow();
+    mockGetSessionToken.mockResolvedValueOnce('raw-token');
+    mockHashSessionToken.mockReturnValueOnce('hashed-token');
+    mockFindSessionByTokenHash.mockResolvedValueOnce(sessionRow);
+
+    const session = await getSession();
+    expect(session).not.toBeNull();
+    expect(mockLogger.debug).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'session', userId: 'user-uuid' }),
+      'Session validated'
+    );
   });
 });

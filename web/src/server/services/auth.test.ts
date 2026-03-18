@@ -24,6 +24,16 @@ import {
 
 // --- Mocks (vi.hoisted ensures declarations are available when vi.mock factories run) ---
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+}));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
+
 const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const mockGetAccountLockoutStatus = vi.hoisted(() => vi.fn());
 const mockRecordFailedAttempt = vi.hoisted(() => vi.fn());
@@ -111,6 +121,8 @@ describe('auth service', () => {
     mockCreateToken.mockReset();
     mockValidateAndConsumeToken.mockReset();
     mockSendVerificationEmail.mockReset();
+    mockLogger.info.mockClear();
+    mockLogger.error.mockClear();
     vi.mocked(bcrypt.compare).mockReset();
     vi.mocked(bcrypt.hash).mockReset().mockResolvedValue('$2a$12$hashedvalue' as never);
   });
@@ -277,6 +289,30 @@ describe('auth service', () => {
 
       expect(mockResetFailedAttempts).toHaveBeenCalledWith('test-user-id');
     });
+
+    it('logs successful login at info level', async () => {
+      const userRow = createMockUserRow({ email_verified: true });
+      mockDbQuery.mockResolvedValueOnce({ rows: [userRow] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+      mockGetAccountLockoutStatus.mockResolvedValueOnce({
+        isLocked: false, failedAttempts: 0, isPermanentlyLocked: false, lockedUntil: null,
+      });
+      mockResetFailedAttempts.mockResolvedValueOnce(undefined);
+
+      setupMockClient();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] })
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      const result = await login('test@example.com', 'password123', context);
+      expect(result.success).toBe(true);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'service_auth', userId: expect.any(String) }),
+        'Login successful'
+      );
+    });
   });
 
   describe('register', () => {
@@ -408,6 +444,32 @@ describe('auth service', () => {
 
       // Registration should still succeed
       expect(result.success).toBe(true);
+    });
+
+    it('logs successful registration at info level', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      setupMockClient();
+      const userRow = createMockUserRow();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [userRow] })  // createUserWithClient
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] })
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      mockCreateToken.mockResolvedValueOnce('verification-token');
+      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
+
+      const result = await register('new@example.com', 'Password1', context);
+      expect(result.success).toBe(true);
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'service_auth', userId: expect.any(String) }),
+        'Registration successful'
+      );
     });
 
     it('registers with beta invite code, marks code as used, fires INVITE_CODE_REDEEMED audit', async () => {

@@ -275,6 +275,24 @@ describe('generateNoteAction', () => {
 
   // --- Successful generation ---
 
+  it('logs note generation start at info level', async () => {
+    const result = await generateNoteAction(makeFormData());
+    expect(result.success).toBe(true);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'action_generate_note', userId: expect.any(String), noteType: expect.any(String) }),
+      'Note generation started'
+    );
+  });
+
+  it('logs note generation completion at info level', async () => {
+    const result = await generateNoteAction(makeFormData());
+    expect(result.success).toBe(true);
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'action_generate_note', userId: expect.any(String), durationMs: expect.any(Number) }),
+      'Note generation completed'
+    );
+  });
+
   it('returns SOAP note on success', async () => {
     const result = await generateNoteAction(makeFormData());
 
