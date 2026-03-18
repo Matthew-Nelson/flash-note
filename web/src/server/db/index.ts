@@ -34,6 +34,8 @@ export const db = globalForDb._flashnoteDb ?? new Pool({
 // Pool error handler — prevents unhandled promise rejections from crashing the process.
 // Only attach on first creation to avoid duplicate listeners on HMR reloads.
 if (isNewPool) {
+  logger.info({ source: 'database', poolSize: 20 }, 'PostgreSQL connection pool created');
+
   db.on('error', (err) => {
     logger.error({ err, source: 'database', errorType: 'pool_error' }, 'PostgreSQL pool error');
   });

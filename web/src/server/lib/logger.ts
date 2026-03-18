@@ -79,6 +79,10 @@ export const logger = isProduction
                 colorize: true,
                 ignore: 'pid,hostname',
                 translateTime: 'HH:MM:ss.l',
+                // Sync mode bypasses pino-pretty's worker thread, which Turbopack
+                // does not relay to the dev terminal (vercel/next.js #84766).
+                // Only used in dev -- production uses GCP JSON (no pino-pretty).
+                sync: true,
               },
             },
           }

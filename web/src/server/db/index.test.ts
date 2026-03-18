@@ -34,6 +34,16 @@ vi.mock('pg', () => ({
   },
 }));
 
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+}));
+
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
+
 describe('db/index', () => {
   const globalForDb = globalThis as unknown as { _flashnoteDb?: unknown };
 
@@ -43,6 +53,9 @@ describe('db/index', () => {
     mockPool.on.mockClear();
     mockPool.connect.mockClear();
     MockPool.mockClear();
+    mockLogger.info.mockClear();
+    mockLogger.warn.mockClear();
+    mockLogger.error.mockClear();
   });
 
   it('exports db as a Pool instance', async () => {
@@ -53,6 +66,14 @@ describe('db/index', () => {
   it('attaches an error handler to new pool', async () => {
     await import('./index');
     expect(mockPool.on).toHaveBeenCalledWith('error', expect.any(Function));
+  });
+
+  it('logs pool creation on first import', async () => {
+    await import('./index');
+    expect(mockLogger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'database', poolSize: 20 }),
+      'PostgreSQL connection pool created'
+    );
   });
 
   it('caches pool on globalThis in non-production', async () => {
@@ -92,9 +113,15 @@ describe('db/index', () => {
 
     // Second import re-evaluates the module. globalThis cache is still set,
     // so Pool constructor should NOT be called again.
+    mockLogger.info.mockClear();
     const { db: db2 } = await import('./index');
     expect(db2).toBe(mockPool);
     expect(MockPool).toHaveBeenCalledTimes(1);
+    // Startup log should NOT fire when pool comes from cache
+    expect(mockLogger.info).not.toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'database' }),
+      expect.any(String)
+    );
   });
 
   it('does not write pool to globalThis in production', async () => {
