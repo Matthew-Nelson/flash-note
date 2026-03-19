@@ -15,12 +15,16 @@ RUN corepack enable && corepack prepare pnpm@10.28.2 --activate
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/web/node_modules ./web/node_modules
 COPY . .
-# Sentry client DSN is injected at build time via --build-arg.
-# Defaults to empty so local/test Docker builds don't fail.
-ARG NEXT_PUBLIC_SENTRY_DSN=""
-ENV NEXT_PUBLIC_SENTRY_DSN=$NEXT_PUBLIC_SENTRY_DSN
-ENV SENTRY_SUPPRESS_TURBOPACK_WARNING=1
 RUN cd web && pnpm build
+# Compile migration script to JS so the slim runner image can execute it.
+# Uses es2022 module output to preserve import.meta.url; output as .mjs so
+# Node.js treats it as ESM regardless of package.json type field.
+RUN cd web && npx tsc src/server/db/migrate.ts \
+    --module es2022 --moduleResolution node \
+    --target es2022 --esModuleInterop true \
+    --skipLibCheck true --outDir /tmp/migrate-build \
+    --declaration false \
+  && cp /tmp/migrate-build/migrate.js src/server/db/migrate.mjs
 
 # Stage 3: Production image
 FROM --platform=linux/amd64 node:20-alpine AS runner
@@ -34,6 +38,9 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 COPY --from=builder /app/web/.next/standalone ./
 COPY --from=builder /app/web/.next/static ./web/.next/static
 COPY --from=builder /app/web/public ./web/public
+# Migration files for Cloud Run migration job
+COPY --from=builder /app/web/src/server/db/migrate.mjs ./web/src/server/db/migrate.mjs
+COPY --from=builder /app/web/src/server/db/migrations ./web/src/server/db/migrations
 USER nextjs
 EXPOSE 3000
 ENV NEXT_MANUAL_SIG_HANDLE=true
