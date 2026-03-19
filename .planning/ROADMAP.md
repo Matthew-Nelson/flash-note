@@ -71,12 +71,12 @@ Plans:
   3. Cloud Run, Cloud SQL, Artifact Registry, and Vertex AI APIs are all enabled and configured in the GCP project
   4. All runtime secrets (DB URL, Stripe keys, Upstash, Resend) are stored in Secret Manager, not environment variables
   5. Custom domain (flashnote.co) resolves to Cloud Run with valid SSL
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md — Terraform foundation, IAM/WIF, Cloud SQL, Secret Manager, Dockerfile cleanup (INFRA-03, INFRA-04, INFRA-05, INFRA-06, INFRA-07)
+- [ ] 03-02-PLAN.md — Deploy workflow rewrite with staging/production split and migration job, CI terraform plan (INFRA-01, INFRA-02)
+- [ ] 03-03-PLAN.md — Cloud Run service/job Terraform, Global ALB with custom domain SSL (INFRA-01, INFRA-06, INFRA-08)
 
 ### Phase 4: Staging Verification
 **Goal**: The application runs successfully in the GCP staging environment with all integrations verified end-to-end
