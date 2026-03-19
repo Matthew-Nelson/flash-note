@@ -87,10 +87,11 @@ Plans:
   2. Note generation works via Vertex AI ADC (not consumer API key) in the deployed environment
   3. A user can register, verify email, log in, generate a note, and log out in staging
   4. A user can complete Stripe checkout (test mode), webhook fires, subscription activates, and note generation unlocks
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 04-01: TBD
+- [ ] 04-01-PLAN.md — Prerequisites, first staging deploy, Pino log verification (INFRA-09)
+- [ ] 04-02-PLAN.md — Auth flow, note generation, and Stripe billing smoke tests (INFRA-10, INFRA-11, INFRA-12)
 
 ### Phase 5: Production Readiness
 **Goal**: The application is ready for real users with real payments -- Stripe live, launch gate criteria met
@@ -198,7 +199,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
 | 2. Structured Logging | 5/5 | Complete | 2026-03-19 |
 | 3. Pipeline & Provisioning | 3/3 | Complete | 2026-03-19 |
-| 4. Staging Verification | 0/1 | Not started | - |
+| 4. Staging Verification | 0/2 | Not started | - |
 | 5. Production Readiness | 0/2 | Not started | - |
 | 6. PHI Storage | 0/4 | Not started | - |
 | 7. Post-PHI Features | 0/2 | Not started | - |
