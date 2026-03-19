@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in-progress
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-03-19T16:42:50Z"
+status: completed
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-19T16:50:47.680Z"
 last_activity: 2026-03-19 -- Completed 03-01 (Terraform foundation, IAM/WIF, Cloud SQL, secrets, Dockerfile)
 progress:
   total_phases: 10
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
-  percent: 90
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
-**Current focus:** Phase 3 in progress (Pipeline & Provisioning). Plans 01 and 02 complete. Plan 03 (Cloud Run + ALB) remaining.
+**Current focus:** Phase 3 complete (Pipeline & Provisioning). All infrastructure provisioned. Ready for Phase 4 (staging verification).
 
 ## Current Position
 
-Phase: 3 of 10 (Pipeline & Provisioning) -- IN PROGRESS
-Plan: 2 of 3 complete in current phase (03-01 and 03-02 done; 03-03 remaining)
-Status: Terraform foundation and deploy pipeline complete. Cloud Run service/job and load balancer (03-03) still pending.
-Last activity: 2026-03-19 -- Completed 03-01 (Terraform foundation, IAM/WIF, Cloud SQL, secrets, Dockerfile)
+Phase: 3 of 10 (Pipeline & Provisioning) -- COMPLETE
+Plan: 3 of 3 complete in current phase
+Status: All infrastructure provisioned -- Terraform foundation, deploy pipeline, Cloud Run service/job, and Global External ALB. Ready for Phase 4.
+Last activity: 2026-03-19 -- Completed 03-03 (Cloud Run service, migration job, Global ALB with managed SSL)
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
+- Total plans completed: 10
 - Average duration: ~6min
-- Total execution time: ~57 min
+- Total execution time: ~59 min
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01-ui-polish | 2 | ~8min | ~4min |
 | 02-structured-logging | 5 | 42min | ~8min |
-| 03-pipeline-provisioning | 2 | 7min | ~4min |
+| 03-pipeline-provisioning | 3 | 9min | ~3min |
 
 **Recent Trend:**
-- Last 5 plans: 02-03 (7min), 02-04 (2min), 02-05 (5min), 03-02 (3min), 03-01 (4min)
+- Last 5 plans: 02-04 (2min), 02-05 (5min), 03-02 (3min), 03-01 (4min), 03-03 (2min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -88,6 +88,9 @@ Recent decisions affecting current work:
 - [03-01]: Migration compiled to .mjs (not .js) -- Node.js treats .mjs as ESM without "type": "module" in package.json
 - [03-01]: tsc --module es2022 for migration compilation (preserves import.meta.url and ESM syntax)
 - [03-01]: Per-secret IAM bindings for secretAccessor (not project-level) for least-privilege access
+- [Phase 03]: Migration job entrypoint uses migrate.mjs (not .js) matching Plan 01 Dockerfile deviation
+- [Phase 03]: DNS managed externally by default (manage_dns=false); set true only if using Google Cloud DNS
+- [Phase 03]: Cloud Run ingress locked to INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER forcing all traffic through ALB
 
 ### Pending Todos
 
@@ -101,6 +104,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T16:42:50Z
-Stopped at: Completed 03-01-PLAN.md
-Resume file: .planning/phases/03-pipeline-provisioning/03-01-SUMMARY.md
+Last session: 2026-03-19T16:50:47.678Z
+Stopped at: Completed 03-03-PLAN.md
+Resume file: None

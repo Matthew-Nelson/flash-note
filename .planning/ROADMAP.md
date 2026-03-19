@@ -13,8 +13,8 @@ FlashNote is a production Next.js application with auth, billing, note generatio
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion (completed 2026-03-17)
-- [ ] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation, Sentry removal
-- [ ] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning
+- [x] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation, Sentry removal (completed 2026-03-19)
+- [x] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning (completed 2026-03-19)
 - [ ] **Phase 4: Staging Verification** - First staging deploy, Vertex AI ADC, end-to-end smoke tests
 - [ ] **Phase 5: Production Readiness** - Stripe live mode, beta launch gate
 - [ ] **Phase 6: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements
@@ -74,9 +74,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Terraform foundation, IAM/WIF, Cloud SQL, Secret Manager, Dockerfile cleanup (INFRA-03, INFRA-04, INFRA-05, INFRA-06, INFRA-07)
-- [ ] 03-02-PLAN.md — Deploy workflow rewrite with staging/production split and migration job, CI terraform plan (INFRA-01, INFRA-02)
-- [ ] 03-03-PLAN.md — Cloud Run service/job Terraform, Global ALB with custom domain SSL (INFRA-01, INFRA-06, INFRA-08)
+- [x] 03-01-PLAN.md — Terraform foundation, IAM/WIF, Cloud SQL, Secret Manager, Dockerfile cleanup (INFRA-03, INFRA-04, INFRA-05, INFRA-06, INFRA-07)
+- [x] 03-02-PLAN.md — Deploy workflow rewrite with staging/production split and migration job, CI terraform plan (INFRA-01, INFRA-02)
+- [x] 03-03-PLAN.md — Cloud Run service/job Terraform, Global ALB with custom domain SSL (INFRA-01, INFRA-06, INFRA-08)
 
 ### Phase 4: Staging Verification
 **Goal**: The application runs successfully in the GCP staging environment with all integrations verified end-to-end
@@ -196,8 +196,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
-| 2. Structured Logging | 4/5 | In progress | - |
-| 3. Pipeline & Provisioning | 2/3 | In Progress|  |
+| 2. Structured Logging | 5/5 | Complete | 2026-03-19 |
+| 3. Pipeline & Provisioning | 3/3 | Complete | 2026-03-19 |
 | 4. Staging Verification | 0/1 | Not started | - |
 | 5. Production Readiness | 0/2 | Not started | - |
 | 6. PHI Storage | 0/4 | Not started | - |
