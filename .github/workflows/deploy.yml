@@ -81,8 +81,6 @@ jobs:
             --wait
 
       - name: Deploy to Cloud Run
-        # TODO: Plan 03 will tighten ingress to --ingress=internal-and-cloud-load-balancing
-        # once the Global ALB is provisioned. Until then, allow direct access.
         run: |
           gcloud run deploy flashnote \
             --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
@@ -96,8 +94,7 @@ jobs:
             --port=3000 \
             --startup-probe-path=/api/health \
             --liveness-probe-path=/api/health \
-            --ingress=all \
-            --allow-unauthenticated \
+            --ingress=internal-and-cloud-load-balancing \
             --set-env-vars="NODE_ENV=production,DEPLOY_VERSION=${{ needs.build.outputs.image_tag }},WEB_URL=https://staging.flashnote.co,LLM_PROVIDER=gemini,GEMINI_USE_ADC=true,GEMINI_API_URL=https://${{ secrets.GCP_REGION }}-aiplatform.googleapis.com/v1/projects/${{ secrets.GCP_PROJECT_ID }}/locations/${{ secrets.GCP_REGION }}/publishers/google,GEMINI_MODEL=gemini-2.5-flash,TRUSTED_PROXY_COUNT=2,REGISTRATION_MODE=invite"
 
   deploy-production:
@@ -130,8 +127,6 @@ jobs:
             --wait
 
       - name: Deploy to Cloud Run
-        # TODO: Plan 03 will tighten ingress to --ingress=internal-and-cloud-load-balancing
-        # once the Global ALB is provisioned. Until then, allow direct access.
         run: |
           gcloud run deploy flashnote \
             --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
@@ -145,6 +140,5 @@ jobs:
             --port=3000 \
             --startup-probe-path=/api/health \
             --liveness-probe-path=/api/health \
-            --ingress=all \
-            --allow-unauthenticated \
+            --ingress=internal-and-cloud-load-balancing \
             --set-env-vars="NODE_ENV=production,DEPLOY_VERSION=${{ needs.build.outputs.image_tag }},WEB_URL=https://flashnote.co,LLM_PROVIDER=gemini,GEMINI_USE_ADC=true,GEMINI_API_URL=https://${{ secrets.GCP_REGION }}-aiplatform.googleapis.com/v1/projects/${{ secrets.GCP_PROD_PROJECT_ID }}/locations/${{ secrets.GCP_REGION }}/publishers/google,GEMINI_MODEL=gemini-2.5-flash,TRUSTED_PROXY_COUNT=2,REGISTRATION_MODE=invite"
