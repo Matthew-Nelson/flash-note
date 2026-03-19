@@ -10,9 +10,12 @@ concurrency:
   group: deploy-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/flashnote/flashnote
+
 jobs:
-  deploy:
-    name: Deploy to Cloud Run
+  build:
+    name: Build Docker Image
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
@@ -20,8 +23,8 @@ jobs:
       contents: read
       id-token: write
 
-    env:
-      IMAGE: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/flashnote/flashnote
+    outputs:
+      image_tag: ${{ github.event.workflow_run.head_sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -37,14 +40,9 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
-      # TODO: Add SENTRY_AUTH_TOKEN as a build secret to enable source map uploads.
-      # Without it, withSentryConfig in next.config.ts silently skips uploads —
-      # Sentry error reports will work but without source-mapped stack traces.
       - name: Build Docker image
         run: |
           docker build --platform linux/amd64 \
-            --build-arg "NEXT_PUBLIC_SENTRY_DSN=${{ secrets.NEXT_PUBLIC_SENTRY_DSN }}" \
-            --build-arg "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }}" \
             -t ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }} \
             -t ${{ env.IMAGE }}:latest .
 
@@ -53,18 +51,93 @@ jobs:
           docker push ${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }}
           docker push ${{ env.IMAGE }}:latest
 
-      # Runtime env vars: NODE_ENV is set here. Secrets (UPSTASH_REDIS_REST_URL,
-      # UPSTASH_REDIS_REST_TOKEN, SENTRY_DSN, etc.) are configured in Cloud Run
-      # console or via Secret Manager — not passed in this workflow to avoid
-      # storing them as GitHub secrets when they only need to exist in GCP.
-      # min-instances=0 is pre-launch cost savings.
-      # Increase to 1 before production traffic to avoid cold starts on every request.
+  deploy-staging:
+    name: Deploy to Staging
+    needs: build
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    environment: staging
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SA_EMAIL }}
+
+      - name: Run database migrations
+        run: |
+          gcloud run jobs update flashnote-migrate \
+            --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }}
+          gcloud run jobs execute flashnote-migrate \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --wait
+
       - name: Deploy to Cloud Run
+        # TODO: Plan 03 will tighten ingress to --ingress=internal-and-cloud-load-balancing
+        # once the Global ALB is provisioned. Until then, allow direct access.
         run: |
           gcloud run deploy flashnote \
-            --image=${{ env.IMAGE }}:${{ github.event.workflow_run.head_sha }} \
+            --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
             --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
             --service-account=${{ secrets.GCP_SA_RUNTIME_EMAIL }} \
+            --memory=1Gi \
+            --cpu=1 \
+            --min-instances=0 \
+            --max-instances=5 \
+            --port=3000 \
+            --startup-probe-path=/api/health \
+            --liveness-probe-path=/api/health \
+            --ingress=all \
+            --allow-unauthenticated \
+            --set-env-vars="NODE_ENV=production,DEPLOY_VERSION=${{ needs.build.outputs.image_tag }},WEB_URL=https://staging.flashnote.co,LLM_PROVIDER=gemini,GEMINI_USE_ADC=true,GEMINI_API_URL=https://${{ secrets.GCP_REGION }}-aiplatform.googleapis.com/v1/projects/${{ secrets.GCP_PROJECT_ID }}/locations/${{ secrets.GCP_REGION }}/publishers/google,GEMINI_MODEL=gemini-2.5-flash,TRUSTED_PROXY_COUNT=2,REGISTRATION_MODE=invite"
+
+  deploy-production:
+    name: Deploy to Production
+    needs: [build, deploy-staging]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    environment: production
+
+    steps:
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_PROD_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_PROD_SA_EMAIL }}
+
+      - name: Run database migrations
+        run: |
+          gcloud run jobs update flashnote-migrate \
+            --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROD_PROJECT_ID }}
+          gcloud run jobs execute flashnote-migrate \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROD_PROJECT_ID }} \
+            --wait
+
+      - name: Deploy to Cloud Run
+        # TODO: Plan 03 will tighten ingress to --ingress=internal-and-cloud-load-balancing
+        # once the Global ALB is provisioned. Until then, allow direct access.
+        run: |
+          gcloud run deploy flashnote \
+            --image=${{ env.IMAGE }}:${{ needs.build.outputs.image_tag }} \
+            --region=${{ secrets.GCP_REGION }} \
+            --project=${{ secrets.GCP_PROD_PROJECT_ID }} \
+            --service-account=${{ secrets.GCP_PROD_SA_RUNTIME_EMAIL }} \
             --memory=1Gi \
             --cpu=1 \
             --min-instances=0 \
@@ -72,5 +145,6 @@ jobs:
             --port=3000 \
             --startup-probe-path=/api/health \
             --liveness-probe-path=/api/health \
+            --ingress=all \
             --allow-unauthenticated \
-            --set-env-vars=NODE_ENV=production
+            --set-env-vars="NODE_ENV=production,DEPLOY_VERSION=${{ needs.build.outputs.image_tag }},WEB_URL=https://flashnote.co,LLM_PROVIDER=gemini,GEMINI_USE_ADC=true,GEMINI_API_URL=https://${{ secrets.GCP_REGION }}-aiplatform.googleapis.com/v1/projects/${{ secrets.GCP_PROD_PROJECT_ID }}/locations/${{ secrets.GCP_REGION }}/publishers/google,GEMINI_MODEL=gemini-2.5-flash,TRUSTED_PROXY_COUNT=2,REGISTRATION_MODE=invite"
