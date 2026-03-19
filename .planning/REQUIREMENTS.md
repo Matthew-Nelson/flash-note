@@ -30,8 +30,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Infrastructure & Deployment
 
-- [ ] **INFRA-01**: Deploy pipeline runs DB migrations before traffic cutover
-- [ ] **INFRA-02**: `/api/health` probes DB connectivity (not just `{ status: 'ok' }`)
+- [x] **INFRA-01**: Deploy pipeline runs DB migrations before traffic cutover
+- [x] **INFRA-02**: `/api/health` probes DB connectivity (not just `{ status: 'ok' }`)
 - [ ] **INFRA-03**: GCP project provisioned with Cloud Run, Cloud SQL, Artifact Registry, Vertex AI APIs enabled
 - [ ] **INFRA-04**: LLM service account configured with `roles/aiplatform.user` for Vertex AI ADC
 - [ ] **INFRA-05**: Cloud SQL provisioned with encryption at rest, `require_ssl = true`, automatic backups
@@ -172,8 +172,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MON-07 | Phase 10 | Pending |
 | MON-08 | Phase 10 | Pending |
 | MON-09 | Phase 10 | Pending |
-| INFRA-01 | Phase 3 | Pending |
-| INFRA-02 | Phase 3 | Pending |
+| INFRA-01 | Phase 3 | Complete |
+| INFRA-02 | Phase 3 | Complete |
 | INFRA-03 | Phase 3 | Pending |
 | INFRA-04 | Phase 3 | Pending |
 | INFRA-05 | Phase 3 | Pending |
