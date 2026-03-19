@@ -32,11 +32,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **INFRA-01**: Deploy pipeline runs DB migrations before traffic cutover
 - [x] **INFRA-02**: `/api/health` probes DB connectivity (not just `{ status: 'ok' }`)
-- [ ] **INFRA-03**: GCP project provisioned with Cloud Run, Cloud SQL, Artifact Registry, Vertex AI APIs enabled
-- [ ] **INFRA-04**: LLM service account configured with `roles/aiplatform.user` for Vertex AI ADC
-- [ ] **INFRA-05**: Cloud SQL provisioned with encryption at rest, `require_ssl = true`, automatic backups
-- [ ] **INFRA-06**: Runtime secrets stored in Secret Manager (DB URL, Stripe keys, Upstash, Resend)
-- [ ] **INFRA-07**: Workload Identity Federation configured for keyless GitHub Actions auth
+- [x] **INFRA-03**: GCP project provisioned with Cloud Run, Cloud SQL, Artifact Registry, Vertex AI APIs enabled
+- [x] **INFRA-04**: LLM service account configured with `roles/aiplatform.user` for Vertex AI ADC
+- [x] **INFRA-05**: Cloud SQL provisioned with encryption at rest, `require_ssl = true`, automatic backups
+- [x] **INFRA-06**: Runtime secrets stored in Secret Manager (DB URL, Stripe keys, Upstash, Resend)
+- [x] **INFRA-07**: Workload Identity Federation configured for keyless GitHub Actions auth
 - [ ] **INFRA-08**: Custom domain (flashnote.co) with SSL configured on Cloud Run
 - [ ] **INFRA-09**: First staging deploy succeeds with Pino logs in Cloud Logging and errors in Cloud Error Reporting
 - [ ] **INFRA-10**: Vertex AI ADC verified working in production (note generation uses ADC endpoint, not consumer API key)
@@ -174,11 +174,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MON-09 | Phase 10 | Pending |
 | INFRA-01 | Phase 3 | Complete |
 | INFRA-02 | Phase 3 | Complete |
-| INFRA-03 | Phase 3 | Pending |
-| INFRA-04 | Phase 3 | Pending |
-| INFRA-05 | Phase 3 | Pending |
-| INFRA-06 | Phase 3 | Pending |
-| INFRA-07 | Phase 3 | Pending |
+| INFRA-03 | Phase 3 | Complete |
+| INFRA-04 | Phase 3 | Complete |
+| INFRA-05 | Phase 3 | Complete |
+| INFRA-06 | Phase 3 | Complete |
+| INFRA-07 | Phase 3 | Complete |
 | INFRA-08 | Phase 3 | Pending |
 | INFRA-09 | Phase 4 | Pending |
 | INFRA-10 | Phase 4 | Pending |

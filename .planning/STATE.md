@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in-progress
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-19T16:41:33Z"
-last_activity: 2026-03-19 -- Completed 03-02 (Deploy pipeline and CI Terraform plan)
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-03-19T16:42:50Z"
+last_activity: 2026-03-19 -- Completed 03-01 (Terraform foundation, IAM/WIF, Cloud SQL, secrets, Dockerfile)
 progress:
   total_phases: 10
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 # Project State
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-16)
 
 **Core value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
-**Current focus:** Phase 3 in progress (Pipeline & Provisioning). Plan 02 complete (deploy pipeline + CI terraform).
+**Current focus:** Phase 3 in progress (Pipeline & Provisioning). Plans 01 and 02 complete. Plan 03 (Cloud Run + ALB) remaining.
 
 ## Current Position
 
 Phase: 3 of 10 (Pipeline & Provisioning) -- IN PROGRESS
-Plan: 1 of 3 complete in current phase (03-02 done; 03-01 and 03-03 remaining)
-Status: Deploy pipeline rewritten, CI Terraform plan added. Terraform provisioning (03-01) and cleanup (03-03) still pending.
-Last activity: 2026-03-19 -- Completed 03-02 (Deploy pipeline and CI Terraform plan)
+Plan: 2 of 3 complete in current phase (03-01 and 03-02 done; 03-03 remaining)
+Status: Terraform foundation and deploy pipeline complete. Cloud Run service/job and load balancer (03-03) still pending.
+Last activity: 2026-03-19 -- Completed 03-01 (Terraform foundation, IAM/WIF, Cloud SQL, secrets, Dockerfile)
 
 Progress: [████████░░] 80%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Average duration: ~7min
-- Total execution time: ~53 min
+- Total plans completed: 9
+- Average duration: ~6min
+- Total execution time: ~57 min
 
 **By Phase:**
 
@@ -45,10 +45,10 @@ Progress: [████████░░] 80%
 |-------|-------|-------|----------|
 | 01-ui-polish | 2 | ~8min | ~4min |
 | 02-structured-logging | 5 | 42min | ~8min |
-| 03-pipeline-provisioning | 1 | 3min | 3min |
+| 03-pipeline-provisioning | 2 | 7min | ~4min |
 
 **Recent Trend:**
-- Last 5 plans: 02-02 (21min), 02-03 (7min), 02-04 (2min), 02-05 (5min), 03-02 (3min)
+- Last 5 plans: 02-03 (7min), 02-04 (2min), 02-05 (5min), 03-02 (3min), 03-01 (4min)
 - Trend: Stable
 
 *Updated after each plan completion*
@@ -84,6 +84,10 @@ Recent decisions affecting current work:
 - [03-02]: TRUSTED_PROXY_COUNT=2 for both staging and production (ALB + Cloud Run proxy hops)
 - [03-02]: INFRA-02 already satisfied by existing health endpoint -- no code changes needed
 - [03-02]: Ingress set to --ingress=all temporarily; Plan 03 tightens once ALB is provisioned
+- [03-01]: Cross-project AR access applied from staging Terraform (prod_runtime_sa_email variable) to avoid needing both project credentials in one apply
+- [03-01]: Migration compiled to .mjs (not .js) -- Node.js treats .mjs as ESM without "type": "module" in package.json
+- [03-01]: tsc --module es2022 for migration compilation (preserves import.meta.url and ESM syntax)
+- [03-01]: Per-secret IAM bindings for secretAccessor (not project-level) for least-privilege access
 
 ### Pending Todos
 
@@ -97,6 +101,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-19T16:41:33Z
-Stopped at: Completed 03-02-PLAN.md
-Resume file: .planning/phases/03-pipeline-provisioning/03-02-SUMMARY.md
+Last session: 2026-03-19T16:42:50Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: .planning/phases/03-pipeline-provisioning/03-01-SUMMARY.md
