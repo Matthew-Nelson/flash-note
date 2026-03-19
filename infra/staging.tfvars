@@ -12,3 +12,4 @@ db_availability_type   = "ZONAL"
 cloudrun_min_instances  = 0
 cloudrun_max_instances  = 5
 prod_runtime_sa_email  = ""
+manage_dns             = false

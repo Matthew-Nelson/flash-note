@@ -11,3 +11,4 @@ db_tier                = "db-custom-1-3840"
 db_availability_type   = "REGIONAL"
 cloudrun_min_instances  = 0
 cloudrun_max_instances  = 10
+manage_dns             = false
