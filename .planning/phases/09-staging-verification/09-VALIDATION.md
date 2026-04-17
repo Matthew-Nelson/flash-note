@@ -1,5 +1,5 @@
 ---
-phase: 4
+phase: 9
 slug: staging-verification
 status: draft
 nyquist_compliant: true
@@ -7,7 +7,7 @@ wave_0_complete: true
 created: 2026-03-19
 ---
 
-# Phase 4 — Validation Strategy
+# Phase 9 — Validation Strategy
 
 > Per-phase validation contract for feedback sampling during execution.
 

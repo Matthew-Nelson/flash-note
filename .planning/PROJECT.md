@@ -43,15 +43,6 @@ Physical Therapists can paste shorthand clinical notes and instantly receive a s
 
 ### Active
 
-- [ ] UI Phase E: Polish pass (touch targets 44px+, cursor audit, skeleton loaders, 375px responsive, print stylesheet, reduced-motion transitions)
-- [ ] Monitoring: Pino structured logger + console.error migration (~44 calls across 18 files)
-- [ ] Monitoring: Client-side telemetry endpoint (/api/telemetry) + error boundary wiring
-- [ ] Monitoring: Sentry removal after Pino is verified in production
-- [ ] Infra: Pipeline hardening (DB migration step in deploy, deep health check)
-- [ ] Infra: GCP infrastructure provisioning (Cloud SQL, Secret Manager, Workload Identity Federation, custom domain)
-- [ ] Infra: First staging deploy + end-to-end verification (Pino logs, Cloud Error Reporting, Vertex AI ADC, smoke tests)
-- [ ] Billing: Stripe live mode activation (identity verification, production webhook, real payment test)
-- [ ] Launch: Beta launch gate (min-instances=1, legal docs published, support email, 48hr stability soak, recruit beta testers)
 - [ ] PHI: Patient records with context injection into future notes
 - [ ] PHI: Clinical notes storage (HIPAA-compliant, append-only)
 - [ ] PHI: Note templates (SOAP built-in, dynamic sections)
@@ -84,11 +75,12 @@ Physical Therapists can paste shorthand clinical notes and instantly receive a s
 
 ## Context
 
-- **Codebase state**: Next.js migration complete (Phase 0 + Phase 1, 9 sub-phases). All legacy code (Express backend, Chrome extension) deleted. UI overhaul 5/6 phases done.
-- **Critical path to launch**: UI Polish E → Pino Logger → Pipeline Hardening → GCP Provisioning → Staging Deploy → Sentry Removal → Stripe Live → Beta Gate
-- **PHI storage is the competitive pivot**: Persistent patients, notes, templates, versioning. Blocked on deployment readiness + HIPAA infra verification.
+- **Project purpose**: Portfolio piece demonstrating HIPAA-compliant healthcare software engineering. May be deployed to production later, but remote deployment is deferred until after feature development is complete.
+- **Codebase state**: Next.js migration complete (Phase 0 + Phase 1, 9 sub-phases). All legacy code (Express backend, Chrome extension) deleted. UI overhaul done. Pino structured logging done. GCP infrastructure provisioned (Terraform, Cloud Run, ALB) but not yet deployed to.
+- **Critical path**: PHI Storage → Post-PHI Features → Retention → Clinic Features → Quality Hardening → (optional) Staging → Production
+- **PHI storage is the core differentiator**: Persistent patients, notes, templates, versioning. No longer blocked on deployment -- audit logging is operational locally.
 - **Testing**: 1493 tests with 97.79% coverage enforced by pre-commit hook. Security-critical paths have dedicated integration tests.
-- **Technical debt**: ~44 console.* calls need Pino migration, /baa page awaiting legal content, Sentry to be replaced by GCP-native monitoring.
+- **Technical debt**: /baa page awaiting legal content.
 - **Target users**: Physical Therapists in clinical settings. They need fast, reliable, HIPAA-compliant documentation tools.
 - **Competitive landscape**: TwoFold and similar PT documentation tools exist. FlashNote differentiates on AI-powered generation from shorthand + future PHI storage with context injection.
 
@@ -111,6 +103,7 @@ Physical Therapists can paste shorthand clinical notes and instantly receive a s
 | Gemini 2.5 Flash via Vertex AI | Cost efficiency + BAA coverage via Vertex AI | Good |
 | Teal design system (no gradients, no dark mode) | WCAG AA contrast compliance, professional clinical aesthetic | Good |
 | Extension sunset | Web app is sufficient; extension added maintenance burden without differentiation | Good |
+| Defer deployment, feature-first | Project pivoted to portfolio piece; remote deploy deferred until after feature development complete | Active |
 
 ---
-*Last updated: 2026-03-16 after GSD initialization*
+*Last updated: 2026-04-16 after roadmap reshuffle (deployment deferred)*

@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: All infrastructure provisioned -- Terraform foundation, deploy pipeline, Cloud Run service/job, and Global External ALB. Ready for Phase 4.
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-19T17:48:45.014Z"
-last_activity: 2026-03-19 -- Completed 03-03 (Cloud Run service, migration job, Global ALB with managed SSL)
+status: Roadmap reshuffled -- deployment deferred, PHI Storage is next. Ready for Phase 4 (PHI Storage) planning.
+stopped_at: Roadmap reshuffle complete
+last_updated: "2026-04-16"
+last_activity: 2026-04-16 -- Deferred staging/production phases (now 9+10), renumbered feature phases 4-8
 progress:
   total_phases: 10
   completed_phases: 3
@@ -18,17 +18,17 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-16)
+See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
-**Current focus:** Phase 3 complete (Pipeline & Provisioning). All infrastructure provisioned. Ready for Phase 4 (staging verification).
+**Current focus:** Feature development. PHI Storage (Phase 4) is next -- the core differentiator that transforms FlashNote from a generation tool into a clinical documentation platform. Remote deployment deferred until after feature development is complete.
 
 ## Current Position
 
 Phase: 3 of 10 (Pipeline & Provisioning) -- COMPLETE
-Plan: 3 of 3 complete in current phase
-Status: All infrastructure provisioned -- Terraform foundation, deploy pipeline, Cloud Run service/job, and Global External ALB. Ready for Phase 4.
-Last activity: 2026-03-19 -- Completed 03-03 (Cloud Run service, migration job, Global ALB with managed SSL)
+Next phase: 4 (PHI Storage) -- NOT STARTED
+Status: Roadmap reshuffled -- deployment deferred, PHI Storage is next. Ready for Phase 4 (PHI Storage) planning.
+Last activity: 2026-04-16 -- Deferred staging/production phases (now 9+10), renumbered feature phases 4-8
 
 Progress: [██████████] 100%
 
@@ -60,11 +60,13 @@ Progress: [██████████] 100%
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
-- [Roadmap]: PROMPT-01/02/03 assigned to Phase 6 (PHI Storage) because template-driven generation restructures the prompt system
-- [Roadmap]: BILL-05 (failed payment emails) assigned to Phase 8 (Retention) because it is a retention mechanism, not a launch-gate billing item
-- [Roadmap]: MON-07/08/09 (monitoring ops) assigned to Phase 10 because audit sink and alerts harden what earlier phases build
+- [Roadmap 2026-04-16]: Deployment deferred -- project pivoted to portfolio piece. Phases 4+5 (staging/production) moved to 9+10. Feature development (PHI Storage through Quality Hardening) is the priority.
+- [Roadmap 2026-04-16]: Phase 6 (now Phase 4, PHI Storage) dependency on Phase 5 (production readiness) removed. Audit logging already operational locally via Pino (Phase 2).
+- [Roadmap]: PROMPT-01/02/03 assigned to Phase 4 (PHI Storage) because template-driven generation restructures the prompt system
+- [Roadmap]: BILL-05 (failed payment emails) assigned to Phase 6 (Retention) because it is a retention mechanism, not a launch-gate billing item
+- [Roadmap]: MON-07/08/09 (monitoring ops) assigned to Phase 8 because audit sink and alerts harden what earlier phases build
 - [Roadmap]: Phases 1 and 2 can execute in parallel (no dependency between UI polish and Pino logging)
-- [01-02]: Print header uses blank underlines for patient fields -- Phase 6 will auto-populate with PHI data
+- [01-02]: Print header uses blank underlines for patient fields -- Phase 4 will auto-populate with PHI data
 - [01-02]: Responsive padding pattern: p-4 sm:p-6 for dashboard page mains, px-4 sm:px-6 for TopBar
 - [01-01]: cursor-pointer applied in both CSS classes and Button.tsx Tailwind for defense-in-depth
 - [01-01]: Reduced-motion spinner exemption uses 1s animation-duration for consistency with CSS spinner definitions
@@ -99,11 +101,11 @@ None yet.
 ### Blockers/Concerns
 
 - [Research]: Account deletion conflicts with PHI retention (HIPAA 6-year requirement vs CCPA). Requires legal counsel before implementation. Does not block any current phase.
-- [Research]: HIPAA proposed rule may mandate MFA. Auth schema should be MFA-extensible. Does not block current phases but affects Phase 6+ design.
-- [Research]: Cloud Run connection pool exhaustion risk under autoscaling. Must validate pool sizing during Phase 4 staging verification.
+- [Research]: HIPAA proposed rule may mandate MFA. Auth schema should be MFA-extensible. Does not block current phases but affects Phase 4+ design.
+- [Research]: Cloud Run connection pool exhaustion risk under autoscaling. Must validate pool sizing during Phase 9 staging verification.
 
 ## Session Continuity
 
-Last session: 2026-03-19T17:48:45.012Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-staging-verification/04-CONTEXT.md
+Last session: 2026-04-16
+Stopped at: Roadmap reshuffle complete
+Resume action: Run /gsd:discuss-phase or /gsd:plan-phase for Phase 4 (PHI Storage)

@@ -37,7 +37,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **INFRA-05**: Cloud SQL provisioned with encryption at rest, `require_ssl = true`, automatic backups
 - [x] **INFRA-06**: Runtime secrets stored in Secret Manager (DB URL, Stripe keys, Upstash, Resend)
 - [x] **INFRA-07**: Workload Identity Federation configured for keyless GitHub Actions auth
-- [ ] **INFRA-08**: Custom domain (flashnote.co) with SSL configured on Cloud Run
+- [x] **INFRA-08**: Custom domain (flashnote.co) with SSL configured on Cloud Run
 - [ ] **INFRA-09**: First staging deploy succeeds with Pino logs in Cloud Logging and errors in Cloud Error Reporting
 - [ ] **INFRA-10**: Vertex AI ADC verified working in production (note generation uses ADC endpoint, not consumer API key)
 - [ ] **INFRA-11**: Smoke test passes: register -> verify email -> login -> generate note -> logout
@@ -179,7 +179,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | INFRA-05 | Phase 3 | Complete |
 | INFRA-06 | Phase 3 | Complete |
 | INFRA-07 | Phase 3 | Complete |
-| INFRA-08 | Phase 3 | Pending |
+| INFRA-08 | Phase 3 | Complete |
 | INFRA-09 | Phase 4 | Pending |
 | INFRA-10 | Phase 4 | Pending |
 | INFRA-11 | Phase 4 | Pending |

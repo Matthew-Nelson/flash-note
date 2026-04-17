@@ -2,7 +2,7 @@
 
 ## Overview
 
-FlashNote is a production Next.js application with auth, billing, note generation, and UI already built. This roadmap covers the remaining 71 requirements to go from working codebase to launched product and beyond: UI polish, structured logging, infrastructure provisioning, staging verification, production launch with Stripe live mode, PHI storage (the competitive pivot), post-PHI features, retention/differentiation, clinic features, and quality hardening. The critical path runs through deployment readiness before PHI storage, and PHI storage before everything that depends on persisted patients and notes.
+FlashNote is a production Next.js application with auth, billing, note generation, and UI already built. This roadmap covers the remaining requirements to complete feature development and (optionally) deploy to production. The project currently serves as a portfolio piece demonstrating HIPAA-compliant healthcare software engineering. Remote deployment is deferred until after feature development is complete. The critical path runs through PHI storage (the core differentiator), then post-PHI features, retention, and clinic features. Infrastructure provisioning (Phase 3) is already done; staging verification and production launch are deferred to the end.
 
 ## Phases
 
@@ -15,13 +15,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion (completed 2026-03-17)
 - [x] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation, Sentry removal (completed 2026-03-19)
 - [x] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning (completed 2026-03-19)
-- [ ] **Phase 4: Staging Verification** - First staging deploy, Vertex AI ADC, end-to-end smoke tests
-- [ ] **Phase 5: Production Readiness** - Stripe live mode, beta launch gate
-- [ ] **Phase 6: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements
-- [ ] **Phase 7: Post-PHI Features** - PDF export, per-section copy, auto titles, time-saved tracking, note search
-- [ ] **Phase 8: Retention & Differentiation** - Macro library, Magic Edit, failed payment notifications
-- [ ] **Phase 9: Clinic Features** - Admin dashboard, member management, shared resources, seat-based billing, org lifecycle
-- [ ] **Phase 10: Quality Hardening** - E2E tests, DAST scanning, secret scanning, accessibility testing, monitoring ops
+- [ ] **Phase 4: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements
+- [ ] **Phase 5: Post-PHI Features** - PDF export, per-section copy, auto titles, time-saved tracking, note search
+- [ ] **Phase 6: Retention & Differentiation** - Macro library, Magic Edit, failed payment notifications
+- [ ] **Phase 7: Clinic Features** - Admin dashboard, member management, shared resources, seat-based billing, org lifecycle
+- [ ] **Phase 8: Quality Hardening** - E2E tests, DAST scanning, secret scanning, accessibility testing, monitoring ops
+- [ ] **Phase 9: Staging Verification** - First staging deploy, Vertex AI ADC, end-to-end smoke tests (DEFERRED — deploy only)
+- [ ] **Phase 10: Production Readiness** - Stripe live mode, beta launch gate (DEFERRED — deploy only)
 
 ## Phase Details
 
@@ -43,7 +43,7 @@ Plans:
 
 ### Phase 2: Structured Logging
 **Goal**: All server-side logging uses structured Pino output, client-side errors flow through a telemetry endpoint, and Sentry is fully removed -- establishing the logging foundation required for HIPAA audit compliance and eliminating the external error tracking dependency
-**Depends on**: Nothing (can run in parallel with Phase 1, but must complete before Phase 4)
+**Depends on**: Nothing (can run in parallel with Phase 1)
 **Requirements**: MON-01, MON-02, MON-03, MON-04, MON-05, MON-06
 **Success Criteria** (what must be TRUE):
   1. Server logs are structured JSON in production (GCP format) and human-readable in dev (pino-pretty)
@@ -78,38 +78,9 @@ Plans:
 - [x] 03-02-PLAN.md — Deploy workflow rewrite with staging/production split and migration job, CI terraform plan (INFRA-01, INFRA-02)
 - [x] 03-03-PLAN.md — Cloud Run service/job Terraform, Global ALB with custom domain SSL (INFRA-01, INFRA-06, INFRA-08)
 
-### Phase 4: Staging Verification
-**Goal**: The application runs successfully in the GCP staging environment with all integrations verified end-to-end
-**Depends on**: Phase 3
-**Requirements**: INFRA-09, INFRA-10, INFRA-11, INFRA-12
-**Success Criteria** (what must be TRUE):
-  1. Pino logs appear in Cloud Logging and errors auto-group in Cloud Error Reporting
-  2. Note generation works via Vertex AI ADC (not consumer API key) in the deployed environment
-  3. A user can register, verify email, log in, generate a note, and log out in staging
-  4. A user can complete Stripe checkout (test mode), webhook fires, subscription activates, and note generation unlocks
-**Plans**: 2 plans
-
-Plans:
-- [ ] 04-01-PLAN.md — Prerequisites, first staging deploy, Pino log verification (INFRA-09)
-- [ ] 04-02-PLAN.md — Auth flow, note generation, and Stripe billing smoke tests (INFRA-10, INFRA-11, INFRA-12)
-
-### Phase 5: Production Readiness
-**Goal**: The application is ready for real users with real payments -- Stripe live, launch gate criteria met
-**Depends on**: Phase 4 (Stripe live requires staging smoke tests passing)
-**Requirements**: BILL-01, BILL-02, BILL-03, BILL-04, LAUNCH-01, LAUNCH-02, LAUNCH-03, LAUNCH-04
-**Success Criteria** (what must be TRUE):
-  1. Stripe is in live mode with identity verification complete and production webhook processing real events
-  2. A real $1 payment succeeds, webhook processes correctly, and the charge is refunded
-  3. Cloud Run has min-instances=1, legal docs are published, support email works, and 48 hours pass with no errors
-**Plans**: TBD
-
-Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-
-### Phase 6: PHI Storage
+### Phase 4: PHI Storage
 **Goal**: FlashNote transforms from a disposable generation tool into a clinical documentation platform -- users can create patients, persist notes, view history, and edit with full HIPAA-compliant versioning
-**Depends on**: Phase 5 (HIPAA audit infrastructure must be operational before PHI is stored)
+**Depends on**: Phase 3 (audit logging infrastructure must be operational)
 **Requirements**: PHI-01, PHI-02, PHI-03, PHI-04, PHI-05, PHI-06, PHI-07, PHI-08, PHI-09, PHI-10, PROMPT-01, PROMPT-02, PROMPT-03
 **Success Criteria** (what must be TRUE):
   1. User can create a patient record and view a patient detail page with profile fields
@@ -120,14 +91,14 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
-- [ ] 06-04: TBD
+- [ ] 04-01: TBD
+- [ ] 04-02: TBD
+- [ ] 04-03: TBD
+- [ ] 04-04: TBD
 
-### Phase 7: Post-PHI Features
+### Phase 5: Post-PHI Features
 **Goal**: Users have the tools to manage, export, and find their persisted notes efficiently
-**Depends on**: Phase 6
+**Depends on**: Phase 4
 **Requirements**: POST-01, POST-02, POST-03, POST-04, POST-05
 **Success Criteria** (what must be TRUE):
   1. User can export a note as PDF with patient name, provider signature, date, and all SOAP sections
@@ -138,12 +109,12 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 07-01: TBD
-- [ ] 07-02: TBD
+- [ ] 05-01: TBD
+- [ ] 05-02: TBD
 
-### Phase 8: Retention & Differentiation
+### Phase 6: Retention & Differentiation
 **Goal**: Users have personalization and AI-powered editing tools that build switching cost and keep subscribers engaged
-**Depends on**: Phase 6 (macros are used in generation; Magic Edit operates on persisted notes)
+**Depends on**: Phase 4 (macros are used in generation; Magic Edit operates on persisted notes)
 **Requirements**: RET-01, RET-02, RET-03, BILL-05
 **Success Criteria** (what must be TRUE):
   1. User can create, edit, and delete shorthand macros (e.g., `mtjm` expands to full clinical text) and macros persist across devices
@@ -152,12 +123,12 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 08-01: TBD
-- [ ] 08-02: TBD
+- [ ] 06-01: TBD
+- [ ] 06-02: TBD
 
-### Phase 9: Clinic Features
+### Phase 7: Clinic Features
 **Goal**: Clinic owners can manage their team, share resources, and pay for seats on a single subscription
-**Depends on**: Phase 6 (clinic admin needs patient/note data), Phase 8 (shared macros extend macro library)
+**Depends on**: Phase 4 (clinic admin needs patient/note data), Phase 6 (shared macros extend macro library)
 **Requirements**: CLINIC-01, CLINIC-02, CLINIC-03, CLINIC-04, CLINIC-05, CLINIC-06
 **Success Criteria** (what must be TRUE):
   1. Org admin can view a team dashboard showing usage analytics per therapist
@@ -168,12 +139,12 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 09-01: TBD
-- [ ] 09-02: TBD
+- [ ] 07-01: TBD
+- [ ] 07-02: TBD
 
-### Phase 10: Quality Hardening
+### Phase 8: Quality Hardening
 **Goal**: The application has comprehensive automated testing, security scanning, accessibility audits, and operational monitoring
-**Depends on**: Phase 4 (E2E/DAST need staging), Phase 6 (E2E tests should cover PHI flows)
+**Depends on**: Phase 4 (E2E tests should cover PHI flows)
 **Requirements**: QUAL-01, QUAL-02, QUAL-03, QUAL-04, QUAL-05, QUAL-06, QUAL-07, QUAL-08, MON-07, MON-08, MON-09
 **Success Criteria** (what must be TRUE):
   1. E2E tests cover auth flows, note generation, copy edge cases, and rate limiting UX -- and pass in CI
@@ -184,25 +155,54 @@ Plans:
 **Plans**: TBD
 
 Plans:
+- [ ] 08-01: TBD
+- [ ] 08-02: TBD
+- [ ] 08-03: TBD
+
+### Phase 9: Staging Verification (DEFERRED)
+**Goal**: The application runs successfully in the GCP staging environment with all integrations verified end-to-end
+**Depends on**: Phase 3, Phase 8 (deploy after features are complete and hardened)
+**Requirements**: INFRA-09, INFRA-10, INFRA-11, INFRA-12
+**Success Criteria** (what must be TRUE):
+  1. Pino logs appear in Cloud Logging and errors auto-group in Cloud Error Reporting
+  2. Note generation works via Vertex AI ADC (not consumer API key) in the deployed environment
+  3. A user can register, verify email, log in, generate a note, and log out in staging
+  4. A user can complete Stripe checkout (test mode), webhook fires, subscription activates, and note generation unlocks
+**Plans**: 2 plans (already prepared from prior Phase 4 planning)
+
+Plans:
+- [ ] 09-01-PLAN.md — Prerequisites, first staging deploy, Pino log verification (INFRA-09)
+- [ ] 09-02-PLAN.md — Auth flow, note generation, and Stripe billing smoke tests (INFRA-10, INFRA-11, INFRA-12)
+
+### Phase 10: Production Readiness (DEFERRED)
+**Goal**: The application is ready for real users with real payments -- Stripe live, launch gate criteria met
+**Depends on**: Phase 9 (Stripe live requires staging smoke tests passing)
+**Requirements**: BILL-01, BILL-02, BILL-03, BILL-04, LAUNCH-01, LAUNCH-02, LAUNCH-03, LAUNCH-04
+**Success Criteria** (what must be TRUE):
+  1. Stripe is in live mode with identity verification complete and production webhook processing real events
+  2. A real $1 payment succeeds, webhook processes correctly, and the charge is refunded
+  3. Cloud Run has min-instances=1, legal docs are published, support email works, and 48 hours pass with no errors
+**Plans**: TBD
+
+Plans:
 - [ ] 10-01: TBD
 - [ ] 10-02: TBD
-- [ ] 10-03: TBD
 
 ## Progress
 
 **Execution Order:**
 Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
-(Phases 1 and 2 can run in parallel; Phase 10 can start after Phase 6 completes)
+(Phases 1 and 2 can run in parallel; Phases 9 and 10 are deferred until feature development is complete)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
 | 2. Structured Logging | 5/5 | Complete | 2026-03-19 |
 | 3. Pipeline & Provisioning | 3/3 | Complete | 2026-03-19 |
-| 4. Staging Verification | 0/2 | Not started | - |
-| 5. Production Readiness | 0/2 | Not started | - |
-| 6. PHI Storage | 0/4 | Not started | - |
-| 7. Post-PHI Features | 0/2 | Not started | - |
-| 8. Retention & Differentiation | 0/2 | Not started | - |
-| 9. Clinic Features | 0/2 | Not started | - |
-| 10. Quality Hardening | 0/3 | Not started | - |
+| 4. PHI Storage | 0/4 | Not started | - |
+| 5. Post-PHI Features | 0/2 | Not started | - |
+| 6. Retention & Differentiation | 0/2 | Not started | - |
+| 7. Clinic Features | 0/2 | Not started | - |
+| 8. Quality Hardening | 0/3 | Not started | - |
+| 9. Staging Verification | 0/2 | Deferred | - |
+| 10. Production Readiness | 0/2 | Deferred | - |
