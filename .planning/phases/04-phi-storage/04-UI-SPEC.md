@@ -64,19 +64,19 @@ FlashNote uses a 4-based scale exposed through CSS custom properties and Tailwin
 
 ## Typography
 
-FlashNote runs an 11-step scale; Phase 4 surfaces use a **subset of 4 sizes + 2 weights** to maintain hierarchy. Body line-height is `leading-relaxed` (1.625) for note content, `leading-normal` (1.5) for UI chrome. Heading line-height is `leading-tight` (1.25).
+FlashNote runs an 11-step scale; Phase 4 surfaces use a **subset of exactly 4 sizes + exactly 2 weights** to maintain hierarchy. Body line-height is `leading-relaxed` (1.625) for note content, `leading-normal` (1.5) for UI chrome. Heading line-height is `leading-tight` (1.25).
 
 | Role | Size | Tailwind | Weight | Line height | Phase 4 usage |
 |------|------|----------|--------|-------------|---------------|
 | Page title (h1) | 24px | `text-fn-2xl` (`--fn-text-2xl`) | 600 semibold | `leading-tight` (1.25) | Patient name, note title (auto-generated), page heading (`/dashboard/patients`, `/dashboard/notes`) |
 | Section heading (h2, h3) | 18px | `text-fn-lg` (`--fn-text-lg`) | 600 semibold | `leading-tight` (1.25) | Card titles ("Patient Info", "Context", "Notes"), SOAP section headers, "Edit History" disclosure button |
-| Body / table cell / label | 14px | `text-fn-base` (`--fn-text-base`, default) | 400 normal (content), 500 medium (labels), 600 semibold (table column headers) | `leading-normal` (1.5) for UI, `leading-relaxed` (1.625) for note-section content | Patient rows, note previews, form inputs, buttons, error/helper text |
-| Meta / secondary | 13px | `text-fn-sm` | 400 normal | `leading-normal` (1.5) | Timestamps, "3 edits" disclosure counter, metadata row (date · duration · modality), table helper text |
-| Micro label (only when necessary) | 12px | `text-fn-xs` | 600 semibold (uppercase `tracking-fn-wider`) | n/a | Source badges on version history (`GENERATED` / `MANUAL EDIT`), table column headers when space-constrained |
+| Body / table cell / label | 14px | `text-fn-base` (`--fn-text-base`, default) | 400 normal (content), 600 semibold (form labels + table column headers) | `leading-normal` (1.5) for UI, `leading-relaxed` (1.625) for note-section content | Patient rows, note previews, form inputs, form labels, buttons, error/helper text |
+| Micro / meta (timestamps, badges, column headers) | 12px | `text-fn-xs` (`--fn-text-xs`) | 400 normal (timestamps, counters, metadata), 600 semibold (source badges + table column headers, uppercase `tracking-fn-wider`) | `leading-normal` (1.5) | Timestamps, "3 edits" disclosure counter, metadata row (date · duration · modality), table helper text, source badges on version history (`GENERATED` / `MANUAL EDIT`), table column headers when space-constrained |
 
 **Rules:**
 - Exactly one `<h1>` per page (Engineering Rule 14). Heading nesting sequential — h1 (page title) → h2 (major card) → h3 (subsection if needed). No `h4+` in Phase 4.
-- Numeric weights only: `400` (normal) and `600` (semibold). `500 medium` is permitted for form labels to match the existing Settings page pattern (`settings/page.tsx:21` uses `font-semibold` for section headings, form labels use `text-sm`). Do NOT introduce 300, 700, or 800.
+- Weights: exactly two — `400` (normal) and `600` (semibold). No 300, 500, 700, or 800. Phase 4 form labels use **600 semibold** (consistent with `Button.tsx` and `Card.tsx` headings). If the existing `/dashboard/settings` page uses 500 for legacy form labels, do NOT promote that pattern into Phase 4 surfaces — the planner may raise a small follow-up to reconcile legacy Settings labels if visible inconsistency surfaces.
+- Sizes: exactly four — 24px, 18px, 14px, 12px. The 13px `text-fn-sm` token is NOT used in Phase 4; meta/timestamp/badge content collapses to 12px `text-fn-xs`.
 - Letter spacing: `tracking-fn-tight` (-0.02em) on h1 only. `tracking-fn-wider` (0.08em) on uppercase micro-labels (source badges, sidebar section headers). Default (-0.01em) everywhere else.
 - Tabular numerals for timestamps and version numbers: use `font-variant-numeric: tabular-nums` via `className="tabular-nums"` to stop version counters jittering in disclosure buttons.
 
@@ -133,7 +133,7 @@ All user-facing strings are curated client-side and mapped from server error cod
 |---------|-----|----------------|----------|
 | `/dashboard/patients` | Add patient | primary | Top-right of page header, also empty-state hero |
 | `/dashboard/patients/new` | Save patient | primary | Form submit (bottom-right of form) |
-| `/dashboard/patients/new` | Cancel | secondary | Adjacent to Save patient |
+| `/dashboard/patients/new` | Cancel | secondary | Adjacent to Save patient (noun-free label acceptable here — adjacent "Save patient" CTA provides clear context) |
 | `/dashboard/patients/[id]` context field | Save context | primary (small) | Inline on textarea when dirty; hidden when pristine |
 | `/dashboard/patients/[id]` | Generate note | primary | Above notes table ("Generate note for this patient") |
 | `/dashboard/patients/[id]` archive | Archive patient | destructive (see below) | Bottom of page, within an outlined secondary button that opens ConfirmDialog |
@@ -142,7 +142,7 @@ All user-facing strings are curated client-side and mapped from server error cod
 | `/dashboard/notes/new` step 2 | Save note | primary | Bottom-right of review panel |
 | `/dashboard/notes/new` step 2 | Start over | secondary | Adjacent to Save note |
 | `/dashboard/notes/[id]` section edit | Save section | primary (small) | Inline below textarea when in edit mode |
-| `/dashboard/notes/[id]` section edit | Cancel | secondary (small) | Adjacent to Save section |
+| `/dashboard/notes/[id]` section edit | Discard changes | secondary (small) | Adjacent to Save section (renamed from "Cancel" to explicitly convey lossy intent) |
 | `/dashboard/notes/[id]` | Copy all | secondary | Top-right of note content, below metadata |
 | `/dashboard/notes/[id]` archive | Archive note | destructive secondary | Bottom of page |
 | `/dashboard/notes/[id]` conflict alert | Refresh to see latest | secondary (inside alert) | Inside the `role="alert"` banner |
@@ -327,10 +327,10 @@ This section converts every discretionary UX item from CONTEXT.md into a locked 
 
 ### Section edit save/cancel flow
 
-- **Locked shape: explicit save with inline Save/Cancel buttons.** Entering edit mode replaces the read-only content with a `<textarea>` (auto-sized via `field-sizing: content` with fallback to manual row calculation) and shows `[Cancel] [Save section]` buttons in a flex row below.
+- **Locked shape: explicit save with inline Save/Discard buttons.** Entering edit mode replaces the read-only content with a `<textarea>` (auto-sized via `field-sizing: content` with fallback to manual row calculation) and shows `[Discard changes] [Save section]` buttons in a flex row below.
 - **Not** auto-save on blur (auto-save in a clinical amendment trail creates noise versions from accidental tab-aways). Explicit commit is the professional model.
 - **Dirty state:** If the user attempts to navigate away while ANY section is in edit mode with unsaved changes, fire a `beforeunload` confirm + an in-app Next.js `beforeunload`-style prompt. Copy: "Leave this page? Your unsaved section edits will be lost." (implementation detail: track per-section `isDirty` in a `Map<sectionId, boolean>` owned by the notes detail page — see Loading/State section below).
-- **Undo within edit mode:** Cancel reverts to the last-saved content immediately without a confirmation (lossy, but the user explicitly chose Cancel).
+- **Undo within edit mode:** "Discard changes" reverts to the last-saved content immediately without a confirmation (lossy, but the user explicitly chose discard).
 - **Save error:** If the action returns a non-conflict error, keep edit mode open, show the error alert above the textarea with the curated string, and keep the textarea's current value (don't revert on error — user's changes are preserved so they can retry).
 - **Save success:** Collapse back to read-only mode, fire the "Section saved." aria-live announcement, refresh version count on the disclosure button.
 
