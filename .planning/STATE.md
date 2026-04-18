@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 4 context gathered
-last_updated: "2026-04-17T20:39:17.211Z"
-last_activity: 2026-04-16 -- Deferred staging/production phases (now 9+10), renumbered feature phases 4-8
+status: executing
+stopped_at: Completed 04-01-foundation-PLAN.md
+last_updated: "2026-04-18T21:01:32.984Z"
+last_activity: 2026-04-18
 progress:
   total_phases: 10
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 10
+  total_plans: 15
+  completed_plans: 11
   percent: 100
 ---
 
@@ -21,14 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-16)
 
 **Core value:** Physical Therapists can paste shorthand clinical notes and instantly receive a structured, professional SOAP note -- saving 15-30 minutes per patient encounter.
-**Current focus:** Feature development. PHI Storage (Phase 4) is next -- the core differentiator that transforms FlashNote from a generation tool into a clinical documentation platform. Remote deployment deferred until after feature development is complete.
+**Current focus:** Phase 04 — phi-storage
 
 ## Current Position
 
-Phase: 3 of 10 (Pipeline & Provisioning) -- COMPLETE
+Phase: 04 (phi-storage) — EXECUTING
+Plan: 2 of 3
 Next phase: 4 (PHI Storage) -- NOT STARTED
-Status: Roadmap reshuffled -- deployment deferred, PHI Storage is next. Ready for Phase 4 (PHI Storage) planning.
-Last activity: 2026-04-16 -- Deferred staging/production phases (now 9+10), renumbered feature phases 4-8
+Status: Ready to execute
+Last activity: 2026-04-18
 
 Progress: [██████████] 100%
 
@@ -54,6 +55,7 @@ Progress: [██████████] 100%
 - Trend: Stable
 
 *Updated after each plan completion*
+| Phase 04 P01 | 26min | 4 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -95,6 +97,12 @@ Recent decisions affecting current work:
 - [Phase 03]: Migration job entrypoint uses migrate.mjs (not .js) matching Plan 01 Dockerfile deviation
 - [Phase 03]: DNS managed externally by default (manage_dns=false); set true only if using Google Cloud DNS
 - [Phase 03]: Cloud Run ingress locked to INGRESS_TRAFFIC_INTERNAL_LOAD_BALANCER forcing all traffic through ALB
+- [Phase 04]: [04-01]: user_style_preferences overlay table (Option A) + LEFT JOIN + COALESCE in findTemplateWithUserStyle — built-in template seed never mutated
+- [Phase 04]: [04-01]: DB-level immutability triggers on note_versions (mirrors audit_logs) as defense-in-depth over DAL no-UPDATE convention
+- [Phase 04]: [04-01]: Stable hard-coded UUIDs for SOAP template (00000000-...0001) and sections (...0011-0014) — clinical_notes.content[].sectionId references them across environments
+- [Phase 04]: [04-01]: saveNoteSchema explicitly declares patientContextSnapshot (B-3) so Zod does not strip the field — required by Plan 04-03 saveNoteAction
+- [Phase 04]: [04-01]: buildPoolConfig() exported with production TLS enforcement (PHI-10 code-side per D-10); Cloud SQL Auth Proxy tunnels and explicit sslmode in URL skip the override
+- [Phase 04]: [04-01]: modality + duration_minutes promoted to first-class clinical_notes columns (not JSONB metadata) — enables CHECK constraints + future filter/sort
 
 ### Pending Todos
 
@@ -108,6 +116,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-17T20:39:17.208Z
-Stopped at: Phase 4 context gathered
+Last session: 2026-04-18T21:01:32.981Z
+Stopped at: Completed 04-01-foundation-PLAN.md
 Resume action: Run /gsd:discuss-phase or /gsd:plan-phase for Phase 4 (PHI Storage)

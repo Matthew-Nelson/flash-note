@@ -64,12 +64,12 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **PHI-02**: User can save generated notes linked to a patient with session metadata (date, duration, modality)
 - [ ] **PHI-03**: User can view chronological note history for a patient (date, title, duration, modality)
 - [ ] **PHI-04**: User can store persistent free-text context per patient that is automatically injected into all future note generation for that patient
-- [ ] **PHI-05**: All note edits create append-only versions (original never deleted) with immutable amendment trail for HIPAA compliance
+- [x] **PHI-05**: All note edits create append-only versions (original never deleted) with immutable amendment trail for HIPAA compliance
 - [ ] **PHI-06**: User can inline edit individual SOAP sections of persisted notes (creating new versions)
 - [ ] **PHI-07**: Note generation uses template-driven prompts (SOAP built-in template with user-configurable section preferences: concise/detailed, paragraph/bullets)
 - [ ] **PHI-08**: Incident response plan updated to reflect PHI storage (currently says "no PHI stored")
-- [ ] **PHI-09**: Audit logging covers PHI read access (patient list views, note history views), not just mutations
-- [ ] **PHI-10**: HIPAA prerequisites verified before PHI launch: encryption at rest, TLS 1.2+, audit retention sink operational
+- [x] **PHI-09**: Audit logging covers PHI read access (patient list views, note history views), not just mutations
+- [x] **PHI-10**: HIPAA prerequisites verified before PHI launch: encryption at rest, TLS 1.2+, audit retention sink operational
 
 ### Post-PHI Features
 
@@ -109,7 +109,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **PROMPT-01**: Gemini safety settings configured explicitly (not default)
 - [ ] **PROMPT-02**: Post-generation validation detects hallucinated numbers (ROM values, strength grades)
-- [ ] **PROMPT-03**: Template-level style preferences (concise/narrative/detailed) configurable per user
+- [x] **PROMPT-03**: Template-level style preferences (concise/narrative/detailed) configurable per user
 
 ## v2 Requirements
 
@@ -197,12 +197,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PHI-02 | Phase 6 | Pending |
 | PHI-03 | Phase 6 | Pending |
 | PHI-04 | Phase 6 | Pending |
-| PHI-05 | Phase 6 | Pending |
+| PHI-05 | Phase 6 | Complete |
 | PHI-06 | Phase 6 | Pending |
 | PHI-07 | Phase 6 | Pending |
 | PHI-08 | Phase 6 | Pending |
-| PHI-09 | Phase 6 | Pending |
-| PHI-10 | Phase 6 | Pending |
+| PHI-09 | Phase 6 | Complete |
+| PHI-10 | Phase 6 | Complete |
 | POST-01 | Phase 7 | Pending |
 | POST-02 | Phase 7 | Pending |
 | POST-03 | Phase 7 | Pending |
@@ -227,7 +227,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | QUAL-08 | Phase 10 | Pending |
 | PROMPT-01 | Phase 6 | Pending |
 | PROMPT-02 | Phase 6 | Pending |
-| PROMPT-03 | Phase 6 | Pending |
+| PROMPT-03 | Phase 6 | Complete |
 
 **Coverage:**
 - v1 requirements: 71 total
