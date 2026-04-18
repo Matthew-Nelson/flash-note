@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui';
 
@@ -14,6 +14,14 @@ const DEBOUNCE_MS = 250;
  * Debounced search input that drives the server-side list on
  * /dashboard/patients via the `?q=` query param. The server is the sole owner
  * of the results list — this component only mirrors input → URL.
+ *
+ * Focus-stability invariant: the controlled `query` state is the sole source
+ * of truth while the user is actively typing. We do NOT sync from
+ * `initialQuery` on every change — doing so would overwrite mid-type keystrokes
+ * when the Server Component re-renders after our own `router.replace`, which
+ * in React 19 concurrent mode can cause the input to lose focus. We only sync
+ * from URL → state when the URL changes from an EXTERNAL source (navigation,
+ * back button, etc.) by comparing against the last value we pushed ourselves.
  */
 export function SearchPatients({ initialQuery }: SearchPatientsProps): React.ReactElement {
   const router = useRouter();
@@ -21,10 +29,18 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the last value we pushed to the URL. If `initialQuery` matches,
+  // the URL change originated from this component and we do not re-sync state
+  // (preserving focus + any keystrokes typed between debounce fire and
+  // server re-render).
+  const lastPushedRef = useRef<string>(initialQuery);
 
-  // Sync local state if the URL changes outside this input (e.g. clear search).
   useEffect(() => {
-    setQuery(initialQuery);
+    // Only pull URL → state when the URL changed from an EXTERNAL source.
+    if (initialQuery !== lastPushedRef.current) {
+      setQuery(initialQuery);
+      lastPushedRef.current = initialQuery;
+    }
   }, [initialQuery]);
 
   useEffect(() => {
@@ -33,15 +49,20 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
     };
   }, []);
 
-  function pushParams(next: string): void {
-    const params = new URLSearchParams(searchParams.toString());
-    if (next.trim()) params.set('q', next.trim());
-    else params.delete('q');
-    // Whenever search changes, reset pagination.
-    params.delete('page');
-    const qs = params.toString();
-    router.replace(qs ? `${pathname}?${qs}` : pathname);
-  }
+  const pushParams = useCallback(
+    (next: string): void => {
+      const trimmed = next.trim();
+      const params = new URLSearchParams(searchParams.toString());
+      if (trimmed) params.set('q', trimmed);
+      else params.delete('q');
+      // Whenever search changes, reset pagination.
+      params.delete('page');
+      const qs = params.toString();
+      lastPushedRef.current = trimmed;
+      router.replace(qs ? `${pathname}?${qs}` : pathname);
+    },
+    [pathname, router, searchParams],
+  );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
     const value = e.target.value;
