@@ -191,4 +191,71 @@ describe('Sidebar', () => {
     const newNoteLinks = screen.getAllByRole('link', { name: /new note/i });
     expect(newNoteLinks[0].className).toContain('min-h-[44px]');
   });
+
+  // Mobile drawer auto-close regression (UAT issue #5) — clicking a nav link
+  // inside the mobile drawer fires onClose so the drawer dismisses as the
+  // route changes. Desktop nav links do NOT close (desktop has no drawer).
+  describe('mobile drawer auto-close', () => {
+    function getMobileDrawerLinks(): HTMLElement {
+      // The mobile drawer is rendered inside the `.lg:hidden` wrapper with
+      // transition-transform; the desktop nav lives in `.hidden.lg:flex`.
+      const drawer = document.querySelector(
+        '.lg\\:hidden.transition-transform',
+      );
+      expect(drawer).not.toBeNull();
+      return drawer as HTMLElement;
+    }
+
+    it('calls onClose when a nav link inside the mobile drawer is clicked', () => {
+      const onClose = vi.fn();
+      renderSidebar({ isOpen: true, onClose });
+      const drawer = getMobileDrawerLinks();
+      const patientsLink = drawer.querySelector(
+        'a[href="/dashboard/patients"]',
+      );
+      expect(patientsLink).not.toBeNull();
+      fireEvent.click(patientsLink!);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when Dashboard link in mobile drawer is clicked', () => {
+      const onClose = vi.fn();
+      renderSidebar({ isOpen: true, onClose });
+      const drawer = getMobileDrawerLinks();
+      const link = drawer.querySelector('a[href="/dashboard"]');
+      fireEvent.click(link!);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when Settings link in mobile drawer is clicked', () => {
+      const onClose = vi.fn();
+      renderSidebar({ isOpen: true, onClose });
+      const drawer = getMobileDrawerLinks();
+      const link = drawer.querySelector('a[href="/dashboard/settings"]');
+      fireEvent.click(link!);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when the New Note CTA in mobile drawer is clicked', () => {
+      const onClose = vi.fn();
+      renderSidebar({ isOpen: true, onClose });
+      const drawer = getMobileDrawerLinks();
+      const link = drawer.querySelector('a[href="/dashboard/notes/new"]');
+      fireEvent.click(link!);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call onClose when a DESKTOP nav link is clicked', () => {
+      const onClose = vi.fn();
+      renderSidebar({ isOpen: false, onClose });
+      // Desktop sidebar lives in `.hidden.lg\:flex`; click its Dashboard link.
+      const desktop = document.querySelector('.hidden.lg\\:flex');
+      expect(desktop).not.toBeNull();
+      const link = (desktop as HTMLElement).querySelector(
+        'a[href="/dashboard"]',
+      );
+      fireEvent.click(link!);
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
 });

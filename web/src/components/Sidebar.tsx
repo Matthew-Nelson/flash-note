@@ -23,11 +23,13 @@ function NavItem({
   label,
   pathname,
   comingSoon = false,
+  onNavigate,
 }: {
   href: string;
   label: string;
   pathname: string;
   comingSoon?: boolean;
+  onNavigate?: () => void;
 }) {
   const active = isActive(pathname, href);
   return (
@@ -35,6 +37,7 @@ function NavItem({
       <Link
         href={href}
         aria-current={active ? 'page' : undefined}
+        onClick={onNavigate}
         className="flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-fn-sm text-fn-sm font-medium
                    text-fn-sidebar-text hover:bg-fn-sidebar-hover transition-colors
                    aria-[current=page]:bg-fn-sidebar-active aria-[current=page]:text-fn-sidebar-text-active"
@@ -50,7 +53,13 @@ function NavItem({
   );
 }
 
-function SidebarContent({ user }: { user: { email: string } }) {
+function SidebarContent({
+  user,
+  onNavigate,
+}: {
+  user: { email: string };
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const initial = user.email.charAt(0).toUpperCase();
 
@@ -86,6 +95,7 @@ function SidebarContent({ user }: { user: { email: string } }) {
       <div className="px-3 pb-4">
         <Link
           href="/dashboard/notes/new"
+          onClick={onNavigate}
           className="flex items-center justify-center gap-2 w-full py-2.5 min-h-[44px] rounded-fn-base
                      bg-fn-primary-DEFAULT text-white text-fn-sm font-semibold
                      hover:bg-fn-primary-hover transition-colors cursor-pointer"
@@ -115,17 +125,24 @@ function SidebarContent({ user }: { user: { email: string } }) {
         </span>
       </div>
       <ul className="px-3 space-y-1 mb-2">
-        <NavItem href="/dashboard" label="Dashboard" pathname={pathname} />
+        <NavItem
+          href="/dashboard"
+          label="Dashboard"
+          pathname={pathname}
+          onNavigate={onNavigate}
+        />
         <NavItem
           href="/dashboard/notes"
           label="Notes"
           pathname={pathname}
           comingSoon
+          onNavigate={onNavigate}
         />
         <NavItem
           href="/dashboard/patients"
           label="Patients"
           pathname={pathname}
+          onNavigate={onNavigate}
         />
       </ul>
 
@@ -141,8 +158,14 @@ function SidebarContent({ user }: { user: { email: string } }) {
           label="Templates"
           pathname={pathname}
           comingSoon
+          onNavigate={onNavigate}
         />
-        <NavItem href="/dashboard/settings" label="Settings" pathname={pathname} />
+        <NavItem
+          href="/dashboard/settings"
+          label="Settings"
+          pathname={pathname}
+          onNavigate={onNavigate}
+        />
       </ul>
 
       {/* User footer */}
@@ -179,6 +202,7 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
   return (
     <>
       {/* Desktop sidebar — always visible at lg+ */}
+      {/* Desktop nav does NOT auto-close (it's never "open" — always visible) */}
       <div className="hidden lg:flex">
         <SidebarContent user={user} />
       </div>
@@ -192,13 +216,13 @@ export function Sidebar({ user, isOpen, onClose }: SidebarProps) {
         />
       )}
 
-      {/* Mobile drawer */}
+      {/* Mobile drawer — closes itself on any nav link click */}
       <div
         className={`fixed inset-y-0 left-0 z-40 lg:hidden transition-transform duration-200 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <SidebarContent user={user} />
+        <SidebarContent user={user} onNavigate={onClose} />
       </div>
     </>
   );
