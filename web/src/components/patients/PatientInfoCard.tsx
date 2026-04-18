@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import { Alert, Button, Card, CardContent, Input } from '@/components/ui';
 import { updatePatientAction } from '@/actions/patients';
 import type { Patient, Pronoun } from '@/lib/types';
+import { formatPhoneDisplay, formatPhoneInput } from '@/lib/utils/phone';
 import { mapPatientError } from './error-messages';
 
 interface PatientInfoCardProps {
@@ -87,7 +88,7 @@ export function PatientInfoCard({ patient }: PatientInfoCardProps): React.ReactE
 
   const dobDisplay = dob ? dob : '—';
   const pronounDisplay = pronoun || '—';
-  const phoneDisplay = phone || '—';
+  const phoneDisplay = phone ? formatPhoneDisplay(phone) : '—';
   const emailDisplay = email || '—';
 
   return (
@@ -200,9 +201,12 @@ export function PatientInfoCard({ patient }: PatientInfoCardProps): React.ReactE
                 name="phone"
                 type="tel"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                 maxLength={32}
                 disabled={isPending}
+                placeholder="(555) 123-4567"
+                inputMode="tel"
+                autoComplete="tel"
               />
               <Input
                 label="Email"

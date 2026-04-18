@@ -145,6 +145,36 @@ describe('PatientCreateForm', () => {
     expect(fd.get('context')).toBe('Chronic knee pain');
   });
 
+  // Phone mask regression (UAT issue #1) — input should format progressively
+  // and submit the formatted value through FormData.
+  it('formats phone input progressively as the user types', async () => {
+    const user = userEvent.setup();
+    render(<PatientCreateForm />);
+    const phone = screen.getByLabelText<HTMLInputElement>(/phone/i);
+    await user.type(phone, '5551234567');
+    expect(phone.value).toBe('(555) 123-4567');
+  });
+
+  it('submits the masked phone value (not raw digits)', async () => {
+    const user = userEvent.setup();
+    h.createPatientAction.mockResolvedValueOnce({
+      success: true,
+      data: { id: 'id-3' },
+    });
+    render(<PatientCreateForm />);
+    await user.type(screen.getByLabelText(/first name/i), 'Jane');
+    await user.type(screen.getByLabelText(/last name/i), 'Doe');
+    await user.type(screen.getByLabelText(/phone/i), '5551234567');
+    await user.click(screen.getByRole('button', { name: /save patient/i }));
+    await waitFor(() => {
+      expect(h.createPatientAction).toHaveBeenCalled();
+    });
+    const fd = h.createPatientAction.mock.calls[0]?.[0] as FormData;
+    // The formatter-masked value is what persists to the DB (DB column is a
+    // raw TEXT string; we preserve the masked, human-readable form).
+    expect(fd.get('phone')).toBe('(555) 123-4567');
+  });
+
   it('server-side validation_error with fieldErrors surfaces in UI', async () => {
     const user = userEvent.setup();
     h.createPatientAction.mockResolvedValueOnce({

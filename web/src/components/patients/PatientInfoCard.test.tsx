@@ -154,4 +154,29 @@ describe('PatientInfoCard', () => {
     render(<PatientInfoCard patient={patient} />);
     expect(screen.getByText('1990-03-14')).toBeInTheDocument();
   });
+
+  // Phone formatting regression (UAT issue #1) — stored raw 10-digit string
+  // must render as (XXX) XXX-XXXX on the detail view.
+  it('formats 10-digit phone as (XXX) XXX-XXXX on display', () => {
+    const patient = createMockPatient({ phone: '5550100' });
+    render(<PatientInfoCard patient={patient} />);
+    // 7 digits -> local format XXX-XXXX
+    expect(screen.getByText('555-0100')).toBeInTheDocument();
+  });
+
+  it('formats full-length 10-digit phone on display', () => {
+    const patient = createMockPatient({ phone: '5551234567' });
+    render(<PatientInfoCard patient={patient} />);
+    expect(screen.getByText('(555) 123-4567')).toBeInTheDocument();
+  });
+
+  it('phone input edit mode applies mask while typing', async () => {
+    const user = userEvent.setup();
+    const patient = createMockPatient({ phone: null });
+    render(<PatientInfoCard patient={patient} />);
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+    const phone = screen.getByLabelText<HTMLInputElement>(/phone/i);
+    await user.type(phone, '5551234567');
+    expect(phone.value).toBe('(555) 123-4567');
+  });
 });

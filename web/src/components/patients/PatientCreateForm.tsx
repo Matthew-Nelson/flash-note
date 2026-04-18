@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Alert, Button, Input } from '@/components/ui';
 import { createPatientAction } from '@/actions/patients';
 import { createPatientSchema } from '@/lib/schemas/patients';
+import { formatPhoneInput } from '@/lib/utils/phone';
 import { mapPatientError } from './error-messages';
 
 /**
@@ -147,10 +148,13 @@ export function PatientCreateForm(): React.ReactElement {
           name="phone"
           type="tel"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
           maxLength={32}
           error={fieldErrors?.phone?.[0]}
           disabled={isPending}
+          placeholder="(555) 123-4567"
+          inputMode="tel"
+          autoComplete="tel"
         />
         <Input
           label="Email"
