@@ -4,3 +4,4 @@ export { Input } from './Input';
 export { Card, CardHeader, CardContent } from './Card';
 export { Alert } from './Alert';
 export { Badge, SubscriptionBadge } from './Badge';
+export { ConfirmDialog } from './ConfirmDialog';

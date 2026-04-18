@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { createRef } from 'react';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Button } from './Button';
@@ -78,5 +79,57 @@ describe('Button', () => {
   it('should have cursor-pointer class even when disabled (CSS :disabled handles override)', () => {
     render(<Button disabled>Disabled</Button>);
     expect(screen.getByRole('button').className).toContain('cursor-pointer');
+  });
+
+  // ----- destructive variant (Plan 04-02) -----
+
+  it('should apply destructive variant', () => {
+    render(<Button variant="destructive">Archive patient</Button>);
+    const btn = screen.getByRole('button');
+    expect(btn.className).toContain('bg-fn-error');
+    expect(btn.className).toContain('hover:bg-fn-error-dark');
+    expect(btn.className).toContain('text-white');
+  });
+
+  it('destructive variant retains 44px touch target', () => {
+    render(<Button variant="destructive">Archive</Button>);
+    expect(screen.getByRole('button').className).toContain('min-h-[44px]');
+  });
+
+  it('destructive variant shows spinner when loading', () => {
+    render(
+      <Button variant="destructive" loading>
+        Archive
+      </Button>,
+    );
+    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getByRole('button')).toBeDisabled();
+  });
+
+  it('destructive variant fires onClick when enabled', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Button variant="destructive" onClick={onClick}>
+        Archive
+      </Button>,
+    );
+    await user.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
+  // ----- forwardRef (required by ConfirmDialog initial-focus on Cancel) -----
+
+  it('forwards ref to the underlying <button>', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>With ref</Button>);
+    expect(ref.current).toBeInstanceOf(HTMLButtonElement);
+  });
+
+  it('ref.current.focus() works (ConfirmDialog needs this for initial focus)', () => {
+    const ref = createRef<HTMLButtonElement>();
+    render(<Button ref={ref}>Focus me</Button>);
+    ref.current?.focus();
+    expect(document.activeElement).toBe(ref.current);
   });
 });

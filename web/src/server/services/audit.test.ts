@@ -182,13 +182,13 @@ describe('AuditService', () => {
         expect.objectContaining({
           err: dbError,
           source: 'audit_service',
-          errorType: 'audit_log_failed',
+          errorType: 'audit_write_failed',
           audit: true,
           userId: 'user-123',
           action: AuditAction.LOGIN,
           status: 'SUCCESS',
         }),
-        'Audit log failed'
+        'Audit write failed (fire-and-forget)'
       );
     });
 

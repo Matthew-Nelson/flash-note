@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type pg from 'pg';
+
 import { db } from '@/server/db';
 import type { Patient, Pronoun, QueryScope } from '@/lib/types';
 import type { PatientRow } from '@/lib/types/database';
@@ -16,11 +18,27 @@ import type { PatientRow } from '@/lib/types/database';
  *
  * Rule 10: all RETURNING paths defensively check `result.rows.length === 0`
  * before accessing `rows[0]`.
+ *
+ * M-6 (Plan 04-02): createPatient / updatePatient / archivePatient accept an
+ * optional `client: pg.PoolClient` so Server Actions can share a single
+ * transaction between the business write and `auditService.logWithClient` per
+ * Rule 9. When `client` is omitted the function falls back to the shared pool.
  */
 
 const PATIENT_COLUMNS = `id, user_id, organization_id, first_name, last_name,
                          date_of_birth, pronoun, phone, email, context,
                          archived_at, created_at, updated_at`;
+
+type QueryExecutor = Pick<pg.PoolClient, 'query'> | typeof db;
+
+/**
+ * Resolve the object that actually runs SQL. When a caller passes a PoolClient
+ * (because they're inside a transaction), we use it; otherwise fall back to
+ * the shared pool.
+ */
+function executor(client?: pg.PoolClient): QueryExecutor {
+  return client ?? db;
+}
 
 function rowToPatient(row: PatientRow): Patient {
   return {
@@ -72,12 +90,16 @@ export interface CreatePatientDalInput {
  * Create a patient row. `scope` MUST include userId (every patient is anchored
  * to a single creating user) and may optionally include organizationId for
  * clinic-scoped patients.
+ *
+ * M-6: accepts an optional PoolClient so the insert can share a transaction
+ * with a matching `auditService.logWithClient(PATIENT_CREATED)` write.
  */
 export async function createPatient(
   scope: { userId: string; organizationId: string | null },
-  input: CreatePatientDalInput
+  input: CreatePatientDalInput,
+  client?: pg.PoolClient
 ): Promise<Patient> {
-  const result = await db.query<PatientRow>(
+  const result = await executor(client).query<PatientRow>(
     `INSERT INTO patients
        (user_id, organization_id, first_name, last_name, date_of_birth, pronoun, phone, email, context)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
@@ -202,11 +224,15 @@ export interface UpdatePatientDalInput {
  * are left unchanged (distinct from `null`, which clears the column).
  *
  * Returns null if the row does not exist, is archived, or is out-of-scope.
+ *
+ * M-6: accepts an optional PoolClient to share a transaction with
+ * `auditService.logWithClient(PATIENT_UPDATED)`.
  */
 export async function updatePatient(
   scope: QueryScope,
   patientId: string,
-  input: UpdatePatientDalInput
+  input: UpdatePatientDalInput,
+  client?: pg.PoolClient
 ): Promise<Patient | null> {
   const setClauses: string[] = [];
   const params: unknown[] = [];
@@ -237,7 +263,7 @@ export async function updatePatient(
   const idIndex = params.length + 1;
   params.push(patientId);
 
-  const result = await db.query<PatientRow>(
+  const result = await executor(client).query<PatientRow>(
     `UPDATE patients SET ${setClauses.join(', ')}
      WHERE ${scopeSql} AND id = $${idIndex} AND archived_at IS NULL
      RETURNING ${PATIENT_COLUMNS}`,
@@ -251,14 +277,18 @@ export async function updatePatient(
 /**
  * Soft-delete a patient within scope. Returns true if a row was archived,
  * false otherwise (not found / already archived / out-of-scope).
+ *
+ * M-6: accepts an optional PoolClient to share a transaction with
+ * `auditService.logWithClient(PATIENT_ARCHIVED)`.
  */
 export async function archivePatient(
   scope: QueryScope,
-  patientId: string
+  patientId: string,
+  client?: pg.PoolClient
 ): Promise<boolean> {
   const { sql: scopeSql, params: scopeParams } = scopeWhereClause(scope, 1);
   const idIndex = scopeParams.length + 1;
-  const result = await db.query<{ id: string }>(
+  const result = await executor(client).query<{ id: string }>(
     `UPDATE patients SET archived_at = NOW()
      WHERE ${scopeSql} AND id = $${idIndex} AND archived_at IS NULL
      RETURNING id`,

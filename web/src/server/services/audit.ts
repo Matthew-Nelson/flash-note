@@ -16,9 +16,22 @@ class AuditService {
       await insertAuditLog(entry);
     } catch (error) {
       // Don't throw — audit failures shouldn't break the app.
-      // Rule 9: log at error level with structured context so Cloud Error Reporting
+      // Rule 9 + M-6: log at error level with structured context so Cloud Error Reporting
       // can group and alert on audit failures (especially security-critical events).
-      logger.error({ err: error instanceof Error ? error : new Error(String(error)), source: 'audit_service', errorType: 'audit_log_failed', audit: true, userId: entry.userId, action: entry.action, status: entry.status }, 'Audit log failed');
+      // errorType 'audit_write_failed' per Plan 04-02 M-6 so every fire-and-forget
+      // audit path (e.g. PATIENT_VIEWED) surfaces consistently in Cloud Error Reporting.
+      logger.error(
+        {
+          err: error instanceof Error ? error : new Error(String(error)),
+          source: 'audit_service',
+          errorType: 'audit_write_failed',
+          audit: true,
+          userId: entry.userId,
+          action: entry.action,
+          status: entry.status,
+        },
+        'Audit write failed (fire-and-forget)',
+      );
     }
   }
 

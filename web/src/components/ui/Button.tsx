@@ -1,7 +1,7 @@
-import { type ButtonHTMLAttributes, type ReactNode } from 'react';
+import { type ButtonHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { Spinner } from './Spinner';
 
-type ButtonVariant = 'primary' | 'secondary';
+type ButtonVariant = 'primary' | 'secondary' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -17,20 +17,38 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: 'px-6 py-3 text-lg',
 };
 
-export function Button({
-  variant = 'primary',
-  size = 'md',
-  loading = false,
-  disabled,
-  children,
-  className = '',
-  ...props
-}: ButtonProps) {
-  const baseClasses = variant === 'primary' ? 'btn-primary' : 'btn-secondary';
+/**
+ * Destructive variant classes. Background `--fn-error`, hover `--fn-error-dark`,
+ * white text. Same focus-ring rules as every other variant (inherits global
+ * `:focus-visible` rule from globals.css). UI-SPEC §Color §Destructive.
+ */
+const DESTRUCTIVE_CLASSES =
+  'bg-fn-error hover:bg-fn-error-dark text-white rounded-fn-base font-semibold ' +
+  'transition-colors disabled:opacity-60 disabled:cursor-not-allowed';
+
+function variantClasses(variant: ButtonVariant): string {
+  if (variant === 'destructive') return DESTRUCTIVE_CLASSES;
+  return variant === 'primary' ? 'btn-primary' : 'btn-secondary';
+}
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  {
+    variant = 'primary',
+    size = 'md',
+    loading = false,
+    disabled,
+    children,
+    className = '',
+    ...props
+  },
+  ref,
+) {
+  const baseClasses = variantClasses(variant);
   const isDisabled = disabled || loading;
 
   return (
     <button
+      ref={ref}
       className={`${baseClasses} ${sizeClasses[size]} inline-flex items-center justify-center gap-2 min-h-[44px] cursor-pointer ${className}`}
       disabled={isDisabled}
       {...props}
@@ -39,4 +57,4 @@ export function Button({
       {children}
     </button>
   );
-}
+});
