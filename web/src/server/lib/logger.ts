@@ -11,6 +11,7 @@ import { createGcpLoggingPinoConfig } from '@google-cloud/pino-logging-gcp-confi
  * Pino uses fast-redact (~2% overhead) for path-based censoring.
  */
 const PHI_REDACT_PATHS = [
+  // Phase 2 paths (02-01) — MUST remain for regression compatibility
   'patient',
   'patientName',
   'patientData',
@@ -25,6 +26,21 @@ const PHI_REDACT_PATHS = [
   'medicalRecordNumber',
   'req.body',
   'res.body',
+  // Phase 4 (04-01) — new PHI fields introduced by patients + clinical_notes schema.
+  // Append-only (Pino fast-redact evaluates all paths; adding does not break existing).
+  'firstName',
+  'lastName',
+  'phone',
+  'context',
+  'content',
+  '*.firstName',
+  '*.lastName',
+  '*.dateOfBirth',
+  '*.phone',
+  '*.context',
+  '*.patientContext',
+  '*.quickNotes',
+  '*.content',
 ];
 
 // Read NODE_ENV directly -- not from config.ts to avoid circular dependency.

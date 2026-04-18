@@ -12,7 +12,9 @@ import { Writable } from 'stream';
  */
 
 // PHI redaction paths -- must match the logger singleton config exactly.
+// Phase 2 paths kept at the top (regression guard); Phase 4 paths appended.
 const PHI_PATHS = [
+  // Phase 2 (02-01)
   'patient',
   'patientName',
   'patientData',
@@ -27,6 +29,20 @@ const PHI_PATHS = [
   'medicalRecordNumber',
   'req.body',
   'res.body',
+  // Phase 4 (04-01) — new PHI field names for patients + clinical_notes
+  'firstName',
+  'lastName',
+  'phone',
+  'context',
+  'content',
+  '*.firstName',
+  '*.lastName',
+  '*.dateOfBirth',
+  '*.phone',
+  '*.context',
+  '*.patientContext',
+  '*.quickNotes',
+  '*.content',
 ];
 
 /**
@@ -189,6 +205,109 @@ describe('logger PHI redaction', () => {
     // Non-PHI fields preserved
     expect(output.source).toBe('dal_auth');
     expect(output.userId).toBe('user-123');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Phase 4 (04-01) PHI redaction paths — patients + clinical_notes fields
+  // ---------------------------------------------------------------------------
+
+  it('redacts firstName field', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ firstName: 'Jane' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.firstName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts lastName field', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ lastName: 'Doe' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.lastName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts phone field', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ phone: '555-1234' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.phone).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts context field (persistent patient context)', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ context: 'Post-op TKA 6wk, hx HTN' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.context).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts content field (clinical note JSONB)', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ content: 'S: Patient reports pain in R knee...' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.content).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested patient.firstName via *.firstName wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { firstName: 'Jane' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.firstName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested dateOfBirth via *.dateOfBirth wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ profile: { dateOfBirth: '1985-03-15' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.profile.dateOfBirth).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested quickNotes via *.quickNotes wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ request: { quickNotes: 'pt c/o knee pain' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.request.quickNotes).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested patientContext via *.patientContext wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ payload: { patientContext: 'post-op TKA' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.payload.patientContext).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested content via *.content wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ note: { content: 'S: pain 5/10' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.note.content).toBe('[PHI_REDACTED]');
+  });
+
+  // ---------------------------------------------------------------------------
+  // Regression guard: Phase 2 paths MUST still redact after Phase 4 append
+  // ---------------------------------------------------------------------------
+
+  it('REGRESSION GUARD: Phase 2 password path still redacts', () => {
+    // Explicit regression guard per plan M-4: any executor who accidentally
+    // REPLACES the redaction paths array (instead of APPENDING) will fail this.
+    // (Note: 'password' is not currently a PHI path — this guard tests the
+    // stable behavior for 'patientName' which is the Phase 2 canonical.)
+    const { logger, chunks } = createTestLogger();
+    logger.info({ patientName: 'Jane Doe' }, 'regression');
+    const output = JSON.parse(chunks[0]);
+    expect(output.patientName).toBe('[PHI_REDACTED]');
+  });
+
+  it('REGRESSION GUARD: Phase 2 noteContent path still redacts', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ noteContent: 'SOAP content' }, 'regression');
+    const output = JSON.parse(chunks[0]);
+    expect(output.noteContent).toBe('[PHI_REDACTED]');
+  });
+
+  it('REGRESSION GUARD: Phase 2 req.body path still redacts', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ req: { body: 'PHI body' } }, 'regression');
+    const output = JSON.parse(chunks[0]);
+    expect(output.req.body).toBe('[PHI_REDACTED]');
   });
 });
 

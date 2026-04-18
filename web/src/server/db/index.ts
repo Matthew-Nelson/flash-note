@@ -19,17 +19,56 @@ const globalForDb = globalThis as unknown as { _flashnoteDb?: pg.Pool };
  * cache prevents creating a new pool on each reload, avoiding connection exhaustion.
  */
 const isNewPool = !globalForDb._flashnoteDb;
-export const db = globalForDb._flashnoteDb ?? new Pool({
-  connectionString: config.DATABASE_URL,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  statement_timeout: 30000,
-  // SSL note: Cloud Run connects to Cloud SQL via the Auth Proxy sidecar,
-  // which provides an encrypted tunnel without requiring application-level SSL.
-  // If connecting directly to Cloud SQL (e.g., in local dev), set
-  // ssl: { rejectUnauthorized: true } or use DATABASE_URL with ?sslmode=require.
-});
+
+/**
+ * Build pg.Pool options with TLS enforcement in production.
+ *
+ * PHI-10 code-side prerequisite (per Phase 4 CONTEXT D-10): in production the
+ * connection to Postgres MUST be encrypted. Two acceptable paths:
+ *   (a) Cloud SQL Auth Proxy sidecar — provides a local-socket tunnel that is
+ *       already encrypted by Google's managed proxy. No app-level SSL needed;
+ *       DATABASE_URL points at 127.0.0.1 / unix socket.
+ *   (b) Direct TCP connection to Cloud SQL (or any external Postgres) — MUST
+ *       include `?sslmode=require` (or verify-full) OR the pg.Pool config must
+ *       set `ssl: { rejectUnauthorized: true }`.
+ *
+ * This helper enforces TLS in production unless the connection string already
+ * signals a local/socket-tunnel path (Cloud SQL proxy or localhost). Dev and
+ * test connections keep TLS optional — local Postgres typically doesn't run
+ * with TLS.
+ */
+export function buildPoolConfig(): pg.PoolConfig {
+  const url = config.DATABASE_URL;
+  const base: pg.PoolConfig = {
+    connectionString: url,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000,
+    statement_timeout: 30000,
+  };
+
+  if (process.env.NODE_ENV !== 'production') {
+    return base;
+  }
+
+  // Production TLS enforcement. Skip when connecting via the Cloud SQL Auth
+  // Proxy sidecar (localhost / unix socket) — that path is already encrypted
+  // by the managed proxy. Otherwise require TLS at the driver level.
+  const isProxyTunnel =
+    url.includes('@127.0.0.1') ||
+    url.includes('@localhost') ||
+    url.includes('host=/cloudsql/');
+  const hasSslMode = /[?&]sslmode=(require|verify-ca|verify-full)\b/.test(url);
+
+  if (!isProxyTunnel && !hasSslMode) {
+    base.ssl = { rejectUnauthorized: true };
+  }
+
+  return base;
+}
+
+export const db =
+  globalForDb._flashnoteDb ?? new Pool(buildPoolConfig());
 
 // Pool error handler — prevents unhandled promise rejections from crashing the process.
 // Only attach on first creation to avoid duplicate listeners on HMR reloads.
