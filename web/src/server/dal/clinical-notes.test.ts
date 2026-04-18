@@ -201,6 +201,35 @@ describe('clinical-notes DAL', () => {
       expect(result?.content[0].content).toBe('Subjective text.');
     });
 
+    it('parses non-null modality via Zod schema', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            ...createMockNoteRow({ modality: 'telehealth' }),
+            patient_first_name: null,
+            patient_last_name: null,
+          },
+        ],
+      });
+
+      const result = await findClinicalNoteById(userScope, NOTE_1);
+      expect(result?.modality).toBe('telehealth');
+    });
+
+    it('leaves null modality unchanged (no Zod parse)', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [
+          {
+            ...createMockNoteRow({ modality: null }),
+            patient_first_name: null,
+            patient_last_name: null,
+          },
+        ],
+      });
+      const result = await findClinicalNoteById(userScope, NOTE_1);
+      expect(result?.modality).toBeNull();
+    });
+
     it('Rule 3: throws when JSONB content is malformed', async () => {
       mockDbQuery.mockResolvedValueOnce({
         rows: [

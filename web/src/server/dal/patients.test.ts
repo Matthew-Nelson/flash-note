@@ -357,6 +357,39 @@ describe('patients DAL', () => {
       expect(sql).toContain('email = $6');
       expect(sql).toContain('context = $7');
     });
+
+    it('coalesces undefined nullable fields to null (dateOfBirth)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockPatientRow()] });
+      // Key is present but value is undefined — hasOwnProperty is true, ?? falls through
+      const input: Record<string, unknown> = { dateOfBirth: undefined };
+      await updatePatient(userScope, PATIENT_1, input);
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params[0]).toBeNull();
+    });
+
+    it('coalesces undefined nullable fields to null (pronoun)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockPatientRow()] });
+      const input: Record<string, unknown> = { pronoun: undefined };
+      await updatePatient(userScope, PATIENT_1, input);
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params[0]).toBeNull();
+    });
+
+    it('coalesces undefined nullable fields to null (phone)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockPatientRow()] });
+      const input: Record<string, unknown> = { phone: undefined };
+      await updatePatient(userScope, PATIENT_1, input);
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params[0]).toBeNull();
+    });
+
+    it('coalesces undefined nullable fields to null (email)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockPatientRow()] });
+      const input: Record<string, unknown> = { email: undefined };
+      await updatePatient(userScope, PATIENT_1, input);
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params[0]).toBeNull();
+    });
   });
 
   // ---------------------------------------------------------------------------
