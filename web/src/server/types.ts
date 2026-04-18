@@ -85,6 +85,21 @@ export enum AuditAction {
   ORG_OWNERSHIP_TRANSFERRED = 'ORG_OWNERSHIP_TRANSFERRED',
   INVITE_CODE_GENERATED = 'INVITE_CODE_GENERATED',
   INVITE_CODE_REVOKED = 'INVITE_CODE_REVOKED',
+  // ------------------------------------------------------------------
+  // Phase 4 (04-01) — PHI Storage audit actions.
+  // Added per Research §5.4. Existing values above MUST NOT be removed
+  // or reordered — external audit log queries depend on the string values.
+  // ------------------------------------------------------------------
+  PATIENT_CREATED = 'PATIENT_CREATED',
+  PATIENT_UPDATED = 'PATIENT_UPDATED',
+  PATIENT_ARCHIVED = 'PATIENT_ARCHIVED',
+  PATIENT_VIEWED = 'PATIENT_VIEWED',
+  NOTE_SAVED = 'NOTE_SAVED',
+  NOTE_UPDATED = 'NOTE_UPDATED',
+  NOTE_ARCHIVED = 'NOTE_ARCHIVED',
+  NOTE_VIEWED = 'NOTE_VIEWED',
+  NOTE_HISTORY_VIEWED = 'NOTE_HISTORY_VIEWED',
+  USER_PREFERENCES_UPDATED = 'USER_PREFERENCES_UPDATED',
 }
 
 export interface AuditLogEntry {

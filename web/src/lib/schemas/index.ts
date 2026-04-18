@@ -15,6 +15,33 @@ export type {
   ResetPasswordInput,
 } from './auth';
 
-export { generateNoteSchema } from './notes';
+export {
+  generateNoteSchema,
+  noteIdSchema,
+  saveNoteSchema,
+  updateNoteSectionsSchema,
+  updateSectionStyleSchema,
+} from './notes';
 
-export type { GenerateNoteInput } from './notes';
+export type {
+  GenerateNoteInput,
+  SaveNoteInput,
+  UpdateNoteSectionsInput,
+  UpdateSectionStyleInput,
+} from './notes';
+
+export {
+  pronounSchema,
+  patientIdSchema,
+  createPatientSchema,
+  updatePatientSchema,
+  updatePatientContextSchema,
+  patientSearchSchema,
+} from './patients';
+
+export type {
+  CreatePatientInput,
+  UpdatePatientInput,
+  UpdatePatientContextInput,
+  PatientSearchInput,
+} from './patients';

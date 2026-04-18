@@ -198,3 +198,126 @@ export interface OrgSubscriptionRow {
   subscription_status: SubscriptionStatus;
   trial_ends_at: Date | null;
 }
+
+// ============================================================================
+// Phase 4 (04-01) — PHI Storage row types
+// ============================================================================
+
+/**
+ * note_templates table row — user/org-owned templates (user_id/org_id NOT NULL
+ * for custom) or built-in (user_id/org_id NULL, is_builtin = true).
+ */
+export interface NoteTemplateRow {
+  id: string;
+  user_id: string | null;
+  organization_id: string | null;
+  name: string;
+  is_builtin: boolean;
+  archived_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * note_template_sections table row — ordered sections belonging to a template.
+ * verbosity/styling are DB defaults; user overrides live in user_style_preferences.
+ */
+export interface NoteTemplateSectionRow {
+  id: string;
+  template_id: string;
+  title: string;
+  sort_order: number;
+  verbosity: 'concise' | 'detailed';
+  styling: 'paragraph' | 'bullets';
+  prompt_instructions: string;
+  include_in_copy_all: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * patients table row — PHI. user_id is ALWAYS set (Rule 5 scope),
+ * organization_id is optional (scope for clinic users).
+ */
+export interface PatientRow {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  first_name: string;
+  last_name: string;
+  date_of_birth: Date | null;
+  pronoun: string | null;
+  phone: string | null;
+  email: string | null;
+  context: string | null;
+  archived_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * clinical_notes table row — PHI. `content` is JSONB (stored as raw from pg);
+ * DAL rowToClinicalNote Zod-parses it into NoteSection[] per Rule 3.
+ */
+export interface ClinicalNoteRow {
+  id: string;
+  user_id: string;
+  organization_id: string | null;
+  patient_id: string | null;
+  template_id: string;
+  note_type: 'daily_note' | 'initial_eval' | 'progress_note' | 'discharge';
+  content: unknown; // JSONB — Zod-parse to NoteSection[] in DAL
+  quick_notes: string;
+  patient_context: string | null;
+  modality: 'in_person' | 'telehealth' | null;
+  duration_minutes: number | null;
+  generation_time_ms: number | null;
+  archived_at: Date | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+/**
+ * clinical_notes LEFT JOIN patients — patient name denormalized into the row
+ * for list/detail views. patient_first_name/patient_last_name are NULL when
+ * the note has no linked patient or when the patient row was archived.
+ */
+export interface ClinicalNoteWithPatientRow extends ClinicalNoteRow {
+  patient_first_name: string | null;
+  patient_last_name: string | null;
+}
+
+/**
+ * note_versions table row — append-only per-section version rows.
+ * Immutability triggers prevent UPDATE/DELETE at the DB level.
+ */
+export interface NoteVersionRow {
+  id: string;
+  note_id: string;
+  section_id: string;
+  version: number;
+  content: string;
+  source: 'generated' | 'manual' | 'magic_edit';
+  created_by: string;
+  created_at: Date;
+}
+
+/**
+ * note_versions JOIN note_template_sections — section title denormalized
+ * for version history UI rendering.
+ */
+export interface NoteVersionWithSectionRow extends NoteVersionRow {
+  section_title: string;
+}
+
+/**
+ * user_style_preferences table row — per-user overlay for section verbosity/styling.
+ * Composite primary key (user_id, section_id).
+ */
+export interface UserStylePreferenceRow {
+  user_id: string;
+  section_id: string;
+  verbosity: 'concise' | 'detailed';
+  styling: 'paragraph' | 'bullets';
+  updated_at: Date;
+}
