@@ -574,7 +574,7 @@ describe('PatientTypeahead', () => {
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('Escape when listbox is already closed is a no-op', async () => {
+  it('Escape when listbox is already closed is a no-op', () => {
     const fetchFn = vi.fn(() => Promise.resolve(patients(0)));
     render(
       <PatientTypeahead

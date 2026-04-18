@@ -146,7 +146,9 @@ describe('ClientPatientDetail', () => {
         screen.getAllByText(/we couldn't archive this patient/i).length,
       ).toBeGreaterThan(0);
     });
-    const [arg] = h.usePhiCleanup.mock.calls[0];
+    const [arg] = h.usePhiCleanup.mock.calls[0] as unknown as [
+      { current: () => void },
+    ];
     // Invoke the registered cleanup — should close dialog + clear error.
     arg.current();
     await waitFor(() => {

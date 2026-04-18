@@ -29,19 +29,30 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
   const searchParams = useSearchParams();
   const [query, setQuery] = useState(initialQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Tracks the last value we pushed to the URL. If `initialQuery` matches,
-  // the URL change originated from this component and we do not re-sync state
-  // (preserving focus + any keystrokes typed between debounce fire and
-  // server re-render).
-  const lastPushedRef = useRef<string>(initialQuery);
+  // Two tracker states implement React's officially-sanctioned "adjust state
+  // based on a prop change" pattern without useEffect or refs (both of which
+  // trigger React 19 lint rules). See:
+  //   https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  //
+  // - `prevInitialQuery` — the most recent `initialQuery` we reconciled with.
+  //   Used to detect that the prop has genuinely changed since last render.
+  // - `lastPushed` — the last value this component pushed to the URL via
+  //   `router.replace`. When the parent Server Component re-renders after
+  //   our own URL push, `initialQuery` will equal `lastPushed` and we DO NOT
+  //   re-sync — that preserves focus and any keystrokes typed between the
+  //   debounce fire and the server re-render. External URL changes
+  //   (navigation, back button, etc.) DO cause a sync because the echoed
+  //   value won't match `lastPushed`.
+  const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
+  const [lastPushed, setLastPushed] = useState(initialQuery);
 
-  useEffect(() => {
-    // Only pull URL → state when the URL changed from an EXTERNAL source.
-    if (initialQuery !== lastPushedRef.current) {
+  if (initialQuery !== prevInitialQuery) {
+    setPrevInitialQuery(initialQuery);
+    if (initialQuery !== lastPushed) {
+      setLastPushed(initialQuery);
       setQuery(initialQuery);
-      lastPushedRef.current = initialQuery;
     }
-  }, [initialQuery]);
+  }
 
   useEffect(() => {
     return (): void => {
@@ -58,7 +69,9 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
       // Whenever search changes, reset pagination.
       params.delete('page');
       const qs = params.toString();
-      lastPushedRef.current = trimmed;
+      // Record that WE pushed this value so the "external change" sync-on-
+      // render branch above won't fight us when the parent re-renders.
+      setLastPushed(trimmed);
       router.replace(qs ? `${pathname}?${qs}` : pathname);
     },
     [pathname, router, searchParams],

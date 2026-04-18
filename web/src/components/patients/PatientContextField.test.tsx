@@ -64,7 +64,7 @@ describe('PatientContextField (view/edit toggle)', () => {
     const patient = createMockPatient({ context: 'original' });
     render(<PatientContextField patient={patient} />);
     await user.click(screen.getByRole('button', { name: /edit patient context/i }));
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    const textarea = screen.getByRole<HTMLTextAreaElement>('textbox');
     expect(textarea).toBeInTheDocument();
     expect(textarea.value).toBe('original');
     expect(screen.getByRole('button', { name: /^save$/i })).toBeInTheDocument();
@@ -156,7 +156,7 @@ describe('PatientContextField (view/edit toggle)', () => {
     await user.click(screen.getByRole('button', { name: /^cancel$/i }));
     // Re-enter edit mode — textarea should show the pristine "original"
     await user.click(screen.getByRole('button', { name: /edit patient context/i }));
-    const textarea = screen.getByRole('textbox') as HTMLTextAreaElement;
+    const textarea = screen.getByRole<HTMLTextAreaElement>('textbox');
     expect(textarea.value).toBe('original');
   });
 
