@@ -14,6 +14,13 @@ const h = vi.hoisted(() => ({
   getRequestContext: vi.fn(),
   auditLog: vi.fn(),
   auditLogWithClient: vi.fn(),
+  redirect: vi.fn((_path: string) => {
+    // Next.js' redirect() throws a NEXT_REDIRECT error. Replicate that so the
+    // Server Action's "post-commit redirect" path is observable in tests.
+    const err = new Error('NEXT_REDIRECT');
+    (err as Error & { digest?: string }).digest = 'NEXT_REDIRECT';
+    throw err;
+  }),
   logger: {
     info: vi.fn(),
     warn: vi.fn(),
@@ -75,6 +82,10 @@ vi.mock('@/server/lib/validation', () => ({
 
 vi.mock('@/server/db', () => ({
   getPoolClient: h.getPoolClient,
+}));
+
+vi.mock('next/navigation', () => ({
+  redirect: h.redirect,
 }));
 
 // ---------------------------------------------------------------------------
@@ -459,15 +470,24 @@ describe('archivePatientAction', () => {
     expect(res).toEqual({ success: false, error: 'rate_limit_exceeded' });
   });
 
-  it('happy path: BEGIN → archivePatient(client) → logWithClient(client) → COMMIT', async () => {
+  it('happy path: BEGIN → archivePatient(client) → logWithClient(client) → COMMIT → redirect', async () => {
     h.archivePatient.mockResolvedValueOnce(true);
 
-    const res = await archivePatientAction(PATIENT_ID);
+    // On success the action throws NEXT_REDIRECT (via `redirect()`); callers
+    // don't see `{ success: true }` on the happy path. Assert both the
+    // redirect target and that BEGIN/COMMIT happened BEFORE the redirect (so
+    // the transaction is durable before navigation).
+    await expect(archivePatientAction(PATIENT_ID)).rejects.toMatchObject({
+      message: 'NEXT_REDIRECT',
+    });
 
-    expect(res).toEqual({ success: true });
+    expect(h.redirect).toHaveBeenCalledWith('/dashboard/patients');
     const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries[0]).toBe('BEGIN');
-    expect(queries[queries.length - 1]).toBe('COMMIT');
+    expect(queries).toContain('COMMIT');
+    expect(queries).not.toContain('ROLLBACK');
+    // Client released BEFORE redirect fires (redirect throws AFTER finally)
+    expect(h.poolClient.release).toHaveBeenCalled();
     expect(h.archivePatient).toHaveBeenCalledWith(
       { type: 'user', userId: USER_ID },
       PATIENT_ID,
@@ -480,6 +500,20 @@ describe('archivePatientAction', () => {
         metadata: { patientId: PATIENT_ID },
       }),
     );
+  });
+
+  it('does NOT redirect when archive fails (returns error without navigation)', async () => {
+    h.archivePatient.mockResolvedValueOnce(false);
+    const res = await archivePatientAction(PATIENT_ID);
+    expect(res).toEqual({ success: false, error: 'archive_failed' });
+    expect(h.redirect).not.toHaveBeenCalled();
+  });
+
+  it('does NOT redirect when DAL throws (returns internal_error)', async () => {
+    h.archivePatient.mockRejectedValueOnce(new Error('boom'));
+    const res = await archivePatientAction(PATIENT_ID);
+    expect(res).toEqual({ success: false, error: 'internal_error' });
+    expect(h.redirect).not.toHaveBeenCalled();
   });
 
   it('archive_failed + ROLLBACK when DAL returns false (already archived / not found)', async () => {
@@ -619,7 +653,10 @@ describe('M-6: transactional DAL + audit share the same PoolClient', () => {
 
   it('archivePatientAction: DAL and audit receive the same client', async () => {
     h.archivePatient.mockResolvedValueOnce(true);
-    await archivePatientAction(PATIENT_ID);
+    // Success throws NEXT_REDIRECT — swallow it so we can inspect mock calls.
+    await archivePatientAction(PATIENT_ID).catch(() => {
+      /* expected NEXT_REDIRECT */
+    });
     const dalClient = h.archivePatient.mock.calls[0]?.[2];
     const auditClient = h.auditLogWithClient.mock.calls[0]?.[0];
     expect(dalClient).toBe(h.poolClient);

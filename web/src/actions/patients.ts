@@ -1,6 +1,7 @@
 'use server';
 
 import { z } from 'zod';
+import { redirect } from 'next/navigation';
 
 import {
   createPatient,
@@ -227,6 +228,16 @@ export async function updatePatientAction(
  * M-6: Archive a patient inside a PoolClient transaction. ROLLBACK when the
  * DAL returns false (row was already archived, or out-of-scope) so we don't
  * emit a PATIENT_ARCHIVED audit for a no-op.
+ *
+ * On success the action calls `redirect('/dashboard/patients')` which throws a
+ * NEXT_REDIRECT error that Next.js catches upstream and returns to the client
+ * as a server-side navigation directive. Client code that awaits this action
+ * does NOT receive `{ success: true }` on the happy path — it receives the
+ * navigation. Error paths still return the discriminated union so the dialog
+ * can render curated copy via `mapPatientError` (Rule 2).
+ *
+ * IMPORTANT: `redirect()` must be called OUTSIDE the try/catch — the NEXT_REDIRECT
+ * throw would otherwise be caught and mapped to `internal_error`.
  */
 export async function archivePatientAction(
   patientId: string,
@@ -243,6 +254,7 @@ export async function archivePatientAction(
 
   const ctx = await getRequestContext();
   const client = await getPoolClient();
+  let committed = false;
   try {
     await client.query('BEGIN');
     const archived = await archivePatient(
@@ -263,7 +275,7 @@ export async function archivePatientAction(
       userAgent: ctx.userAgent,
     });
     await client.query('COMMIT');
-    return { success: true };
+    committed = true;
   } catch (err) {
     try {
       await client.query('ROLLBACK');
@@ -283,6 +295,15 @@ export async function archivePatientAction(
   } finally {
     safeRelease(client);
   }
+
+  // Server-side redirect AFTER the transaction commits and client is released.
+  // `redirect()` throws a NEXT_REDIRECT error that Next.js handles — control
+  // does not return here on success. Only reached if `committed === true`.
+  if (committed) {
+    redirect('/dashboard/patients');
+  }
+  // Unreachable, but satisfies TS return type.
+  return { success: true };
 }
 
 /**

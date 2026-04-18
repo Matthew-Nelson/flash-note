@@ -51,8 +51,15 @@ export function ClientPatientDetail({
   const handleConfirm = useCallback(() => {
     setErrorCode(null);
     startTransition(async () => {
+      // On success the Server Action calls `redirect('/dashboard/patients')`
+      // which Next.js handles — the client-side navigation happens before this
+      // promise resolves with a meaningful value. We only reach the code below
+      // when the action returned an error discriminant.
       const res = await archivePatientAction(patient.id);
-      if (res.success) {
+      // Extra-defensive: if navigation somehow didn't occur but success was
+      // reported, explicitly push to the list so we never leave the user on a
+      // stale detail page. Normal flow: redirect() has already navigated.
+      if (res?.success) {
         setDialogOpen(false);
         router.push('/dashboard/patients');
         router.refresh();
