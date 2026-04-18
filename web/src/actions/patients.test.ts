@@ -196,7 +196,7 @@ describe('createPatientAction', () => {
     expect(res).toEqual({ success: true, data: { id: PATIENT_ID } });
     // Query order: BEGIN, COMMIT (the DAL query is mocked so only transactional
     // bookends are observable on the PoolClient)
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries[0]).toBe('BEGIN');
     expect(queries[queries.length - 1]).toBe('COMMIT');
     expect(queries).not.toContain('ROLLBACK');
@@ -245,7 +245,7 @@ describe('createPatientAction', () => {
     const res = await createPatientAction(buildCreateFormData());
 
     expect(res).toEqual({ success: false, error: 'internal_error' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('BEGIN');
     expect(queries).toContain('ROLLBACK');
     expect(queries).not.toContain('COMMIT');
@@ -268,7 +268,7 @@ describe('createPatientAction', () => {
     const res = await createPatientAction(buildCreateFormData());
 
     expect(res).toEqual({ success: false, error: 'internal_error' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(queries).not.toContain('COMMIT');
     expect(h.poolClient.release).toHaveBeenCalled();
@@ -276,9 +276,9 @@ describe('createPatientAction', () => {
 
   it('client is released even when ROLLBACK itself throws', async () => {
     h.createPatient.mockRejectedValueOnce(new Error('boom'));
-    h.poolClient.query.mockImplementation(async (q: string) => {
-      if (q === 'ROLLBACK') throw new Error('rollback failed');
-      return { rows: [] };
+    h.poolClient.query.mockImplementation((q: string) => {
+      if (q === 'ROLLBACK') return Promise.reject(new Error('rollback failed'));
+      return Promise.resolve({ rows: [] });
     });
 
     const res = await createPatientAction(buildCreateFormData());
@@ -348,7 +348,7 @@ describe('updatePatientAction', () => {
     );
 
     expect(res.success).toBe(true);
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries[0]).toBe('BEGIN');
     expect(queries[queries.length - 1]).toBe('COMMIT');
     expect(h.updatePatient).toHaveBeenCalledWith(
@@ -394,7 +394,7 @@ describe('updatePatientAction', () => {
     const res = await updatePatientAction(PATIENT_ID, buildUpdateFormData());
 
     expect(res).toEqual({ success: false, error: 'patient_not_found' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(queries).not.toContain('COMMIT');
     expect(h.auditLogWithClient).not.toHaveBeenCalled();
@@ -425,7 +425,7 @@ describe('updatePatientAction', () => {
     h.updatePatient.mockRejectedValueOnce(new Error('boom'));
     const res = await updatePatientAction(PATIENT_ID, buildUpdateFormData());
     expect(res).toEqual({ success: false, error: 'internal_error' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(h.logger.error).toHaveBeenCalled();
   });
@@ -465,7 +465,7 @@ describe('archivePatientAction', () => {
     const res = await archivePatientAction(PATIENT_ID);
 
     expect(res).toEqual({ success: true });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries[0]).toBe('BEGIN');
     expect(queries[queries.length - 1]).toBe('COMMIT');
     expect(h.archivePatient).toHaveBeenCalledWith(
@@ -488,7 +488,7 @@ describe('archivePatientAction', () => {
     const res = await archivePatientAction(PATIENT_ID);
 
     expect(res).toEqual({ success: false, error: 'archive_failed' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(queries).not.toContain('COMMIT');
     expect(h.auditLogWithClient).not.toHaveBeenCalled();
@@ -498,7 +498,7 @@ describe('archivePatientAction', () => {
     h.archivePatient.mockRejectedValueOnce(new Error('boom'));
     const res = await archivePatientAction(PATIENT_ID);
     expect(res).toEqual({ success: false, error: 'internal_error' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(h.logger.error).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -559,7 +559,7 @@ describe('updatePatientContextAction', () => {
     const res = await updatePatientContextAction(PATIENT_ID, 'hi');
 
     expect(res).toEqual({ success: false, error: 'context_save_failed' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
   });
 
@@ -567,7 +567,7 @@ describe('updatePatientContextAction', () => {
     h.updatePatient.mockRejectedValueOnce(new Error('db down'));
     const res = await updatePatientContextAction(PATIENT_ID, 'hi');
     expect(res).toEqual({ success: false, error: 'context_save_failed' });
-    const queries = h.poolClient.query.mock.calls.map((c) => c[0]);
+    const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries).toContain('ROLLBACK');
     expect(h.logger.error).toHaveBeenCalledWith(
       expect.objectContaining({

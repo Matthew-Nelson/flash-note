@@ -126,7 +126,6 @@ function SidebarContent({ user }: { user: { email: string } }) {
           href="/dashboard/patients"
           label="Patients"
           pathname={pathname}
-          comingSoon
         />
       </ul>
 

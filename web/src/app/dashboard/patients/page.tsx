@@ -1,38 +1,142 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
+import { findPatientsByScope } from '@/server/dal';
 import { TopBar } from '@/components/TopBar';
+import { Button } from '@/components/ui';
+import { PatientRow, SearchPatients } from '@/components/patients';
 
-export default async function PatientsPage() {
+interface PatientsPageProps {
+  searchParams: Promise<{ q?: string; page?: string }>;
+}
+
+const PAGE_SIZE = 50;
+
+export default async function PatientsPage({ searchParams }: PatientsPageProps) {
   const session = await getSession();
   if (!session) redirect('/login?reason=session_expired');
+
+  const sp = await searchParams;
+  const q = sp.q?.trim() ?? '';
+  const page = Math.max(parseInt(sp.page ?? '1', 10) || 1, 1);
+  const offset = (page - 1) * PAGE_SIZE;
+
+  const { patients, total } = await findPatientsByScope(
+    { type: 'user', userId: session.userId },
+    { search: q || undefined, limit: PAGE_SIZE, offset },
+  );
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasPrev = page > 1;
+  const hasNext = page < totalPages;
 
   return (
     <>
       <TopBar title="Patients" />
-      <main id="main-content" tabIndex={-1} className="flex-1 p-6">
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <svg
-            aria-hidden="true"
-            className="w-12 h-12 text-fn-text-muted mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"
-            />
-          </svg>
-          <h2 className="text-fn-lg font-semibold text-fn-text-primary mb-2">
-            Coming Soon
-          </h2>
-          <p className="text-fn-sm text-fn-text-secondary max-w-sm">
-            Patient management is on the way. For now, generate notes from the dashboard.
-          </p>
+      <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6">
+        <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+          <h1 className="text-fn-2xl font-semibold tracking-fn-tight text-fn-text-primary">
+            Patients
+          </h1>
+          <Link href="/dashboard/patients/new">
+            <Button variant="primary">Add patient</Button>
+          </Link>
         </div>
+
+        <SearchPatients initialQuery={q} />
+
+        {patients.length === 0 ? (
+          <div className="py-16 text-center">
+            <h2 className="text-fn-lg font-semibold text-fn-text-primary">
+              {q ? `No patients match "${q}"` : 'No patients yet'}
+            </h2>
+            <p className="mt-2 text-fn-base text-fn-text-secondary max-w-md mx-auto">
+              {q
+                ? 'Try a different name or clear the search.'
+                : 'Create your first patient to start saving notes and building a patient history.'}
+            </p>
+            {!q && (
+              <div className="mt-6">
+                <Link href="/dashboard/patients/new">
+                  <Button variant="primary">Add patient</Button>
+                </Link>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-fn-base border border-fn-border bg-white">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-fn-border bg-fn-slate-50">
+                  <th className="px-3 py-2 text-left text-fn-xs font-semibold uppercase tracking-fn-wider text-fn-text-secondary">
+                    Name
+                  </th>
+                  <th className="px-3 py-2 text-left text-fn-xs font-semibold uppercase tracking-fn-wider text-fn-text-secondary">
+                    Date of birth
+                  </th>
+                  <th className="px-3 py-2 text-left text-fn-xs font-semibold uppercase tracking-fn-wider text-fn-text-secondary">
+                    Pronoun
+                  </th>
+                  <th className="px-3 py-2 text-left text-fn-xs font-semibold uppercase tracking-fn-wider text-fn-text-secondary">
+                    Added
+                  </th>
+                  <th className="px-3 py-2 text-right text-fn-xs font-semibold uppercase tracking-fn-wider text-fn-text-secondary">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {patients.map((p) => (
+                  <PatientRow key={p.id} patient={p} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {(hasPrev || hasNext) && (
+          <nav
+            aria-label="Pagination"
+            className="mt-6 flex items-center justify-between"
+          >
+            <Link
+              href={{
+                pathname: '/dashboard/patients',
+                query: hasPrev
+                  ? { ...(q ? { q } : {}), page: page - 1 }
+                  : undefined,
+              }}
+              aria-disabled={!hasPrev}
+              className={`inline-flex items-center justify-center min-h-[44px] px-4 rounded-fn-base border border-fn-border text-fn-base ${
+                hasPrev
+                  ? 'hover:bg-fn-slate-50 cursor-pointer'
+                  : 'opacity-50 cursor-not-allowed pointer-events-none'
+              }`}
+            >
+              Previous
+            </Link>
+            <span className="text-fn-xs text-fn-text-secondary">
+              Page {page} of {totalPages}
+            </span>
+            <Link
+              href={{
+                pathname: '/dashboard/patients',
+                query: hasNext
+                  ? { ...(q ? { q } : {}), page: page + 1 }
+                  : undefined,
+              }}
+              aria-disabled={!hasNext}
+              className={`inline-flex items-center justify-center min-h-[44px] px-4 rounded-fn-base border border-fn-border text-fn-base ${
+                hasNext
+                  ? 'hover:bg-fn-slate-50 cursor-pointer'
+                  : 'opacity-50 cursor-not-allowed pointer-events-none'
+              }`}
+            >
+              Next
+            </Link>
+          </nav>
+        )}
       </main>
     </>
   );

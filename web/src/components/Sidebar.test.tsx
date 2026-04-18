@@ -63,6 +63,35 @@ describe('Sidebar', () => {
     expect(screen.getAllByRole('link', { name: /patients/i }).length).toBeGreaterThan(0);
   });
 
+  it('Patients nav item no longer shows "Soon" badge (Plan 04-02)', () => {
+    renderSidebar();
+    const links = screen.getAllByRole('link', { name: /patients/i });
+    // The accessible name for a link with a child "Soon" badge would include it.
+    // Assert no link with accessible name "Patients Soon" exists.
+    const matchesSoon = links.filter((l) => /soon/i.test(l.textContent ?? ''));
+    expect(matchesSoon).toHaveLength(0);
+  });
+
+  it('Patients nav item sets aria-current when on /dashboard/patients', () => {
+    mockUsePathname.mockReturnValue('/dashboard/patients');
+    renderSidebar();
+    const allLinks = screen.getAllByRole('link');
+    const patientsLink = allLinks.find(
+      (l) => l.getAttribute('href') === '/dashboard/patients',
+    );
+    expect(patientsLink).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('Patients nav item sets aria-current when on /dashboard/patients/[id]', () => {
+    mockUsePathname.mockReturnValue('/dashboard/patients/abc123');
+    renderSidebar();
+    const allLinks = screen.getAllByRole('link');
+    const patientsLink = allLinks.find(
+      (l) => l.getAttribute('href') === '/dashboard/patients',
+    );
+    expect(patientsLink).toHaveAttribute('aria-current', 'page');
+  });
+
   it('renders Templates nav item', () => {
     renderSidebar();
     expect(screen.getAllByRole('link', { name: /templates/i }).length).toBeGreaterThan(0);

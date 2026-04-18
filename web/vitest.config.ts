@@ -27,6 +27,7 @@ export default defineConfig({
         'src/server/db/migrate.ts', // CLI script, not unit-testable
         'src/components/auth/index.ts',
         'src/components/notes/index.ts',
+        'src/components/patients/index.ts',
         'src/components/ui/index.ts',
         'src/lib/schemas/index.ts',
         'src/lib/types/index.ts',

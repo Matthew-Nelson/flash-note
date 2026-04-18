@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfirmDialog } from './ConfirmDialog';
@@ -80,10 +80,8 @@ describe('ConfirmDialog', () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel })} />);
-    const dialog = screen.getByRole('dialog');
-    const backdrop = dialog.parentElement;
-    expect(backdrop).not.toBeNull();
-    await user.click(backdrop!);
+    const backdrop = screen.getByRole('button', { name: /close dialog/i });
+    await user.click(backdrop);
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
@@ -91,13 +89,12 @@ describe('ConfirmDialog', () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel, loading: true })} />);
-    const dialog = screen.getByRole('dialog');
-    const backdrop = dialog.parentElement!;
+    const backdrop = screen.getByRole('button', { name: /close dialog/i });
     await user.click(backdrop);
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('clicking inside the dialog does NOT bubble to backdrop', async () => {
+  it('clicking inside the dialog does NOT dismiss (backdrop is a sibling element)', async () => {
     const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel })} />);
@@ -209,5 +206,24 @@ describe('ConfirmDialog', () => {
     expect(
       screen.getByRole('button', { name: 'Keep patient' }),
     ).toBeDisabled();
+  });
+
+  it('Tab in the middle of the focusables does NOT wrap', () => {
+    render(<ConfirmDialog {...baseProps()} />);
+    const cancel = screen.getByRole('button', { name: 'Keep patient' });
+    const confirm = screen.getByRole('button', { name: 'Archive patient' });
+    // Start with cancel focused (initial focus); Tab should let native browser
+    // move focus, so our trap should not preventDefault or reassign focus.
+    cancel.focus();
+    fireEvent.keyDown(window, { key: 'Tab' });
+    // Either cancel or confirm is OK — the trap should NOT hijack in middle.
+    expect([cancel, confirm]).toContain(document.activeElement);
+  });
+
+  it('non-Escape / non-Tab key is ignored by the handler', () => {
+    const onCancel = vi.fn();
+    render(<ConfirmDialog {...baseProps({ onCancel })} />);
+    fireEvent.keyDown(window, { key: 'a' });
+    expect(onCancel).not.toHaveBeenCalled();
   });
 });

@@ -119,18 +119,23 @@ export function ConfirmDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={handleBackdropClick}
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop: rendered as a <button> so keyboard users get the same
+          "click outside to dismiss" affordance and jsx-a11y is satisfied. */}
+      <button
+        type="button"
+        aria-label="Close dialog"
+        tabIndex={-1}
+        className="absolute inset-0 w-full h-full bg-black/40 cursor-default"
+        onClick={handleBackdropClick}
+      />
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         aria-describedby={bodyId}
-        className="w-full max-w-md rounded-fn-base bg-white p-6 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md rounded-fn-base bg-white p-6 shadow-lg"
       >
         <h2
           id={titleId}

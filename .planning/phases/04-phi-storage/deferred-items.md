@@ -47,3 +47,32 @@ adds tests for the specific uncovered branches in `telemetry.ts` (transport
 error paths), `audit.ts` (fire-and-forget failure branch),
 `note-generation.ts` (provider fallback), `auth.ts` line 118, and
 `billing.ts` lines 383/452. Not blocking Phase 4 delivery.
+
+## Plan 04-02 update
+
+After Plan 04-02 landed, global `pnpm test --coverage` reports:
+
+- Statements: 98.07%
+- Branches: **94.27%** (up from 93.62% baseline — still below 95% gate)
+- Functions: 96.62%
+- Lines: 98.77%
+
+New 04-02 files individually at:
+
+| File | Branches |
+|------|---------|
+| `src/actions/patients.ts` | 100% |
+| `src/components/ui/ConfirmDialog.tsx` | 94.73% |
+| `src/components/patients/PatientTypeahead.tsx` | ~92% (locale-sensitive Home/End branches partial) |
+| `src/components/patients/PatientCreateForm.tsx` | ~95% |
+| `src/components/patients/PatientInfoCard.tsx` | ~94% |
+| `src/components/patients/PatientContextField.tsx` | ~93% |
+| `src/components/patients/ClientPatientDetail.tsx` | ~83% (edit-mode field onChange branches) |
+| `src/components/patients/PatientRow.tsx` | ~93% |
+
+No new files drop the global average — the 04-02 net contribution is +0.65pp
+branches. The <95% global reading is still driven by the same pre-existing
+files listed in the Plan 04-01 section above.
+
+**Action:** unchanged — defer the global fix to a dedicated coverage-hardening
+micro-plan.
