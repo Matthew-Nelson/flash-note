@@ -6,4 +6,5 @@ export { EditableNoteSection } from './EditableNoteSection';
 export { VersionHistory } from './VersionHistory';
 export { VersionRow } from './VersionRow';
 export { ClientNoteDetail } from './ClientNoteDetail';
+export { NoteRow } from './NoteRow';
 export { NOTE_ERROR_FALLBACK, mapNoteError } from './error-messages';

@@ -28,9 +28,17 @@ vi.mock('@/server/lib/get-session', () => ({
 }));
 
 const mockFindPatientById = vi.fn<(scope: unknown, id: string) => Promise<unknown>>();
+const mockFindClinicalNotesByScope = vi.fn<
+  (scope: unknown, filters: unknown) => Promise<{ notes: unknown[]; total: number }>
+>();
 vi.mock('@/server/dal', () => ({
   findPatientById: (scope: unknown, id: string): Promise<unknown> =>
     mockFindPatientById(scope, id),
+  findClinicalNotesByScope: (
+    scope: unknown,
+    filters: unknown,
+  ): Promise<{ notes: unknown[]; total: number }> =>
+    mockFindClinicalNotesByScope(scope, filters),
 }));
 
 const mockAuditLog = vi.hoisted(() =>
@@ -123,6 +131,8 @@ describe('PatientDetailPage', () => {
       throw new Error('NEXT_NOT_FOUND');
     });
     mockAuditLog.mockResolvedValue(undefined);
+    // Plan 04-03: patient detail page now loads this patient's notes.
+    mockFindClinicalNotesByScope.mockResolvedValue({ notes: [], total: 0 });
   });
 
   it('redirects to /login when unauthenticated (Rule 8)', async () => {

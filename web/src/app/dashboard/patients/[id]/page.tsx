@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
-import { findPatientById } from '@/server/dal';
+import { findClinicalNotesByScope, findPatientById } from '@/server/dal';
 import { auditService } from '@/server/services/audit';
 import { getRequestContext } from '@/server/lib/request-context';
 import { AuditAction } from '@/server/types';
@@ -44,9 +44,11 @@ export default async function PatientDetailPage({ params }: Props) {
     userAgent: ctx.userAgent,
   });
 
-  // Plan 04-03 will wire findClinicalNotesByScope here; 04-02 passes [] so the
-  // placeholder empty state renders.
-  const notes: readonly never[] = [];
+  // Plan 04-03: load this patient's clinical notes (Rule 5 — user-scoped DAL).
+  const { notes } = await findClinicalNotesByScope(
+    { type: 'user', userId: session.userId },
+    { patientId: patient.id },
+  );
 
   return (
     <>

@@ -10,6 +10,18 @@ vi.mock('@/server/lib/get-session', () => ({
   getSession: (): Promise<SessionData | null> => mockGetSession(),
 }));
 
+// Plan 04-03 Task 4c: settings page loads SOAP template with user style overlay
+const mockFindTemplateWithUserStyle =
+  vi.fn<(id: string, userId: string) => Promise<unknown>>();
+vi.mock('@/server/dal', () => ({
+  findTemplateWithUserStyle: (id: string, userId: string): Promise<unknown> =>
+    mockFindTemplateWithUserStyle(id, userId),
+}));
+
+vi.mock('./NoteStylePreferencesSection', () => ({
+  NoteStylePreferencesSection: () => <div data-testid="style-prefs-section" />,
+}));
+
 // Mock client components
 vi.mock('@/components/auth', () => ({
   PasswordResetSection: ({ email }: { email: string }) => (
@@ -57,6 +69,38 @@ describe('SettingsPage', () => {
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
+    mockFindTemplateWithUserStyle.mockResolvedValue({
+      id: '00000000-0000-0000-0000-000000000001',
+      sections: [
+        {
+          id: '00000000-0000-0000-0000-000000000011',
+          templateId: '00000000-0000-0000-0000-000000000001',
+          title: 'Subjective',
+          sortOrder: 1,
+          verbosity: 'concise',
+          styling: 'paragraph',
+          promptInstructions: '…',
+          includeInCopyAll: true,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    });
+  });
+
+  it('renders NoteStylePreferencesSection (Plan 04-03)', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(await SettingsPage());
+    expect(screen.getByTestId('style-prefs-section')).toBeInTheDocument();
+  });
+
+  it('calls findTemplateWithUserStyle with SOAP_TEMPLATE_ID and session.userId', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    await SettingsPage();
+    expect(mockFindTemplateWithUserStyle).toHaveBeenCalledWith(
+      '00000000-0000-0000-0000-000000000001',
+      'user-uuid',
+    );
   });
 
   it('redirects to /login?reason=session_expired when getSession() returns null', async () => {

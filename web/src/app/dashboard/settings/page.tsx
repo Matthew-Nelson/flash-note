@@ -1,14 +1,29 @@
 import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
+import { findTemplateWithUserStyle } from '@/server/dal';
 import { Card, CardContent } from '@/components/ui';
 import { PasswordResetSection } from '@/components/auth';
 import { TopBar } from '@/components/TopBar';
 import { DeleteAccountSection } from './DeleteAccountSection';
+import { NoteStylePreferencesSection } from './NoteStylePreferencesSection';
+
+/**
+ * SOAP template UUID (seeded in migration 002). Exported for tests.
+ */
+export const SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
 
 export default async function SettingsPage() {
   const session = await getSession();
   if (!session) redirect('/login?reason=session_expired');
+
+  // Plan 04-03 Task 4c: load the SOAP template with user style overlay applied
+  // so the Note style preferences section renders the clinician's effective
+  // verbosity/styling per section.
+  const soapTemplate = await findTemplateWithUserStyle(
+    SOAP_TEMPLATE_ID,
+    session.userId,
+  );
 
   return (
     <>
@@ -48,6 +63,11 @@ export default async function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Note style preferences (Plan 04-03) */}
+          {soapTemplate && (
+            <NoteStylePreferencesSection sections={soapTemplate.sections} />
+          )}
 
           {/* Change Password */}
           <Card>
