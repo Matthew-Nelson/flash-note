@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui';
 
@@ -15,13 +15,24 @@ const DEBOUNCE_MS = 250;
  * /dashboard/patients via the `?q=` query param. The server is the sole owner
  * of the results list — this component only mirrors input → URL.
  *
- * Focus-stability invariant: the controlled `query` state is the sole source
- * of truth while the user is actively typing. We do NOT sync from
- * `initialQuery` on every change — doing so would overwrite mid-type keystrokes
- * when the Server Component re-renders after our own `router.replace`, which
- * in React 19 concurrent mode can cause the input to lose focus. We only sync
- * from URL → state when the URL changes from an EXTERNAL source (navigation,
- * back button, etc.) by comparing against the last value we pushed ourselves.
+ * Focus-stability invariants:
+ *  1. `router.replace()` is called with `{ scroll: false }` so Next.js's
+ *     built-in a11y focus management does NOT shift focus to the `<main>`
+ *     landmark on every keystroke. Without this, Next.js treats every URL
+ *     change as a navigation and focuses `<main id="main-content"
+ *     tabIndex={-1}>`, blurring the search input even though the element
+ *     itself is preserved.
+ *  2. `router.replace` runs inside `startTransition` so a route-level
+ *     `loading.tsx` (if one ever exists at this segment) won't replace the
+ *     subtree containing the input. The data fetch lives inside a keyed
+ *     component-level `<Suspense>` in the page, so the skeleton fallback is
+ *     scoped to the table only and never unmounts the search input.
+ *  3. The controlled `query` state is the sole source of truth while the user
+ *     is actively typing. We do NOT sync from `initialQuery` on every change —
+ *     doing so would overwrite mid-type keystrokes when the Server Component
+ *     re-renders after our own `router.replace`. We only sync from URL → state
+ *     when the URL changes from an EXTERNAL source (navigation, back button,
+ *     etc.) by comparing against the last value we pushed ourselves.
  */
 export function SearchPatients({ initialQuery }: SearchPatientsProps): React.ReactElement {
   const router = useRouter();
@@ -45,6 +56,7 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
   //   value won't match `lastPushed`.
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   const [lastPushed, setLastPushed] = useState(initialQuery);
+  const [, startTransition] = useTransition();
 
   if (initialQuery !== prevInitialQuery) {
     setPrevInitialQuery(initialQuery);
@@ -72,9 +84,16 @@ export function SearchPatients({ initialQuery }: SearchPatientsProps): React.Rea
       // Record that WE pushed this value so the "external change" sync-on-
       // render branch above won't fight us when the parent re-renders.
       setLastPushed(trimmed);
-      router.replace(qs ? `${pathname}?${qs}` : pathname);
+      // `{ scroll: false }` disables both the scroll-to-top AND the
+      // auto-focus-<main> behavior that Next.js applies on every route change.
+      // startTransition marks the navigation as non-urgent so the current UI
+      // (including the focused input) stays visible while the new server data
+      // streams in via the page's component-level Suspense boundary.
+      startTransition(() => {
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      });
     },
-    [pathname, router, searchParams],
+    [pathname, router, searchParams, startTransition],
   );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {

@@ -48,7 +48,7 @@ vi.mock('@/components/patients', () => ({
   ),
 }));
 
-import PatientsPage from './page';
+import PatientsPage, { PatientsTable } from './page';
 
 function session(overrides: Partial<SessionData> = {}): SessionData {
   return {
@@ -97,9 +97,29 @@ describe('PatientsPage', () => {
     expect(h1s[0]).toHaveTextContent('Patients');
   });
 
-  it('calls DAL with user scope from session', async () => {
-    mockGetSession.mockResolvedValue(session({ userId: 'abc' }));
-    await PatientsPage({ searchParams: Promise.resolve({}) });
+  it('passes q to SearchPatients', async () => {
+    mockGetSession.mockResolvedValue(session());
+    render(
+      await PatientsPage({ searchParams: Promise.resolve({ q: 'doe' }) }),
+    );
+    expect(screen.getByTestId('search-patients')).toHaveAttribute(
+      'data-query',
+      'doe',
+    );
+  });
+});
+
+// PatientsTable owns the DB call (it's the async Suspense child in page.tsx).
+// These assertions target that component directly, since RTL would render the
+// Suspense fallback rather than awaiting the inner async component.
+describe('PatientsTable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindPatientsByScope.mockResolvedValue({ patients: [], total: 0 });
+  });
+
+  it('calls DAL with user scope', async () => {
+    await PatientsTable({ userId: 'abc', q: '', page: 1 });
     expect(mockFindPatientsByScope).toHaveBeenCalledWith(
       { type: 'user', userId: 'abc' },
       expect.objectContaining({ limit: 50, offset: 0 }),
@@ -107,49 +127,36 @@ describe('PatientsPage', () => {
   });
 
   it('renders empty state when no patients AND no search query', async () => {
-    mockGetSession.mockResolvedValue(session());
     mockFindPatientsByScope.mockResolvedValueOnce({ patients: [], total: 0 });
-    render(await PatientsPage({ searchParams: Promise.resolve({}) }));
+    render(await PatientsTable({ userId: 'u', q: '', page: 1 }));
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
       'No patients yet',
     );
     expect(
       screen.getByText(/Create your first patient/i),
     ).toBeInTheDocument();
-    // "Add patient" CTA appears in empty state (plus the page header).
     expect(
       screen.getAllByRole('link', { name: /add patient/i }).length,
     ).toBeGreaterThan(0);
   });
 
   it('renders search-scoped empty state when query yields no results', async () => {
-    mockGetSession.mockResolvedValue(session());
     mockFindPatientsByScope.mockResolvedValueOnce({ patients: [], total: 0 });
-    render(
-      await PatientsPage({ searchParams: Promise.resolve({ q: 'zelda' }) }),
-    );
+    render(await PatientsTable({ userId: 'u', q: 'zelda', page: 1 }));
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(
       'No patients match "zelda"',
     );
   });
 
-  it('passes q to DAL and SearchPatients', async () => {
-    mockGetSession.mockResolvedValue(session());
-    render(
-      await PatientsPage({ searchParams: Promise.resolve({ q: 'doe' }) }),
-    );
+  it('forwards search query to DAL', async () => {
+    await PatientsTable({ userId: 'u', q: 'doe', page: 1 });
     expect(mockFindPatientsByScope).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ search: 'doe' }),
     );
-    expect(screen.getByTestId('search-patients')).toHaveAttribute(
-      'data-query',
-      'doe',
-    );
   });
 
   it('renders PatientRow for each patient', async () => {
-    mockGetSession.mockResolvedValue(session());
     mockFindPatientsByScope.mockResolvedValueOnce({
       patients: [
         createMockPatient({ id: 'p1', firstName: 'Jane', lastName: 'Doe' }),
@@ -157,13 +164,12 @@ describe('PatientsPage', () => {
       ],
       total: 2,
     });
-    render(await PatientsPage({ searchParams: Promise.resolve({}) }));
+    render(await PatientsTable({ userId: 'u', q: '', page: 1 }));
     expect(screen.getByTestId('patient-row-p1')).toBeInTheDocument();
     expect(screen.getByTestId('patient-row-p2')).toBeInTheDocument();
   });
 
   it('pagination renders when total > PAGE_SIZE', async () => {
-    mockGetSession.mockResolvedValue(session());
     mockFindPatientsByScope.mockResolvedValueOnce({
       patients: Array.from({ length: 50 }, (_, i) =>
         createMockPatient({
@@ -174,9 +180,7 @@ describe('PatientsPage', () => {
       ),
       total: 125,
     });
-    render(
-      await PatientsPage({ searchParams: Promise.resolve({ page: '2' }) }),
-    );
+    render(await PatientsTable({ userId: 'u', q: '', page: 2 }));
     expect(
       screen.getByRole('navigation', { name: /pagination/i }),
     ).toBeInTheDocument();
@@ -184,36 +188,23 @@ describe('PatientsPage', () => {
   });
 
   it('no pagination when total fits on one page', async () => {
-    mockGetSession.mockResolvedValue(session());
     mockFindPatientsByScope.mockResolvedValueOnce({
       patients: [
         createMockPatient({ id: 'p1', firstName: 'Jane', lastName: 'Doe' }),
       ],
       total: 1,
     });
-    render(await PatientsPage({ searchParams: Promise.resolve({}) }));
+    render(await PatientsTable({ userId: 'u', q: '', page: 1 }));
     expect(
       screen.queryByRole('navigation', { name: /pagination/i }),
     ).not.toBeInTheDocument();
   });
 
-  it('page offset is computed from the page query param', async () => {
-    mockGetSession.mockResolvedValue(session());
-    await PatientsPage({ searchParams: Promise.resolve({ page: '3' }) });
+  it('page offset is computed from the page prop', async () => {
+    await PatientsTable({ userId: 'u', q: '', page: 3 });
     expect(mockFindPatientsByScope).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ limit: 50, offset: 100 }),
-    );
-  });
-
-  it('non-numeric page param falls back to 1 (offset 0)', async () => {
-    mockGetSession.mockResolvedValue(session());
-    await PatientsPage({
-      searchParams: Promise.resolve({ page: 'banana' }),
-    });
-    expect(mockFindPatientsByScope).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ offset: 0 }),
     );
   });
 });

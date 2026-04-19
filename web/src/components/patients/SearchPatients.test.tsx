@@ -46,6 +46,7 @@ describe('SearchPatients', () => {
     expect(h.replace).toHaveBeenCalledTimes(1);
     expect(h.replace).toHaveBeenCalledWith(
       '/dashboard/patients?q=Ja',
+      { scroll: false },
     );
   });
 
@@ -57,7 +58,7 @@ describe('SearchPatients', () => {
       fireEvent.change(input, { target: { value: '' } });
       vi.advanceTimersByTime(250);
     });
-    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients');
+    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients', { scroll: false });
   });
 
   it('resets page param when search changes', async () => {
@@ -68,7 +69,7 @@ describe('SearchPatients', () => {
       fireEvent.change(input, { target: { value: 'Ja' } });
       vi.advanceTimersByTime(250);
     });
-    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Ja');
+    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Ja', { scroll: false });
   });
 
   // Focus-stability regression (UAT issue #3) — once the user types, the input
@@ -85,7 +86,7 @@ describe('SearchPatients', () => {
       fireEvent.change(input, { target: { value: 'Jan' } });
       vi.advanceTimersByTime(250);
     });
-    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Jan');
+    expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Jan', { scroll: false });
 
     // Simulate the parent Server Component re-rendering with the new URL.
     await act(async () => { await Promise.resolve();
