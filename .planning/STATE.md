@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-01-foundation-PLAN.md
-last_updated: "2026-04-18T21:01:32.984Z"
-last_activity: 2026-04-18
+stopped_at: Completed 04-02-patients-PLAN.md
+last_updated: "2026-04-19T00:07:32.579Z"
+last_activity: 2026-04-19
 progress:
   total_phases: 10
   completed_phases: 3
   total_plans: 15
-  completed_plans: 11
+  completed_plans: 12
   percent: 100
 ---
 
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-04-16)
 ## Current Position
 
 Phase: 04 (phi-storage) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Next phase: 4 (PHI Storage) -- NOT STARTED
 Status: Ready to execute
-Last activity: 2026-04-18
+Last activity: 2026-04-19
 
 Progress: [██████████] 100%
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 
 *Updated after each plan completion*
 | Phase 04 P01 | 26min | 4 tasks | 32 files |
+| Phase 04 P02 | ~2h 49min | 3 tasks | 42 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,10 @@ Recent decisions affecting current work:
 - [Phase 04]: [04-01]: saveNoteSchema explicitly declares patientContextSnapshot (B-3) so Zod does not strip the field — required by Plan 04-03 saveNoteAction
 - [Phase 04]: [04-01]: buildPoolConfig() exported with production TLS enforcement (PHI-10 code-side per D-10); Cloud SQL Auth Proxy tunnels and explicit sslmode in URL skip the override
 - [Phase 04]: [04-01]: modality + duration_minutes promoted to first-class clinical_notes columns (not JSONB metadata) — enables CHECK constraints + future filter/sort
+- [Phase 04]: [04-02]: M-6 transactional pattern for PHI writes — Server Actions wrap DAL + auditService.logWithClient in one PoolClient BEGIN/COMMIT; audit-service fire-and-forget catch branch now logs failures at error level (source='audit_service')
+- [Phase 04]: [04-02]: Next.js 16 App Router auto-focuses <main id='main-content'> on router.replace() — preserving focus in debounced URL-driven search requires router.replace(url, {scroll:false}) AND component-level <Suspense> (not route-level loading.tsx, which re-mounts the subtree)
+- [Phase 04]: [04-02]: ConfirmDialog initial focus defaults to Cancel button (safer default for destructive actions per 04-UI-SPEC); consumed by Plan 04-03 archive-note flow
+- [Phase 04]: [04-02]: PatientContextField uses explicit view → edit toggle with Save-when-dirty; no auto-save on blur (clinician UAT feedback — prevents partial edits committing silently)
 
 ### Pending Todos
 
@@ -116,6 +121,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-18T21:01:32.981Z
-Stopped at: Completed 04-01-foundation-PLAN.md
+Last session: 2026-04-19T00:07:32.577Z
+Stopped at: Completed 04-02-patients-PLAN.md
 Resume action: Run /gsd:discuss-phase or /gsd:plan-phase for Phase 4 (PHI Storage)

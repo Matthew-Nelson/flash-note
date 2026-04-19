@@ -60,7 +60,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### PHI Storage
 
-- [ ] **PHI-01**: User can create a patient record with minimal fields (name, pronoun) and view patient detail page with additional fields (DOB, phone, email)
+- [x] **PHI-01**: User can create a patient record with minimal fields (name, pronoun) and view patient detail page with additional fields (DOB, phone, email)
 - [ ] **PHI-02**: User can save generated notes linked to a patient with session metadata (date, duration, modality)
 - [ ] **PHI-03**: User can view chronological note history for a patient (date, title, duration, modality)
 - [ ] **PHI-04**: User can store persistent free-text context per patient that is automatically injected into all future note generation for that patient
@@ -193,7 +193,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAUNCH-02 | Phase 5 | Pending |
 | LAUNCH-03 | Phase 5 | Pending |
 | LAUNCH-04 | Phase 5 | Pending |
-| PHI-01 | Phase 6 | Pending |
+| PHI-01 | Phase 6 | Complete |
 | PHI-02 | Phase 6 | Pending |
 | PHI-03 | Phase 6 | Pending |
 | PHI-04 | Phase 6 | Pending |

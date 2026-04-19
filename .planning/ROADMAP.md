@@ -92,7 +92,7 @@ Plans:
 
 Plans:
 - [x] 04-01-foundation-PLAN.md — Migration, DAL, types, schemas, PHI cleanup hook (PHI-05, PHI-09, PHI-10 code, PROMPT-03 schema)
-- [ ] 04-02-patients-PLAN.md — Patient CRUD + detail + context + typeahead (PHI-01, PHI-04, PHI-09)
+- [x] 04-02-patients-PLAN.md — Patient CRUD + detail + context + typeahead (PHI-01, PHI-04, PHI-09)
 - [ ] 04-03-notes-versioning-PLAN.md — Template generation, note persistence, versioning, style prefs (PHI-02, PHI-03, PHI-04, PHI-05, PHI-06, PHI-07, PHI-09, PROMPT-01, PROMPT-02, PROMPT-03)
 
 ### Phase 5: Post-PHI Features
