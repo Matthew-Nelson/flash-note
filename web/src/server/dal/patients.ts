@@ -130,11 +130,12 @@ export async function createPatient(
  */
 export async function findPatientById(
   scope: QueryScope,
-  patientId: string
+  patientId: string,
+  client?: pg.PoolClient
 ): Promise<Patient | null> {
   const { sql: scopeSql, params: scopeParams } = scopeWhereClause(scope, 1);
   const idIndex = scopeParams.length + 1;
-  const result = await db.query<PatientRow>(
+  const result = await executor(client).query<PatientRow>(
     `SELECT ${PATIENT_COLUMNS} FROM patients
      WHERE ${scopeSql} AND id = $${idIndex} AND archived_at IS NULL`,
     [...scopeParams, patientId]

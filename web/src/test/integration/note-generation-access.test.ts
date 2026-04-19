@@ -52,6 +52,45 @@ vi.mock('@/server/dal/organizations', () => ({
   getOrgSubscription: mockGetOrgSubscription,
 }));
 
+// Plan 04-03 Task 3: generateNoteAction now imports from the DAL barrel
+// (findTemplateWithUserStyle, findTemplateById, findBuiltinTemplates,
+// findPatientById). We mock the barrel so the test doesn't transitively
+// load @/server/db (which calls process.exit on missing DATABASE_URL).
+//
+// The subscription-access paths under test short-circuit BEFORE reaching
+// these DAL calls, so we only need stubs to satisfy the import graph.
+// NOTE: factory runs at module init — use vi.hoisted() for the template.
+const soapTemplate = vi.hoisted(() => ({
+  id: '00000000-0000-0000-0000-000000000001',
+  userId: null as string | null,
+  organizationId: null as string | null,
+  name: 'SOAP Note',
+  isBuiltin: true,
+  archivedAt: null as Date | null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+  sections: [] as unknown[],
+}));
+vi.mock('@/server/dal', () => ({
+  findTemplateById: vi.fn().mockResolvedValue(soapTemplate),
+  findTemplateWithUserStyle: vi.fn().mockResolvedValue(soapTemplate),
+  findBuiltinTemplates: vi.fn().mockResolvedValue([soapTemplate]),
+  findPatientById: vi.fn().mockResolvedValue(null),
+  createClinicalNote: vi.fn(),
+  findClinicalNoteById: vi.fn(),
+  updateClinicalNoteContent: vi.fn(),
+  archiveClinicalNote: vi.fn(),
+  createInitialVersions: vi.fn(),
+  createVersionForSection: vi.fn(),
+}));
+
+// getPoolClient is used by the new save/update actions only; stub it so the
+// import graph resolves without loading @/server/db.
+vi.mock('@/server/db', () => ({
+  getPoolClient: vi.fn(),
+  db: { query: vi.fn() },
+}));
+
 // Mock LLM (external I/O)
 vi.mock('@/server/services/note-generation', () => ({
   generateNote: mockGenerateNote,
@@ -64,12 +103,16 @@ vi.mock('@/server/dal/usage', () => ({
 vi.mock('@/server/services/audit', () => ({
   auditService: {
     log: mockAuditLog,
+    logWithClient: vi.fn(),
   },
 }));
 
 vi.mock('@/server/types', () => ({
   AuditAction: {
     NOTE_GENERATED: 'NOTE_GENERATED',
+    NOTE_SAVED: 'NOTE_SAVED',
+    NOTE_UPDATED: 'NOTE_UPDATED',
+    NOTE_ARCHIVED: 'NOTE_ARCHIVED',
     ACCESS_DENIED: 'ACCESS_DENIED',
   },
 }));
@@ -109,10 +152,13 @@ function makeFormData(overrides: Record<string, string> = {}): FormData {
 
 function createGenerateResult() {
   return {
-    subjective: 'Patient reports pain 4/10.',
-    objective: 'ROM: Flexion 60°.',
-    assessment: 'Progressing well.',
-    plan: 'Continue PT 2x/week.',
+    content: [
+      { sectionId: '00000000-0000-0000-0000-000000000011', title: 'Subjective', content: 'Patient reports pain 4/10.' },
+      { sectionId: '00000000-0000-0000-0000-000000000012', title: 'Objective', content: 'ROM: Flexion 60°.' },
+      { sectionId: '00000000-0000-0000-0000-000000000013', title: 'Assessment', content: 'Progressing well.' },
+      { sectionId: '00000000-0000-0000-0000-000000000014', title: 'Plan', content: 'Continue PT 2x/week.' },
+    ],
+    hallucinationIssues: [],
     metadata: {
       model: 'gemini-2.5-flash',
       inputTokens: 100,

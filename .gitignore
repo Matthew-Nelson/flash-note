@@ -42,6 +42,7 @@ coverage/
 playwright-report/
 test-results/
 .auth/
+.playwright-mcp/
 
 # TypeScript
 *.tsbuildinfo
