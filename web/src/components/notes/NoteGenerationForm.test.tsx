@@ -423,12 +423,66 @@ describe('NoteGenerationForm', () => {
     expect(dateInput).toHaveAttribute('readonly');
   });
 
-  it('renders patient selector stub as disabled', () => {
+  it('renders patient selector as readonly when no patient selected (Plan 04-03)', () => {
     render(<NoteGenerationForm />);
 
     const patientInput = screen.getByRole('textbox', { name: /Patient/i });
-    expect(patientInput).toBeDisabled();
-    expect(patientInput).toHaveAttribute('placeholder', 'Patient selection coming soon');
+    expect(patientInput).toHaveAttribute('readonly');
+    expect(patientInput).toHaveAttribute(
+      'placeholder',
+      'No patient selected — generation will not be linked to a patient record.',
+    );
+  });
+
+  it('displays preselected patient name when selectedPatient prop provided (Plan 04-03)', () => {
+    render(
+      <NoteGenerationForm
+        selectedPatient={{
+          id: '11111111-1111-1111-1111-111111111111',
+          userId: 'user-1',
+          organizationId: null,
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: null,
+          pronoun: null,
+          phone: null,
+          email: null,
+          context: null,
+          archivedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }}
+      />,
+    );
+
+    const patientInput = screen.getByRole('textbox', { name: /Patient/i });
+    expect(patientInput).toHaveValue('Jane Doe');
+  });
+
+  it('submits patientId when initialPatientId prop provided (Plan 04-03)', async () => {
+    const { generateNoteAction: mock } = await import('@/actions/notes');
+    const mockFn = vi.mocked(mock);
+    mockFn.mockResolvedValue({
+      success: true,
+      data: {
+        subjective: 'S',
+        objective: 'O',
+        assessment: 'A',
+        plan: 'P',
+        metadata: { generationTimeMs: 100 },
+      },
+    });
+    const user = userEvent.setup();
+    const PATIENT_ID = '11111111-1111-1111-1111-111111111111';
+
+    render(<NoteGenerationForm initialPatientId={PATIENT_ID} />);
+    const textarea = screen.getByLabelText(/Session Notes/i);
+    await user.type(textarea, 'pt reports pain 5/10, ROM improving, strength gaining');
+    const submit = screen.getByRole('button', { name: /Generate/i });
+    await user.click(submit);
+
+    const submitted = mockFn.mock.calls[0][0];
+    expect(submitted.get('patientId')).toBe(PATIENT_ID);
   });
 
   it('renders context panel stub with "Select a patient to see context"', () => {

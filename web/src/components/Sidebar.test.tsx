@@ -72,6 +72,29 @@ describe('Sidebar', () => {
     expect(matchesSoon).toHaveLength(0);
   });
 
+  it('Notes nav item no longer shows "Soon" badge (Plan 04-03)', () => {
+    renderSidebar();
+    const links = screen.getAllByRole('link', { name: /notes/i });
+    // Filter to the Notes NAV link (href=/dashboard/notes), excluding "New Note" CTA.
+    const notesNav = links.filter((l) => l.getAttribute('href') === '/dashboard/notes');
+    expect(notesNav.length).toBeGreaterThan(0);
+    for (const l of notesNav) {
+      expect(/soon/i.test(l.textContent ?? '')).toBe(false);
+    }
+  });
+
+  it('only Templates retains the "Soon" badge after Plan 04-03', () => {
+    renderSidebar();
+    const allLinks = screen.getAllByRole('link');
+    const soonLinks = allLinks.filter((l) => /soon/i.test(l.textContent ?? ''));
+    // Sidebar renders once for desktop + once for mobile drawer = 2 Templates links
+    // both retain the badge.
+    expect(soonLinks.length).toBeGreaterThan(0);
+    for (const link of soonLinks) {
+      expect(link.getAttribute('href')).toBe('/dashboard/templates');
+    }
+  });
+
   it('Patients nav item sets aria-current when on /dashboard/patients', () => {
     mockUsePathname.mockReturnValue('/dashboard/patients');
     renderSidebar();

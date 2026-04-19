@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useTransition } from 'react';
+import { useState, useEffect, useRef, useTransition } from 'react';
 import { generateNoteAction } from '@/actions/notes';
 import type { GenerateNoteResponse } from '@/actions/notes';
 import { GeneratedNote } from './GeneratedNote';
 import { Alert, Button } from '@/components/ui';
-import type { NoteType } from '@/lib/types';
+import type { NoteType, NoteTemplateWithSections, Patient } from '@/lib/types';
+import { usePhiCleanup } from '@/hooks/use-phi-cleanup';
+import { mapNoteError } from './error-messages';
 
 export const NOTE_ERROR_MESSAGES: Record<string, string> = {
   unauthenticated: 'Please sign in to generate notes.',
@@ -21,8 +23,6 @@ export const NOTE_ERROR_MESSAGES: Record<string, string> = {
   ai_error: 'Something went wrong generating your note. Please try again.',
   internal_error: 'Something went wrong. Please try again.',
 };
-
-const NOTE_ERROR_FALLBACK = 'Something went wrong. Please try again.';
 
 const NOTE_TYPE_LABELS: Record<NoteType, string> = {
   daily_note: 'Daily Note',
@@ -78,7 +78,21 @@ function StepIndicator({ activeStep }: { activeStep: 1 | 2 }) {
   );
 }
 
-export function NoteGenerationForm() {
+export interface NoteGenerationFormProps {
+  /** Builtin + user templates preloaded by the /notes/new server component. */
+  templates?: NoteTemplateWithSections[];
+  /** When /notes/new?patientId=... is visited, the server component preloads
+   * the patient and passes it here so the context panel renders immediately. */
+  selectedPatient?: Patient | null;
+  /** Preselected patientId — submitted as part of the generation FormData. */
+  initialPatientId?: string | null;
+}
+
+export function NoteGenerationForm({
+  templates: _templates,
+  selectedPatient,
+  initialPatientId = null,
+}: NoteGenerationFormProps = {}) {
   const [noteType, setNoteType] = useState<NoteType>('daily_note');
   const [modality, setModality] = useState<'in_person' | 'telehealth'>('in_person');
   const [duration, setDuration] = useState<string>('');
@@ -90,9 +104,22 @@ export function NoteGenerationForm() {
   const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [isPending, startTransition] = useTransition();
 
-  // Rule 4: Clear all PHI state when logout is initiated
+  // Rule 4: Clear all PHI state when logout is initiated OR when navigating
+  // away from /dashboard/notes/new via usePhiCleanup.
+  const cleanupRef = useRef(() => {
+    setQuickNotes('');
+    setPatientContext('');
+    setModality('in_person');
+    setDuration('');
+    setGeneratedNote(null);
+    setErrorCode(null);
+    setFieldErrors(null);
+    setActiveStep(1);
+  });
+
+  // Keep the cleanup callback current — closures over the LATEST setState refs.
   useEffect(() => {
-    function handleLogout() {
+    cleanupRef.current = () => {
       setQuickNotes('');
       setPatientContext('');
       setModality('in_person');
@@ -101,10 +128,10 @@ export function NoteGenerationForm() {
       setErrorCode(null);
       setFieldErrors(null);
       setActiveStep(1);
-    }
-    window.addEventListener('flashnote:logout', handleLogout);
-    return () => window.removeEventListener('flashnote:logout', handleLogout);
-  }, []);
+    };
+  });
+
+  usePhiCleanup(cleanupRef);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -120,6 +147,9 @@ export function NoteGenerationForm() {
       if (duration.trim()) formData.set('duration', duration);
       formData.set('quickNotes', quickNotes.trim());
       if (patientContext.trim()) formData.set('patientContext', patientContext);
+      // Plan 04-03: forward the pre-selected patientId from the /notes/new
+      // query param so saveNoteAction can persist the linkage.
+      if (initialPatientId) formData.set('patientId', initialPatientId);
       const result = await generateNoteAction(formData);
       if (result.success) {
         setGeneratedNote(result.data);
@@ -149,7 +179,9 @@ export function NoteGenerationForm() {
       <div aria-live="assertive">
         {errorCode && (
           <Alert variant="error" className="mb-5">
-            {NOTE_ERROR_MESSAGES[errorCode] ?? NOTE_ERROR_FALLBACK}
+            {/* Prefer curated message from local table; fall back to shared
+                mapNoteError() which covers the Plan 04-03 codes. */}
+            {NOTE_ERROR_MESSAGES[errorCode] ?? mapNoteError(errorCode)}
           </Alert>
         )}
       </div>
@@ -158,18 +190,31 @@ export function NoteGenerationForm() {
         {/* Form column */}
         <div className="flex-1 min-w-0">
           <form onSubmit={handleSubmit} noValidate>
-            {/* Patient selector stub */}
+            {/* Patient selector — displays preselected patient from
+                /notes/new?patientId=... query param (Plan 04-03). A full
+                typeahead replaces this stub in a later iteration. */}
             <div className="mb-5">
               <label htmlFor="patient" className="label block text-fn-sm mb-1.5">
                 Patient{' '}
-                <span className="text-fn-2xs text-fn-text-secondary ml-1">Coming soon</span>
+                <span className="text-fn-2xs text-fn-text-secondary ml-1">
+                  {selectedPatient ? 'Selected' : '(optional)'}
+                </span>
               </label>
               <input
                 id="patient"
                 type="text"
-                disabled
-                placeholder="Patient selection coming soon"
-                className="input-field w-full px-3 py-2.5 text-fn-base opacity-60 cursor-not-allowed"
+                readOnly
+                value={
+                  selectedPatient
+                    ? `${selectedPatient.firstName} ${selectedPatient.lastName}`
+                    : ''
+                }
+                placeholder={
+                  selectedPatient
+                    ? ''
+                    : 'No patient selected — generation will not be linked to a patient record.'
+                }
+                className="input-field w-full px-3 py-2.5 text-fn-base"
               />
             </div>
 

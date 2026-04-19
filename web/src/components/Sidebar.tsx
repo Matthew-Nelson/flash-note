@@ -135,7 +135,6 @@ function SidebarContent({
           href="/dashboard/notes"
           label="Notes"
           pathname={pathname}
-          comingSoon
           onNavigate={onNavigate}
         />
         <NavItem
