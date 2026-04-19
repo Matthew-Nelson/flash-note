@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: UI Polish** - Touch targets, cursor audit, skeletons, responsive, print, reduced-motion (completed 2026-03-17)
 - [x] **Phase 2: Structured Logging** - Pino logger, console migration, client telemetry, error boundary wiring, instrumentation, Sentry removal (completed 2026-03-19)
 - [x] **Phase 3: Pipeline & Provisioning** - Deploy pipeline hardening, deep health check, GCP infrastructure provisioning (completed 2026-03-19)
-- [ ] **Phase 4: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements
+- [x] **Phase 4: PHI Storage** - Patient records, note persistence, versioning, templates, context injection, HIPAA prerequisites, prompt improvements (completed 2026-04-18)
 - [ ] **Phase 5: Post-PHI Features** - PDF export, per-section copy, auto titles, time-saved tracking, note search
 - [ ] **Phase 6: Retention & Differentiation** - Macro library, Magic Edit, failed payment notifications
 - [ ] **Phase 7: Clinic Features** - Admin dashboard, member management, shared resources, seat-based billing, org lifecycle
@@ -91,9 +91,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [x] 04-01-foundation-PLAN.md — Migration, DAL, types, schemas, PHI cleanup hook (PHI-05, PHI-09, PHI-10 code, PROMPT-03 schema)
-- [x] 04-02-patients-PLAN.md — Patient CRUD + detail + context + typeahead (PHI-01, PHI-04, PHI-09)
-- [ ] 04-03-notes-versioning-PLAN.md — Template generation, note persistence, versioning, style prefs (PHI-02, PHI-03, PHI-04, PHI-05, PHI-06, PHI-07, PHI-09, PROMPT-01, PROMPT-02, PROMPT-03)
+- [x] 04-01-foundation-PLAN.md — Migration, DAL, types, schemas, PHI cleanup hook (PHI-05, PHI-09, PHI-10 code, PROMPT-03 schema) — completed 2026-04-18
+- [x] 04-02-patients-PLAN.md — Patient CRUD + detail + context + typeahead (PHI-01, PHI-04, PHI-09) — completed 2026-04-18
+- [x] 04-03-notes-versioning-PLAN.md — Template generation, note persistence, versioning, style prefs (PHI-02, PHI-03, PHI-04, PHI-05, PHI-06, PHI-07, PHI-09, PROMPT-01, PROMPT-02, PROMPT-03) — completed 2026-04-18
 
 ### Phase 5: Post-PHI Features
 **Goal**: Users have the tools to manage, export, and find their persisted notes efficiently
@@ -198,7 +198,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10
 | 1. UI Polish | 2/2 | Complete   | 2026-03-17 |
 | 2. Structured Logging | 5/5 | Complete | 2026-03-19 |
 | 3. Pipeline & Provisioning | 3/3 | Complete | 2026-03-19 |
-| 4. PHI Storage | 0/3 | Not started | - |
+| 4. PHI Storage | 3/3 | Complete | 2026-04-18 |
 | 5. Post-PHI Features | 0/2 | Not started | - |
 | 6. Retention & Differentiation | 0/2 | Not started | - |
 | 7. Clinic Features | 0/2 | Not started | - |
