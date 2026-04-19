@@ -277,6 +277,33 @@ describe('GeminiProvider', () => {
       expect(body.contents[0].parts[0].text).toBe('test user prompt');
     });
 
+    it('should include explicit safetySettings in request body (PROMPT-01)', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            candidates: [
+              {
+                content: { parts: [{ text: JSON.stringify(validPTNoteResponse) }] },
+                finishReason: 'STOP',
+              },
+            ],
+          }),
+      });
+
+      await provider.generatePTNote('test system prompt', 'test user prompt', requestConfig);
+
+      const [, options] = mockFetch.mock.calls[0];
+      const body = JSON.parse((options as { body: string }).body);
+      // Top-level sibling, not nested
+      expect(body.safetySettings).toBeDefined();
+      expect(body.generationConfig.safetySettings).toBeUndefined();
+      expect(body.safetySettings).toHaveLength(4);
+      expect((body.safetySettings as { threshold: string }[]).every((s) => s.threshold === 'BLOCK_ONLY_HIGH')).toBe(
+        true,
+      );
+    });
+
     it('should include response schema in request body', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

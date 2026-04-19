@@ -60,6 +60,29 @@ const ADCTokenResponseSchema = z.object({
   token_type: z.string().optional(),
 });
 
+/**
+ * PROMPT-01 — Explicit Gemini safety settings (Plan 04-03 Task 1).
+ *
+ * Every generateContent request sends this array so Gemini applies the clinician-
+ * appropriate threshold instead of its (unstable) defaults. BLOCK_ONLY_HIGH is
+ * chosen because BLOCK_MEDIUM_AND_ABOVE false-positives on routine clinical content
+ * (pain descriptions, anatomical references, treatment narratives).
+ *
+ * Rationale: see .planning/phases/04-phi-storage/04-RESEARCH.md §7.1.
+ *
+ * m-7 — If Vertex AI ever rejects the string literal 'BLOCK_ONLY_HIGH' with a 400
+ * Bad Request, switch this constant to the SDK enum form
+ * ({ category: HarmCategory.HARM_CATEGORY_*, threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH })
+ * from @google-cloud/vertexai — DO NOT drop the setting, DO NOT downgrade to
+ * 'OFF' or 'BLOCK_NONE'. The threshold must remain BLOCK_ONLY_HIGH (or enum equivalent).
+ */
+const GEMINI_SAFETY_SETTINGS = [
+  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+] as const;
+
 export interface GeminiProviderConfig {
   /** API key for direct Gemini API auth. Required unless useADC is true. */
   apiKey?: string;
@@ -172,6 +195,8 @@ export class GeminiProvider extends BaseLLMProvider {
             responseMimeType: 'application/json',
             responseSchema: this.geminiSchema,
           },
+          // PROMPT-01: explicit safety thresholds — top-level sibling per Vertex AI spec.
+          safetySettings: GEMINI_SAFETY_SETTINGS,
         }),
         signal: controller.signal,
       });
