@@ -12,6 +12,8 @@ const mockCheckSubscriptionAccess = vi.hoisted(() => vi.fn());
 const mockGenerateNote = vi.hoisted(() => vi.fn());
 const mockIncrementUsage = vi.hoisted(() => vi.fn());
 const mockAuditLog = vi.hoisted(() => vi.fn());
+const mockFindTemplateById = vi.hoisted(() => vi.fn());
+const mockFindBuiltinTemplates = vi.hoisted(() => vi.fn());
 const mockLogger = vi.hoisted(() => ({
   info: vi.fn(),
   warn: vi.fn(),
@@ -40,6 +42,11 @@ vi.mock('@/server/services/subscription', () => ({
 
 vi.mock('@/server/services/note-generation', () => ({
   generateNote: mockGenerateNote,
+}));
+
+vi.mock('@/server/dal', () => ({
+  findTemplateById: mockFindTemplateById,
+  findBuiltinTemplates: mockFindBuiltinTemplates,
 }));
 
 vi.mock('@/server/dal/usage', () => ({
@@ -97,14 +104,42 @@ function createSession(overrides: Partial<SessionData> = {}): SessionData {
   };
 }
 
+const SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
+const SUB_ID = '00000000-0000-0000-0000-000000000011';
+const OBJ_ID = '00000000-0000-0000-0000-000000000012';
+const ASS_ID = '00000000-0000-0000-0000-000000000013';
+const PLA_ID = '00000000-0000-0000-0000-000000000014';
+
+const now = new Date('2026-04-18T00:00:00Z');
+
+const soapTemplate = {
+  id: SOAP_TEMPLATE_ID,
+  userId: null,
+  organizationId: null,
+  name: 'SOAP Note',
+  isBuiltin: true,
+  archivedAt: null,
+  createdAt: now,
+  updatedAt: now,
+  sections: [
+    { id: SUB_ID, templateId: SOAP_TEMPLATE_ID, title: 'Subjective', sortOrder: 1, verbosity: 'concise' as const, styling: 'paragraph' as const, promptInstructions: '…', includeInCopyAll: true, createdAt: now, updatedAt: now },
+    { id: OBJ_ID, templateId: SOAP_TEMPLATE_ID, title: 'Objective', sortOrder: 2, verbosity: 'detailed' as const, styling: 'paragraph' as const, promptInstructions: '…', includeInCopyAll: true, createdAt: now, updatedAt: now },
+    { id: ASS_ID, templateId: SOAP_TEMPLATE_ID, title: 'Assessment', sortOrder: 3, verbosity: 'concise' as const, styling: 'paragraph' as const, promptInstructions: '…', includeInCopyAll: true, createdAt: now, updatedAt: now },
+    { id: PLA_ID, templateId: SOAP_TEMPLATE_ID, title: 'Plan', sortOrder: 4, verbosity: 'concise' as const, styling: 'bullets' as const, promptInstructions: '…', includeInCopyAll: true, createdAt: now, updatedAt: now },
+  ],
+};
+
 function createGenerateResult(overrides: Partial<GeneratedNoteResult> = {}): GeneratedNoteResult {
   return {
-    subjective: 'Patient reports pain 4/10.',
-    objective: 'ROM: Flexion 60°.',
-    assessment: 'Progressing well.',
-    plan: 'Continue PT 2x/week.',
+    content: [
+      { sectionId: SUB_ID, title: 'Subjective', content: 'Patient reports pain 4/10.' },
+      { sectionId: OBJ_ID, title: 'Objective', content: 'ROM: Flexion 60°.' },
+      { sectionId: ASS_ID, title: 'Assessment', content: 'Progressing well.' },
+      { sectionId: PLA_ID, title: 'Plan', content: 'Continue PT 2x/week.' },
+    ],
     billing: { suggestedCodes: [{ cptCode: '97110', description: 'Therapeutic Exercise' }] },
     alerts: ['Check billing codes.'],
+    hallucinationIssues: [],
     metadata: {
       model: 'gemini-2.5-flash',
       inputTokens: 100,
@@ -130,6 +165,8 @@ describe('generateNoteAction', () => {
     mockGenerateNote.mockResolvedValue(createGenerateResult());
     mockIncrementUsage.mockResolvedValue(undefined);
     mockAuditLog.mockResolvedValue(undefined);
+    mockFindTemplateById.mockResolvedValue(soapTemplate);
+    mockFindBuiltinTemplates.mockResolvedValue([soapTemplate]);
   });
 
   // --- Validation ---
@@ -186,9 +223,12 @@ describe('generateNoteAction', () => {
     }));
     expect(result.success).toBe(true);
     expect(mockGenerateNote).toHaveBeenCalledWith(
-      'valid text with more than ten characters',
-      'daily_note',
-      '65 y/o female'  // Should be trimmed
+      expect.objectContaining({
+        quickNotes: 'valid text with more than ten characters',
+        noteType: 'daily_note',
+        patientContext: '65 y/o female',  // Should be trimmed
+        template: expect.objectContaining({ id: SOAP_TEMPLATE_ID }),
+      }),
     );
   });
 
@@ -199,9 +239,12 @@ describe('generateNoteAction', () => {
     expect(result.success).toBe(true);
     // Verify the trimmed value was passed to generateNote
     expect(mockGenerateNote).toHaveBeenCalledWith(
-      'pt reports improvement in strength and balance',  // Trimmed
-      'daily_note',
-      undefined
+      expect.objectContaining({
+        quickNotes: 'pt reports improvement in strength and balance',  // Trimmed
+        noteType: 'daily_note',
+        patientContext: null,
+        template: expect.objectContaining({ id: SOAP_TEMPLATE_ID }),
+      }),
     );
   });
 
@@ -332,9 +375,10 @@ describe('generateNoteAction', () => {
     await generateNoteAction(makeFormData({ patientContext: '65 y/o female' }));
 
     expect(mockGenerateNote).toHaveBeenCalledWith(
-      expect.any(String),
-      'daily_note',
-      '65 y/o female'
+      expect.objectContaining({
+        noteType: 'daily_note',
+        patientContext: '65 y/o female',
+      }),
     );
   });
 

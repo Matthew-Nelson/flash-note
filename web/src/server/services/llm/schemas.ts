@@ -241,12 +241,55 @@ export type ClinicalSetting =
  * @returns JSON Schema object suitable for:
  *   - Gemini: generationConfig.responseJsonSchema
  *   - Claude: tools[].input_schema
+ *
+ * @deprecated Use `buildPTNoteOutputSchema(sectionIds)` from the assemble module
+ *   to support template-driven dynamic section IDs (Plan 04-03). This function
+ *   remains for the legacy fixed-SOAP schema used by existing tests and by the
+ *   LLM provider constructor during transitional calls. The template-driven
+ *   path (generateNote) passes an explicit schema at request time.
  */
 export function getPTNoteJsonSchema(): Record<string, unknown> {
   return zodToJsonSchema(PTNoteOutputSchema, {
     // Don't add $schema and definitions wrapper
     // LLMs expect a simple schema object
     $refStrategy: 'none',
+  });
+}
+
+/**
+ * Build a Zod schema for template-driven LLM responses keyed by dynamic
+ * section UUIDs (Plan 04-03 / PROMPT-03).
+ *
+ * The returned schema validates a response shape:
+ *   {
+ *     sections: { "<sectionId1>": "content…", "<sectionId2>": "content…", … },
+ *     billing?: {...}, goals?: {...}, alerts?: [...], uncertainAreas?: [...],
+ *   }
+ *
+ * This replaces the hardcoded subjective/objective/assessment/plan keys used by
+ * PTNoteOutputSchema. Callers pass the section IDs from the currently loaded
+ * template; every ID must be present in the response.
+ */
+export function buildPTNoteOutputSchema(sectionIds: string[]): z.ZodType<{
+  sections: Record<string, string>;
+  billing?: BillingSummary;
+  goals?: GoalsTracking;
+  alerts?: string[];
+  uncertainAreas?: string[];
+}> {
+  const sectionsShape = z
+    .record(z.string(), z.string())
+    .refine(
+      (value) => sectionIds.every((id) => typeof value[id] === 'string'),
+      'sections missing one or more required section IDs',
+    );
+
+  return z.object({
+    sections: sectionsShape,
+    billing: BillingSummarySchema.optional(),
+    goals: GoalsTrackingSchema.optional(),
+    alerts: z.array(z.string()).optional(),
+    uncertainAreas: z.array(z.string()).optional(),
   });
 }
 

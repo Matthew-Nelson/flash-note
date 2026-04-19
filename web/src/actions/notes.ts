@@ -10,6 +10,7 @@ import {
   TimeoutError,
   NetworkError,
 } from '@/server/services/llm';
+import { findBuiltinTemplates, findTemplateById } from '@/server/dal';
 import { getSession } from '@/server/lib/get-session';
 import { logger } from '@/server/lib/logger';
 import { getRequestContext } from '@/server/lib/request-context';
@@ -41,6 +42,14 @@ export interface GenerateNoteResponse {
   };
 }
 
+/**
+ * Default SOAP template UUID (seeded in migration 002). Used when an older
+ * caller doesn't explicitly pass `templateId`. Plan 04-03 Task 4a's rewrite of
+ * NoteGenerationForm will always pass an explicit templateId; this fallback
+ * maintains backward compatibility with the transitional UI.
+ */
+const DEFAULT_SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
+
 export async function generateNoteAction(
   formData: FormData
 ): Promise<ActionResult<GenerateNoteResponse>> {
@@ -51,7 +60,7 @@ export async function generateNoteAction(
     return { success: false, error: 'validation_error', fieldErrors: sanitizeFieldErrors(parsed.error.flatten().fieldErrors) };
   }
 
-  const { noteType, quickNotes, patientContext, modality, duration } = parsed.data;
+  const { noteType, quickNotes, patientContext, modality, duration, templateId } = parsed.data;
 
   // 2. Auth check
   const session = await getSession();
@@ -91,16 +100,42 @@ export async function generateNoteAction(
     return { success: false, error: 'rate_limit_exceeded' };
   }
 
-  // 6. Generate note
+  // 6. Load template (Plan 04-03: template-driven generation).
+  //    Fallback to built-in SOAP template when no templateId provided.
+  const effectiveTemplateId = templateId ?? DEFAULT_SOAP_TEMPLATE_ID;
+  const template = await findTemplateById(effectiveTemplateId);
+  if (!template) {
+    // Try built-in list as a last resort so a missing seed row is recoverable
+    const builtins = await findBuiltinTemplates();
+    const soap = builtins.find((t) => t.id === DEFAULT_SOAP_TEMPLATE_ID);
+    if (!soap) {
+      logger.error(
+        { source: 'action_generate_note', errorType: 'template_unavailable', userId: session.userId },
+        'Default SOAP template missing',
+      );
+      return { success: false, error: 'template_unavailable' };
+    }
+  }
+  const loadedTemplate = template ?? (await findBuiltinTemplates()).find((t) => t.id === DEFAULT_SOAP_TEMPLATE_ID);
+  if (!loadedTemplate) {
+    return { success: false, error: 'template_unavailable' };
+  }
+
+  // 7. Generate note
   logger.info(
     { source: 'action_generate_note', userId: session.userId, noteType },
     'Note generation started'
   );
 
   try {
-    const result = await generateNote(quickNotes, noteType, patientContext);
+    const result = await generateNote({
+      quickNotes,
+      noteType,
+      template: loadedTemplate,
+      patientContext: patientContext ?? null,
+    });
 
-    // 7. Usage tracking (errors swallowed internally)
+    // 8. Usage tracking (errors swallowed internally)
     await incrementUsage(
       session.userId,
       result.metadata.inputTokens,
@@ -112,12 +147,12 @@ export async function generateNoteAction(
       'Note generation completed'
     );
 
-    // 8. Security monitoring — log suspicious patterns synchronously before audit
+    // 9. Security monitoring — log suspicious patterns synchronously before audit
     if (result.securityMetadata.suspiciousPatternDetected) {
       logger.warn({ source: 'action_generate_note', errorType: 'suspicious_patterns', audit: true, userId: session.userId, noteType, suspiciousPatternCount: result.securityMetadata.suspiciousPatternCount }, 'Suspicious prompt patterns detected');
     }
 
-    // 9. Audit log (errors swallowed internally by auditService.log)
+    // 10. Audit log (errors swallowed internally by auditService.log)
     await auditService.log({
       userId: session.userId,
       action: AuditAction.NOTE_GENERATED,
@@ -130,19 +165,24 @@ export async function generateNoteAction(
         outputTokens: result.metadata.outputTokens,
         generationTimeMs: result.metadata.generationTimeMs,
         suspiciousPatternDetected: result.securityMetadata.suspiciousPatternDetected,
+        sectionCount: result.content.length,
+        hallucinationCount: result.hallucinationIssues.length,
       },
       ipAddress: context.ipAddress,
       userAgent: context.userAgent,
     });
 
-    // 9. Return sanitized result — strip model, token counts, securityMetadata
+    // 11. Map NoteSection[] back to flat S/O/A/P keys for the transitional UI
+    //     (Task 4a rewrites the UI to consume result.content directly).
+    const byTitle = new Map(result.content.map((s) => [s.title.toLowerCase(), s.content]));
+
     return {
       success: true,
       data: {
-        subjective: result.subjective,
-        objective: result.objective,
-        assessment: result.assessment,
-        plan: result.plan,
+        subjective: byTitle.get('subjective') ?? '',
+        objective: byTitle.get('objective') ?? '',
+        assessment: byTitle.get('assessment') ?? '',
+        plan: byTitle.get('plan') ?? '',
         billing: result.billing,
         goals: result.goals,
         alerts: result.alerts,

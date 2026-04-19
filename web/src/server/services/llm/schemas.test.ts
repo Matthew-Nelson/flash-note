@@ -8,6 +8,7 @@ import {
   getPTNoteJsonSchema,
   validatePTNoteOutput,
   safeParsePTNoteOutput,
+  buildPTNoteOutputSchema,
 } from './schemas';
 
 describe('LLM Schemas', () => {
@@ -447,6 +448,65 @@ describe('LLM Schemas', () => {
 
       const result = safeParsePTNoteOutput(input);
       expect(result).toBeNull();
+    });
+  });
+
+  describe('buildPTNoteOutputSchema (template-driven)', () => {
+    const SUB = '00000000-0000-0000-0000-000000000011';
+    const OBJ = '00000000-0000-0000-0000-000000000012';
+    const ASS = '00000000-0000-0000-0000-000000000013';
+    const PLA = '00000000-0000-0000-0000-000000000014';
+
+    it('validates a response with all required section IDs present', () => {
+      const schema = buildPTNoteOutputSchema([SUB, OBJ, ASS, PLA]);
+      const result = schema.parse({
+        sections: {
+          [SUB]: 'Patient reports 4/10 pain.',
+          [OBJ]: 'ROM flex 110°.',
+          [ASS]: 'Progressing.',
+          [PLA]: 'Continue PT 2x/week.',
+        },
+      });
+      expect(result.sections[SUB]).toContain('4/10');
+    });
+
+    it('rejects a response missing a required section ID', () => {
+      const schema = buildPTNoteOutputSchema([SUB, OBJ, ASS, PLA]);
+      expect(() =>
+        schema.parse({
+          sections: {
+            [SUB]: 'Subjective content',
+            [OBJ]: 'Objective content',
+            [ASS]: 'Assessment content',
+            // PLAN missing
+          },
+        }),
+      ).toThrow();
+    });
+
+    it('accepts optional top-level billing / goals / alerts / uncertainAreas fields', () => {
+      const schema = buildPTNoteOutputSchema([SUB]);
+      const result = schema.parse({
+        sections: { [SUB]: 'some content' },
+        billing: { suggestedCodes: [{ cptCode: '97110', description: 'Therapeutic Exercise' }] },
+        alerts: ['Review documentation.'],
+        uncertainAreas: ['ther ex interpretation'],
+      });
+      expect(result.billing?.suggestedCodes?.[0].cptCode).toBe('97110');
+      expect(result.alerts).toHaveLength(1);
+      expect(result.uncertainAreas).toHaveLength(1);
+    });
+
+    it('accepts single-section templates (dynamic shape)', () => {
+      const ONLY = '11111111-1111-1111-1111-111111111111';
+      const schema = buildPTNoteOutputSchema([ONLY]);
+      const result = schema.parse({ sections: { [ONLY]: 'single section content' } });
+      expect(result.sections[ONLY]).toBe('single section content');
+    });
+
+    it('rejects a response without the sections object entirely', () => {
+      const schema = buildPTNoteOutputSchema([SUB]);
+      expect(() => schema.parse({})).toThrow();
     });
   });
 });

@@ -1,15 +1,18 @@
 import 'server-only';
 
 import { config, isProduction } from '@/server/db/config';
-import { getSystemPrompt, buildUserPrompt } from '@/server/prompts/pt-prompts';
+import { getSystemPrompt } from '@/server/prompts/system';
+import { assembleUserPrompt } from '@/server/prompts/assemble';
 import { detectSuspiciousPatterns } from '@/server/lib/prompt-sanitization';
+import { detectHallucinations } from './note-generation/hallucination-detector';
+import type { HallucinationIssue } from './note-generation/hallucination-detector';
 import {
   getConfiguredProvider,
   type LLMRequestConfig,
   type BillingSummary,
   type GoalsTracking,
 } from '@/server/services/llm';
-import type { NoteType } from '@/lib/types';
+import type { NoteSection, NoteTemplateWithSections, NoteType } from '@/lib/types';
 
 /**
  * Security metadata for audit purposes (MEDIUM-005).
@@ -21,18 +24,21 @@ export interface PromptSecurityMetadata {
 }
 
 /**
- * Full internal result from note generation.
+ * Result from template-driven note generation (Plan 04-03).
+ *
  * The Server Action strips sensitive fields before returning to the client.
+ *
+ * `content` is an ordered array of `NoteSection` — one entry per loaded
+ * template section. Titles are snapshots so downstream consumers (note
+ * detail page, copy buttons) are stable if a template rename happens later.
  */
 export interface GeneratedNoteResult {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
+  content: NoteSection[];
   billing?: BillingSummary;
   goals?: GoalsTracking;
   alerts?: string[];
   uncertainAreas?: string[];
+  hallucinationIssues: HallucinationIssue[];
   metadata: {
     model: string;
     inputTokens: number;
@@ -71,27 +77,83 @@ function getRequestConfig(): LLMRequestConfig {
 }
 
 /**
+ * Map the LLM's response (currently legacy SOAP keys subjective/objective/
+ * assessment/plan — see "Response schema fallback" note below) back to an
+ * ordered `NoteSection[]` aligned with the template's section order.
+ *
+ * Matching is case-insensitive on `section.title`. Unknown titles (future
+ * non-SOAP templates) fall through to an empty-string placeholder so the
+ * per-section mapping is always complete — the hallucination detector and
+ * UI can still render the section even if the LLM didn't populate it.
+ *
+ * Response schema fallback: Vertex AI's `responseSchema` doesn't handle
+ * dynamic UUID-keyed object properties reliably across model revisions, so
+ * the provider still requests the stable SOAP-keyed schema and this function
+ * bridges that to the template's section IDs. Documented in Plan 04-03 SUMMARY.
+ */
+function mapResponseToSections(
+  template: NoteTemplateWithSections,
+  response: {
+    subjective: string;
+    objective: string;
+    assessment: string;
+    plan: string;
+  },
+): NoteSection[] {
+  const byTitle = new Map<string, string>();
+  byTitle.set('subjective', response.subjective);
+  byTitle.set('objective', response.objective);
+  byTitle.set('assessment', response.assessment);
+  byTitle.set('plan', response.plan);
+
+  return template.sections
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((section) => ({
+      sectionId: section.id,
+      title: section.title,
+      content: byTitle.get(section.title.toLowerCase()) ?? '',
+    }));
+}
+
+/**
  * Generate a mock SOAP note for development/testing.
  * Returns a realistic fixture response without calling any LLM API.
  */
-function generateMockNote(_noteType: NoteType, quickNotesLength: number): GeneratedNoteResult {
-  const mockSections = {
-    subjective: 'Patient reports pain level of 4/10 at rest, increasing to 6/10 with prolonged standing. States compliance with home exercise program at 80%.',
-    objective: 'Lumbar AROM: Flexion 60°, Extension 15°. Hip strength: R hip abductors 4/5. Gait: Decreased lateral trunk sway. Manual therapy to lumbar spine 15 min, therapeutic exercises 20 min.',
-    assessment: 'Patient demonstrates continued progress toward functional goals. Improved lumbar ROM and hip strength correlate with reported functional improvements.',
-    plan: 'Continue PT 2x/week for 3 weeks. Progress hip strengthening. Update HEP.',
+function generateMockNote(
+  template: NoteTemplateWithSections,
+  quickNotesLength: number,
+): GeneratedNoteResult {
+  const mockSections: Record<string, string> = {
+    Subjective:
+      'Patient reports pain level of 4/10 at rest, increasing to 6/10 with prolonged standing. States compliance with home exercise program at 80%.',
+    Objective:
+      'Lumbar AROM: Flexion 60°, Extension 15°. Hip strength: R hip abductors 4/5. Gait: Decreased lateral trunk sway. Manual therapy to lumbar spine 15 min, therapeutic exercises 20 min.',
+    Assessment:
+      'Patient demonstrates continued progress toward functional goals. Improved lumbar ROM and hip strength correlate with reported functional improvements.',
+    Plan: 'Continue PT 2x/week for 3 weeks. Progress hip strengthening. Update HEP.',
   };
 
-  const outputChars = Object.values(mockSections).join('').length;
+  const content: NoteSection[] = template.sections
+    .slice()
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+    .map((section) => ({
+      sectionId: section.id,
+      title: section.title,
+      content: mockSections[section.title] ?? '',
+    }));
+
+  const outputChars = content.reduce((acc, s) => acc + s.content.length, 0);
 
   return {
-    ...mockSections,
+    content,
     billing: {
       suggestedCodes: [
         { cptCode: '97140', description: 'Manual Therapy' },
         { cptCode: '97110', description: 'Therapeutic Exercise' },
       ],
     },
+    hallucinationIssues: [],
     metadata: {
       model: `mock-${config.LLM_PROVIDER}`,
       inputTokens: Math.ceil(quickNotesLength / 4),
@@ -103,25 +165,33 @@ function generateMockNote(_noteType: NoteType, quickNotesLength: number): Genera
   };
 }
 
+export interface GenerateNoteInput {
+  quickNotes: string;
+  noteType: NoteType;
+  /** Loaded template with user style overrides already applied. */
+  template: NoteTemplateWithSections;
+  /** Patient persistent context (server-loaded snapshot) or null. */
+  patientContext: string | null;
+}
+
 /**
- * Generate a PT SOAP note from clinician input.
+ * Generate a clinical note (template-driven — Plan 04-03).
  *
- * Orchestrates prompt building, security detection, and LLM call.
- * Does NOT handle auth, rate limiting, usage tracking, or audit — those
- * are the Server Action's responsibility.
+ * Orchestrates prompt assembly (system + user), security detection, the LLM
+ * call, and post-generation hallucination detection. Does NOT handle auth,
+ * rate limiting, usage tracking, persistence, or audit — those are the
+ * Server Action's responsibility.
  *
  * @throws {LLMError} on LLM failures (rate limit, content blocked, timeout, etc.)
  */
 export async function generateNote(
-  quickNotes: string,
-  noteType: NoteType,
-  patientContext?: string
+  input: GenerateNoteInput,
 ): Promise<GeneratedNoteResult> {
   // SECURITY (MEDIUM-005): Detect suspicious patterns for monitoring
   // This is detection-only; we do NOT block requests based on this
-  const quickNotesDetection = detectSuspiciousPatterns(quickNotes);
-  const contextDetection = patientContext
-    ? detectSuspiciousPatterns(patientContext)
+  const quickNotesDetection = detectSuspiciousPatterns(input.quickNotes);
+  const contextDetection = input.patientContext
+    ? detectSuspiciousPatterns(input.patientContext)
     : { detected: false, count: 0 };
 
   const securityMetadata: PromptSecurityMetadata = {
@@ -131,13 +201,18 @@ export async function generateNote(
 
   // Mock AI for development/testing (production guard above prevents misuse)
   if (config.USE_MOCK_AI) {
-    return { ...generateMockNote(noteType, quickNotes.length), securityMetadata };
+    return { ...generateMockNote(input.template, input.quickNotes.length), securityMetadata };
   }
 
   const startTime = Date.now();
 
   const systemPrompt = getSystemPrompt();
-  const userPrompt = buildUserPrompt(quickNotes, noteType, patientContext);
+  const userPrompt = assembleUserPrompt({
+    noteType: input.noteType,
+    sections: input.template.sections,
+    quickNotes: input.quickNotes,
+    patientContext: input.patientContext,
+  });
 
   const provider = getConfiguredProvider({
     provider: config.LLM_PROVIDER,
@@ -153,15 +228,25 @@ export async function generateNote(
   const result = await provider.generatePTNote(systemPrompt, userPrompt, requestConfig);
   const generationTimeMs = Date.now() - startTime;
 
-  return {
+  const sections = mapResponseToSections(input.template, {
     subjective: result.note.subjective,
     objective: result.note.objective,
     assessment: result.note.assessment,
     plan: result.note.plan,
+  });
+
+  const hallucinationIssues = detectHallucinations(
+    input.quickNotes,
+    sections.map((s) => ({ title: s.title, content: s.content })),
+  );
+
+  return {
+    content: sections,
     billing: result.note.billing,
     goals: result.note.goals,
     alerts: result.note.alerts,
     uncertainAreas: result.note.uncertainAreas,
+    hallucinationIssues,
     metadata: {
       model: provider.model,
       inputTokens: result.usage.inputTokens,
