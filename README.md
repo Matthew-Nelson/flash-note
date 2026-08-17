@@ -1,6 +1,13 @@
 # FlashNote
 
-AI-powered SOAP note generation for Physical Therapists. HIPAA-compliant healthcare software deployed on Google Cloud Run.
+AI-powered SOAP note generation for Physical Therapists. Built to HIPAA
+technical-safeguard requirements and architected to run entirely on Google Cloud
+Run, so the whole stack sits under a single Business Associate Agreement.
+
+> **Not for clinical use.** This is a personal engineering project. It has not been
+> deployed, assessed for HIPAA compliance by a third party, or cleared for use with
+> real protected health information. All data in this repository — seeds, fixtures,
+> and tests — is synthetic. Do not use it to document real patient care.
 
 ## What It Is
 
@@ -77,4 +84,8 @@ See [CLAUDE.md](./CLAUDE.md) for the full engineering guide including:
 
 ## License
 
-Proprietary - All rights reserved
+MIT — see [LICENSE](./LICENSE).
+
+The MIT license permits reuse, but note the disclaimer at the top of this file:
+the software is provided as-is, with no warranty, and it is not fit for clinical
+use as written.
