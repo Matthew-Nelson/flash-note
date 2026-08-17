@@ -23,6 +23,7 @@ describe('LoginPage', () => {
       refresh: vi.fn(),
       prefetch: vi.fn(),
       forward: vi.fn(),
+      bfcacheId: '',
     });
   });
 
