@@ -5,21 +5,19 @@ import Link from 'next/link';
 import { getSession } from '@/server/lib/get-session';
 import { findClinicalNotesByScope } from '@/server/dal';
 import { logger } from '@/server/lib/logger';
+import { notesListParamsSchema } from '@/lib/schemas';
 import type { NoteType } from '@/lib/types';
 import { TopBar } from '@/components/TopBar';
 import { Button } from '@/components/ui';
 import { NoteRow, SearchNotes } from '@/components/notes';
 
 interface Props {
-  searchParams: Promise<{
-    patientId?: string;
-    noteType?: string;
-    q?: string;
-    page?: string;
-  }>;
+  // Next.js resolves a repeated param (?q=a&q=b) to string[], so this mirrors
+  // what the framework actually delivers rather than the happy path.
+  // notesListParamsSchema normalizes and validates it (Rule 3).
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-const NOTE_TYPES = new Set(['daily_note', 'initial_eval', 'progress_note', 'discharge']);
 const PAGE_SIZE = 50;
 
 /**
@@ -36,10 +34,9 @@ export default async function NotesPage({ searchParams }: Props) {
   const session = await getSession();
   if (!session) redirect('/login?reason=session_expired');
 
-  const sp = await searchParams;
-  const page = Math.max(Number.parseInt(sp.page ?? '1', 10) || 1, 1);
-  const q = sp.q?.trim() ?? '';
-  const noteType = sp.noteType && NOTE_TYPES.has(sp.noteType) ? sp.noteType : undefined;
+  const { q, page, noteType, patientId } = notesListParamsSchema.parse(
+    await searchParams
+  );
 
   return (
     <>
@@ -57,13 +54,13 @@ export default async function NotesPage({ searchParams }: Props) {
         <SearchNotes initialQuery={q} />
 
         <Suspense
-          key={`${sp.patientId ?? ''}::${noteType ?? ''}::${q}::${page}`}
+          key={`${patientId ?? ''}::${noteType ?? ''}::${q}::${page}`}
           fallback={<NotesTableSkeleton />}
         >
           <NotesTable
             userId={session.userId}
-            patientId={sp.patientId}
-            noteType={noteType as NoteType | undefined}
+            patientId={patientId}
+            noteType={noteType}
             q={q}
             page={page}
           />
@@ -83,19 +80,27 @@ interface NotesTableProps {
 
 export async function NotesTable({ userId, patientId, noteType, q, page }: NotesTableProps) {
   const offset = (page - 1) * PAGE_SIZE;
-  const filters = {
-    patientId,
-    noteType,
-    search: q || undefined,
-  };
 
   const { notes, total } = await findClinicalNotesByScope(
     { type: 'user', userId },
-    { ...filters, limit: PAGE_SIZE, offset },
+    { patientId, noteType, search: q || undefined, limit: PAGE_SIZE, offset },
   );
 
+  // The search term is deliberately NOT logged, and the filter object is never
+  // spread in here. `q` is free text the therapist typed to match against note
+  // content, so it is PHI by construction — a patient name, a diagnosis, a body
+  // part. Only its presence is observable. Same reasoning for patientId: a
+  // boolean is enough to debug the filter path.
   logger.info(
-    { source: 'page_notes_list', userId, ...filters, page, resultCount: notes.length },
+    {
+      source: 'page_notes_list',
+      userId,
+      page,
+      noteType,
+      hasSearch: q.length > 0,
+      filteredByPatient: patientId !== undefined,
+      resultCount: notes.length,
+    },
     'Notes list rendered',
   );
 
@@ -186,7 +191,10 @@ function NotesTableSkeleton() {
   const ghostRows = Array.from({ length: 5 });
 
   return (
-    <div className="rounded-fn-base border border-fn-border overflow-hidden">
+    <div
+      className="rounded-fn-base border border-fn-border overflow-hidden"
+      aria-busy="true"
+    >
       <div className="bg-fn-bg-secondary h-10" aria-hidden="true" />
       <ul className="divide-y divide-fn-border">
         {ghostRows.map((_, idx) => (
@@ -199,9 +207,6 @@ function NotesTableSkeleton() {
           </li>
         ))}
       </ul>
-      <p className="sr-only" aria-live="polite">
-        Loading notes.
-      </p>
     </div>
   );
 }

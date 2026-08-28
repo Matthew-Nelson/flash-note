@@ -294,10 +294,45 @@ describe('clinical-notes DAL', () => {
         unknown[],
       ];
       expect(countSql).toContain('cn.quick_notes ILIKE $');
-      expect(countSql).toContain('cn.content::text ILIKE $');
+      expect(countSql).toContain("section->>'content' ILIKE $");
       expect(listSql).toContain('cn.quick_notes ILIKE $');
+      expect(listSql).toContain("section->>'content' ILIKE $");
       expect(countParams).toContain('%knee%');
       expect(listParams).toContain('%knee%');
+    });
+
+    // Regression: `content::text ILIKE` searched the JSONB serialization, so
+    // the structural keys (sectionId/title/content) and the section titles
+    // (Subjective/Objective/Assessment/Plan) were inside the searched string —
+    // those terms matched every note in scope.
+    it('searches section prose, never the JSONB serialization', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: 'assessment' });
+
+      const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(countSql).not.toContain('cn.content::text');
+      expect(countSql).toContain('jsonb_array_elements');
+      expect(countSql).toContain("section->>'content'");
+      // Titles are excluded on purpose — matching them is what made the SOAP
+      // section names match every note.
+      expect(countSql).not.toContain("section->>'title'");
+    });
+
+    it('coerces a non-array content column to an empty array', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: 'knee' });
+
+      const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      // Without the guard, jsonb_array_elements() raises on a row whose
+      // content is an object and fails the whole search.
+      expect(countSql).toContain("jsonb_typeof(cn.content) = 'array'");
+      expect(countSql).toContain("'[]'::jsonb");
     });
 
     it('escapes LIKE metacharacters in the search term', async () => {

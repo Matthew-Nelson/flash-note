@@ -1,0 +1,284 @@
+<!doctype html>
+<!--
+  report-template.html - triple-review-code
+
+  Self-contained: no build step, no external assets, no network references.
+
+  IMPORTANT: HTML comments cannot nest. Never write the two-character sequence
+  that closes a comment inside this block; refer to repeat markers by name only
+  (e.g. "the REPEAT: leg marker"), or the block terminates early and everything
+  after it renders as visible text above the report.
+
+  ESCAPING: every value substituted below is model-authored (finding text,
+  verifier evidence, raw third-leg output). HTML-escape & < > in ALL of them
+  before substitution. Unescaped, a claim mentioning Foo<T> silently loses <T>,
+  and raw third-leg output containing a closing pre tag breaks out of the
+  appendix block.
+
+  Blocks marked "REPEAT: name" are rendered once per item.
+
+  FULL PLACEHOLDER LIST
+    feat(notes): full-text search on the notes list 118 https://github.com/Matthew-Nelson/flash-note/pull/118 Matthew-Nelson
+    main c517a4e (merge result reviewed: b9dac46) HEAD^1 HEAD
+    7 587 119
+    claude-opus &times;2 (reviewer legs) + gemini-3.1-pro-high (third leg); verifiers: sonnet for Medium+, haiku for Low      e.g. "claude-opus, claude-sonnet, gemini-3.1-pro-high"
+    gemini-3.1-pro-high  the third leg's model id, stated plainly
+    <strong>Merge result, no caveats.</strong> Fresh worktree at the current merge ref, clean tree, no head-only fallback, no reused checkout, no stale merge ref, no skipped leg, no fallback model. All three legs returned SUCCESS and all 10 candidates were verified &mdash; nothing went unverified over a cap.          every degraded mode, or the literal
+                         "Merge result, no caveats."
+    21 7
+    One High. <strong>The search term is logged verbatim at info level</strong> (page.tsx:97-100) and the logger's PHI redaction list does not cover the <code>search</code> key &mdash; in a codebase whose first rule is "NEVER log PHI", this is the one that blocks. It is new in this diff; the pre-diff page logged nothing. Two Mediums are close behind: a repeated <code>?q=</code> parameter crashes the route, and <code>content::text ILIKE</code> makes the six most natural clinical search terms match every note, so the headline feature returns noise for exactly the words a PT would type first.    the merge-blocking question
+    Four more survivors, none blocking: an unbounded/unvalidated <code>q</code> feeding an unindexable double scan (Rule 3), a skeleton live region that reproduces Rule 13's own WRONG example, a search input with three different accessible names, and a now-false comment in <code>loading.tsx</code>. The focus-stability work the PR describes holds up &mdash; no leg found a defect in the Suspense-key or debounce logic, which was the riskiest part of the change.     the quality question, kept separate
+    <div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>claude-A (Opus, general-purpose)</strong></p><p>10 raised &rarr; 6 survived</p><p class="ev">Broadest sweep and the only leg to reach the migration files and the orphaned patients schema. Also the least precise: all three of its unique findings were refuted.</p></div>
+<div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>claude-B (Opus, general-purpose)</strong></p><p>8 raised &rarr; 7 survived</p><p class="ev">Highest survival rate of the Claude legs, and the only leg to catch the stale loading.tsx comment. Bundled the q-array crash and the missing length bound into one finding; they were split back apart for verification.</p></div>
+<div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>gemini-3.1-pro-high (third leg)</strong></p><p>3 raised &rarr; 3 survived</p><p class="ev">Smallest output, perfect precision: raised only three findings and all three survived. Independently caught every finding the other two legs agreed on, and nothing else.</p></div> <div class="finding high"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:86-100</span> &middot; raised by claude-A, claude-B, gemini &middot; <span class="badge b-high">High</span></div><p class="claim">The therapist's raw note-content search term is written verbatim to the application log at <code>info</code> level on every render of the list. <code>filters</code> is built at lines 86-90 as <code>{ patientId, noteType, search: q || undefined }</code> and spread straight into <code>logger.info(...)</code> at lines 97-100.</p><p class="ev"><strong>Verifier:</strong> <code>PHI_REDACT_PATHS</code> (logger.ts:13-44) covers <code>quickNotes</code>, <code>content</code>, <code>patientContext</code>, <code>diagnosis</code> and friends, but has no <code>search</code> or <code>*.search</code> entry, so fast-redact leaves the key untouched. The same string is ILIKE'd against <code>cn.quick_notes</code> and <code>cn.content::text</code> — by construction it is a substring of exactly the content the redact list exists to protect. <code>git show HEAD^1</code> on this file has no logger call at all, and the sibling patients page still logs nothing, so the logging is new in this diff. The Suspense key includes <code>q</code>, so each debounce settle re-logs the current partial term — one query produces several log lines.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:41</span> &middot; raised by claude-A, claude-B, gemini (claimed High) &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>sp.q?.trim()</code> assumes a string, but a repeated query parameter resolves to <code>string[]</code>. <code>/dashboard/notes?q=a&amp;q=b</code> throws <code>TypeError: sp.q.trim is not a function</code> and drops the route into the error boundary.</p><p class="ev"><strong>Verifier:</strong> Confirmed against the installed Next.js 16.3.1 in the worktree: <code>SearchParams = { [key: string]: string | string[] | undefined }</code>, and <code>searchParamsToUrlQuery</code> explicitly pushes repeat occurrences into an array. Nothing normalizes it first — proxy.ts never touches this route's params and next.config.ts has no rewrites. The sibling params survive array input by accident: <code>page</code> goes through <code>parseInt</code> (which stringifies <code>['1','2']</code> to <code>'1,2'</code> → 1) and <code>noteType</code> through <code>Set.has</code> (returns false). <code>q</code> is the only one that dereferences a string-only method without a guard. Re-rated from the third leg's High to Medium: trivially reachable via a hand-typed or shared link, but single route, single request, no persisted state.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/server/dal/clinical-notes.ts:228</span> &middot; raised by claude-A, claude-B, gemini &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>cn.content::text ILIKE</code> searches the JSONB <em>serialization</em>, not the note prose — so the literal keys (<code>sectionId</code>, <code>title</code>, <code>content</code>) and the section titles are inside the searched text. A therapist searching <code>plan</code>, <code>assessment</code>, <code>objective</code>, <code>subjective</code>, <code>title</code> or <code>content</code> matches every note in scope.</p><p class="ev"><strong>Verifier:</strong> The verifier reproduced this against a real Postgres 17 instance: on a row with all four sections, <code>content::text</code> renders as <code>[{"title": "Subjective", "content": "...", "sectionId": "..."}, ...]</code> and all six terms evaluate true. This is not an edge case — the built-in SOAP template seeded at <code>002_phi_storage.sql:242-266</code> is the only template the app can currently produce (there is no create path in <code>note-templates.ts</code>), and its titles are literally Subjective/Objective/Assessment/Plan. So those are the section names of 100% of notes. The DAL docstring at lines 195-197 ("matches either the therapist's shorthand or the generated SOAP sections") overstates the precision actually delivered.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:41-42 · web/src/server/dal/clinical-notes.ts:223-249</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>q</code> reaches SQL with no length bound and no Zod schema, and the resulting leading-wildcard ILIKE over a detoasted JSONB cast runs in both the <code>COUNT(*)</code> query and the list query.</p><p class="ev"><strong>Verifier:</strong> No bound exists anywhere on the path, and the <code>&lt;Input&gt;</code> has no <code>maxLength</code>; because <code>q</code> is a GET param the 250ms debounce is bypassable outright by typing a URL. The migrations define only btree indexes on <code>(user_id/org_id, patient_id, created_at)</code> — no pg_trgm, no GIN — so the predicate cannot use an index. <code>filterClause</code> is interpolated verbatim into both queries, doubling the cost. <strong>Partially refuted:</strong> the cited precedent <code>patientSearchSchema</code> (<code>schemas/patients.ts:33</code>, <code>max(100)</code>) turns out to be orphaned — never imported, and the patients page does the same unvalidated thing. So this repeats a pre-existing gap rather than regressing from a working convention. It still stands on CLAUDE.md Rule 3 independently. Medium, not High: <code>scopeSql</code> restricts to the caller's own rows, so a careless input degrades only that user's request.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:202-204</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>&lt;p className="sr-only" aria-live="polite"&gt;Loading notes.&lt;/p&gt;</code> is inserted as part of a whole Suspense-fallback subtree with its text already inside it, so screen readers have no mutation to announce.</p><p class="ev"><strong>Verifier:</strong> The skeleton is used only as <code>fallback={&lt;NotesTableSkeleton /&gt;}</code> on a boundary keyed <code>${patientId}::${noteType}::${q}::${page}</code>, so every keystroke and pagination change remounts the region and its content together in one insertion. This is the exact WRONG example in CLAUDE.md Rule 13, confirmed verbatim at line 549 ("The live region container must exist in the DOM before content changes"). <code>PatientsTableSkeleton</code> at least pairs its region with <code>aria-busy="true"</code>; this one omits that too. The legs' "never announces" phrasing is a mild overstatement — behavior varies by AT and browser — but the substantive defect is real and is the anti-pattern this repo wrote a numbered rule about after a P0 audit finding.</p></div>
+<div class="finding low"><div class="loc"><span class="mono">web/src/components/notes/SearchNotes.tsx:80-89</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-low">Low</span></div><p class="claim">One control, three different names: the visible <code>&lt;label&gt;</code> says "Search notes", the placeholder says "Search your notes", and <code>aria-label</code> says "Search notes by content". The <code>aria-label</code> wins as the computed accessible name, making the visible label decorative for AT users.</p><p class="ev"><strong>Verifier:</strong> All three strings confirmed as written. <code>Input.tsx:17-21</code> does render a visible <code>&lt;label htmlFor&gt;</code> and passes <code>aria-label</code> through via <code>{...props}</code>, so the override is real. WCAG 2.5.3 "Label in Name" passes only incidentally, because the aria-label happens to prefix-contain the visible label — a future wording change breaks it silently. <code>SearchPatients.tsx:116-117</code> keeps its placeholder and aria-label identical, so this is an unexplained divergence from the very component this file's docstring says it mirrors.</p></div>
+<div class="finding low"><div class="loc"><span class="mono">web/src/app/dashboard/notes/loading.tsx:4-5</span> &middot; raised by claude-B &middot; <span class="badge b-low">Low</span></div><p class="claim">The comment "Shows while the server-rendered page awaits the DAL query" describes behavior this PR removed.</p><p class="ev"><strong>Verifier:</strong> The <code>findClinicalNotesByScope</code> call moved out of <code>NotesPage</code> and into <code>NotesTable</code> behind a component-level Suspense boundary. <code>NotesPage</code> now awaits only <code>getSession()</code> and <code>searchParams</code> and then returns JSX synchronously, so it no longer suspends on the DAL query — and route-level <code>loading.tsx</code> renders only when the route itself suspends, not when a child boundary does. During the DAL query it is now <code>NotesTableSkeleton</code> that shows, never this file.</p></div> <div class="finding refuted"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:113-156</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-dead">Medium claimed</span></div><p class="claim">No aria-live region announces the arrival of results or the "No matching notes" empty state, so screen-reader users get no feedback that the search did anything.</p><p class="ev"><strong>Why it fell:</strong> The gap is real but not this PR's. The patients page has it identically — its results and empty state carry no live region either, and that search+Suspense pattern shipped in commit b6d23f6, well before this PR. SearchNotes' own docstring states it deliberately mirrors SearchPatients. This is systemic codebase debt worth one ticket covering both pages, not a defect introduced here.</p></div>
+<div class="finding refuted"><div class="loc"><span class="mono">web/src/components/notes/SearchNotes.tsx:53-68</span> &middot; raised by claude-A &middot; <span class="badge b-dead">Medium claimed</span></div><p class="claim">Every keystroke pushes the note-content search term into the URL as <code>?q=</code>, so Cloud Run's platform request logging captures PHI outside the app's redaction pipeline.</p><p class="ev"><strong>Why it fell:</strong> Mechanically accurate, but <code>SearchPatients</code> ships the byte-for-byte identical mechanism to search patients <em>by name</em> — more directly PHI than note content — and predates this PR. The codebase's own security process has already dispositioned this class: <code>docs/compliance/CONSOLIDATED_AUDIT_2026_02.md</code> M-9 records "sensitive value in URL query param → server access logs" as Medium and closed it with a Referrer-Policy mitigation. Real architectural debt, and an infra-level concern spanning multiple components; not attributable to this diff.</p></div>
+<div class="finding refuted"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:11</span> &middot; raised by claude-A &middot; <span class="badge b-dead">Low claimed</span></div><p class="claim">Switching <code>NoteRow</code> from a direct path to the <code>@/components/notes</code> barrel drags 8 unused <code>'use client'</code> modules into the route's module graph.</p><p class="ev"><strong>Why it fell:</strong> The import change is real and the export counts check out (8 of 11 are client modules). The consequence does not: the barrel is pure side-effect-free re-exports, which is precisely what Turbopack's tree-shaking eliminates, and the codebase uses barrels this way throughout (ui, auth, dal, types, schemas) without evident bundle problems. No measurement, build warning, or regression was offered. Speculative.</p></div> None. Every candidate that cleared dedup was verified &mdash; 10 dispatched, 10 verdicts returned.
+    per leg card, inside the REPEAT: leg marker -
+      {{LEG_NAME}} {{LEG_RAISED}} {{LEG_SURVIVED}} {{LEG_SUMMARY}}
+    3 findings &mdash; the logged search term, the repeated-<code>q</code> crash, and the JSONB <code>::text</code> false positives. <strong>All 3 survived.</strong> Unanimity was a perfect predictor here. 4 findings &mdash; unbounded <code>q</code>, the skeleton live region, the three-names input, and the missing results announcement. 3 of 4 survived; the results announcement fell as pre-existing. 5 findings, all from a Claude leg. Only 1 survived (claude-B's stale <code>loading.tsx</code> comment). claude-A's 3 uniques were all refuted, and 2 more (skeleton duplication, test import placement) were dropped as taste before verification. <strong>gemini-3.1-pro-high</strong> on precision &mdash; 3 raised, 3 survived, and it independently found every finding the other two legs agreed on while adding no noise. <strong>claude-B</strong> on value &mdash; 7 of 8 survived including the only surviving unique finding. claude-A raised the most and contributed the most refuted material; its real contribution was depth of evidence (it was the leg that traced the orphaned <code>patientSearchSchema</code>), which sharpened another leg's finding rather than standing on its own.
+    ```json
+{
+  &quot;findings&quot;: [
+    {
+      &quot;location&quot;: &quot;web/src/app/dashboard/notes/page.tsx:41&quot;,
+      &quot;severity&quot;: &quot;High&quot;,
+      &quot;claim&quot;: &quot;The page crashes with a 500 error if multiple `q` query parameters are passed in the URL.&quot;,
+      &quot;evidence&quot;: &quot;Next.js parses multiple URL parameters with the same key (e.g., `?q=a&amp;q=b`) as an array of strings. Calling `sp.q?.trim()` will throw a `TypeError` when `sp.q` is an array, completely breaking the page for that URL.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;web/src/app/dashboard/notes/page.tsx:97&quot;,
+      &quot;severity&quot;: &quot;High&quot;,
+      &quot;claim&quot;: &quot;The logger leaks potentially sensitive user search queries in plain text.&quot;,
+      &quot;evidence&quot;: &quot;The `filters` object includes the `search` property derived from the user&#x27;s free-text input. Spreading `...filters` into the `logger.info` payload records these terms (which could be patient names or medical conditions) directly into the application logs, causing a privacy violation.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;web/src/server/dal/clinical-notes.ts:226&quot;,
+      &quot;severity&quot;: &quot;Low&quot;,
+      &quot;claim&quot;: &quot;Searching the JSONB content by casting the entire object to text causes false positive matches against structural JSON keys.&quot;,
+      &quot;evidence&quot;: &quot;Because `cn.content::text` serializes the structure as well as the values, a user searching for standard SOAP section names like \&quot;assessment\&quot; or \&quot;objective\&quot; will incorrectly match every note that contains those keys, polluting the results.&quot;
+    }
+  ],
+  &quot;overflowHeadlines&quot;: []
+}
+```
+{&quot;findings&quot;:[{&quot;claim&quot;:&quot;The page crashes with a 500 error if multiple `q` query parameters are passed in the URL.&quot;,&quot;evidence&quot;:&quot;Next.js parses multiple URL parameters with the same key (e.g., `?q=a\u0026q=b`) as an array of strings. Calling `sp.q?.trim()` will throw a `TypeError` when `sp.q` is an array, completely breaking the page for that URL.&quot;,&quot;location&quot;:&quot;web/src/app/dashboard/notes/page.tsx:41&quot;,&quot;severity&quot;:&quot;High&quot;},{&quot;claim&quot;:&quot;The logger leaks potentially sensitive user search queries in plain text.&quot;,&quot;evidence&quot;:&quot;The `filters` object includes the `search` property derived from the user&#x27;s free-text input. Spreading `...filters` into the `logger.info` payload records these terms (which could be patient names or medical conditions) directly into the application logs, causing a privacy violation.&quot;,&quot;location&quot;:&quot;web/src/app/dashboard/notes/page.tsx:97&quot;,&quot;severity&quot;:&quot;High&quot;},{&quot;claim&quot;:&quot;Searching the JSONB content by casting the entire object to text causes false positive matches against structural JSON keys.&quot;,&quot;evidence&quot;:&quot;Because `cn.content::text` serializes the structure as well as the values, a user searching for standard SOAP section names like \&quot;assessment\&quot; or \&quot;objective\&quot; will incorrectly match every note that contains those keys, polluting the results.&quot;,&quot;location&quot;:&quot;web/src/server/dal/clinical-notes.ts:226&quot;,&quot;severity&quot;:&quot;Low&quot;}],&quot;overflowHeadlines&quot;:[],&quot;toolAction&quot;:&quot;Finishing the PR review&quot;,&quot;toolSummary&quot;:&quot;Finish review&quot;}
+ agy --model gemini-3.1-pro-high --input-format stream-json --output-format stream-json --json-schema @third-leg.schema.json --print= --print-timeout 15m &lt; @third-leg.payload.ndjson 86,682 in / 30,055 out (29,279 thinking) &mdash; 116,737 total
+    253.1s 1 &mdash; gemini-3.1-pro-high, SUCCESS on first attempt, fallback model never used
+    <strong>Total ~15 min.</strong> Prereqs + explorer pre-pass 2m40s &middot; three review legs in parallel ~5m (gemini 253s, claude-B 273s, claude-A 297s) &middot; comment refresh &middot; 10 verifiers in parallel ~2m30s (longest 145s) &middot; collation. 14 agent invocations total: 1 explorer, 2 reviewer legs, 1 agy subprocess, 10 verifiers. All three legs. The explorer judged every line load-bearing &mdash; DAL authorization, LIKE-metacharacter escaping, and an explicit focus-stability contract &mdash; with no generated or vendored content to skip.
+    2026-08-27 21:15 PDT
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review · PR #118</title>
+<style>
+  :root {
+    --bg:#fbfbfa; --panel:#fff; --ink:#1a1a18; --muted:#6b6b66; --line:#e3e3df;
+    --high:#b4232c; --med:#b06a1b; --low:#5a6b7a; --ok:#2c6e49; --dead:#8a8a84;
+    --accent:#2b4a7d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#16161a; --panel:#1e1e24; --ink:#e8e8e4; --muted:#9a9a94; --line:#32323a;
+      --high:#f2777a; --med:#e2a355; --low:#9ab0c4; --ok:#7fc9a0; --dead:#77776f;
+      --accent:#9ab7e8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#16161a; --panel:#1e1e24; --ink:#e8e8e4; --muted:#9a9a94; --line:#32323a;
+    --high:#f2777a; --med:#e2a355; --low:#9ab0c4; --ok:#7fc9a0; --dead:#77776f;
+    --accent:#9ab7e8;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; padding:2.5rem 1.25rem 5rem; background:var(--bg); color:var(--ink);
+    font:15px/1.65 ui-sans-serif,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap { max-width:60rem; margin:0 auto; }
+  code, pre, .mono { font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; }
+  h1 { font-size:1.5rem; margin:0 0 .35rem; letter-spacing:-.01em; }
+  h2 {
+    font-size:.75rem; text-transform:uppercase; letter-spacing:.09em;
+    color:var(--muted); margin:2.75rem 0 .85rem; font-weight:600;
+  }
+  a { color:var(--accent); }
+  .sub { color:var(--muted); font-size:.9rem; margin:0 0 1.5rem; }
+  .headline {
+    font-size:1.9rem; font-weight:650; letter-spacing:-.02em; margin:.2rem 0 .1rem;
+  }
+  .headline .arrow { color:var(--muted); font-weight:400; }
+  .panel {
+    background:var(--panel); border:1px solid var(--line); border-radius:9px;
+    padding:1.15rem 1.35rem; margin:0 0 1rem;
+  }
+  .caveats { border-left:3px solid var(--med); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(13rem,1fr)); gap:.75rem; }
+  dl.meta { margin:0; display:grid; grid-template-columns:auto 1fr; gap:.3rem 1rem; font-size:.9rem; }
+  dl.meta dt { color:var(--muted); }
+  dl.meta dd { margin:0; }
+  .badge {
+    display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.7rem;
+    font-weight:650; text-transform:uppercase; letter-spacing:.05em; border:1px solid currentColor;
+  }
+  .b-high{color:var(--high);} .b-med{color:var(--med);} .b-low{color:var(--low);}
+  .b-ok{color:var(--ok);} .b-dead{color:var(--dead);}
+  .finding { border-left:3px solid var(--line); padding-left:1rem; margin:0 0 1.4rem; }
+  .finding.high { border-left-color:var(--high); }
+  .finding.medium { border-left-color:var(--med); }
+  .finding.low { border-left-color:var(--low); }
+  .finding .loc { font-size:.82rem; color:var(--muted); }
+  .finding .claim { margin:.3rem 0; }
+  .finding .ev { font-size:.9rem; color:var(--muted); }
+  .refuted { opacity:.85; }
+  .refuted .claim { text-decoration:line-through; text-decoration-color:var(--muted); }
+  pre {
+    background:var(--panel); border:1px solid var(--line); border-radius:7px;
+    padding:1rem; overflow-x:auto; font-size:.82rem; margin:0;
+  }
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th, td { text-align:left; padding:.45rem .6rem; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; }
+  .scroll { overflow-x:auto; }
+  footer { margin-top:3.5rem; padding-top:1rem; border-top:1px solid var(--line); color:var(--muted); font-size:.82rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>feat(notes): full-text search on the notes list</h1>
+  <p class="sub">
+    <a href="https://github.com/Matthew-Nelson/flash-note/pull/118">#118</a> · Matthew-Nelson ·
+    7 files, +587/−119
+  </p>
+
+  <div class="headline">
+    21 raised <span class="arrow">→</span> 7 survived
+  </div>
+
+  <h2>Meta</h2>
+  <div class="panel">
+    <dl class="meta">
+      <dt>Mix</dt><dd>claude-opus &times;2 (reviewer legs) + gemini-3.1-pro-high (third leg); verifiers: sonnet for Medium+, haiku for Low</dd>
+      <dt>Base</dt><dd>main</dd>
+      <dt>Head</dt><dd class="mono">c517a4e (merge result reviewed: b9dac46)</dd>
+      <dt>Diff range</dt><dd class="mono">HEAD^1 HEAD</dd>
+    </dl>
+  </div>
+  <!-- Silence here reads as a clean merge-result review. If there are no
+       caveats, this must say so explicitly. -->
+  <div class="panel caveats"><strong>Merge result, no caveats.</strong> Fresh worktree at the current merge ref, clean tree, no head-only fallback, no reused checkout, no stale merge ref, no skipped leg, no fallback model. All three legs returned SUCCESS and all 10 candidates were verified &mdash; nothing went unverified over a cap.</div>
+
+  <h2>TL;DR</h2>
+  <div class="panel">
+    <p><strong>Merge blocking:</strong> One High. <strong>The search term is logged verbatim at info level</strong> (page.tsx:97-100) and the logger's PHI redaction list does not cover the <code>search</code> key &mdash; in a codebase whose first rule is "NEVER log PHI", this is the one that blocks. It is new in this diff; the pre-diff page logged nothing. Two Mediums are close behind: a repeated <code>?q=</code> parameter crashes the route, and <code>content::text ILIKE</code> makes the six most natural clinical search terms match every note, so the headline feature returns noise for exactly the words a PT would type first.</p>
+    <p><strong>Quality:</strong> Four more survivors, none blocking: an unbounded/unvalidated <code>q</code> feeding an unindexable double scan (Rule 3), a skeleton live region that reproduces Rule 13's own WRONG example, a search input with three different accessible names, and a now-false comment in <code>loading.tsx</code>. The focus-stability work the PR describes holds up &mdash; no leg found a defect in the Suspense-key or debounce logic, which was the riskiest part of the change.</p>
+  </div>
+
+  <h2>Reviewer legs</h2>
+  <div class="grid">
+    <!-- REPEAT: leg -->
+    <div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>claude-A (Opus, general-purpose)</strong></p><p>10 raised &rarr; 6 survived</p><p class="ev">Broadest sweep and the only leg to reach the migration files and the orphaned patients schema. Also the least precise: all three of its unique findings were refuted.</p></div>
+<div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>claude-B (Opus, general-purpose)</strong></p><p>8 raised &rarr; 7 survived</p><p class="ev">Highest survival rate of the Claude legs, and the only leg to catch the stale loading.tsx comment. Bundled the q-array crash and the missing length bound into one finding; they were split back apart for verification.</p></div>
+<div class="panel"><span class="badge b-ok">SUCCESS</span><p><strong>gemini-3.1-pro-high (third leg)</strong></p><p>3 raised &rarr; 3 survived</p><p class="ev">Smallest output, perfect precision: raised only three findings and all three survived. Independently caught every finding the other two legs agreed on, and nothing else.</p></div>
+    <!-- Each: <div class="panel"><span class="badge b-ok">SUCCESS</span>
+         <p><strong>{{LEG_NAME}}</strong></p>
+         <p>{{LEG_RAISED}} raised → {{LEG_SURVIVED}} survived</p>
+         <p class="ev">{{LEG_SUMMARY}}</p></div>
+         Render DENIED / EMPTY / TIMEOUT / ERROR / SKIPPED literally — they are
+         diagnoses, not a generic FAILED. -->
+    <!-- /REPEAT -->
+  </div>
+
+  <h2>Findings — survivors</h2>
+  <!-- REPEAT: finding -->
+  <div class="finding high"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:86-100</span> &middot; raised by claude-A, claude-B, gemini &middot; <span class="badge b-high">High</span></div><p class="claim">The therapist's raw note-content search term is written verbatim to the application log at <code>info</code> level on every render of the list. <code>filters</code> is built at lines 86-90 as <code>{ patientId, noteType, search: q || undefined }</code> and spread straight into <code>logger.info(...)</code> at lines 97-100.</p><p class="ev"><strong>Verifier:</strong> <code>PHI_REDACT_PATHS</code> (logger.ts:13-44) covers <code>quickNotes</code>, <code>content</code>, <code>patientContext</code>, <code>diagnosis</code> and friends, but has no <code>search</code> or <code>*.search</code> entry, so fast-redact leaves the key untouched. The same string is ILIKE'd against <code>cn.quick_notes</code> and <code>cn.content::text</code> — by construction it is a substring of exactly the content the redact list exists to protect. <code>git show HEAD^1</code> on this file has no logger call at all, and the sibling patients page still logs nothing, so the logging is new in this diff. The Suspense key includes <code>q</code>, so each debounce settle re-logs the current partial term — one query produces several log lines.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:41</span> &middot; raised by claude-A, claude-B, gemini (claimed High) &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>sp.q?.trim()</code> assumes a string, but a repeated query parameter resolves to <code>string[]</code>. <code>/dashboard/notes?q=a&amp;q=b</code> throws <code>TypeError: sp.q.trim is not a function</code> and drops the route into the error boundary.</p><p class="ev"><strong>Verifier:</strong> Confirmed against the installed Next.js 16.3.1 in the worktree: <code>SearchParams = { [key: string]: string | string[] | undefined }</code>, and <code>searchParamsToUrlQuery</code> explicitly pushes repeat occurrences into an array. Nothing normalizes it first — proxy.ts never touches this route's params and next.config.ts has no rewrites. The sibling params survive array input by accident: <code>page</code> goes through <code>parseInt</code> (which stringifies <code>['1','2']</code> to <code>'1,2'</code> → 1) and <code>noteType</code> through <code>Set.has</code> (returns false). <code>q</code> is the only one that dereferences a string-only method without a guard. Re-rated from the third leg's High to Medium: trivially reachable via a hand-typed or shared link, but single route, single request, no persisted state.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/server/dal/clinical-notes.ts:228</span> &middot; raised by claude-A, claude-B, gemini &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>cn.content::text ILIKE</code> searches the JSONB <em>serialization</em>, not the note prose — so the literal keys (<code>sectionId</code>, <code>title</code>, <code>content</code>) and the section titles are inside the searched text. A therapist searching <code>plan</code>, <code>assessment</code>, <code>objective</code>, <code>subjective</code>, <code>title</code> or <code>content</code> matches every note in scope.</p><p class="ev"><strong>Verifier:</strong> The verifier reproduced this against a real Postgres 17 instance: on a row with all four sections, <code>content::text</code> renders as <code>[{"title": "Subjective", "content": "...", "sectionId": "..."}, ...]</code> and all six terms evaluate true. This is not an edge case — the built-in SOAP template seeded at <code>002_phi_storage.sql:242-266</code> is the only template the app can currently produce (there is no create path in <code>note-templates.ts</code>), and its titles are literally Subjective/Objective/Assessment/Plan. So those are the section names of 100% of notes. The DAL docstring at lines 195-197 ("matches either the therapist's shorthand or the generated SOAP sections") overstates the precision actually delivered.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:41-42 · web/src/server/dal/clinical-notes.ts:223-249</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>q</code> reaches SQL with no length bound and no Zod schema, and the resulting leading-wildcard ILIKE over a detoasted JSONB cast runs in both the <code>COUNT(*)</code> query and the list query.</p><p class="ev"><strong>Verifier:</strong> No bound exists anywhere on the path, and the <code>&lt;Input&gt;</code> has no <code>maxLength</code>; because <code>q</code> is a GET param the 250ms debounce is bypassable outright by typing a URL. The migrations define only btree indexes on <code>(user_id/org_id, patient_id, created_at)</code> — no pg_trgm, no GIN — so the predicate cannot use an index. <code>filterClause</code> is interpolated verbatim into both queries, doubling the cost. <strong>Partially refuted:</strong> the cited precedent <code>patientSearchSchema</code> (<code>schemas/patients.ts:33</code>, <code>max(100)</code>) turns out to be orphaned — never imported, and the patients page does the same unvalidated thing. So this repeats a pre-existing gap rather than regressing from a working convention. It still stands on CLAUDE.md Rule 3 independently. Medium, not High: <code>scopeSql</code> restricts to the caller's own rows, so a careless input degrades only that user's request.</p></div>
+<div class="finding medium"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:202-204</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-med">Medium</span></div><p class="claim"><code>&lt;p className="sr-only" aria-live="polite"&gt;Loading notes.&lt;/p&gt;</code> is inserted as part of a whole Suspense-fallback subtree with its text already inside it, so screen readers have no mutation to announce.</p><p class="ev"><strong>Verifier:</strong> The skeleton is used only as <code>fallback={&lt;NotesTableSkeleton /&gt;}</code> on a boundary keyed <code>${patientId}::${noteType}::${q}::${page}</code>, so every keystroke and pagination change remounts the region and its content together in one insertion. This is the exact WRONG example in CLAUDE.md Rule 13, confirmed verbatim at line 549 ("The live region container must exist in the DOM before content changes"). <code>PatientsTableSkeleton</code> at least pairs its region with <code>aria-busy="true"</code>; this one omits that too. The legs' "never announces" phrasing is a mild overstatement — behavior varies by AT and browser — but the substantive defect is real and is the anti-pattern this repo wrote a numbered rule about after a P0 audit finding.</p></div>
+<div class="finding low"><div class="loc"><span class="mono">web/src/components/notes/SearchNotes.tsx:80-89</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-low">Low</span></div><p class="claim">One control, three different names: the visible <code>&lt;label&gt;</code> says "Search notes", the placeholder says "Search your notes", and <code>aria-label</code> says "Search notes by content". The <code>aria-label</code> wins as the computed accessible name, making the visible label decorative for AT users.</p><p class="ev"><strong>Verifier:</strong> All three strings confirmed as written. <code>Input.tsx:17-21</code> does render a visible <code>&lt;label htmlFor&gt;</code> and passes <code>aria-label</code> through via <code>{...props}</code>, so the override is real. WCAG 2.5.3 "Label in Name" passes only incidentally, because the aria-label happens to prefix-contain the visible label — a future wording change breaks it silently. <code>SearchPatients.tsx:116-117</code> keeps its placeholder and aria-label identical, so this is an unexplained divergence from the very component this file's docstring says it mirrors.</p></div>
+<div class="finding low"><div class="loc"><span class="mono">web/src/app/dashboard/notes/loading.tsx:4-5</span> &middot; raised by claude-B &middot; <span class="badge b-low">Low</span></div><p class="claim">The comment "Shows while the server-rendered page awaits the DAL query" describes behavior this PR removed.</p><p class="ev"><strong>Verifier:</strong> The <code>findClinicalNotesByScope</code> call moved out of <code>NotesPage</code> and into <code>NotesTable</code> behind a component-level Suspense boundary. <code>NotesPage</code> now awaits only <code>getSession()</code> and <code>searchParams</code> and then returns JSX synchronously, so it no longer suspends on the DAL query — and route-level <code>loading.tsx</code> renders only when the route itself suspends, not when a child boundary does. During the DAL query it is now <code>NotesTableSkeleton</code> that shows, never this file.</p></div>
+  <!-- Each: <div class="finding high"><div class="loc">file.ts:42 ·
+       raised by opus, gemini · <span class="badge b-high">High</span></div>
+       <p class="claim">…</p><p class="ev">Verifier: …</p></div>
+       Every survivor is actionable. Do not soften one into an FYI, and do not
+       re-inflate what the verifiers demoted. -->
+  <!-- /REPEAT -->
+
+  <h2>Refuted</h2>
+  <p class="sub">Disproved claims, High-rated first. This section is what makes the rest trustworthy.</p>
+  <!-- REPEAT: refuted -->
+  <div class="finding refuted"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:113-156</span> &middot; raised by claude-A, claude-B &middot; <span class="badge b-dead">Medium claimed</span></div><p class="claim">No aria-live region announces the arrival of results or the "No matching notes" empty state, so screen-reader users get no feedback that the search did anything.</p><p class="ev"><strong>Why it fell:</strong> The gap is real but not this PR's. The patients page has it identically — its results and empty state carry no live region either, and that search+Suspense pattern shipped in commit b6d23f6, well before this PR. SearchNotes' own docstring states it deliberately mirrors SearchPatients. This is systemic codebase debt worth one ticket covering both pages, not a defect introduced here.</p></div>
+<div class="finding refuted"><div class="loc"><span class="mono">web/src/components/notes/SearchNotes.tsx:53-68</span> &middot; raised by claude-A &middot; <span class="badge b-dead">Medium claimed</span></div><p class="claim">Every keystroke pushes the note-content search term into the URL as <code>?q=</code>, so Cloud Run's platform request logging captures PHI outside the app's redaction pipeline.</p><p class="ev"><strong>Why it fell:</strong> Mechanically accurate, but <code>SearchPatients</code> ships the byte-for-byte identical mechanism to search patients <em>by name</em> — more directly PHI than note content — and predates this PR. The codebase's own security process has already dispositioned this class: <code>docs/compliance/CONSOLIDATED_AUDIT_2026_02.md</code> M-9 records "sensitive value in URL query param → server access logs" as Medium and closed it with a Referrer-Policy mitigation. Real architectural debt, and an infra-level concern spanning multiple components; not attributable to this diff.</p></div>
+<div class="finding refuted"><div class="loc"><span class="mono">web/src/app/dashboard/notes/page.tsx:11</span> &middot; raised by claude-A &middot; <span class="badge b-dead">Low claimed</span></div><p class="claim">Switching <code>NoteRow</code> from a direct path to the <code>@/components/notes</code> barrel drags 8 unused <code>'use client'</code> modules into the route's module graph.</p><p class="ev"><strong>Why it fell:</strong> The import change is real and the export counts check out (8 of 11 are client modules). The consequence does not: the barrel is pure side-effect-free re-exports, which is precisely what Turbopack's tree-shaking eliminates, and the codebase uses barrels this way throughout (ui, auth, dal, types, schemas) without evident bundle problems. No measurement, build warning, or regression was offered. Speculative.</p></div>
+  <!-- /REPEAT -->
+
+  <h2>Over the cap — unverified</h2>
+  <div class="panel">None. Every candidate that cleared dedup was verified &mdash; 10 dispatched, 10 verdicts returned.</div>
+
+  <h2>Overlap analysis</h2>
+  <div class="panel scroll">
+    <table>
+      <tr><th>Caught by all legs</th><td>3 findings &mdash; the logged search term, the repeated-<code>q</code> crash, and the JSONB <code>::text</code> false positives. <strong>All 3 survived.</strong> Unanimity was a perfect predictor here.</td></tr>
+      <tr><th>Caught by two</th><td>4 findings &mdash; unbounded <code>q</code>, the skeleton live region, the three-names input, and the missing results announcement. 3 of 4 survived; the results announcement fell as pre-existing.</td></tr>
+      <tr><th>Unique to one</th><td>5 findings, all from a Claude leg. Only 1 survived (claude-B's stale <code>loading.tsx</code> comment). claude-A's 3 uniques were all refuted, and 2 more (skeleton duplication, test import placement) were dropped as taste before verification.</td></tr>
+      <tr><th>Most valuable after verification</th><td><strong>gemini-3.1-pro-high</strong> on precision &mdash; 3 raised, 3 survived, and it independently found every finding the other two legs agreed on while adding no noise. <strong>claude-B</strong> on value &mdash; 7 of 8 survived including the only surviving unique finding. claude-A raised the most and contributed the most refuted material; its real contribution was depth of evidence (it was the leg that traced the orphaned <code>patientSearchSchema</code>), which sharpened another leg's finding rather than standing on its own.</td></tr>
+    </table>
+  </div>
+
+  <h2>Verbatim appendix — third leg</h2>
+  <p class="sub">Unparaphrased. This is your check on synthesis fidelity.</p>
+  <div class="panel">
+    <dl class="meta">
+      <dt>Command</dt><dd class="mono">agy --model gemini-3.1-pro-high --input-format stream-json --output-format stream-json --json-schema @third-leg.schema.json --print= --print-timeout 15m &lt; @third-leg.payload.ndjson</dd>
+      <dt>Model</dt><dd class="mono">gemini-3.1-pro-high</dd>
+      <dt>Usage</dt><dd>86,682 in / 30,055 out (29,279 thinking) &mdash; 116,737 total</dd>
+      <dt>Duration</dt><dd>253.1s</dd>
+      <dt>Attempts</dt><dd>1 &mdash; gemini-3.1-pro-high, SUCCESS on first attempt, fallback model never used</dd>
+    </dl>
+  </div>
+  <pre>```json
+{
+  &quot;findings&quot;: [
+    {
+      &quot;location&quot;: &quot;web/src/app/dashboard/notes/page.tsx:41&quot;,
+      &quot;severity&quot;: &quot;High&quot;,
+      &quot;claim&quot;: &quot;The page crashes with a 500 error if multiple `q` query parameters are passed in the URL.&quot;,
+      &quot;evidence&quot;: &quot;Next.js parses multiple URL parameters with the same key (e.g., `?q=a&amp;q=b`) as an array of strings. Calling `sp.q?.trim()` will throw a `TypeError` when `sp.q` is an array, completely breaking the page for that URL.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;web/src/app/dashboard/notes/page.tsx:97&quot;,
+      &quot;severity&quot;: &quot;High&quot;,
+      &quot;claim&quot;: &quot;The logger leaks potentially sensitive user search queries in plain text.&quot;,
+      &quot;evidence&quot;: &quot;The `filters` object includes the `search` property derived from the user&#x27;s free-text input. Spreading `...filters` into the `logger.info` payload records these terms (which could be patient names or medical conditions) directly into the application logs, causing a privacy violation.&quot;
+    },
+    {
+      &quot;location&quot;: &quot;web/src/server/dal/clinical-notes.ts:226&quot;,
+      &quot;severity&quot;: &quot;Low&quot;,
+      &quot;claim&quot;: &quot;Searching the JSONB content by casting the entire object to text causes false positive matches against structural JSON keys.&quot;,
+      &quot;evidence&quot;: &quot;Because `cn.content::text` serializes the structure as well as the values, a user searching for standard SOAP section names like \&quot;assessment\&quot; or \&quot;objective\&quot; will incorrectly match every note that contains those keys, polluting the results.&quot;
+    }
+  ],
+  &quot;overflowHeadlines&quot;: []
+}
+```
+{&quot;findings&quot;:[{&quot;claim&quot;:&quot;The page crashes with a 500 error if multiple `q` query parameters are passed in the URL.&quot;,&quot;evidence&quot;:&quot;Next.js parses multiple URL parameters with the same key (e.g., `?q=a\u0026q=b`) as an array of strings. Calling `sp.q?.trim()` will throw a `TypeError` when `sp.q` is an array, completely breaking the page for that URL.&quot;,&quot;location&quot;:&quot;web/src/app/dashboard/notes/page.tsx:41&quot;,&quot;severity&quot;:&quot;High&quot;},{&quot;claim&quot;:&quot;The logger leaks potentially sensitive user search queries in plain text.&quot;,&quot;evidence&quot;:&quot;The `filters` object includes the `search` property derived from the user&#x27;s free-text input. Spreading `...filters` into the `logger.info` payload records these terms (which could be patient names or medical conditions) directly into the application logs, causing a privacy violation.&quot;,&quot;location&quot;:&quot;web/src/app/dashboard/notes/page.tsx:97&quot;,&quot;severity&quot;:&quot;High&quot;},{&quot;claim&quot;:&quot;Searching the JSONB content by casting the entire object to text causes false positive matches against structural JSON keys.&quot;,&quot;evidence&quot;:&quot;Because `cn.content::text` serializes the structure as well as the values, a user searching for standard SOAP section names like \&quot;assessment\&quot; or \&quot;objective\&quot; will incorrectly match every note that contains those keys, polluting the results.&quot;,&quot;location&quot;:&quot;web/src/server/dal/clinical-notes.ts:226&quot;,&quot;severity&quot;:&quot;Low&quot;}],&quot;overflowHeadlines&quot;:[],&quot;toolAction&quot;:&quot;Finishing the PR review&quot;,&quot;toolSummary&quot;:&quot;Finish review&quot;}
+</pre>
+
+  <h2>Orchestration notes</h2>
+  <div class="panel">
+    <p><strong>Total ~15 min.</strong> Prereqs + explorer pre-pass 2m40s &middot; three review legs in parallel ~5m (gemini 253s, claude-B 273s, claude-A 297s) &middot; comment refresh &middot; 10 verifiers in parallel ~2m30s (longest 145s) &middot; collation. 14 agent invocations total: 1 explorer, 2 reviewer legs, 1 agy subprocess, 10 verifiers.</p>
+    <p><strong>Explorer's mix recommendation:</strong> All three legs. The explorer judged every line load-bearing &mdash; DAL authorization, LIKE-metacharacter escaping, and an explicit focus-stability contract &mdash; with no generated or vendored content to skip.</p>
+  </div>
+
+  <footer>Generated 2026-08-27 21:15 PDT · triple-review-code · nothing was posted to the PR.</footer>
+</div>
+</body>
+</html>

@@ -41,6 +41,10 @@ const PHI_REDACT_PATHS = [
   '*.patientContext',
   '*.quickNotes',
   '*.content',
+  // Free-text search terms are matched against note content and patient names,
+  // so a term is PHI by construction. Never log one — this is the backstop.
+  'search',
+  '*.search',
 ];
 
 // Read NODE_ENV directly -- not from config.ts to avoid circular dependency.

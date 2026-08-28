@@ -67,7 +67,7 @@ function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
 }
 
 function makeSearchParams(
-  value: { patientId?: string; noteType?: string; q?: string; page?: string } = {},
+  value: Record<string, string | string[] | undefined> = {},
 ) {
   return Promise.resolve(value);
 }
@@ -142,6 +142,42 @@ describe('NotesPage', () => {
     mockGetSession.mockResolvedValue(createMockSession());
     render(await NotesPage({ searchParams: makeSearchParams({ q: '  knee  ' }) }));
     expect(screen.getByTestId('search-notes')).toHaveAttribute('data-query', 'knee');
+  });
+
+  // Regression: Next.js resolves ?q=a&q=b to string[]; sp.q.trim() threw a
+  // TypeError and dropped the whole route into the error boundary.
+  it('renders instead of throwing when params repeat in the URL', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({
+        searchParams: makeSearchParams({
+          q: ['knee', 'shoulder'],
+          page: ['2', '9'],
+          noteType: ['initial_eval'],
+          patientId: ['00000000-0000-0000-0000-0000000abcde'],
+        }),
+      }),
+    );
+    expect(screen.getByTestId('search-notes')).toHaveAttribute('data-query', 'knee');
+  });
+
+  it('ignores an unknown noteType rather than erroring', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({ searchParams: makeSearchParams({ noteType: 'bogus' }) }),
+    );
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('bounds an over-long search term before it reaches the page', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({ searchParams: makeSearchParams({ q: 'x'.repeat(500) }) }),
+    );
+    const seeded = screen
+      .getByTestId('search-notes')
+      .getAttribute('data-query');
+    expect(seeded).toHaveLength(100);
   });
 });
 
@@ -224,6 +260,37 @@ describe('NotesTable', () => {
     expect(prev).toHaveAttribute('href', '/dashboard/notes?q=knee&page=1');
     const next = screen.getByRole('link', { name: /next/i });
     expect(next).toHaveAttribute('href', '/dashboard/notes?q=knee&page=3');
+  });
+
+  // Regression (High): the search term is PHI by construction — it is matched
+  // against note content. It must never reach the logger, directly or via a
+  // spread of the filter object.
+  it('never logs the search term', async () => {
+    await NotesTable({ userId: 'u', q: 'Marjorie knee replacement', page: 1 });
+
+    expect(mockLogger.info).toHaveBeenCalledTimes(1);
+    const [context] = mockLogger.info.mock.calls[0] as [Record<string, unknown>];
+    expect(JSON.stringify(context)).not.toContain('Marjorie');
+    expect(context).not.toHaveProperty('search');
+    expect(context).toMatchObject({
+      source: 'page_notes_list',
+      userId: 'u',
+      hasSearch: true,
+      resultCount: 0,
+    });
+  });
+
+  it('never logs the patient id, only whether one was filtered on', async () => {
+    await NotesTable({
+      userId: 'u',
+      patientId: '00000000-0000-0000-0000-0000000abcde',
+      q: '',
+      page: 1,
+    });
+
+    const [context] = mockLogger.info.mock.calls[0] as [Record<string, unknown>];
+    expect(JSON.stringify(context)).not.toContain('0000000abcde');
+    expect(context).toMatchObject({ filteredByPatient: true, hasSearch: false });
   });
 
   it('omits pagination when everything fits on one page', async () => {

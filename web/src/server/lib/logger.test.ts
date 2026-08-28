@@ -43,6 +43,10 @@ const PHI_PATHS = [
   '*.patientContext',
   '*.quickNotes',
   '*.content',
+  // Phase 5 — free-text search terms are matched against note content and
+  // patient names, so a term is PHI by construction.
+  'search',
+  '*.search',
 ];
 
 /**
@@ -73,6 +77,20 @@ function createTestLogger() {
 }
 
 describe('logger PHI redaction', () => {
+  it('redacts a search term at the top level', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ search: 'Marjorie knee' }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.search).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts a nested search term', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ filters: { search: 'Marjorie knee' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.filters.search).toBe('[PHI_REDACTED]');
+  });
+
   it('redacts patient field', () => {
     const { logger, chunks } = createTestLogger();
     logger.info({ patient: 'John Doe' }, 'test');

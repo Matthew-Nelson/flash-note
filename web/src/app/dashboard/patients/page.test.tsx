@@ -97,6 +97,21 @@ describe('PatientsPage', () => {
     expect(h1s[0]).toHaveTextContent('Patients');
   });
 
+  // Regression: Next.js resolves ?q=a&q=b to string[]; sp.q.trim() threw a
+  // TypeError and dropped the route into the error boundary.
+  it('renders instead of throwing when q and page repeat in the URL', async () => {
+    mockGetSession.mockResolvedValue(session());
+    render(
+      await PatientsPage({
+        searchParams: Promise.resolve({ q: ['doe', 'smith'], page: ['2', '7'] }),
+      }),
+    );
+    expect(screen.getByTestId('search-patients')).toHaveAttribute(
+      'data-query',
+      'doe',
+    );
+  });
+
   it('passes q to SearchPatients', async () => {
     mockGetSession.mockResolvedValue(session());
     render(

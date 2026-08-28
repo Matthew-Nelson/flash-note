@@ -4,12 +4,15 @@ import { redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
 import { findPatientsByScope } from '@/server/dal';
+import { searchListParamsSchema } from '@/lib/schemas';
 import { TopBar } from '@/components/TopBar';
 import { Button } from '@/components/ui';
 import { PatientRow, SearchPatients } from '@/components/patients';
 
 interface PatientsPageProps {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  // Next.js resolves a repeated param (?q=a&q=b) to string[]; the schema
+  // normalizes and bounds it (Rule 3).
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 const PAGE_SIZE = 50;
@@ -18,9 +21,7 @@ export default async function PatientsPage({ searchParams }: PatientsPageProps) 
   const session = await getSession();
   if (!session) redirect('/login?reason=session_expired');
 
-  const sp = await searchParams;
-  const q = sp.q?.trim() ?? '';
-  const page = Math.max(parseInt(sp.page ?? '1', 10) || 1, 1);
+  const { q, page } = searchListParamsSchema.parse(await searchParams);
 
   return (
     <>
