@@ -177,6 +177,7 @@ export async function findClinicalNoteById(
 export interface FindClinicalNotesByScopeInput {
   patientId?: string;
   noteType?: NoteType;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -187,8 +188,32 @@ export interface FindClinicalNotesByScopeResult {
 }
 
 /**
- * List notes within scope, optionally filtered by patient and/or note type,
- * paginated and sorted newest-first. LEFT JOINs patients for denormalized names.
+ * List notes within scope, optionally filtered by patient, note type, and/or a
+ * free-text search term, paginated and sorted newest-first. LEFT JOINs patients
+ * for denormalized names.
+ *
+ * Search strategy: ILIKE against `quick_notes` and against the prose inside
+ * each section of the JSONB `content` array — NOT `content::text`. Casting the
+ * whole document to text would put the JSON keys (`sectionId`, `title`,
+ * `content`) and the section titles inside the searched string, so a therapist
+ * searching "plan" or "assessment" would match every note in scope: the
+ * built-in SOAP template names its sections Subjective/Objective/Assessment/
+ * Plan. Unnesting and reading `section->>'content'` searches only what the
+ * clinician actually wrote. Rows whose `content` is somehow not an array are
+ * coerced to an empty array so a malformed row cannot error the whole query.
+ *
+ * Mirrors `findPatientsByScope` — LIKE metacharacters (% and _) and the escape
+ * character itself are escaped before the term is wrapped in `%...%`, so user
+ * input cannot smuggle in wildcards.
+ *
+ * The search predicate is applied to BOTH the count and the list query so
+ * `total` (and therefore the page count) reflects the filtered result set.
+ *
+ * Cost: the leading wildcard means neither predicate can use a btree index,
+ * and the unnest runs per row, so this is a scan over the caller's own notes
+ * executed twice (count + list). Callers must bound the term — see
+ * `MAX_SEARCH_LENGTH`. A pg_trgm GIN index is the fix if this becomes hot; it
+ * needs a migration plus the extension enabled on Cloud SQL.
  */
 export async function findClinicalNotesByScope(
   scope: QueryScope,
@@ -208,6 +233,17 @@ export async function findClinicalNotesByScope(
   if (filters.noteType) {
     paramList.push(filters.noteType);
     filterClause += ` AND cn.note_type = $${paramList.length}`;
+  }
+  if (filters.search && filters.search.trim().length > 0) {
+    // Escape LIKE metacharacters (% and _) and the escape char (\) itself.
+    const safe = filters.search.trim().replace(/[\\%_]/g, '\\$&');
+    paramList.push(`%${safe}%`);
+    const idx = paramList.length;
+    filterClause +=
+      ` AND (cn.quick_notes ILIKE $${idx}` +
+      ` OR EXISTS (SELECT 1 FROM jsonb_array_elements(` +
+      `CASE WHEN jsonb_typeof(cn.content) = 'array' THEN cn.content ELSE '[]'::jsonb END` +
+      `) AS section WHERE section->>'content' ILIKE $${idx}))`;
   }
 
   const countResult = await db.query<{ total: number }>(

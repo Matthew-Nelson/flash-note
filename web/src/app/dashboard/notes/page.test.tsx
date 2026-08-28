@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
-import NotesPage from './page';
 import type { SessionData } from '@/server/types';
 import type { ClinicalNoteWithPatient } from '@/lib/types';
 
@@ -13,14 +12,26 @@ vi.mock('@/server/lib/get-session', () => ({
 
 // Plan 04-03: DAL call for listing
 const mockFindClinicalNotesByScope = vi.fn<
-  () => Promise<{ notes: ClinicalNoteWithPatient[]; total: number }>
+  (
+    scope: unknown,
+    filters?: unknown,
+  ) => Promise<{ notes: ClinicalNoteWithPatient[]; total: number }>
 >();
 vi.mock('@/server/dal', () => ({
-  findClinicalNotesByScope: (): Promise<{
-    notes: ClinicalNoteWithPatient[];
-    total: number;
-  }> => mockFindClinicalNotesByScope(),
+  findClinicalNotesByScope: (
+    scope: unknown,
+    filters?: unknown,
+  ): Promise<{ notes: ClinicalNoteWithPatient[]; total: number }> =>
+    mockFindClinicalNotesByScope(scope, filters),
 }));
+
+const mockLogger = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+}));
+vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 // Mock TopBar (Client Component)
 vi.mock('@/components/TopBar', () => ({
@@ -29,13 +40,18 @@ vi.mock('@/components/TopBar', () => ({
   ),
 }));
 
-vi.mock('@/components/notes/NoteRow', () => ({
+vi.mock('@/components/notes', () => ({
   NoteRow: ({ note }: { note: ClinicalNoteWithPatient }) => (
     <tr data-testid="note-row">
       <td data-note-id={note.id}>{note.id}</td>
     </tr>
   ),
+  SearchNotes: ({ initialQuery }: { initialQuery: string }) => (
+    <div data-testid="search-notes" data-query={initialQuery} />
+  ),
 }));
+
+import NotesPage, { NotesTable } from './page';
 
 function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
   return {
@@ -50,7 +66,9 @@ function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
   };
 }
 
-function makeSearchParams(value: { patientId?: string; noteType?: string; page?: string } = {}) {
+function makeSearchParams(
+  value: Record<string, string | string[] | undefined> = {},
+) {
   return Promise.resolve(value);
 }
 
@@ -107,12 +125,6 @@ describe('NotesPage', () => {
     expect(headings.some((h) => h.textContent === 'Notes')).toBe(true);
   });
 
-  it('calls findClinicalNotesByScope (Rule 5)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    await NotesPage({ searchParams: makeSearchParams() });
-    expect(mockFindClinicalNotesByScope).toHaveBeenCalled();
-  });
-
   it('renders "New note" link to /dashboard/notes/new', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     render(await NotesPage({ searchParams: makeSearchParams() }));
@@ -120,25 +132,175 @@ describe('NotesPage', () => {
     expect(link).toHaveAttribute('href', '/dashboard/notes/new');
   });
 
-  it('renders empty state when no notes', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    render(await NotesPage({ searchParams: makeSearchParams() }));
-    expect(screen.getByRole('heading', { level: 2, name: /No notes yet/i })).toBeInTheDocument();
-  });
-
-  it('renders a NoteRow per note when notes exist', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
-    mockFindClinicalNotesByScope.mockResolvedValue({
-      notes: [createMockNote('a'), createMockNote('b'), createMockNote('c')],
-      total: 3,
-    });
-    render(await NotesPage({ searchParams: makeSearchParams() }));
-    expect(screen.getAllByTestId('note-row')).toHaveLength(3);
-  });
-
   it('renders main#main-content', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     render(await NotesPage({ searchParams: makeSearchParams() }));
     expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content');
+  });
+
+  it('seeds SearchNotes with the ?q= param', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(await NotesPage({ searchParams: makeSearchParams({ q: '  knee  ' }) }));
+    expect(screen.getByTestId('search-notes')).toHaveAttribute('data-query', 'knee');
+  });
+
+  // Regression: Next.js resolves ?q=a&q=b to string[]; sp.q.trim() threw a
+  // TypeError and dropped the whole route into the error boundary.
+  it('renders instead of throwing when params repeat in the URL', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({
+        searchParams: makeSearchParams({
+          q: ['knee', 'shoulder'],
+          page: ['2', '9'],
+          noteType: ['initial_eval'],
+          patientId: ['00000000-0000-0000-0000-0000000abcde'],
+        }),
+      }),
+    );
+    expect(screen.getByTestId('search-notes')).toHaveAttribute('data-query', 'knee');
+  });
+
+  it('ignores an unknown noteType rather than erroring', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({ searchParams: makeSearchParams({ noteType: 'bogus' }) }),
+    );
+    expect(screen.getByRole('main')).toBeInTheDocument();
+  });
+
+  it('bounds an over-long search term before it reaches the page', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(
+      await NotesPage({ searchParams: makeSearchParams({ q: 'x'.repeat(500) }) }),
+    );
+    const seeded = screen
+      .getByTestId('search-notes')
+      .getAttribute('data-query');
+    expect(seeded).toHaveLength(100);
+  });
+});
+
+// NotesTable owns the DAL call (it's the async Suspense child in page.tsx), so
+// these assertions target it directly — RTL would otherwise render the Suspense
+// fallback instead of awaiting the inner async component.
+describe('NotesTable', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindClinicalNotesByScope.mockResolvedValue({ notes: [], total: 0 });
+  });
+
+  it('calls findClinicalNotesByScope with user scope (Rule 5)', async () => {
+    await NotesTable({ userId: 'user-uuid', q: '', page: 1 });
+    expect(mockFindClinicalNotesByScope).toHaveBeenCalledWith(
+      { type: 'user', userId: 'user-uuid' },
+      expect.objectContaining({ limit: 50, offset: 0 }),
+    );
+  });
+
+  it('forwards the search term to the DAL', async () => {
+    await NotesTable({ userId: 'u', q: 'gait training', page: 1 });
+    expect(mockFindClinicalNotesByScope).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ search: 'gait training' }),
+    );
+  });
+
+  it('omits search when the query is empty', async () => {
+    await NotesTable({ userId: 'u', q: '', page: 1 });
+    expect(mockFindClinicalNotesByScope).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ search: undefined }),
+    );
+  });
+
+  it('computes offset from the page prop', async () => {
+    await NotesTable({ userId: 'u', q: '', page: 3 });
+    expect(mockFindClinicalNotesByScope).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: 50, offset: 100 }),
+    );
+  });
+
+  it('renders the default empty state when there are no notes and no query', async () => {
+    render(await NotesTable({ userId: 'u', q: '', page: 1 }));
+    expect(
+      screen.getByRole('heading', { level: 2, name: /No notes yet/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('renders a search-scoped empty state when a query yields nothing', async () => {
+    render(await NotesTable({ userId: 'u', q: 'zebra', page: 1 }));
+    expect(
+      screen.getByRole('heading', { level: 2, name: /No matching notes/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Try a different search term/i)).toBeInTheDocument();
+  });
+
+  it('renders a NoteRow per note when notes exist', async () => {
+    mockFindClinicalNotesByScope.mockResolvedValueOnce({
+      notes: [createMockNote('a'), createMockNote('b'), createMockNote('c')],
+      total: 3,
+    });
+    render(await NotesTable({ userId: 'u', q: '', page: 1 }));
+    expect(screen.getAllByTestId('note-row')).toHaveLength(3);
+  });
+
+  it('renders pagination and preserves the query in page links', async () => {
+    mockFindClinicalNotesByScope.mockResolvedValueOnce({
+      notes: [createMockNote('a')],
+      total: 125,
+    });
+    render(await NotesTable({ userId: 'u', q: 'knee', page: 2 }));
+    expect(
+      screen.getByRole('navigation', { name: /pagination/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Page 2 of 3/)).toBeInTheDocument();
+    const prev = screen.getByRole('link', { name: /previous/i });
+    expect(prev).toHaveAttribute('href', '/dashboard/notes?q=knee&page=1');
+    const next = screen.getByRole('link', { name: /next/i });
+    expect(next).toHaveAttribute('href', '/dashboard/notes?q=knee&page=3');
+  });
+
+  // Regression (High): the search term is PHI by construction — it is matched
+  // against note content. It must never reach the logger, directly or via a
+  // spread of the filter object.
+  it('never logs the search term', async () => {
+    await NotesTable({ userId: 'u', q: 'Marjorie knee replacement', page: 1 });
+
+    expect(mockLogger.info).toHaveBeenCalledTimes(1);
+    const [context] = mockLogger.info.mock.calls[0] as [Record<string, unknown>];
+    expect(JSON.stringify(context)).not.toContain('Marjorie');
+    expect(context).not.toHaveProperty('search');
+    expect(context).toMatchObject({
+      source: 'page_notes_list',
+      userId: 'u',
+      hasSearch: true,
+      resultCount: 0,
+    });
+  });
+
+  it('never logs the patient id, only whether one was filtered on', async () => {
+    await NotesTable({
+      userId: 'u',
+      patientId: '00000000-0000-0000-0000-0000000abcde',
+      q: '',
+      page: 1,
+    });
+
+    const [context] = mockLogger.info.mock.calls[0] as [Record<string, unknown>];
+    expect(JSON.stringify(context)).not.toContain('0000000abcde');
+    expect(context).toMatchObject({ filteredByPatient: true, hasSearch: false });
+  });
+
+  it('omits pagination when everything fits on one page', async () => {
+    mockFindClinicalNotesByScope.mockResolvedValueOnce({
+      notes: [createMockNote('a')],
+      total: 1,
+    });
+    render(await NotesTable({ userId: 'u', q: '', page: 1 }));
+    expect(
+      screen.queryByRole('navigation', { name: /pagination/i }),
+    ).not.toBeInTheDocument();
   });
 });

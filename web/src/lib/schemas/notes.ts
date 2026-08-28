@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { searchListParamsSchema, singleParam } from './list-params';
+
 /**
  * Note Zod schemas — Rule 3 boundary for Server Actions that generate,
  * save, and update clinical notes.
@@ -101,3 +103,21 @@ export const updateSectionStyleSchema = z
   );
 
 export type UpdateSectionStyleInput = z.infer<typeof updateSectionStyleSchema>;
+
+/**
+ * notesListParamsSchema — Rule 3 boundary for the /dashboard/notes URL.
+ *
+ * Extends the shared `q` + `page` shape with the two notes-specific filters.
+ * See list-params.ts for why every field is array-normalized and degrades to a
+ * default rather than throwing.
+ */
+export const notesListParamsSchema = searchListParamsSchema.extend({
+  noteType: singleParam(
+    z.enum(['daily_note', 'initial_eval', 'progress_note', 'discharge'])
+  )
+    .optional()
+    .catch(undefined),
+  patientId: singleParam(z.string().uuid()).optional().catch(undefined),
+});
+
+export type NotesListParams = z.infer<typeof notesListParamsSchema>;
