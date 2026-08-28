@@ -177,6 +177,7 @@ export async function findClinicalNoteById(
 export interface FindClinicalNotesByScopeInput {
   patientId?: string;
   noteType?: NoteType;
+  search?: string;
   limit?: number;
   offset?: number;
 }
@@ -187,8 +188,18 @@ export interface FindClinicalNotesByScopeResult {
 }
 
 /**
- * List notes within scope, optionally filtered by patient and/or note type,
- * paginated and sorted newest-first. LEFT JOINs patients for denormalized names.
+ * List notes within scope, optionally filtered by patient, note type, and/or a
+ * free-text search term, paginated and sorted newest-first. LEFT JOINs patients
+ * for denormalized names.
+ *
+ * Search strategy: ILIKE against `quick_notes` and the JSONB `content` rendered
+ * as text, so a term matches either the therapist's shorthand or the generated
+ * SOAP sections. Mirrors `findPatientsByScope` — LIKE metacharacters (% and _)
+ * and the escape character itself are escaped before the term is wrapped in
+ * `%...%`, so user input cannot smuggle in wildcards.
+ *
+ * The search predicate is applied to BOTH the count and the list query so
+ * `total` (and therefore the page count) reflects the filtered result set.
  */
 export async function findClinicalNotesByScope(
   scope: QueryScope,
@@ -208,6 +219,13 @@ export async function findClinicalNotesByScope(
   if (filters.noteType) {
     paramList.push(filters.noteType);
     filterClause += ` AND cn.note_type = $${paramList.length}`;
+  }
+  if (filters.search && filters.search.trim().length > 0) {
+    // Escape LIKE metacharacters (% and _) and the escape char (\) itself.
+    const safe = filters.search.trim().replace(/[\\%_]/g, '\\$&');
+    paramList.push(`%${safe}%`);
+    const idx = paramList.length;
+    filterClause += ` AND (cn.quick_notes ILIKE $${idx} OR cn.content::text ILIKE $${idx})`;
   }
 
   const countResult = await db.query<{ total: number }>(
