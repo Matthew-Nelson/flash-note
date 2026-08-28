@@ -30,8 +30,31 @@ describe('SearchNotes', () => {
   it('renders a labelled search input (Rule 11)', () => {
     render(<SearchNotes initialQuery="" />);
     expect(
-      screen.getByRole('searchbox', { name: /search notes by content/i }),
+      screen.getByRole('searchbox', { name: 'Search notes' }),
     ).toBeInTheDocument();
+  });
+
+  // Regression: the control had three different names (visible label,
+  // placeholder, aria-label). The visible label must be the accessible name.
+  it('takes its accessible name from the visible label, with no aria-label', () => {
+    render(<SearchNotes initialQuery="" />);
+    const input = screen.getByRole('searchbox');
+    expect(input).not.toHaveAttribute('aria-label');
+    expect(screen.getByText('Search notes').tagName).toBe('LABEL');
+  });
+
+  it('caps typed input at the server-side search bound', () => {
+    render(<SearchNotes initialQuery="" />);
+    expect(screen.getByRole('searchbox')).toHaveAttribute('maxlength', '100');
+  });
+
+  // Rule 13: the region must be in the DOM before its content changes.
+  it('renders a persistent status region that is empty when idle', () => {
+    render(<SearchNotes initialQuery="" />);
+    const status = screen.getByRole('status');
+    expect(status).toBeInTheDocument();
+    expect(status).toHaveAttribute('aria-live', 'polite');
+    expect(status).toBeEmptyDOMElement();
   });
 
   it('debounces URL updates by 250ms', async () => {

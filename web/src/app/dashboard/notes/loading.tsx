@@ -1,14 +1,17 @@
 /**
  * /dashboard/notes loading skeleton (Plan 04-03 / 04-UI-SPEC §Loading state).
  *
- * Header row + 5 ghost rows with shimmer animation. Shows while the
- * server-rendered page awaits the DAL query.
+ * Header row + 5 ghost rows with shimmer animation. Route-level fallback:
+ * it renders while the route itself suspends (a fresh navigation to
+ * /dashboard/notes, which awaits the session). The notes query lives behind a
+ * component-level boundary inside page.tsx, so a search or a page change shows
+ * that boundary's NotesTableSkeleton instead of this file.
  */
 export default function NotesLoading() {
   const ghostRows = Array.from({ length: 5 });
 
   return (
-    <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6">
+    <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6" aria-busy="true">
       <div className="mb-6 flex items-center justify-between">
         <div className="h-7 w-32 rounded-fn-sm bg-fn-bg-secondary animate-fn-shimmer" />
         <div className="h-9 w-28 rounded-fn-base bg-fn-bg-secondary animate-fn-shimmer" />
@@ -28,9 +31,6 @@ export default function NotesLoading() {
           ))}
         </ul>
       </div>
-      <p className="sr-only" aria-live="polite">
-        Loading notes.
-      </p>
     </main>
   );
 }

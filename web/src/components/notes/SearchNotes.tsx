@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui';
+import { MAX_SEARCH_LENGTH } from '@/lib/schemas';
 
 interface SearchNotesProps {
   initialQuery: string;
@@ -25,6 +26,15 @@ const DEBOUNCE_MS = 250;
  *  3. Controlled state is the source of truth while typing; we only re-sync
  *     from the URL when it changes from an EXTERNAL source (back button,
  *     navigation), detected by comparing against the last value we pushed.
+ *
+ * Rule 13: the status region below is rendered unconditionally and only its
+ * text changes, so assistive tech has a mutation to announce. It lives here
+ * rather than in the results table because this component is outside the
+ * Suspense boundary — the table remounts on every keystroke, which would
+ * insert a region and its content together and announce nothing.
+ *
+ * Rule 11: the visible <label> is the accessible name. No aria-label —
+ * an aria-label would override the label and leave the two able to drift.
  */
 export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElement {
   const router = useRouter();
@@ -34,7 +44,7 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   const [lastPushed, setLastPushed] = useState(initialQuery);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   if (initialQuery !== prevInitialQuery) {
     setPrevInitialQuery(initialQuery);
@@ -84,9 +94,12 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
         type="search"
         value={query}
         onChange={handleChange}
-        placeholder="Search your notes"
-        aria-label="Search notes by content"
+        placeholder="Search by note content"
+        maxLength={MAX_SEARCH_LENGTH}
       />
+      <p className="sr-only" role="status" aria-live="polite">
+        {isPending ? 'Searching notes' : ''}
+      </p>
     </div>
   );
 }
