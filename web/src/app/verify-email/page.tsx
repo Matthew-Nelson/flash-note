@@ -47,7 +47,6 @@ function VerifyEmailContent() {
       return;
     }
     verificationStarted.current = true;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Server Action call on mount (external system sync)
     void verifyEmail(token);
   }, [token, verifyEmail]);
 

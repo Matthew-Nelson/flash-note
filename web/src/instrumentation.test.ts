@@ -25,7 +25,7 @@ describe('instrumentation', () => {
       const request = { method: 'GET', path: '/dashboard', headers: {} };
       const context = { routeType: 'page' as const, routePath: '/dashboard' };
 
-      await onRequestError(err, request as never, context as never);
+      await onRequestError(err, request, context as never);
 
       expect(mockLogger.error).toHaveBeenCalledOnce();
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -48,7 +48,7 @@ describe('instrumentation', () => {
       const request = { method: 'POST', path: '/api/notes', headers: {} };
       const context = { routeType: 'app-route' as const, routePath: '/api/notes' };
 
-      await onRequestError(err, request as never, context as never);
+      await onRequestError(err, request, context as never);
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.any(Object),

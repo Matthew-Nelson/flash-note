@@ -23,7 +23,7 @@ import { logger } from '@/server/lib/logger';
 import { sanitizeFieldErrors } from '@/server/lib/validation';
 import { getPoolClient } from '@/server/db';
 import type { ActionResult } from '@/lib/types/actions';
-import type { Patient, Pronoun } from '@/lib/types';
+import type { Patient } from '@/lib/types';
 
 /**
  * Allowed field names that may appear in Server Action field-error payloads.
@@ -108,7 +108,7 @@ export async function createPatientAction(
         firstName: parsed.data.firstName,
         lastName: parsed.data.lastName,
         dateOfBirth: parsed.data.dateOfBirth ?? null,
-        pronoun: (parsed.data.pronoun ?? null) as Pronoun | null,
+        pronoun: parsed.data.pronoun ?? null,
         phone: parsed.data.phone ?? null,
         email: parsed.data.email ?? null,
         context: parsed.data.context ?? null,

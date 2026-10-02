@@ -1,7 +1,7 @@
 /**
  * Test factories for ClinicalNote rows and domain objects.
  */
-import type { ClinicalNote, NoteSection, NoteType } from '@/lib/types';
+import type { ClinicalNote, NoteSection } from '@/lib/types';
 import type { ClinicalNoteRow } from '@/lib/types/database';
 
 const DEFAULT_NOTE_ID = '00000000-0000-0000-0000-0000000cdcde';
@@ -52,7 +52,7 @@ export function createMockNote(
     organizationId: null,
     patientId: null,
     templateId: DEFAULT_TEMPLATE_ID,
-    noteType: 'daily_note' as NoteType,
+    noteType: 'daily_note',
     content: [createMockNoteSection()],
     quickNotes: 'pt c/o knee pain, ROM 100 deg',
     patientContext: null,
