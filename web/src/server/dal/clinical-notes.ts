@@ -56,7 +56,7 @@ function rowToClinicalNote(row: ClinicalNoteRow): ClinicalNote {
     organizationId: row.organization_id,
     patientId: row.patient_id,
     templateId: row.template_id,
-    noteType: noteTypeSchema.parse(row.note_type) as NoteType,
+    noteType: noteTypeSchema.parse(row.note_type),
     content: NoteContentSchema.parse(row.content),
     quickNotes: row.quick_notes,
     patientContext: row.patient_context,

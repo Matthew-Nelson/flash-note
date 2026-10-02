@@ -51,7 +51,7 @@ export function PatientCreateForm(): React.ReactElement {
     if (!pre.success) {
       const flat = pre.error.flatten();
       setErrorCode('validation_error');
-      setFieldErrors(flat.fieldErrors as Record<string, string[]>);
+      setFieldErrors(flat.fieldErrors);
       return;
     }
 

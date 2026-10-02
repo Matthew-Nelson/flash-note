@@ -82,7 +82,7 @@ describe('SignupPage', () => {
           trialEndsAt: new Date(),
           emailVerified: false,
           organizationId: null,
-        } as SanitizedUser,
+        },
       },
     };
     vi.mocked(registerAction).mockResolvedValueOnce(successResult);

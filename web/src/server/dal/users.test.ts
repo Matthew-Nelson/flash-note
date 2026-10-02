@@ -89,7 +89,7 @@ describe('User Queries', () => {
     });
 
     it('should throw on invalid subscription_status from DB', async () => {
-      const mockRow = createMockUserRow({ subscription_status: 'invalid_status' as never });
+      const mockRow = createMockUserRow({ subscription_status: 'invalid_status' });
       mockDbQuery.mockResolvedValueOnce({ rows: [mockRow] });
 
       await expect(findUserByEmail('test@example.com')).rejects.toThrow();
