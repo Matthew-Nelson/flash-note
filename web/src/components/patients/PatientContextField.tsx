@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Alert, Button, Card, CardContent } from '@/components/ui';
 import { updatePatientContextAction } from '@/actions/patients';
+import { usePhiCleanup } from '@/hooks/use-phi-cleanup';
 import type { Patient } from '@/lib/types';
 import { mapPatientError } from './error-messages';
 
@@ -49,6 +50,19 @@ export function PatientContextField({ patient }: PatientContextFieldProps): Reac
     setErrorCode(null);
     setEditing(false);
   }
+
+  // Rule 4: discard the unsaved draft on logout / route change. Unlike
+  // handleCancel this must not be blocked by a pending save.
+  function clearDraft(): void {
+    setValue(savedValue);
+    setErrorCode(null);
+    setEditing(false);
+  }
+  const cleanupRef = useRef(clearDraft);
+  useEffect(() => {
+    cleanupRef.current = clearDraft;
+  });
+  usePhiCleanup(cleanupRef);
 
   function handleSave(): void {
     if (tooLong) return;

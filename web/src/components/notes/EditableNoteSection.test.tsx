@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditableNoteSection } from './EditableNoteSection';
 import type { NoteSection } from '@/lib/types';
@@ -163,5 +163,37 @@ describe('EditableNoteSection', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     // mapNoteError('internal_error') → "Something went wrong. Please try again."
     expect(screen.getByRole('alert').textContent).toMatch(/Something went wrong/i);
+  });
+
+  describe('logout (Rule 4)', () => {
+    it('discards an unsaved draft and returns to read mode on flashnote:logout', async () => {
+      const user = userEvent.setup();
+      render(
+        <EditableNoteSection
+          noteId={NOTE_ID}
+          section={section()}
+          expectedUpdatedAt={UPDATED_AT}
+          versions={[]}
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /Edit Subjective section/i }));
+      const textarea = screen.getByRole('textbox', { name: /Edit Subjective/i });
+      await user.clear(textarea);
+      await user.type(textarea, 'Unsaved draft: Jane Doe DOB 1/2/1960');
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('flashnote:logout'));
+      });
+
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Unsaved draft/)).not.toBeInTheDocument();
+      expect(screen.getByText('Original subjective content.')).toBeInTheDocument();
+
+      // Re-entering edit mode must not resurrect the discarded draft
+      await user.click(screen.getByRole('button', { name: /Edit Subjective section/i }));
+      expect(screen.getByRole('textbox', { name: /Edit Subjective/i })).toHaveValue(
+        'Original subjective content.',
+      );
+    });
   });
 });

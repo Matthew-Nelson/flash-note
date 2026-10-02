@@ -97,6 +97,39 @@ describe('DB pool TLS configuration (PHI-10 code-side)', () => {
     expect(opts.ssl).toBeUndefined();
   });
 
+  it('does NOT set ssl for a Cloud SQL Auth Proxy on localhost', async () => {
+    env.NODE_ENV = 'production';
+    mockConfig.current = {
+      DATABASE_URL: 'postgres://user:pass@localhost:5432/flashnote',
+    };
+    const { buildPoolConfig } = await import('@/server/db');
+    expect(buildPoolConfig().ssl).toBeUndefined();
+  });
+
+  // The tunnel exemption must be decided from the host pg actually connects
+  // to — not from substrings anywhere in the URL — or TLS fails open.
+  it.each([
+    ['a remote host whose name starts with localhost', 'postgres://user:pass@localhost.evil.example:5432/flashnote'],
+    ['a remote host whose name starts with 127.0.0.1', 'postgres://user:pass@127.0.0.1.nip.example:5432/flashnote'],
+    ['"@localhost" in a query parameter', 'postgres://user:pass@db.example.com:5432/flashnote?application_name=@localhost'],
+    ['"host=/cloudsql/" inside another parameter value', 'postgres://user:pass@db.example.com:5432/flashnote?application_name=xhost=/cloudsql/x'],
+    ['a host= override pointing at a remote server', 'postgres://user:pass@localhost:5432/flashnote?host=db.example.com'],
+  ])('enforces TLS in production for %s', async (_label, url) => {
+    env.NODE_ENV = 'production';
+    mockConfig.current = { DATABASE_URL: url };
+    const { buildPoolConfig } = await import('@/server/db');
+    expect(buildPoolConfig().ssl).toEqual({ rejectUnauthorized: true });
+  });
+
+  it('does NOT set ssl when a host= override points at the Cloud SQL socket', async () => {
+    env.NODE_ENV = 'production';
+    mockConfig.current = {
+      DATABASE_URL: 'postgres://user:pass@db.example.com:5432/flashnote?host=/cloudsql/project:region:instance',
+    };
+    const { buildPoolConfig } = await import('@/server/db');
+    expect(buildPoolConfig().ssl).toBeUndefined();
+  });
+
   it('does NOT set ssl in development mode', async () => {
     env.NODE_ENV = 'development';
     mockConfig.current = {

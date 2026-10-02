@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 // useEffect retained for the beforeunload listener below.
 
 import { updateNoteSectionsAction } from '@/actions/notes';
+import { usePhiCleanup } from '@/hooks/use-phi-cleanup';
 import { Alert, Button } from '@/components/ui';
 import type { NoteSection } from '@/lib/types';
 
@@ -72,6 +73,19 @@ export function EditableNoteSection({
   const [isPending, startTransition] = useTransition();
 
   const isDirty = mode === 'edit' && draft !== originalContent;
+
+  // Rule 4: discard the unsaved draft on logout / route change.
+  function clearDraft() {
+    setTracked((t) => ({ ...t, draft: t.upstream, mode: 'read' }));
+    setErrorCode(null);
+    setConflict(false);
+    setSavedMessage(null);
+  }
+  const cleanupRef = useRef(clearDraft);
+  useEffect(() => {
+    cleanupRef.current = clearDraft;
+  });
+  usePhiCleanup(cleanupRef);
 
   // Dirty-state guard (Rule 13): prompt on browser navigation when there are
   // unsaved edits. In-app routing guards are at the ClientNoteDetail level.

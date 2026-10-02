@@ -11,17 +11,16 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error: Error | null;
 }
 
 export default class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
   }
 
   componentDidCatch(error: Error, _errorInfo: React.ErrorInfo) {
@@ -29,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null });
+    this.setState({ hasError: false });
   };
 
   render() {
@@ -58,19 +57,6 @@ export default class ErrorBoundary extends Component<Props, State> {
           <p className="text-fn-text-secondary mb-6 max-w-md">
             We encountered an unexpected error. Please try refreshing the page or contact support if the problem persists.
           </p>
-
-          {process.env.NODE_ENV === 'development' && this.state.error && (
-            <details className="text-left w-full max-w-lg mb-6">
-              <summary className="text-sm text-fn-text-muted cursor-pointer hover:text-fn-text-secondary">
-                Error details (development only)
-              </summary>
-              <pre className="mt-2 p-4 bg-fn-bg-secondary rounded-lg text-xs overflow-auto max-h-48">
-                {this.state.error.message}
-                {'\n\n'}
-                {this.state.error.stack}
-              </pre>
-            </details>
-          )}
 
           <div className="flex gap-4">
             <button

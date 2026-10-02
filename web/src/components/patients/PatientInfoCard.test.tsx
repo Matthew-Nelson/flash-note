@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const h = vi.hoisted(() => ({
@@ -178,5 +178,29 @@ describe('PatientInfoCard', () => {
     const phone = screen.getByLabelText<HTMLInputElement>(/phone/i);
     await user.type(phone, '5551234567');
     expect(phone.value).toBe('(555) 123-4567');
+  });
+
+  describe('logout (Rule 4)', () => {
+    it('discards unsaved edits and exits edit mode on flashnote:logout', async () => {
+      const user = userEvent.setup();
+      const patient = createMockPatient({ firstName: 'Jane', lastName: 'Doe', email: 'jane@example.com' });
+      render(<PatientInfoCard patient={patient} />);
+      await user.click(screen.getByRole('button', { name: /edit/i }));
+      const email = screen.getByLabelText('Email');
+      await user.clear(email);
+      await user.type(email, 'unsaved-draft@example.com');
+
+      act(() => {
+        window.dispatchEvent(new CustomEvent('flashnote:logout'));
+      });
+
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+      expect(screen.queryByText('unsaved-draft@example.com')).not.toBeInTheDocument();
+      expect(screen.getByText('jane@example.com')).toBeInTheDocument();
+      expect(h.updatePatientAction).not.toHaveBeenCalled();
+
+      await user.click(screen.getByRole('button', { name: /edit/i }));
+      expect(screen.getByLabelText('Email')).toHaveValue('jane@example.com');
+    });
   });
 });
