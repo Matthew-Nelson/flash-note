@@ -1,6 +1,7 @@
 import 'server-only';
 
 import pg from 'pg';
+import { parse as parseConnectionString } from 'pg-connection-string';
 
 import { config } from './config';
 import { logger } from '@/server/lib/logger';
@@ -54,10 +55,15 @@ export function buildPoolConfig(): pg.PoolConfig {
   // Production TLS enforcement. Skip when connecting via the Cloud SQL Auth
   // Proxy sidecar (localhost / unix socket) — that path is already encrypted
   // by the managed proxy. Otherwise require TLS at the driver level.
+  //
+  // Decide from the host pg will actually connect to (same parser pg uses,
+  // honoring a `?host=` override). Substring checks on the raw URL fail open,
+  // e.g. `@localhost.evil.example`.
+  const host = parseConnectionString(url).host ?? '';
   const isProxyTunnel =
-    url.includes('@127.0.0.1') ||
-    url.includes('@localhost') ||
-    url.includes('host=/cloudsql/');
+    host === '127.0.0.1' ||
+    host === 'localhost' ||
+    host.startsWith('/cloudsql/');
   const hasSslMode = /[?&]sslmode=(require|verify-ca|verify-full)\b/.test(url);
 
   if (!isProxyTunnel && !hasSslMode) {

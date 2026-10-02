@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Alert, Button, Card, CardContent, Input } from '@/components/ui';
 import { updatePatientAction } from '@/actions/patients';
+import { usePhiCleanup } from '@/hooks/use-phi-cleanup';
 import type { Patient, Pronoun } from '@/lib/types';
 import { formatPhoneDisplay, formatPhoneInput } from '@/lib/utils/phone';
 import { mapPatientError } from './error-messages';
@@ -60,6 +61,13 @@ export function PatientInfoCard({ patient }: PatientInfoCardProps): React.ReactE
     setErrorCode(null);
     setEditing(false);
   }
+
+  // Rule 4: discard unsaved edits on logout / route change.
+  const cleanupRef = useRef(handleCancel);
+  useEffect(() => {
+    cleanupRef.current = handleCancel;
+  });
+  usePhiCleanup(cleanupRef);
 
   function handleSave(e: React.FormEvent): void {
     e.preventDefault();

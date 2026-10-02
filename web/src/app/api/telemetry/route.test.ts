@@ -103,9 +103,37 @@ describe('POST /api/telemetry', () => {
     expect(fields.source).toBe('client');
     expect(fields.errorType).toBe('unhandled_error');
     expect(fields.stack_trace).toBe(payload.stack);
-    expect(fields.url).toBe(payload.url);
+    expect(fields.url).toBe('/dashboard');
     expect(message).toContain('[Client]');
     expect(message).toContain('Uncaught TypeError');
+  });
+
+  it.each([
+    ['absolute URL with PHI query', 'http://localhost:3000/dashboard/patients?q=Jane%20Doe', '/dashboard/patients'],
+    ['fragment', 'https://app.example.com/dashboard/notes/abc#Jane-Doe', '/dashboard/notes/abc'],
+    ['relative path with query', '/dashboard/patients?q=Jane+Doe&page=2', '/dashboard/patients'],
+  ])('logs only the pathname for %s', async (_label, url, expectedPath) => {
+    const response = await POST(makeRequest({ type: 'unhandled_error', message: 'x', url }));
+
+    expect(response.status).toBe(200);
+    const [fields] = mockLoggerError.mock.calls[0] as [Record<string, unknown>];
+    expect(fields.url).toBe(expectedPath);
+    expect(JSON.stringify(mockLoggerError.mock.calls)).not.toContain('Jane');
+  });
+
+  it('drops an unparseable URL instead of logging it raw', async () => {
+    await POST(makeRequest({ type: 'unhandled_error', message: 'x', url: 'http://[Jane Doe' }));
+
+    const [fields] = mockLoggerError.mock.calls[0] as [Record<string, unknown>];
+    expect(fields.url).toBeUndefined();
+    expect(JSON.stringify(mockLoggerError.mock.calls)).not.toContain('Jane');
+  });
+
+  it('logs no url field when the client omits it', async () => {
+    await POST(makeRequest({ type: 'unhandled_error', message: 'x' }));
+
+    const [fields] = mockLoggerError.mock.calls[0] as [Record<string, unknown>];
+    expect(fields.url).toBeUndefined();
   });
 
   it('returns 200 { ok: true } silently for invalid payload (missing type)', async () => {

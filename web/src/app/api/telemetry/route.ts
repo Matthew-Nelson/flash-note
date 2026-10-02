@@ -32,6 +32,20 @@ const telemetrySchema = z.object({
 const OK_RESPONSE = { ok: true };
 
 /**
+ * Reduce a client-reported URL to its pathname. Query strings and fragments
+ * can carry PHI (e.g. patient search `?q=<name>`) and must never be logged.
+ * Path segments are route names and UUIDs only. Unparseable input is dropped.
+ */
+function toLoggablePath(url: string | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    return new URL(url, 'http://telemetry.invalid').pathname;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Extract client IP from x-forwarded-for, using TRUSTED_PROXY_COUNT
  * to skip trusted proxy hops from the right.
  *
@@ -87,7 +101,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         source: 'client',
         errorType: event.type,
         stack_trace: event.stack, // Key name matches GCP Error Reporting expectation
-        url: event.url,
+        url: toLoggablePath(event.url),
         digest: event.digest,
         componentStack: event.componentStack,
       },

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const h = vi.hoisted(() => ({
@@ -227,5 +227,28 @@ describe('PatientContextField (view/edit toggle)', () => {
     await user.click(screen.getByRole('button', { name: /edit patient context/i }));
     await user.type(screen.getByRole('textbox'), 'abcde');
     expect(screen.getByText('5 / 2000')).toBeInTheDocument();
+  });
+
+  // -------------------------------------------------------------------------
+  // Logout (Rule 4)
+  // -------------------------------------------------------------------------
+
+  it('discards an unsaved draft and exits edit mode on flashnote:logout', async () => {
+    const user = userEvent.setup();
+    const patient = createMockPatient({ context: 'Chronic knee pain' });
+    render(<PatientContextField patient={patient} />);
+    await user.click(screen.getByRole('button', { name: /edit patient context/i }));
+    await user.type(screen.getByRole('textbox'), ' — unsaved draft');
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('flashnote:logout'));
+    });
+
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+    expect(screen.queryByText(/unsaved draft/)).not.toBeInTheDocument();
+    expect(screen.getByText('Chronic knee pain')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /edit patient context/i }));
+    expect(screen.getByRole('textbox')).toHaveValue('Chronic knee pain');
   });
 });

@@ -40,7 +40,10 @@ describe('telemetry client', () => {
     setGlobal('navigator', { sendBeacon: mockSendBeacon });
     setGlobal('window', {
       addEventListener: mockAddEventListener,
-      location: { href: 'http://localhost:3000/dashboard' },
+      location: {
+        href: 'http://localhost:3000/dashboard/patients?q=Jane%20Doe#row-3',
+        pathname: '/dashboard/patients',
+      },
     });
     setGlobal('fetch', mockFetch);
 
@@ -85,7 +88,7 @@ describe('telemetry client', () => {
         type: 'unhandled_error',
         message: 'Uncaught TypeError: x is not a function',
         stack: 'TypeError: x is not a function\n    at foo.js:10',
-        url: 'http://localhost:3000/dashboard',
+        url: '/dashboard/patients',
       });
     });
 
@@ -124,7 +127,7 @@ describe('telemetry client', () => {
         type: 'unhandled_rejection',
         message: 'Promise rejected',
         stack: 'Error: Promise rejected\n    at bar.js:5',
-        url: 'http://localhost:3000/dashboard',
+        url: '/dashboard/patients',
       });
     });
 
@@ -148,6 +151,23 @@ describe('telemetry client', () => {
       const payload = await beaconPayload();
       expect(payload.message).toBe('Unknown rejection');
       expect(JSON.stringify(payload)).not.toContain('Jane Doe');
+    });
+  });
+
+  describe('PHI in the page URL', () => {
+    it('never reports the query string or fragment (patient search puts names in ?q=)', async () => {
+      initClientTelemetry();
+      getListener<ErrorEvent>('error')({ message: 'boom', error: null } as ErrorEvent);
+      getListener<PromiseRejectionEvent>('unhandledrejection')({ reason: 'x' } as PromiseRejectionEvent);
+      reportErrorBoundary(new Error('render'));
+
+      expect(mockSendBeacon).toHaveBeenCalledTimes(3);
+      for (let i = 0; i < 3; i++) {
+        const raw = JSON.stringify(await beaconPayload(i));
+        expect(raw).not.toContain('Jane');
+        expect(raw).not.toContain('?q=');
+        expect(raw).not.toContain('#row-3');
+      }
     });
   });
 
@@ -237,7 +257,7 @@ describe('telemetry client', () => {
         message: 'Component render error',
         stack: 'Error: Component render error\n    at MyComponent (app.js:42)',
         digest: 'digest-abc',
-        url: 'http://localhost:3000/dashboard',
+        url: '/dashboard/patients',
       });
     });
 

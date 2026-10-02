@@ -23,8 +23,8 @@ interface ClientNoteDetailProps {
  *   - Hosts per-section editors (EditableNoteSection) with a shared
  *     expectedUpdatedAt token (optimistic lock).
  *   - Drives the archive ConfirmDialog.
- *   - Wires usePhiCleanup so section drafts, archive dialog error state,
- *     and any in-flight fetches are cleared on logout / route change (Rule 4).
+ *   - Wires usePhiCleanup so archive dialog state is cleared on logout /
+ *     route change (Rule 4). Each EditableNoteSection clears its own draft.
  */
 export function ClientNoteDetail({ note, versions }: ClientNoteDetailProps) {
   const router = useRouter();
