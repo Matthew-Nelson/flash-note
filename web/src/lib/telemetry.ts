@@ -11,6 +11,9 @@
  * Design: Fire-and-forget via sendBeacon (survives page unloads).
  * Falls back to fetch with keepalive. Never throws -- telemetry failures
  * must not impact the user experience.
+ *
+ * PHI: only `location.pathname` is reported. Query strings can contain PHI
+ * (patient search puts the typed name in `?q=`).
  */
 
 const TELEMETRY_URL = '/api/telemetry';
@@ -66,7 +69,7 @@ export function initClientTelemetry(): void {
       type: 'unhandled_error',
       message: event.message || 'Unknown error',
       stack: event.error instanceof Error ? event.error.stack : undefined,
-      url: window.location.href,
+      url: window.location.pathname,
     });
   });
 
@@ -84,7 +87,7 @@ export function initClientTelemetry(): void {
       type: 'unhandled_rejection',
       message,
       stack,
-      url: window.location.href,
+      url: window.location.pathname,
     });
   });
 }
@@ -104,6 +107,6 @@ export function reportErrorBoundary(error: Error, digest?: string): void {
     message: error.message || 'Unknown error boundary error',
     stack: error.stack,
     digest,
-    url: typeof window !== 'undefined' ? window.location.href : undefined,
+    url: typeof window !== 'undefined' ? window.location.pathname : undefined,
   });
 }

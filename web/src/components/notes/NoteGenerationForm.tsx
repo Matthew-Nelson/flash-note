@@ -104,9 +104,16 @@ export function NoteGenerationForm({
   const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [isPending, startTransition] = useTransition();
 
+  // Incremented on every submit and on PHI cleanup. Server Actions can't be
+  // aborted, so a response is applied only if its generation is still current
+  // — otherwise a note in flight at logout would repopulate PHI (Rule 4), or a
+  // stale response could overwrite a newer one.
+  const generationRef = useRef(0);
+
   // Rule 4: Clear all PHI state when logout is initiated OR when navigating
   // away from /dashboard/notes/new via usePhiCleanup.
-  const cleanupRef = useRef(() => {
+  function clearPhi() {
+    generationRef.current += 1;
     setQuickNotes('');
     setPatientContext('');
     setModality('in_person');
@@ -115,20 +122,12 @@ export function NoteGenerationForm({
     setErrorCode(null);
     setFieldErrors(null);
     setActiveStep(1);
-  });
+  }
+  const cleanupRef = useRef(clearPhi);
 
   // Keep the cleanup callback current — closures over the LATEST setState refs.
   useEffect(() => {
-    cleanupRef.current = () => {
-      setQuickNotes('');
-      setPatientContext('');
-      setModality('in_person');
-      setDuration('');
-      setGeneratedNote(null);
-      setErrorCode(null);
-      setFieldErrors(null);
-      setActiveStep(1);
-    };
+    cleanupRef.current = clearPhi;
   });
 
   usePhiCleanup(cleanupRef);
@@ -139,6 +138,7 @@ export function NoteGenerationForm({
     setFieldErrors(null);
     setGeneratedNote(null);
     setActiveStep(1);
+    const generation = ++generationRef.current;
     startTransition(async () => {
       const formData = new FormData();
       formData.set('noteType', noteType);
@@ -151,6 +151,7 @@ export function NoteGenerationForm({
       // query param so saveNoteAction can persist the linkage.
       if (initialPatientId) formData.set('patientId', initialPatientId);
       const result = await generateNoteAction(formData);
+      if (generation !== generationRef.current) return;
       if (result.success) {
         setGeneratedNote(result.data);
         setActiveStep(2);

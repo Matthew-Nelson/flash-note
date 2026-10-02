@@ -108,17 +108,23 @@ describe('ErrorBoundary', () => {
     expect(reloadMock).toHaveBeenCalledTimes(1);
   });
 
-  it('should show error details in development', () => {
-    vi.stubEnv('NODE_ENV', 'development');
+  it.each(['development', 'production'])(
+    'never renders the raw error message or stack (NODE_ENV=%s, Rule 7)',
+    (nodeEnv) => {
+      vi.stubEnv('NODE_ENV', nodeEnv);
+      try {
+        const { container } = render(
+          <ErrorBoundary>
+            <ThrowOnRender shouldThrow={true} />
+          </ErrorBoundary>
+        );
 
-    render(
-      <ErrorBoundary>
-        <ThrowOnRender shouldThrow={true} />
-      </ErrorBoundary>
-    );
-
-    expect(screen.getByText('Error details (development only)')).toBeInTheDocument();
-
-    vi.unstubAllEnvs();
-  });
+        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+        expect(container.textContent).not.toContain('Test error');
+        expect(container.textContent).not.toContain('ThrowOnRender');
+      } finally {
+        vi.unstubAllEnvs();
+      }
+    }
+  );
 });
