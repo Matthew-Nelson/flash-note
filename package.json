@@ -11,16 +11,11 @@
     "clean": "pnpm -r clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=20.9.0",
     "pnpm": ">=10.0.0"
   },
-  "packageManager": "pnpm@10.28.2",
-  "pnpm": {
-    "overrides": {
-      "protobufjs": "^7.5.5"
-    }
-  }
+  "packageManager": "pnpm@10.28.2"
 }
