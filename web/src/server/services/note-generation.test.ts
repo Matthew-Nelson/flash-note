@@ -403,3 +403,132 @@ describe('generateNote (mock AI mode)', () => {
     expect(mockProvider.generatePTNote).not.toHaveBeenCalled();
   });
 });
+
+describe('generateNote (non-SOAP template sections)', () => {
+  const customTemplate: NoteTemplateWithSections = {
+    ...soapTemplate,
+    id: '00000000-0000-0000-0000-000000000002',
+    name: 'Custom',
+    isBuiltin: false,
+    sections: [
+      { ...soapTemplate.sections[1], id: 'sec-b', title: 'Functional Outcomes', sortOrder: 2 },
+      { ...soapTemplate.sections[0], id: 'sec-a', title: 'SUBJECTIVE', sortOrder: 1 },
+    ],
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDetectSuspiciousPatterns.mockReturnValue({ detected: false, count: 0 });
+    mockGetConfiguredProvider.mockReturnValue(mockProvider);
+    mockProvider.generatePTNote.mockResolvedValue({
+      note: { subjective: 'S text', objective: 'O text', assessment: 'A text', plan: 'P text' },
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+  });
+
+  it('matches titles case-insensitively and leaves unknown titles empty, in sortOrder', async () => {
+    const result = await generateNote(buildInput({ template: customTemplate }));
+
+    expect(result.content).toEqual([
+      { sectionId: 'sec-a', title: 'SUBJECTIVE', content: 'S text' },
+      { sectionId: 'sec-b', title: 'Functional Outcomes', content: '' },
+    ]);
+  });
+});
+
+describe('generateNote (environment-dependent configuration)', () => {
+  const baseConfig = {
+    USE_MOCK_AI: false,
+    LLM_PROVIDER: 'gemini',
+    GEMINI_API_KEY: 'test-key',
+    GEMINI_MODEL: 'gemini-2.5-flash',
+    GEMINI_API_URL: 'https://example.com',
+    GEMINI_USE_ADC: false,
+    GEMINI_MAX_TOKENS: 4000,
+    GEMINI_TEMPERATURE: 0.2,
+    GEMINI_TIMEOUT_MS: 30000,
+    ANTHROPIC_API_KEY: 'sk-ant-test',
+    ANTHROPIC_MODEL: 'claude-sonnet-4-20250514',
+    ANTHROPIC_MAX_TOKENS: 2000,
+    ANTHROPIC_TEMPERATURE: 0.7,
+    ANTHROPIC_TIMEOUT_MS: 45000,
+  };
+
+  async function importWithConfig(
+    overrides: Partial<typeof baseConfig>,
+    isProduction = false,
+  ): Promise<typeof import('./note-generation')> {
+    vi.resetModules();
+    vi.doMock('@/server/db/config', () => ({
+      config: { ...baseConfig, ...overrides },
+      isProduction,
+    }));
+    // Re-register spy-backed mocks: an earlier describe's vi.doMock calls replace them.
+    vi.doMock('@/server/lib/prompt-sanitization', () => ({
+      detectSuspiciousPatterns: mockDetectSuspiciousPatterns,
+    }));
+    vi.doMock('@/server/prompts/system', () => ({ getSystemPrompt: mockGetSystemPrompt }));
+    vi.doMock('@/server/prompts/assemble', () => ({ assembleUserPrompt: mockAssembleUserPrompt }));
+    vi.doMock('@/server/services/llm', () => ({ getConfiguredProvider: mockGetConfiguredProvider }));
+    return import('./note-generation');
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDetectSuspiciousPatterns.mockReturnValue({ detected: false, count: 0 });
+    mockGetSystemPrompt.mockReturnValue('system prompt');
+    mockAssembleUserPrompt.mockReturnValue('user prompt');
+    mockGetConfiguredProvider.mockReturnValue(mockProvider);
+    mockProvider.generatePTNote.mockResolvedValue({
+      note: { subjective: 'S', objective: 'O', assessment: 'A', plan: 'P' },
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+  });
+
+  it('refuses to load in production when USE_MOCK_AI is enabled (fake clinical notes)', async () => {
+    await expect(importWithConfig({ USE_MOCK_AI: true }, true)).rejects.toThrow(
+      'SECURITY ERROR: USE_MOCK_AI cannot be enabled in production',
+    );
+  });
+
+  it('loads and calls the real provider in production when USE_MOCK_AI is disabled', async () => {
+    const mod = await importWithConfig({ USE_MOCK_AI: false }, true);
+
+    await mod.generateNote(buildInput());
+
+    expect(mockProvider.generatePTNote).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses the Anthropic token/temperature/timeout settings when LLM_PROVIDER is claude', async () => {
+    const mod = await importWithConfig({ LLM_PROVIDER: 'claude' });
+
+    await mod.generateNote(buildInput());
+
+    expect(mockGetConfiguredProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: 'claude', claudeApiKey: 'sk-ant-test' }),
+    );
+    expect(mockProvider.generatePTNote).toHaveBeenCalledWith('system prompt', 'user prompt', {
+      maxTokens: 2000,
+      temperature: 0.7,
+      timeoutMs: 45000,
+    });
+  });
+
+  it('returns empty content for template sections the mock fixture does not know', async () => {
+    const mod = await importWithConfig({ USE_MOCK_AI: true });
+    const template: NoteTemplateWithSections = {
+      ...soapTemplate,
+      sections: [
+        { ...soapTemplate.sections[0], id: 'sec-s' },
+        { ...soapTemplate.sections[1], id: 'sec-x', title: 'Home Exercise Program' },
+      ],
+    };
+
+    const result = await mod.generateNote(buildInput({ template }));
+
+    expect(result.content[0]).toMatchObject({ sectionId: 'sec-s', title: 'Subjective' });
+    expect(result.content[0].content.length).toBeGreaterThan(0);
+    expect(result.content[1]).toEqual({ sectionId: 'sec-x', title: 'Home Exercise Program', content: '' });
+    expect(mockProvider.generatePTNote).not.toHaveBeenCalled();
+  });
+});

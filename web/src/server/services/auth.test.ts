@@ -313,6 +313,90 @@ describe('auth service', () => {
         'Login successful'
       );
     });
+
+    it('still completes login when resetFailedAttempts fails, and logs an audit-flagged error', async () => {
+      const userRow = createMockUserRow({ email_verified: true });
+      mockDbQuery.mockResolvedValueOnce({ rows: [userRow] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+      mockGetAccountLockoutStatus.mockResolvedValueOnce({
+        isLocked: false, failedAttempts: 2, isPermanentlyLocked: false, lockedUntil: null,
+      });
+      const resetErr = new Error('lockout db unavailable');
+      mockResetFailedAttempts.mockRejectedValueOnce(resetErr);
+
+      setupMockClient();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })  // BEGIN
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] })
+        .mockResolvedValueOnce({ rows: [] }); // COMMIT
+
+      const result = await login('test@example.com', 'password123', context);
+
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.user.id).toBe('test-user-id');
+        expect(result.token).toEqual(expect.any(String));
+      }
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        { err: resetErr, source: 'dal_auth', errorType: 'lockout_reset_failed', audit: true },
+        'Lockout service error during failed attempts reset'
+      );
+    });
+
+    it('wraps a non-Error thrown by resetFailedAttempts before logging', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockUserRow()] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+      mockGetAccountLockoutStatus.mockResolvedValueOnce({
+        isLocked: false, failedAttempts: 0, isPermanentlyLocked: false, lockedUntil: null,
+      });
+      mockResetFailedAttempts.mockRejectedValueOnce('redis timeout');
+
+      setupMockClient();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'session-1' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      const result = await login('test@example.com', 'password123', context);
+
+      expect(result.success).toBe(true);
+      const [logContext] = mockLogger.error.mock.calls[0] as [{ err: unknown; errorType: string }];
+      expect(logContext.errorType).toBe('lockout_reset_failed');
+      expect(logContext.err).toBeInstanceOf(Error);
+      expect((logContext.err as Error).message).toBe('redis timeout');
+    });
+
+    it('logs an audit-flagged error when recordFailedAttempt throws a non-Error', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockUserRow()] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(false as never);
+      mockRecordFailedAttempt.mockRejectedValueOnce('connection reset');
+
+      const result = await login('test@example.com', 'wrong', context);
+
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
+      expect(mockLogger.error).toHaveBeenCalledTimes(1);
+      const [logContext] = mockLogger.error.mock.calls[0] as [Record<string, unknown>];
+      expect(logContext).toMatchObject({ source: 'dal_auth', errorType: 'lockout_record_failed', audit: true });
+      expect((logContext.err as Error).message).toBe('connection reset');
+    });
+
+    it('fails secure and logs an audit-flagged error when the lockout check throws a non-Error', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockUserRow()] });
+      vi.mocked(bcrypt.compare).mockResolvedValueOnce(true as never);
+      mockGetAccountLockoutStatus.mockRejectedValueOnce('query cancelled');
+
+      const result = await login('test@example.com', 'password123', context);
+
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
+      // Fail-secure: no session may be created when lockout state is unknown
+      expect(mockGetPoolClient).not.toHaveBeenCalled();
+      expect(mockResetFailedAttempts).not.toHaveBeenCalled();
+      const [logContext] = mockLogger.error.mock.calls[0] as [Record<string, unknown>];
+      expect(logContext).toMatchObject({ source: 'dal_auth', errorType: 'lockout_check_failed', audit: true });
+      expect((logContext.err as Error).message).toBe('query cancelled');
+    });
   });
 
   describe('register', () => {
@@ -444,6 +528,66 @@ describe('auth service', () => {
 
       // Registration should still succeed
       expect(result.success).toBe(true);
+    });
+
+    it('logs verification email failures (including non-Error rejections) without failing registration', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      setupMockClient();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [createMockUserRow()] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 's-1' }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      mockCreateToken.mockResolvedValueOnce('verification-token');
+      mockSendVerificationEmail.mockRejectedValueOnce('resend 503');
+
+      const result = await register('new@example.com', 'Password1', context);
+
+      expect(result.success).toBe(true);
+      expect(mockSendVerificationEmail).toHaveBeenCalledWith('new@example.com', 'verification-token');
+      const [logContext, message] = mockLogger.error.mock.calls[0] as [Record<string, unknown>, string];
+      expect(message).toBe('Failed to send verification email');
+      expect(logContext).toMatchObject({ source: 'dal_auth', errorType: 'verification_email_failed' });
+      expect((logContext.err as Error).message).toBe('resend 503');
+      // PII: the email address must not appear in the log context
+      expect(JSON.stringify(logContext)).not.toContain('new@example.com');
+    });
+
+    it('records legal acceptances with null IP and user agent when the request context lacks them', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      setupMockClient();
+      mockClientQuery
+        .mockResolvedValueOnce({ rows: [] })
+        .mockResolvedValueOnce({ rows: [createMockUserRow()] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-1' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-2' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 'la-3' }] })
+        .mockResolvedValueOnce({ rows: [{ count: '0' }] })
+        .mockResolvedValueOnce({ rows: [{ id: 's-1' }] })
+        .mockResolvedValueOnce({ rows: [] });
+      mockCreateToken.mockResolvedValueOnce('verification-token');
+      mockSendVerificationEmail.mockResolvedValueOnce(undefined);
+
+      const result = await register('new@example.com', 'Password1', {});
+
+      expect(result.success).toBe(true);
+      const legalInserts = mockClientQuery.mock.calls.filter(
+        ([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO legal_acceptances')
+      );
+      expect(legalInserts).toHaveLength(3);
+      for (const [, params] of legalInserts) {
+        const [userId, , , ip, userAgent] = params as unknown[];
+        expect(userId).toBe('test-user-id');
+        expect(ip).toBeNull();
+        expect(userAgent).toBeNull();
+      }
     });
 
     it('logs successful registration at info level', async () => {

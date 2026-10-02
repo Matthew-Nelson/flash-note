@@ -145,6 +145,13 @@ function makeEvent(type: string, dataObject: unknown): unknown {
 // Tests
 // ---------------------------------------------------------------------------
 
+describe('getBillingService', () => {
+  it('returns the same instance on every call (lazy singleton)', () => {
+    expect(getBillingService()).toBe(billingService);
+    expect(getBillingService()).toBe(getBillingService());
+  });
+});
+
 describe('BillingService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -472,6 +479,35 @@ describe('BillingService', () => {
       ).rejects.toThrow('DB error');
     });
 
+    it('logs both failures at error level, wrapping non-Error values, and re-throws the original value', async () => {
+      const subscription = makeSubscription({ status: 'past_due' });
+      const event = makeEvent('customer.subscription.updated', subscription);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockUpdateSubscriptionStatus.mockRejectedValue('pg: terminating connection');
+      mockDeleteProcessedWebhookEvent.mockRejectedValue('pg: pool exhausted');
+
+      await expect(
+        billingService.handleWebhook(Buffer.from('{}'), 'sig')
+      ).rejects.toBe('pg: terminating connection');
+
+      expect(mockDeleteProcessedWebhookEvent).toHaveBeenCalledWith('evt-123');
+      expect(mockLogger.error).toHaveBeenCalledTimes(2);
+      const [handlerCtx, handlerMsg] = mockLogger.error.mock.calls[0] as [Record<string, unknown>, string];
+      expect(handlerMsg).toBe('Webhook handler failed');
+      expect(handlerCtx).toMatchObject({
+        source: 'billing_webhook',
+        errorType: 'webhook_handler_failed',
+        eventType: 'customer.subscription.updated',
+        eventId: 'evt-123',
+      });
+      expect((handlerCtx.err as Error).message).toBe('pg: terminating connection');
+
+      const [cleanupCtx, cleanupMsg] = mockLogger.error.mock.calls[1] as [Record<string, unknown>, string];
+      expect(cleanupMsg).toBe('Idempotency cleanup failed');
+      expect(cleanupCtx).toMatchObject({ errorType: 'idempotency_cleanup_failed', eventId: 'evt-123' });
+      expect((cleanupCtx.err as Error).message).toBe('pg: pool exhausted');
+    });
+
     it('logs warn and completes successfully for unknown event types (BUG-10)', async () => {
       const event = makeEvent('charge.dispute.created', { id: 'ch_123' });
       mockStripeWebhooksConstructEvent.mockReturnValue(event);
@@ -727,6 +763,35 @@ describe('BillingService', () => {
         expect.objectContaining({ action: 'SUBSCRIPTION_CANCELLED', status: 'SUCCESS' })
       );
     });
+
+    it('does not cancel anything and records a WEBHOOK_PROCESSING_FAILED audit when userId metadata is missing', async () => {
+      const subscription = makeSubscription({ id: 'sub-orphan', metadata: {} });
+      const event = makeEvent('customer.subscription.deleted', subscription);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(mockAuditLog).not.toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'SUBSCRIPTION_CANCELLED' })
+      );
+      expect(mockAuditLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: null,
+          action: 'WEBHOOK_PROCESSING_FAILED',
+          status: 'FAILURE',
+          metadata: expect.objectContaining({
+            reason: 'missing_user_metadata',
+            eventType: 'customer.subscription.deleted',
+            subscriptionId: 'sub-orphan',
+          }),
+        })
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'billing_webhook', errorType: 'missing_user_metadata' }),
+        expect.any(String)
+      );
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -787,6 +852,37 @@ describe('BillingService', () => {
         expect.objectContaining({ source: 'billing_webhook', errorType: 'invoice_canceled_subscription' }),
         expect.stringContaining('canceled subscription')
       );
+    });
+
+    it('is idempotent for an already-active user: no status write, no renewal audit', async () => {
+      const invoice = makeInvoice({ billing_reason: 'subscription_cycle' });
+      const event = makeEvent('invoice.paid', invoice);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(makeSubscription());
+      mockFindUserById.mockResolvedValue(makeUser({ subscriptionStatus: 'active' }));
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockFindUserById).toHaveBeenCalledWith(TEST_USER_ID);
+      expect(mockUpdateSubscriptionStatus).not.toHaveBeenCalled();
+      expect(mockAuditLog).not.toHaveBeenCalled();
+      expect(mockLogger.error).not.toHaveBeenCalled();
+    });
+
+    it('resolves the subscription ID from an expanded subscription object on the invoice', async () => {
+      const invoice = makeInvoice({
+        parent: { subscription_details: { subscription: { id: 'sub-expanded' } } },
+      });
+      const event = makeEvent('invoice.paid', invoice);
+      mockStripeWebhooksConstructEvent.mockReturnValue(event);
+      mockStripeSubscriptionsRetrieve.mockResolvedValue(makeSubscription({ id: 'sub-expanded' }));
+      mockFindUserById.mockResolvedValue(makeUser({ subscriptionStatus: 'past_due' }));
+      mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
+
+      await billingService.handleWebhook(Buffer.from('{}'), 'sig');
+
+      expect(mockStripeSubscriptionsRetrieve).toHaveBeenCalledWith('sub-expanded');
+      expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, 'active');
     });
 
     it('calls auditService.log with SUBSCRIPTION_RENEWED for subscription_cycle billing', async () => {
