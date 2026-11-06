@@ -25,11 +25,11 @@ export const MAX_SEARCH_LENGTH = 100;
  * Accept the `string | string[] | undefined` that Next.js actually delivers,
  * collapsing a repeated param to its first occurrence before validation.
  */
-export function singleParam<T extends z.ZodTypeAny>(
+export function singleParam<T extends z.ZodType>(
   schema: T
-): z.ZodEffects<T, T['_output'], unknown> {
+): z.ZodPreprocess<T> {
   return z.preprocess(
-    (value) => (Array.isArray(value) ? value[0] : value),
+    (value): unknown => (Array.isArray(value) ? value[0] : value),
     schema
   );
 }

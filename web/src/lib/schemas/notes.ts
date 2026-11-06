@@ -117,7 +117,7 @@ export const notesListParamsSchema = searchListParamsSchema.extend({
   )
     .optional()
     .catch(undefined),
-  patientId: singleParam(z.string().uuid()).optional().catch(undefined),
+  patientId: singleParam(z.guid()).optional().catch(undefined),
 });
 
 export type NotesListParams = z.infer<typeof notesListParamsSchema>;
