@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NoteGenerationForm, NOTE_ERROR_MESSAGES } from './NoteGenerationForm';
 
@@ -360,6 +360,104 @@ describe('NoteGenerationForm', () => {
 
     expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveValue('');
     expect(screen.getByRole('textbox', { name: /Additional Context/i })).toHaveValue('');
+  });
+
+  it('discards a generation response that arrives after logout (Rule 4)', async () => {
+    let resolveGeneration!: (value: ReturnType<typeof buildSuccessResponse>) => void;
+    mockGenerateNoteAction.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some clinical notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    // Logout while the LLM call is still in flight
+    act(() => {
+      window.dispatchEvent(new CustomEvent('flashnote:logout'));
+    });
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveValue('');
+
+    await act(async () => {
+      resolveGeneration(buildSuccessResponse());
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveValue('');
+  });
+
+  it('discards an error response that arrives after logout', async () => {
+    let resolveGeneration!: (value: { success: false; error: string }) => void;
+    mockGenerateNoteAction.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveGeneration = resolve;
+      })
+    );
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some clinical notes');
+    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledOnce();
+    });
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent('flashnote:logout'));
+    });
+    await act(async () => {
+      resolveGeneration({ success: false, error: 'llm_error' });
+      await Promise.resolve();
+    });
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('only renders the response from the most recent submission', async () => {
+    let resolveFirst!: (value: ReturnType<typeof buildSuccessResponse>) => void;
+    mockGenerateNoteAction
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+      )
+      .mockResolvedValueOnce(buildSuccessResponse({ subjective: 'Fresh note.' }));
+    const user = userEvent.setup();
+
+    render(<NoteGenerationForm />);
+
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some clinical notes');
+    const submit = screen.getByRole('button', { name: 'Generate Professional Note' });
+    await user.click(submit);
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledTimes(1);
+    });
+    // Submit the form again (Enter) while the first request is pending
+    act(() => {
+      submit.closest('form')!.requestSubmit();
+    });
+    await waitFor(() => {
+      expect(mockGenerateNoteAction).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('generated-note')).toHaveTextContent('Fresh note.');
+    });
+
+    // The stale first response must not overwrite the newer note
+    await act(async () => {
+      resolveFirst(buildSuccessResponse({ subjective: 'Stale note.' }));
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId('generated-note')).toHaveTextContent('Fresh note.');
   });
 
   it('trims quickNotes whitespace in FormData before submission', async () => {
