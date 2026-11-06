@@ -410,10 +410,10 @@ describe('LLM Schemas', () => {
       expect(schema).not.toHaveProperty('$ref');
     });
 
-    // The fixture was generated from the zod-to-json-schema output before the
-    // Zod 4 migration. This schema is sent verbatim to Gemini and Claude, so any
-    // drift changes LLM behavior; update the fixture only for an intended
-    // schema change, never to make a library upgrade pass.
+    // This schema is sent verbatim to Gemini and Claude, so any drift changes
+    // LLM behavior. Update the fixture only after reviewing the diff, never to
+    // make a library upgrade pass. The Zod 4 migration's only semantic change
+    // was a MAX_SAFE_INTEGER `maximum` on the four .int() fields.
     it('matches the golden schema sent to LLM providers', () => {
       expect(getPTNoteJsonSchema()).toEqual(goldenPTNoteJsonSchema);
     });

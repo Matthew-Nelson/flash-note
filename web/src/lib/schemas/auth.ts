@@ -43,7 +43,7 @@ export const registerSchema = z.object({
   password: passwordSchema,
   confirmPassword: z.string().min(1, 'Please confirm your password'),
   acceptedLegalTerms: z.literal(true, {
-    errorMap: () => ({ message: 'You must accept the legal terms to create an account' }),
+    error: 'You must accept the legal terms to create an account',
   }),
   inviteCode: z.string().max(20).optional(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -115,7 +115,7 @@ export function getValidationError<T>(schema: z.ZodSchema<T>, data: unknown): st
   const result = schema.safeParse(data);
   if (result.success) return null;
   /* v8 ignore next -- Zod always provides error messages; defensive fallback only */
-  return result.error.errors[0]?.message ?? 'Validation failed';
+  return result.error.issues[0]?.message ?? 'Validation failed';
 }
 
 /**
@@ -130,7 +130,7 @@ export function validateLogin(
   }
   return {
     success: false,
-    errors: result.error.errors.map((e: z.ZodIssue) => e.message),
+    errors: result.error.issues.map((e: z.ZodIssue) => e.message),
   };
 }
 
@@ -146,6 +146,6 @@ export function validateRegister(
   }
   return {
     success: false,
-    errors: result.error.errors.map((e: z.ZodIssue) => e.message),
+    errors: result.error.issues.map((e: z.ZodIssue) => e.message),
   };
 }

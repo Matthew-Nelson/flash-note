@@ -50,7 +50,7 @@ function ResetPasswordContent() {
     if (!validation.success) {
       const messages: string[] = [];
       const invalid = new Set<string>();
-      validation.error.errors.forEach((err) => {
+      validation.error.issues.forEach((err) => {
         messages.push(err.message);
         if (err.path[0]) invalid.add(String(err.path[0]));
       });

@@ -35,7 +35,7 @@ const CLINICAL_NOTE_COLUMNS = `id, user_id, organization_id, patient_id, templat
 
 // Rule 3: runtime-validate JSONB content shape on read.
 const NoteSectionSchema = z.object({
-  sectionId: z.string().uuid(),
+  sectionId: z.guid(),
   title: z.string(),
   content: z.string(),
 });

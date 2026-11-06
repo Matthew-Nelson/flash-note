@@ -88,7 +88,7 @@ class BillingService {
       this.logMissingUserIdError(eventType, context);
       return null;
     }
-    const parsed = z.string().uuid().safeParse(userId);
+    const parsed = z.guid().safeParse(userId);
     if (!parsed.success) {
       this.logMissingUserIdError(eventType, { ...context, invalidUserId: '[REDACTED]' });
       return null;

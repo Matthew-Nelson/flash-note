@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 export const pronounSchema = z.enum(['he/him', 'she/her', 'they/them', 'other']);
 
-export const patientIdSchema = z.string().uuid();
+export const patientIdSchema = z.guid();
 
 export const createPatientSchema = z.object({
   firstName: z.string().trim().min(1).max(100),
