@@ -237,6 +237,19 @@ describe('NotesTable', () => {
     expect(screen.getByText(/Try a different search term/i)).toBeInTheDocument();
   });
 
+  // Regression (PR #118 review B3): a filter that matches nothing is not an
+  // empty history — "Generate your first note" would mislead.
+  it.each([
+    ['noteType', { noteType: 'initial_eval' as const }],
+    ['patientId', { patientId: '00000000-0000-0000-0000-000000000001' }],
+  ])('renders a filter-scoped empty state when a %s filter yields nothing', async (_name, filter) => {
+    render(await NotesTable({ userId: 'u', q: '', page: 1, ...filter }));
+    expect(
+      screen.getByRole('heading', { level: 2, name: /No matching notes/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Generate your first note/i)).not.toBeInTheDocument();
+  });
+
   it('renders a NoteRow per note when notes exist', async () => {
     mockFindClinicalNotesByScope.mockResolvedValueOnce({
       notes: [createMockNote('a'), createMockNote('b'), createMockNote('c')],

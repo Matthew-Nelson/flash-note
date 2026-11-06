@@ -105,6 +105,7 @@ export async function NotesTable({ userId, patientId, noteType, q, page }: Notes
   );
 
   const totalPages = Math.max(Math.ceil(total / PAGE_SIZE), 1);
+  const isFiltered = Boolean(q || patientId || noteType);
 
   function pageHref(target: number): string {
     return `/dashboard/notes?${new URLSearchParams({
@@ -120,12 +121,14 @@ export async function NotesTable({ userId, patientId, noteType, q, page }: Notes
       {notes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <h2 className="text-fn-lg font-semibold text-fn-text-primary mb-2">
-            {q ? 'No matching notes' : 'No notes yet'}
+            {isFiltered ? 'No matching notes' : 'No notes yet'}
           </h2>
           <p className="text-fn-sm text-fn-text-secondary max-w-md">
             {q
               ? 'Try a different search term.'
-              : 'Generate your first note to start building your clinical history.'}
+              : isFiltered
+                ? 'No notes match these filters.'
+                : 'Generate your first note to start building your clinical history.'}
           </p>
         </div>
       ) : (

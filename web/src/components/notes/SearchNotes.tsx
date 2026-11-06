@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, useTransition } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useTransition } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui';
 import { MAX_SEARCH_LENGTH } from '@/lib/schemas';
@@ -44,6 +44,7 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [prevInitialQuery, setPrevInitialQuery] = useState(initialQuery);
   const [lastPushed, setLastPushed] = useState(initialQuery);
+  const [externalSyncs, setExternalSyncs] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   if (initialQuery !== prevInitialQuery) {
@@ -51,8 +52,16 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
     if (initialQuery !== lastPushed) {
       setLastPushed(initialQuery);
       setQuery(initialQuery);
+      setExternalSyncs((n) => n + 1);
     }
   }
+
+  // A debounce still pending from before an external URL change would fire
+  // with the stale term and undo that navigation. Layout effect so it is
+  // cancelled in the same task as the commit, before the timer can run.
+  useLayoutEffect(() => {
+    if (externalSyncs > 0 && debounceRef.current) clearTimeout(debounceRef.current);
+  }, [externalSyncs]);
 
   useEffect(() => {
     return (): void => {
@@ -63,6 +72,10 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
   const pushParams = useCallback(
     (next: string): void => {
       const trimmed = next.trim();
+      // Same term as we last pushed (e.g. a trailing space): replacing would
+      // drop `page` and refetch for no change. Compared against lastPushed, not
+      // searchParams, which lags while our own replace is still in flight.
+      if (trimmed === lastPushed) return;
       const params = new URLSearchParams(searchParams.toString());
       if (trimmed) params.set('q', trimmed);
       else params.delete('q');
@@ -74,7 +87,7 @@ export function SearchNotes({ initialQuery }: SearchNotesProps): React.ReactElem
         router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       });
     },
-    [pathname, router, searchParams, startTransition],
+    [lastPushed, pathname, router, searchParams, startTransition],
   );
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
