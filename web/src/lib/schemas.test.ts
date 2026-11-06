@@ -166,7 +166,7 @@ describe('Web Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        const messages = result.error.errors.map((e) => e.message);
+        const messages = result.error.issues.map((e) => e.message);
         expect(messages).toContain('Please confirm your password');
       }
     });
@@ -178,7 +178,7 @@ describe('Web Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        const paths = result.error.errors.map((e) => e.path.join('.'));
+        const paths = result.error.issues.map((e) => e.path.join('.'));
         expect(paths).toContain('confirmPassword');
       }
     });
@@ -230,7 +230,7 @@ describe('Web Validation Schemas', () => {
       const result = resetPasswordSchema.safeParse({ ...validData, confirmPassword: '' });
       expect(result.success).toBe(false);
       if (!result.success) {
-        const messages = result.error.errors.map((e) => e.message);
+        const messages = result.error.issues.map((e) => e.message);
         expect(messages).toContain('Please confirm your password');
       }
     });
@@ -242,7 +242,7 @@ describe('Web Validation Schemas', () => {
       });
       expect(result.success).toBe(false);
       if (!result.success) {
-        const paths = result.error.errors.map((e) => e.path.join('.'));
+        const paths = result.error.issues.map((e) => e.path.join('.'));
         expect(paths).toContain('confirmPassword');
       }
     });

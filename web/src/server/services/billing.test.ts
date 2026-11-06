@@ -98,7 +98,7 @@ const billingService = getBillingService();
 // Helpers
 // ---------------------------------------------------------------------------
 
-// Valid UUID required by validateMetadataUserId (z.string().uuid())
+// Valid UUID required by validateMetadataUserId (z.guid())
 const TEST_USER_ID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
 
 function makeUser(overrides: Record<string, unknown> = {}) {

@@ -10,7 +10,6 @@ import 'server-only';
  */
 
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 
 /**
  * Suggested CPT code without time data.
@@ -249,11 +248,9 @@ export type ClinicalSetting =
  *   path (generateNote) passes an explicit schema at request time.
  */
 export function getPTNoteJsonSchema(): Record<string, unknown> {
-  return zodToJsonSchema(PTNoteOutputSchema, {
-    // Don't add $schema and definitions wrapper
-    // LLMs expect a simple schema object
-    $refStrategy: 'none',
-  });
+  // draft-07 matches what zod-to-json-schema emitted before the Zod 4
+  // migration; reused sub-schemas are inlined by default, so no $ref/$defs.
+  return z.toJSONSchema(PTNoteOutputSchema, { target: 'draft-07' });
 }
 
 /**

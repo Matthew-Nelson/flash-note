@@ -20,7 +20,7 @@ export default function ForgotPasswordPage() {
 
     const validation = emailSchema.safeParse(email);
     if (!validation.success) {
-      setErrors(validation.error.errors.map((e) => e.message));
+      setErrors(validation.error.issues.map((e) => e.message));
       setInvalidFields(new Set(['email']));
       return;
     }

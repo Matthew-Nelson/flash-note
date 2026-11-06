@@ -423,3 +423,55 @@ describe('updateSectionStyleSchema', () => {
     ).toBe(false);
   });
 });
+
+// The default SOAP template and its sections are seeded with fixed IDs
+// (migrations 002 and 003) that are not RFC 9562 UUIDs: the version and variant
+// nibbles are 0. Every schema that accepts a template or section ID must keep
+// accepting them, or notes on the default template cannot be generated, saved,
+// or edited.
+describe('seeded default template IDs', () => {
+  const templateId = '00000000-0000-0000-0000-000000000001';
+  const sectionIds = [
+    '00000000-0000-0000-0000-000000000011',
+    '00000000-0000-0000-0000-000000000012',
+    '00000000-0000-0000-0000-000000000013',
+    '00000000-0000-0000-0000-000000000014',
+  ];
+
+  it('generateNoteSchema accepts the default templateId', () => {
+    expect(
+      generateNoteSchema.safeParse({
+        noteType: 'daily_note',
+        quickNotes: 'pt reports pain 5/10, ROM improving',
+        templateId,
+      }).success
+    ).toBe(true);
+  });
+
+  it('saveNoteSchema accepts the default templateId and every seeded sectionId', () => {
+    const result = saveNoteSchema.safeParse({
+      templateId,
+      noteType: 'daily_note',
+      content: sectionIds.map((sectionId) => ({ sectionId, title: 'Section', content: 'x' })),
+      quickNotes: 'pt c/o knee pain, ROM improving',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('updateNoteSectionsSchema accepts seeded sectionIds as record keys', () => {
+    const result = updateNoteSectionsSchema.safeParse({
+      noteId: '3f2b8c1e-4d5a-4b6c-8d7e-9f0a1b2c3d4e',
+      expectedUpdatedAt: '2026-01-01T00:00:00.000Z',
+      sections: Object.fromEntries(sectionIds.map((id) => [id, 'updated'])),
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('updateSectionStyleSchema accepts every seeded sectionId', () => {
+    for (const sectionId of sectionIds) {
+      expect(
+        updateSectionStyleSchema.safeParse({ sectionId, verbosity: 'concise' }).success
+      ).toBe(true);
+    }
+  });
+});

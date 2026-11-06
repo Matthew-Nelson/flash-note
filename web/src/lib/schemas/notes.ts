@@ -18,8 +18,8 @@ export const generateNoteSchema = z.object({
   // Phase 4 additions — required for template-driven generation (Plan 04-03).
   // Made optional in the schema so existing callers don't break; Plan 04-03
   // will make templateId required once the generation path is cut over.
-  templateId: z.string().uuid().optional(),
-  patientId: z.string().uuid().nullable().optional(),
+  templateId: z.guid().optional(),
+  patientId: z.guid().nullable().optional(),
 });
 
 export type GenerateNoteInput = z.infer<typeof generateNoteSchema>;
@@ -28,7 +28,7 @@ export type Modality = z.infer<typeof generateNoteSchema>['modality'];
 /**
  * noteIdSchema — URL param validation for /dashboard/notes/[id] routes.
  */
-export const noteIdSchema = z.string().uuid();
+export const noteIdSchema = z.guid();
 
 /**
  * A single section in the saved note content JSONB array.
@@ -36,7 +36,7 @@ export const noteIdSchema = z.string().uuid();
  * title is a denormalized snapshot captured at save time.
  */
 const noteSectionSchema = z.object({
-  sectionId: z.string().uuid(),
+  sectionId: z.guid(),
   title: z.string().min(1).max(100),
   content: z.string().max(10000),
 });
@@ -49,8 +49,8 @@ const noteSectionSchema = z.object({
  * the context snapshot captured at generation time.
  */
 export const saveNoteSchema = z.object({
-  templateId: z.string().uuid(),
-  patientId: z.string().uuid().nullable().optional(),
+  templateId: z.guid(),
+  patientId: z.guid().nullable().optional(),
   noteType: z.enum(['daily_note', 'initial_eval', 'progress_note', 'discharge']),
   content: z.array(noteSectionSchema).min(1).max(20),
   quickNotes: z.string().trim().min(10).max(5000),
@@ -73,10 +73,10 @@ export type SaveNoteInput = z.infer<typeof saveNoteSchema>;
  * appear. At least one section must be present.
  */
 export const updateNoteSectionsSchema = z.object({
-  noteId: z.string().uuid(),
+  noteId: z.guid(),
   expectedUpdatedAt: z.string().datetime(),
   sections: z
-    .record(z.string().uuid(), z.string().max(10000))
+    .record(z.guid(), z.string().max(10000))
     .refine(
       (v) => Object.keys(v).length > 0,
       'At least one section must be provided'
@@ -91,7 +91,7 @@ export type UpdateNoteSectionsInput = z.infer<typeof updateNoteSectionsSchema>;
  */
 export const updateSectionStyleSchema = z
   .object({
-    sectionId: z.string().uuid(),
+    sectionId: z.guid(),
     verbosity: z.enum(['concise', 'detailed']).optional(),
     styling: z.enum(['paragraph', 'bullets']).optional(),
   })

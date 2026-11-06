@@ -10,6 +10,7 @@ import {
   safeParsePTNoteOutput,
   buildPTNoteOutputSchema,
 } from './schemas';
+import goldenPTNoteJsonSchema from './__fixtures__/pt-note-json-schema.json';
 
 describe('LLM Schemas', () => {
   describe('SuggestedCodeSchema', () => {
@@ -407,6 +408,14 @@ describe('LLM Schemas', () => {
       expect(schema).toHaveProperty('properties');
       // Should not use $ref which would require definitions
       expect(schema).not.toHaveProperty('$ref');
+    });
+
+    // This schema is sent verbatim to Gemini and Claude, so any drift changes
+    // LLM behavior. Update the fixture only after reviewing the diff, never to
+    // make a library upgrade pass. The Zod 4 migration's only semantic change
+    // was a MAX_SAFE_INTEGER `maximum` on the four .int() fields.
+    it('matches the golden schema sent to LLM providers', () => {
+      expect(getPTNoteJsonSchema()).toEqual(goldenPTNoteJsonSchema);
     });
   });
 
