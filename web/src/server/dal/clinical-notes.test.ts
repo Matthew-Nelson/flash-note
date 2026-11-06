@@ -278,6 +278,112 @@ describe('clinical-notes DAL', () => {
       expect(params).toContain('initial_eval');
     });
 
+    it('applies the search filter to both count and list queries', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: 'knee' });
+
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
+      const [listSql, listParams] = mockDbQuery.mock.calls[1] as [
+        string,
+        unknown[],
+      ];
+      expect(countSql).toContain('cn.quick_notes ILIKE $');
+      expect(countSql).toContain("section->>'content' ILIKE $");
+      expect(listSql).toContain('cn.quick_notes ILIKE $');
+      expect(listSql).toContain("section->>'content' ILIKE $");
+      expect(countParams).toContain('%knee%');
+      expect(listParams).toContain('%knee%');
+    });
+
+    // Regression: `content::text ILIKE` searched the JSONB serialization, so
+    // the structural keys (sectionId/title/content) and the section titles
+    // (Subjective/Objective/Assessment/Plan) were inside the searched string —
+    // those terms matched every note in scope.
+    it('searches section prose, never the JSONB serialization', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: 'assessment' });
+
+      const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(countSql).not.toContain('cn.content::text');
+      expect(countSql).toContain('jsonb_array_elements');
+      expect(countSql).toContain("section->>'content'");
+      // Titles are excluded on purpose — matching them is what made the SOAP
+      // section names match every note.
+      expect(countSql).not.toContain("section->>'title'");
+    });
+
+    it('coerces a non-array content column to an empty array', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: 'knee' });
+
+      const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      // Without the guard, jsonb_array_elements() raises on a row whose
+      // content is an object and fails the whole search.
+      expect(countSql).toContain("jsonb_typeof(cn.content) = 'array'");
+      expect(countSql).toContain("'[]'::jsonb");
+    });
+
+    it('escapes LIKE metacharacters in the search term', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: '100%_off\\' });
+
+      const [, countParams] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(countParams).toContain('%100\\%\\_off\\\\%');
+    });
+
+    it('ignores a whitespace-only search term', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, { search: '   ' });
+
+      const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(countSql).not.toContain('ILIKE');
+    });
+
+    it('combines search with the noteType filter and keeps scope first', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(userScope, {
+        noteType: 'progress_note',
+        search: 'knee',
+      });
+
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [
+        string,
+        unknown[],
+      ];
+      expect(countSql).toContain('cn.user_id = $1');
+      expect(countSql).toContain('cn.note_type = $2');
+      expect(countSql).toContain('ILIKE $3');
+      // Note: `paramList` is a single array shared with the list query, which
+      // appends limit/offset after the count query has already run — assert on
+      // the leading filter params only.
+      expect(countParams.slice(0, 3)).toEqual([
+        USER_A,
+        'progress_note',
+        '%knee%',
+      ]);
+    });
+
     it('clamps limit to 100 and offset >= 0', async () => {
       mockDbQuery
         .mockResolvedValueOnce({ rows: [{ total: 0 }] })

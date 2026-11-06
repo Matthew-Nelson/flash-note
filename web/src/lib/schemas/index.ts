@@ -16,8 +16,17 @@ export type {
 } from './auth';
 
 export {
+  MAX_SEARCH_LENGTH,
+  searchListParamsSchema,
+  singleParam,
+} from './list-params';
+
+export type { SearchListParams } from './list-params';
+
+export {
   generateNoteSchema,
   noteIdSchema,
+  notesListParamsSchema,
   saveNoteSchema,
   updateNoteSectionsSchema,
   updateSectionStyleSchema,
@@ -25,6 +34,7 @@ export {
 
 export type {
   GenerateNoteInput,
+  NotesListParams,
   SaveNoteInput,
   UpdateNoteSectionsInput,
   UpdateSectionStyleInput,

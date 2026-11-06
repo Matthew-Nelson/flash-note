@@ -132,4 +132,69 @@ describe('SearchPatients', () => {
     });
     expect(input.value).toBe('external');
   });
+
+  // Regression (PR #118 review A2): an edit that trims to the current term
+  // (a trailing space) must not reset pagination or refetch the list.
+  it('does not touch the URL when the trimmed term equals the current q', async () => {
+    h.searchParams = new URLSearchParams('q=Jane&page=3');
+    render(<SearchPatients initialQuery="Jane" />);
+    const input = screen.getByRole('searchbox');
+    await act(async () => {
+      await Promise.resolve();
+      fireEvent.change(input, { target: { value: 'Jane ' } });
+      vi.advanceTimersByTime(250);
+    });
+    expect(h.replace).not.toHaveBeenCalled();
+  });
+
+  // Regression (PR #118 review A3): a debounce still pending when the URL
+  // changes externally (back button, pagination link) must not fire and undo
+  // that navigation.
+  it('cancels a pending debounce when the URL changes externally', async () => {
+    const { rerender } = render(<SearchPatients initialQuery="" />);
+    const input = screen.getByRole<HTMLInputElement>('searchbox');
+    await act(async () => {
+      await Promise.resolve();
+      fireEvent.change(input, { target: { value: 'gait' } });
+      vi.advanceTimersByTime(100);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      rerender(<SearchPatients initialQuery="external" />);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      vi.advanceTimersByTime(250);
+    });
+    expect(h.replace).not.toHaveBeenCalled();
+    expect(input.value).toBe('external');
+  });
+
+  // Regression (PR #118 review A1): the server truncates q to
+  // MAX_SEARCH_LENGTH; without the same cap on the input, the truncated echo
+  // reads as an external change and rewrites the input mid-typing.
+  it('caps typed input at the server-side search bound', () => {
+    render(<SearchPatients initialQuery="" />);
+    expect(screen.getByRole('searchbox')).toHaveAttribute('maxlength', '100');
+  });
+
+  // A term typed back to the URL's current q while our own replace is still in
+  // flight (searchParams not yet updated) must still be pushed.
+  it('pushes a term equal to the stale URL q when a different term is in flight', async () => {
+    h.searchParams = new URLSearchParams('q=knee');
+    render(<SearchPatients initialQuery="knee" />);
+    const input = screen.getByRole('searchbox');
+    await act(async () => {
+      await Promise.resolve();
+      fireEvent.change(input, { target: { value: 'kneex' } });
+      vi.advanceTimersByTime(250);
+    });
+    await act(async () => {
+      await Promise.resolve();
+      fireEvent.change(input, { target: { value: 'knee' } });
+      vi.advanceTimersByTime(250);
+    });
+    expect(h.replace).toHaveBeenCalledTimes(2);
+    expect(h.replace).toHaveBeenLastCalledWith('/dashboard/patients?q=knee', { scroll: false });
+  });
 });
