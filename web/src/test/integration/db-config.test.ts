@@ -114,6 +114,8 @@ describe('DB pool TLS configuration (PHI-10 code-side)', () => {
     ['"@localhost" in a query parameter', 'postgres://user:pass@db.example.com:5432/flashnote?application_name=@localhost'],
     ['"host=/cloudsql/" inside another parameter value', 'postgres://user:pass@db.example.com:5432/flashnote?application_name=xhost=/cloudsql/x'],
     ['a host= override pointing at a remote server', 'postgres://user:pass@localhost:5432/flashnote?host=db.example.com'],
+    ['"?sslmode=require" inside another parameter value', 'postgres://user:pass@db.example.com:5432/flashnote?application_name=x?sslmode=require'],
+    ['sslmode=require overridden by a later sslmode=disable', 'postgres://user:pass@db.example.com:5432/flashnote?sslmode=require&sslmode=disable'],
   ])('enforces TLS in production for %s', async (_label, url) => {
     env.NODE_ENV = 'production';
     mockConfig.current = { DATABASE_URL: url };

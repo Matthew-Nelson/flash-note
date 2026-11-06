@@ -56,15 +56,20 @@ export function buildPoolConfig(): pg.PoolConfig {
   // Proxy sidecar (localhost / unix socket) — that path is already encrypted
   // by the managed proxy. Otherwise require TLS at the driver level.
   //
-  // Decide from the host pg will actually connect to (same parser pg uses,
-  // honoring a `?host=` override). Substring checks on the raw URL fail open,
-  // e.g. `@localhost.evil.example`.
-  const host = parseConnectionString(url).host ?? '';
+  // Decide from the host and sslmode pg will actually use (same parser pg
+  // uses, honoring a `?host=` override and last-wins repeated params).
+  // Substring checks on the raw URL fail open, e.g. `@localhost.evil.example`
+  // or `?application_name=x?sslmode=require`.
+  const parsed = parseConnectionString(url);
+  const host = parsed.host ?? '';
   const isProxyTunnel =
     host === '127.0.0.1' ||
     host === 'localhost' ||
     host.startsWith('/cloudsql/');
-  const hasSslMode = /[?&]sslmode=(require|verify-ca|verify-full)\b/.test(url);
+  // sslmode is untyped in pg-connection-string's ConnectionOptions (index
+  // signature `unknown`), so narrow before comparing.
+  const sslMode = typeof parsed.sslmode === 'string' ? parsed.sslmode : '';
+  const hasSslMode = ['require', 'verify-ca', 'verify-full'].includes(sslMode);
 
   if (!isProxyTunnel && !hasSslMode) {
     base.ssl = { rejectUnauthorized: true };
