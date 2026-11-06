@@ -80,14 +80,22 @@ const SUSPICIOUS_PATTERNS: RegExp[] = [
  * including tags with attributes (e.g., `<clinician_notes x="">`).
  * Also strips unclosed tags (no closing `>`) at end of line/string (BUG-11).
  * Medical notation like `<90°` is preserved since it doesn't match tag names.
+ *
+ * Repeats until no further change: a single pass can reassemble a tag from
+ * nested fragments (e.g. `</clinician_</clinician_notes>notes>`). Each pass
+ * that changes the string makes it strictly shorter, so the loop terminates.
  */
 export function escapeDelimiterTags(content: string): string {
   let sanitized = content;
-  for (const tagName of DELIMITER_TAG_NAMES) {
-    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*>`, 'gi'), '');
-    // Also strip unclosed tags (no closing '>') at end of line/string (BUG-11)
-    sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>\\n]*$`, 'gim'), '');
-  }
+  let previous: string;
+  do {
+    previous = sanitized;
+    for (const tagName of DELIMITER_TAG_NAMES) {
+      sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>]*>`, 'gi'), '');
+      // Also strip unclosed tags (no closing '>') at end of line/string (BUG-11)
+      sanitized = sanitized.replace(new RegExp(`<\\s*/?\\s*${tagName}[^>\\n]*$`, 'gim'), '');
+    }
+  } while (sanitized !== previous);
   return sanitized;
 }
 
