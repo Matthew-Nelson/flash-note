@@ -1,0 +1,198 @@
+{
+  "type": "object",
+  "properties": {
+    "subjective": {
+      "type": "string",
+      "description": "Patient-reported symptoms, pain levels (0-10), functional limitations, home exercise program compliance, and changes since last visit"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Measurable clinical findings (ROM in degrees, strength MMT grades, special tests, gait analysis) AND interventions performed with time, technique, and skilled language that supports medical necessity"
+    },
+    "assessment": {
+      "type": "string",
+      "description": "Clinical interpretation of findings, progress toward established goals, treatment effectiveness, barriers to progress, and justification for skilled care"
+    },
+    "plan": {
+      "type": "string",
+      "description": "Treatment plan for next visit, frequency/duration recommendations, home exercise program updates, patient education, and short-term goals"
+    },
+    "billing": {
+      "type": "object",
+      "properties": {
+        "charges": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cptCode": {
+                "type": "string",
+                "description": "CPT code (e.g., \"97110\", \"97140\", \"97530\")"
+              },
+              "description": {
+                "type": "string",
+                "description": "Service description (e.g., \"Therapeutic Exercise\", \"Manual Therapy\")"
+              },
+              "minutes": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Time spent in minutes - ONLY include if clinician explicitly stated time"
+              },
+              "units": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Billable units based on 8-minute rule"
+              }
+            },
+            "required": [
+              "cptCode",
+              "description",
+              "minutes",
+              "units"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Individual CPT code charges with time and units. ONLY include if clinician explicitly stated times (e.g., \"manual therapy 15 min\"). NEVER estimate or hallucinate times."
+        },
+        "totalTimedMinutes": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total timed service minutes - only if charges are present"
+        },
+        "totalUnits": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total billable units - only if charges are present"
+        },
+        "suggestedCodes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "cptCode": {
+                "type": "string",
+                "description": "CPT code (e.g., \"97110\", \"97140\", \"97530\")"
+              },
+              "description": {
+                "type": "string",
+                "description": "Service description (e.g., \"Therapeutic Exercise\", \"Manual Therapy\")"
+              }
+            },
+            "required": [
+              "cptCode",
+              "description"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Suggested CPT codes based on interventions mentioned (without times). Include when therapist mentions interventions but does not specify times. Helps clinician identify correct codes to bill without fabricating time data."
+        },
+        "suggestedModifiers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Suggested modifiers (e.g., \"GP\" for Medicare, \"59\" for distinct procedures, \"KX\" for medical necessity)"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Billing summary for reference. Note: EMRs use structured entry (checkboxes/dropdowns) for billing, not text fields. This is for visual reference while clicking checkboxes."
+    },
+    "goals": {
+      "type": "object",
+      "properties": {
+        "shortTerm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Goal description (e.g., \"Knee flexion >= 110 degrees\")"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "progressing",
+                  "met",
+                  "discontinued"
+                ],
+                "description": "Current status of the goal. Can be inferred from language: \"making progress\" -> progressing, \"achieved\" -> met, \"stopped\" -> discontinued"
+              },
+              "percentComplete": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Percentage complete toward goal. ONLY include if clinician explicitly states a percentage (e.g., \"75% toward goal\"). NEVER estimate or hallucinate percentages - omit this field if not explicitly stated."
+              }
+            },
+            "required": [
+              "description",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Short-term goals (typically 2-4 weeks)"
+        },
+        "longTerm": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string",
+                "description": "Goal description (e.g., \"Knee flexion >= 110 degrees\")"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "progressing",
+                  "met",
+                  "discontinued"
+                ],
+                "description": "Current status of the goal. Can be inferred from language: \"making progress\" -> progressing, \"achieved\" -> met, \"stopped\" -> discontinued"
+              },
+              "percentComplete": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "Percentage complete toward goal. ONLY include if clinician explicitly states a percentage (e.g., \"75% toward goal\"). NEVER estimate or hallucinate percentages - omit this field if not explicitly stated."
+              }
+            },
+            "required": [
+              "description",
+              "status"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Long-term goals (typically discharge goals)"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Goal status tracking when progress toward goals is mentioned in the quick notes"
+    },
+    "alerts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Billing warnings, documentation gaps, or modifier reminders (e.g., \"Medicare patient? Add GP modifier\", \"15 min manual therapy - 16+ safer for audits\")"
+    },
+    "uncertainAreas": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Areas where the clinician input was ambiguous and the model made an interpretation choice. Examples: \"Interpreted 'ther ex' as 'therapeutic exercise' (not therapy extension)\", \"ROM mentioned without specifying joint - used general language\", \"Unclear if '15 min' applies to manual therapy or total session\". Flag these for clinician review. Only include genuinely ambiguous items. Do NOT flag routine shorthand expansion (e.g., \"HEP\" to \"home exercise program\")."
+    }
+  },
+  "required": [
+    "subjective",
+    "objective",
+    "assessment",
+    "plan"
+  ],
+  "additionalProperties": false,
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

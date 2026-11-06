@@ -10,6 +10,7 @@ import {
   safeParsePTNoteOutput,
   buildPTNoteOutputSchema,
 } from './schemas';
+import goldenPTNoteJsonSchema from './__fixtures__/pt-note-json-schema.json';
 
 describe('LLM Schemas', () => {
   describe('SuggestedCodeSchema', () => {
@@ -407,6 +408,14 @@ describe('LLM Schemas', () => {
       expect(schema).toHaveProperty('properties');
       // Should not use $ref which would require definitions
       expect(schema).not.toHaveProperty('$ref');
+    });
+
+    // The fixture was generated from the zod-to-json-schema output before the
+    // Zod 4 migration. This schema is sent verbatim to Gemini and Claude, so any
+    // drift changes LLM behavior; update the fixture only for an intended
+    // schema change, never to make a library upgrade pass.
+    it('matches the golden schema sent to LLM providers', () => {
+      expect(getPTNoteJsonSchema()).toEqual(goldenPTNoteJsonSchema);
     });
   });
 
