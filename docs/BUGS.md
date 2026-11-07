@@ -6,20 +6,17 @@ Entries here are short on purpose. **Before fixing one, reproduce it with a fail
 
 Paths are relative to `web/src/`. Everything below was re-verified against the code on 2026-11-07. That check read the code; it did not run failing tests.
 
-## Security and data integrity
+## Data integrity
 
 | Location | Problem |
 |---|---|
-| `app/{login,signup,reset-password,forgot-password,resend-verification}/page.tsx`, `components/notes/NoteGenerationForm.tsx`, `components/patients/{PatientCreateForm,PatientInfoCard}.tsx` | Each form only has an `onSubmit` handler; none sets `method` or `action`. If someone submits before hydration, the browser sends a GET, and the passwords, emails, session notes, or patient fields end up in the URL. That puts them in browser history and load-balancer logs. |
-| `actions/notes.ts` (`generateNoteAction`, `saveNoteAction`), `server/dal/note-templates.ts:102-108,156-164` | Neither generation nor save checks that the template is builtin or owned by the user/org; the DAL lookups filter only on `id` and `archived_at`. Save also accepts archived templates. Not reachable today because nothing creates non-builtin templates. |
-| `actions/patients.ts:52` | `normalizeFormData` drops blank strings, so `updatePatientAction` can't clear `dateOfBirth`, `pronoun`, `phone`, or `email`. The save still reports success and the stale PHI stays. (`context` can be cleared through `updatePatientContextAction`.) |
-| `actions/notes.ts:509` | `updateNoteSectionsAction` reads the note with `findClinicalNoteById(scope, …)` without the transaction client, so the read happens outside the transaction it writes in. The `updated_at` optimistic lock probably covers it. |
+| `actions/notes.ts:503` | `updateNoteSectionsAction` reads the note with `findClinicalNoteById(scope, …)` without the transaction client, so the read happens outside the transaction it writes in. The `updated_at` optimistic lock probably covers it. |
 
 ## Generate → save loop (ROADMAP "Next up" item 1)
 
 | Location | Problem |
 |---|---|
-| `actions/notes.ts:348` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. |
+| `actions/notes.ts:337` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. |
 | `components/notes/NoteGenerationForm.tsx:402` | BUG-UI-12: the generated note renders below the form on the same page instead of in its own view. |
 | Patient detail page, `components/patients/PatientNotesTable.tsx` | Nothing links to `/dashboard/notes/new?patientId=…`, not even the "no notes yet" empty state. The new-note patient field is read-only, so the UI has no way to link a note to a patient. `PatientTypeahead.tsx` is built but rendered nowhere. |
 | `app/dashboard/notes/new/page.tsx:31` | `?patientId=` goes to the DAL without Zod validation (Rule 3). A non-UUID value likely errors with a 500 (not run). |
@@ -43,6 +40,12 @@ Paths are relative to `web/src/`. Everything below was re-verified against the c
 | `server/services/auth.ts`, `server/services/lockout.ts` | A login against a locked account is audited as `LOGIN_FAILED`, never `LOGIN_BLOCKED_LOCKED`. With a wrong password the audit row has no user ID or lockout reason; with the right password, two `LOGIN_FAILED` rows are written. Also, 8 org/invite `AuditAction` members plus `AUTH_FAILED`, `CSRF_FAILED`, and `EMAIL_VERIFICATION_SENT` are never emitted (see [compliance/AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md)). |
 | `server/dal/users.ts:272`, `server/services/lockout.ts:16,47` | Lockout thresholds exist in three copies. The DAL SQL sets `locked_until`; the service's table drives the audit metadata and the returned status. They agree today, and no test would catch them drifting apart. |
 | `server/services/auth.ts:83,94,118,288` | These log `source: 'dal_auth'` from a service module. The same file also uses `service_auth` and `registration`. CLAUDE.md's source-naming table has no pattern for services. |
+
+## Testing
+
+| Location | Problem |
+|---|---|
+| `test/db-harness.ts` | The three real-DB suites (`test/integration/phi-*.test.ts`, `template-authorization.test.ts`) each drop and recreate the same schema in `beforeAll`, so they race when Vitest runs files in parallel: run together, `phi-migration` and `template-authorization` failed, and with `--no-file-parallelism` both passed. To run them at all, `DATABASE_URL` and `GEMINI_API_KEY` must also be set, because importing the DAL validates config. DAL calls made without a client go to `DATABASE_URL`, not `DATABASE_URL_TEST`. Fix this before adding Postgres to CI (ROADMAP "Quality"). |
 
 ## Low priority
 
