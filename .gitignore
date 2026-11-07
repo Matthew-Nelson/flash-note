@@ -76,3 +76,9 @@ service-account.json
 # Design mockups (reference only, not source code)
 docs/design/*.html
 docs/design/*.png
+
+# Next.js agent rules file, written by `next dev`
+web/AGENTS.md
+
+# Local code-review reports (triple-review-code output)
+reviews/
