@@ -13,21 +13,29 @@ vi.mock('@/actions/notes', () => ({
 
 // Mock GeneratedNote child component — it has its own test file
 vi.mock('./GeneratedNote', () => ({
-  GeneratedNote: ({ note }: { note: { subjective: string } }) => (
-    <div data-testid="generated-note">{note.subjective}</div>
+  GeneratedNote: ({ note }: { note: { content: Array<{ content: string }> } }) => (
+    <div data-testid="generated-note">{note.content[0]?.content}</div>
   ),
 }));
 
-function buildSuccessResponse(overrides = {}) {
+const SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
+
+function soapContent(subjective = 'Patient reports pain 5/10.') {
+  return [
+    { sectionId: '00000000-0000-0000-0000-000000000011', title: 'Subjective', content: subjective },
+    { sectionId: '00000000-0000-0000-0000-000000000012', title: 'Objective', content: 'ROM flexion 95 degrees.' },
+    { sectionId: '00000000-0000-0000-0000-000000000013', title: 'Assessment', content: 'Progressing toward goals.' },
+    { sectionId: '00000000-0000-0000-0000-000000000014', title: 'Plan', content: 'Continue 2x/week.' },
+  ];
+}
+
+function buildSuccessResponse(subjective?: string) {
   return {
     success: true as const,
     data: {
-      subjective: 'Patient reports pain 5/10.',
-      objective: 'ROM flexion 95 degrees.',
-      assessment: 'Progressing toward goals.',
-      plan: 'Continue 2x/week.',
+      templateId: SOAP_TEMPLATE_ID,
+      content: soapContent(subjective),
       metadata: { generationTimeMs: 1000 },
-      ...overrides,
     },
   };
 }
@@ -426,7 +434,7 @@ describe('NoteGenerationForm', () => {
           resolveFirst = resolve;
         })
       )
-      .mockResolvedValueOnce(buildSuccessResponse({ subjective: 'Fresh note.' }));
+      .mockResolvedValueOnce(buildSuccessResponse('Fresh note.'));
     const user = userEvent.setup();
 
     render(<NoteGenerationForm />);
@@ -450,7 +458,7 @@ describe('NoteGenerationForm', () => {
 
     // The stale first response must not overwrite the newer note
     await act(async () => {
-      resolveFirst(buildSuccessResponse({ subjective: 'Stale note.' }));
+      resolveFirst(buildSuccessResponse('Stale note.'));
       await Promise.resolve();
     });
     expect(screen.getByTestId('generated-note')).toHaveTextContent('Fresh note.');
@@ -559,10 +567,8 @@ describe('NoteGenerationForm', () => {
     mockFn.mockResolvedValue({
       success: true,
       data: {
-        subjective: 'S',
-        objective: 'O',
-        assessment: 'A',
-        plan: 'P',
+        templateId: SOAP_TEMPLATE_ID,
+        content: soapContent(),
         metadata: { generationTimeMs: 100 },
       },
     });

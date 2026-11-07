@@ -45,10 +45,10 @@ import { sanitizeFieldErrors } from '@/server/lib/validation';
 import type { ClinicalNote, NoteSection, QueryScope } from '@/lib/types';
 
 export interface GenerateNoteResponse {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
+  /** The template the note was generated from; saveNoteAction needs it. */
+  templateId: string;
+  /** One entry per template section, in template order. */
+  content: NoteSection[];
   billing?: BillingSummary;
   goals?: GoalsTracking;
   alerts?: string[];
@@ -205,17 +205,11 @@ export async function generateNoteAction(
       userAgent: context.userAgent,
     });
 
-    // 11. Map NoteSection[] back to flat S/O/A/P keys for the transitional UI
-    //     (Task 4a rewrites the UI to consume result.content directly).
-    const byTitle = new Map(result.content.map((s) => [s.title.toLowerCase(), s.content]));
-
     return {
       success: true,
       data: {
-        subjective: byTitle.get('subjective') ?? '',
-        objective: byTitle.get('objective') ?? '',
-        assessment: byTitle.get('assessment') ?? '',
-        plan: byTitle.get('plan') ?? '',
+        templateId: loadedTemplate.id,
+        content: result.content,
         billing: result.billing,
         goals: result.goals,
         alerts: result.alerts,

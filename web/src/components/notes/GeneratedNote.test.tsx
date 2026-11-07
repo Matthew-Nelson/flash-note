@@ -20,10 +20,13 @@ type NoteResponse = GenerateNoteResponse;
 
 function buildNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
   return {
-    subjective: 'Patient reports left knee pain 5/10.',
-    objective: 'ROM flexion 95 degrees. Manual therapy performed.',
-    assessment: 'Patient progressing toward goals.',
-    plan: 'Continue current plan of care 2x/week.',
+    templateId: '00000000-0000-0000-0000-000000000001',
+    content: [
+      { sectionId: '00000000-0000-0000-0000-000000000011', title: 'Subjective', content: 'Patient reports left knee pain 5/10.' },
+      { sectionId: '00000000-0000-0000-0000-000000000012', title: 'Objective', content: 'ROM flexion 95 degrees. Manual therapy performed.' },
+      { sectionId: '00000000-0000-0000-0000-000000000013', title: 'Assessment', content: 'Patient progressing toward goals.' },
+      { sectionId: '00000000-0000-0000-0000-000000000014', title: 'Plan', content: 'Continue current plan of care 2x/week.' },
+    ],
     metadata: { generationTimeMs: 1500 },
     ...overrides,
   };
@@ -603,16 +606,16 @@ describe('GeneratedNote', () => {
       expect(mockWriteText).toHaveBeenCalledWith(
         [
           'SUBJECTIVE',
-          note.subjective,
+          'Patient reports left knee pain 5/10.',
           '',
           'OBJECTIVE',
-          note.objective,
+          'ROM flexion 95 degrees. Manual therapy performed.',
           '',
           'ASSESSMENT',
-          note.assessment,
+          'Patient progressing toward goals.',
           '',
           'PLAN',
-          note.plan,
+          'Continue current plan of care 2x/week.',
         ].join('\n')
       );
     });

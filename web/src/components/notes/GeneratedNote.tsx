@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { GenerateNoteResponse } from '@/actions/notes';
+import type { NoteSection as NoteSectionData } from '@/lib/types';
 
 type BillingData = NonNullable<GenerateNoteResponse['billing']>;
 type BillingCharge = NonNullable<BillingData['charges']>[number];
@@ -476,23 +477,13 @@ function GoalsSection({ goals }: { goals: GoalsData }) {
   );
 }
 
-function buildFullNoteText(note: GenerateNoteResponse, editedNote: Partial<Record<string, string>> = {}): string {
-  const get = (key: keyof GenerateNoteResponse) =>
-    editedNote[key as string] ?? (note[key] as string);
-  const lines: string[] = [
-    'SUBJECTIVE',
-    get('subjective'),
-    '',
-    'OBJECTIVE',
-    get('objective'),
-    '',
-    'ASSESSMENT',
-    get('assessment'),
-    '',
-    'PLAN',
-    get('plan'),
-  ];
-  return lines.join('\n');
+function buildFullNoteText(
+  sections: NoteSectionData[],
+  edits: Partial<Record<string, string>> = {},
+): string {
+  return sections
+    .map((s) => `${s.title.toUpperCase()}\n${edits[s.sectionId] ?? s.content}`)
+    .join('\n\n');
 }
 
 export function GeneratedNote({ note }: GeneratedNoteProps) {
@@ -527,8 +518,8 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
     });
   }
 
-  function getDisplayContent(sectionKey: string, original: string): string {
-    return editedNote[sectionKey] ?? original;
+  function getDisplayContent(sectionId: string, original: string): string {
+    return editedNote[sectionId] ?? original;
   }
 
   const hasSuggestions =
@@ -539,13 +530,6 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
 
   const [generatedDate] = useState(() => new Date().toLocaleDateString());
 
-  const sections: Array<{ key: string; title: string; value: string }> = [
-    { key: 'subjective', title: 'Subjective', value: note.subjective },
-    { key: 'objective', title: 'Objective', value: note.objective },
-    { key: 'assessment', title: 'Assessment', value: note.assessment },
-    { key: 'plan', title: 'Plan', value: note.plan },
-  ];
-
   return (
     <div className="mt-8">
       {/* Action bar: h2 + Copy All */}
@@ -554,7 +538,7 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
           Generated SOAP Note
         </h2>
         <FullCopyButton
-          text={buildFullNoteText(note, { ...editedNote, ...editingSections })}
+          text={buildFullNoteText(note.content, { ...editedNote, ...editingSections })}
           label="Copy full SOAP note"
         />
       </div>
@@ -612,19 +596,19 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
       <div className="flex gap-6">
         {/* Left column: SOAP sections */}
         <div className="flex-1 min-w-0">
-          {sections.map(({ key, title, value }) => {
-            const displayContent = getDisplayContent(key, value);
+          {note.content.map(({ sectionId, title, content }) => {
+            const displayContent = getDisplayContent(sectionId, content);
             return (
               <NoteSection
-                key={key}
+                key={sectionId}
                 title={title}
                 content={displayContent}
-                isEditing={editingSections[key] !== undefined}
-                editValue={editingSections[key]}
-                onStartEdit={() => handleStartEdit(key, displayContent)}
-                onEditChange={(val) => handleEditChange(key, val)}
-                onSave={() => handleSaveEdit(key)}
-                onCancelEdit={() => handleCancelEdit(key)}
+                isEditing={editingSections[sectionId] !== undefined}
+                editValue={editingSections[sectionId]}
+                onStartEdit={() => handleStartEdit(sectionId, displayContent)}
+                onEditChange={(val) => handleEditChange(sectionId, val)}
+                onSave={() => handleSaveEdit(sectionId)}
+                onCancelEdit={() => handleCancelEdit(sectionId)}
               />
             );
           })}

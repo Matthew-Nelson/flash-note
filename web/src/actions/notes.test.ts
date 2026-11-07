@@ -343,16 +343,19 @@ describe('generateNoteAction', () => {
     );
   });
 
-  it('returns SOAP note on success', async () => {
+  it('returns the generated sections in template order with the template id', async () => {
     const result = await generateNoteAction(makeFormData());
 
     expect(result).toMatchObject({
       success: true,
       data: {
-        subjective: 'Patient reports pain 4/10.',
-        objective: 'ROM: Flexion 60°.',
-        assessment: 'Progressing well.',
-        plan: 'Continue PT 2x/week.',
+        templateId: SOAP_TEMPLATE_ID,
+        content: [
+          { sectionId: SUB_ID, title: 'Subjective', content: 'Patient reports pain 4/10.' },
+          { sectionId: OBJ_ID, title: 'Objective', content: 'ROM: Flexion 60°.' },
+          { sectionId: ASS_ID, title: 'Assessment', content: 'Progressing well.' },
+          { sectionId: PLA_ID, title: 'Plan', content: 'Continue PT 2x/week.' },
+        ],
       },
     });
   });
