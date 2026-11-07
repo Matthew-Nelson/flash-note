@@ -343,8 +343,8 @@ export function NoteGenerationForm({
                 ships, this free-text input will be replaced by:
                 1. A patient search/typeahead selector (backed by api.getPatients())
                 2. Stored patient context from patients.context (auto-injected into generation)
-                See: docs/planning/PHI_STORAGE_PLAN.md (Chunk 6, "New Note page")
-                See: docs/planning/UI_OVERHAUL_PLAN.md ("Additional Context Deprecation Plan") */}
+                See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/PHI_STORAGE_PLAN.md (Chunk 6, "New Note page")
+                See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/UI_OVERHAUL_PLAN.md ("Additional Context Deprecation Plan") */}
             <div className="mb-6">
               <label htmlFor="patientContext" className="label block text-fn-sm mb-1.5">
                 Additional Context{' '}

@@ -28,14 +28,14 @@ Single Next.js 16 application with an integrated server-side backend — no sepa
 | LLM | Google Gemini 2.5 Flash via Vertex AI |
 | Payments | Stripe |
 | Styling | Tailwind CSS |
-| Error Tracking | Sentry (`@sentry/nextjs`) |
-| Deployment | Google Cloud Run (containerized) |
+| Logging | Pino (structured, GCP Cloud Logging format) |
+| Deployment | Google Cloud Run (Terraform in `infra/`; not yet deployed) |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 20+
+- Node.js 20.9+ (`.nvmrc`)
 - PostgreSQL 15+
 - pnpm
 
@@ -57,6 +57,7 @@ cd web
 pnpm dev          # Start dev server
 pnpm build        # Production build
 pnpm test         # Run tests
+pnpm test:e2e     # Playwright e2e (uses its own flashnote_e2e database)
 pnpm db:migrate   # Run database migrations
 ```
 
@@ -65,12 +66,20 @@ pnpm db:migrate   # Run database migrations
 ```
 web/src/
   app/              # Next.js App Router (pages, layouts, API routes)
-  components/       # React components (ui/, auth/, notes/)
+  components/       # React components (ui/, auth/, notes/, patients/)
+  hooks/            # Client hooks
   lib/              # Shared utilities, Zod schemas, types (client + server safe)
   server/           # Server-only code (DAL, services, DB, prompts)
-  actions/          # Server Actions (auth, notes, billing)
-  test/             # Test setup, helpers, factories
+  actions/          # Server Actions (auth, billing, notes, patients, templates)
+  test/             # Test setup, helpers, factories, integration tests
+web/tests/e2e/      # Playwright suite
+infra/              # Terraform for Google Cloud
 ```
+
+## Documentation
+
+- [docs/ROADMAP.md](./docs/ROADMAP.md): current state and what's next
+- [docs/README.md](./docs/README.md): index of the remaining docs
 
 ## Engineering Guide
 

@@ -68,7 +68,7 @@ const ADCTokenResponseSchema = z.object({
  * chosen because BLOCK_MEDIUM_AND_ABOVE false-positives on routine clinical content
  * (pain descriptions, anatomical references, treatment narratives).
  *
- * Rationale: see .planning/phases/04-phi-storage/04-RESEARCH.md §7.1.
+ * Rationale: §7.1 of https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/.planning/phases/04-phi-storage/04-RESEARCH.md
  *
  * m-7 — If Vertex AI ever rejects the string literal 'BLOCK_ONLY_HIGH' with a 400
  * Bad Request, switch this constant to the SDK enum form

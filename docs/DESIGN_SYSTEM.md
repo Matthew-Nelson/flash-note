@@ -1,8 +1,6 @@
 # FlashNote Design System — Refined Teal
 
-Source of truth for all visual design tokens, typography, and principles. Extracted from the HTML mockups in `docs/design/`.
-
-Implementation: `web/design-system/design-tokens-teal.css` + `web/design-system/tailwind-preset-teal.js`
+Reference for visual design tokens, typography, and principles. The live source of truth is the code: `web/design-system/design-tokens-teal.css` (tokens), `web/design-system/components.css` (component classes), `web/design-system/tailwind-preset-teal.js` (Tailwind utilities), and `web/src/app/globals.css` (imports them and sets global focus and print styles).
 
 ---
 
@@ -128,7 +126,7 @@ Replaces Inter. Plus Jakarta Sans is more distinctive and friendly while remaini
 | Token | Value | Usage |
 |-------|-------|-------|
 | `--fn-sidebar-width` | 240px | Sidebar |
-| `--fn-context-panel-width` | 340px | Right context panel |
+| `--fn-context-panel-width` | 340px | Right context panel (token and `w-fn-context-panel` utility are defined; no component currently uses them) |
 | `--fn-content-max-width` | 860px | Centered content (note result) |
 
 ### Responsive Breakpoints
@@ -136,13 +134,13 @@ Replaces Inter. Plus Jakarta Sans is more distinctive and friendly while remaini
 | Token | Value | Behavior |
 |-------|-------|----------|
 | `sm` | 640px | Single-column forms |
-| `md` | 768px | Sidebar collapses to icon rail or off-canvas drawer with hamburger toggle |
-| `lg` | 1024px | Full sidebar visible, two-column form rows |
-| `xl` | 1280px | Context panel visible alongside note form |
+| `md` | 768px | Standard Tailwind breakpoint; the sidebar does not change here |
+| `lg` | 1024px | Full sidebar visible (`hidden lg:flex` in `web/src/components/Sidebar.tsx`); below this it is an off-canvas drawer opened from the top bar hamburger (`lg:hidden` in `web/src/components/TopBar.tsx`) |
+| `xl` | 1280px | Suggestions panel shown beside the SOAP sections (`hidden xl:block` in `web/src/components/notes/GeneratedNote.tsx`); below xl it stacks under them |
 
-**Mobile sidebar strategy:** Below `md`, the sidebar is hidden off-canvas and toggled via a hamburger button in the top bar. The top bar gains a left-aligned menu button at this breakpoint. No icon-rail mode — full hide/show for simplicity.
+**Mobile sidebar strategy:** Below `lg`, the sidebar is hidden off-canvas and toggled via a hamburger button in the top bar. No icon-rail mode — full hide/show for simplicity.
 
-**Tablet consideration:** PTs commonly use tablets between patients. The `md`–`lg` range (768–1024px) should be usable with the sidebar collapsed and single-column form layout.
+**Tablet consideration:** PTs commonly use tablets between patients. The range below `lg` (1024px) uses the drawer sidebar and should remain usable single-column.
 
 ---
 
@@ -158,10 +156,10 @@ Component-level classes are defined in `web/design-system/components.css`. These
 | `btn-secondary` | Bordered button — border, text, hover bg, focus ring |
 | `btn-ghost` | Transparent button — text only, hover bg, focus ring |
 | `card` | Card container — bg, border, radius, shadow |
-| `badge` | Pill badge — padding, radius, font size |
-| `badge-trial` | Trial status badge variant |
+| `badge` | Pill badge — padding, full radius (`--fn-radius-full`), font size |
+| `badge-trial` / `badge-active` / `badge-expired` | Status badge variants |
 
-All button classes include `focus-visible:ring-2 focus-visible:ring-fn-primary-DEFAULT focus-visible:ring-offset-2` for keyboard accessibility.
+All button classes set `:focus-visible { outline: 2px solid var(--fn-primary); outline-offset: 2px; }` for keyboard accessibility (`web/design-system/components.css`). `globals.css` also applies a global 2px `:focus-visible` outline.
 
 ---
 

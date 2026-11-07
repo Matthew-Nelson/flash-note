@@ -1,6 +1,8 @@
 # HIPAA Audit Logging Requirements
 
 **Created:** January 2026
+**Last Updated:** 2026-11-07
+**Deployment status:** Not deployed; no real PHI (see the "Not for clinical use" notice in `README.md`).
 **Purpose:** Document HIPAA audit logging requirements and FlashNote's compliance status
 **Regulatory Reference:** 45 CFR § 164.312 (Technical Safeguards), 45 CFR § 164.308 (Administrative Safeguards)
 
@@ -20,6 +22,8 @@ HIPAA's Security Rule mandates audit controls as part of the Technical Safeguard
 
 **Current Status:** Not Enforced
 
+**Cloud Logging sink:** The 6-year Cloud Logging log sink / locked-retention bucket is not configured. `infra/*.tf` contains no log sink or log bucket resource (`grep -rniE "sink" infra/*.tf` returns nothing), and the only retention settings in `infra/database.tf` are Cloud SQL transaction-log and backup retention. Retention of the `audit_logs` table itself is not enforced by any job or policy.
+
 **Gap:** No retention enforcement mechanism exists. We need:
 - Documented retention policy
 - Automated archival process (optional but recommended)
@@ -33,66 +37,64 @@ HIPAA's Security Rule mandates audit controls as part of the Technical Safeguard
 | Event Type | HIPAA Basis | FlashNote Status | Implementation |
 |------------|-------------|------------------|----------------|
 | Login/logout | § 164.312(b) | Implemented | `LOGIN`, `LOGOUT` |
-| Failed authentication | § 164.312(b) | Implemented | `LOGIN_FAILED`, `AUTH_FAILED` |
-| Access to PHI | § 164.312(b) | Implemented | `NOTE_GENERATED` (metadata only) |
+| Failed authentication | § 164.312(b) | Implemented | `LOGIN_FAILED` (`AUTH_FAILED` is defined but not emitted) |
+| Access to PHI | § 164.312(b) | Implemented | `NOTE_GENERATED`, `PATIENT_*`, `NOTE_*` (see PHI audit pattern below) |
 | Authorization failures | § 164.312(b) | Implemented | `ACCESS_DENIED` |
-| User/account changes | § 164.308(a)(4) | Implemented | `REGISTER`, `SUBSCRIPTION_*` |
-| Security incidents | § 164.308(a)(6) | Implemented | `CSRF_FAILED` |
-| Account lockout | § 164.312(b) | Implemented | `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED`, `LOGIN_BLOCKED_LOCKED` |
-| Email verification | § 164.308(a)(4) | Implemented | `EMAIL_VERIFICATION_*` |
+| User/account changes | § 164.308(a)(4) | Implemented | `REGISTER`, `SUBSCRIPTION_*`, `LEGAL_CONSENT_ACCEPTED`, `USER_PREFERENCES_UPDATED` |
+| Security incidents | § 164.308(a)(6) | Partial | `CSRF_FAILED` is defined but never emitted (see "Defined but not emitted") |
+| Account lockout | § 164.312(b) | Partial | `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED` emitted; `LOGIN_BLOCKED_LOCKED` defined but not emitted |
+| Email verification | § 164.308(a)(4) | Partial | `EMAIL_VERIFICATION_SUCCESS/FAILED/RESENT` emitted; `EMAIL_VERIFICATION_SENT` not emitted |
 | Password reset | § 164.308(a)(4) | Implemented | `PASSWORD_RESET_*` |
 | Session management | § 164.312(d) | Implemented | `SESSION_DEVICE_CHANGE`, `SESSION_LIMIT_EXCEEDED` |
 | Webhook failures | § 164.308(a)(6) | Implemented | `WEBHOOK_PROCESSING_FAILED` |
 
 ### Full AuditAction Enum Reference
 
-All audit actions are defined in `web/src/server/types.ts`:
+All audit actions are defined in the `AuditAction` enum in `web/src/server/types.ts:48` (49 values, counted from the enum body). The string values must not be changed or removed; a comment in the enum notes external audit log queries depend on them.
 
-```typescript
-export enum AuditAction {
-  // Authentication
-  LOGIN = 'LOGIN',
-  LOGIN_FAILED = 'LOGIN_FAILED',
-  LOGOUT = 'LOGOUT',
-  AUTH_FAILED = 'AUTH_FAILED',
+| Group | Actions |
+|-------|---------|
+| Authentication | `LOGIN`, `LOGIN_FAILED`, `LOGOUT`, `AUTH_FAILED` |
+| Account / access | `REGISTER`, `ACCESS_DENIED`, `LEGAL_CONSENT_ACCEPTED`, `USER_PREFERENCES_UPDATED` |
+| Account lockout | `ACCOUNT_LOCKED`, `ACCOUNT_UNLOCKED`, `LOGIN_BLOCKED_LOCKED` |
+| Email verification | `EMAIL_VERIFICATION_SENT`, `EMAIL_VERIFICATION_SUCCESS`, `EMAIL_VERIFICATION_FAILED`, `EMAIL_VERIFICATION_RESENT` |
+| Password reset | `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_SUCCESS`, `PASSWORD_RESET_FAILED`, `PASSWORD_RESET_TOKEN_INVALID` |
+| Session management | `SESSION_DEVICE_CHANGE`, `SESSION_LIMIT_EXCEEDED` |
+| Note generation | `NOTE_GENERATED` |
+| Patients (PHI) | `PATIENT_CREATED`, `PATIENT_UPDATED`, `PATIENT_ARCHIVED`, `PATIENT_VIEWED` |
+| Clinical notes (PHI) | `NOTE_SAVED`, `NOTE_UPDATED`, `NOTE_ARCHIVED`, `NOTE_VIEWED`, `NOTE_HISTORY_VIEWED` |
+| Subscription / billing | `SUBSCRIPTION_CREATED`, `SUBSCRIPTION_CANCELLED`, `SUBSCRIPTION_RENEWED`, `PAYMENT_FAILED` |
+| Organizations | `ORG_CREATED`, `ORG_SUBSCRIPTION_CHANGED`, `ORG_MEMBER_JOINED`, `ORG_MEMBER_REMOVED`, `ORG_MEMBER_LEFT`, `ORG_MEMBER_ROLE_CHANGED`, `ORG_OWNERSHIP_TRANSFERRED` |
+| Invite codes | `INVITE_CODE_REDEEMED`, `INVITE_CODE_VALIDATED`, `INVITE_CODE_VALIDATION_FAILED`, `INVITE_CODE_GENERATED`, `INVITE_CODE_REVOKED` |
+| Security events | `CSRF_FAILED`, `WEBHOOK_PROCESSING_FAILED` |
 
-  // Account Management
-  REGISTER = 'REGISTER',
-  ACCESS_DENIED = 'ACCESS_DENIED',
+### Defined but not emitted
 
-  // Account Lockout
-  ACCOUNT_LOCKED = 'ACCOUNT_LOCKED',
-  ACCOUNT_UNLOCKED = 'ACCOUNT_UNLOCKED',
-  LOGIN_BLOCKED_LOCKED = 'LOGIN_BLOCKED_LOCKED',
+These enum values have no reference of the form `AuditAction.<NAME>` in non-test code under `web/src` (checked with grep, excluding `*.test.*` and `web/src/test/`). Any claim above that depends on them is a gap, not an implemented control.
 
-  // Email Verification
-  EMAIL_VERIFICATION_SENT = 'EMAIL_VERIFICATION_SENT',
-  EMAIL_VERIFICATION_SUCCESS = 'EMAIL_VERIFICATION_SUCCESS',
-  EMAIL_VERIFICATION_FAILED = 'EMAIL_VERIFICATION_FAILED',
-  EMAIL_VERIFICATION_RESENT = 'EMAIL_VERIFICATION_RESENT',
+- `AUTH_FAILED`, `CSRF_FAILED`, `LOGIN_BLOCKED_LOCKED`, `EMAIL_VERIFICATION_SENT`
+- `ORG_CREATED`, `ORG_SUBSCRIPTION_CHANGED`, `ORG_MEMBER_REMOVED`, `ORG_MEMBER_LEFT`, `ORG_MEMBER_ROLE_CHANGED`, `ORG_OWNERSHIP_TRANSFERRED`
+- `INVITE_CODE_GENERATED`, `INVITE_CODE_REVOKED`
 
-  // Password Reset
-  PASSWORD_RESET_REQUESTED = 'PASSWORD_RESET_REQUESTED',
-  PASSWORD_RESET_SUCCESS = 'PASSWORD_RESET_SUCCESS',
-  PASSWORD_RESET_FAILED = 'PASSWORD_RESET_FAILED',
-  PASSWORD_RESET_TOKEN_INVALID = 'PASSWORD_RESET_TOKEN_INVALID',
+Of the `ORG_*` actions only `ORG_MEMBER_JOINED` is emitted (`web/src/server/services/auth.ts:258`).
 
-  // Session Management
-  SESSION_DEVICE_CHANGE = 'SESSION_DEVICE_CHANGE',
-  SESSION_LIMIT_EXCEEDED = 'SESSION_LIMIT_EXCEEDED',
+### Audit write paths
 
-  // PHI Access (metadata only - no content logged)
-  NOTE_GENERATED = 'NOTE_GENERATED',
+`auditService` (`web/src/server/services/audit.ts`) exposes two methods:
 
-  // Subscription/Billing
-  SUBSCRIPTION_CREATED = 'SUBSCRIPTION_CREATED',
-  SUBSCRIPTION_CANCELLED = 'SUBSCRIPTION_CANCELLED',
+- `log(entry)`: fire-and-forget. A failed insert is caught and logged at `error` level (`errorType: 'audit_write_failed'`) and does not fail the caller.
+- `logWithClient(client, entry)`: writes through a caller-supplied `PoolClient` and lets errors propagate, so the audit row commits or rolls back with the action it documents (Rule 9).
 
-  // Security Events
-  CSRF_FAILED = 'CSRF_FAILED',
-  WEBHOOK_PROCESSING_FAILED = 'WEBHOOK_PROCESSING_FAILED',
-}
-```
+**PHI write pattern.** The PHI-writing Server Actions call `auditService.logWithClient` inside the same transaction as the write:
+
+- `web/src/actions/patients.ts`: `PATIENT_CREATED` (line 118), `PATIENT_UPDATED` (lines 196 and 354), `PATIENT_ARCHIVED` (line 269)
+- `web/src/actions/notes.ts`: `NOTE_SAVED` (line 421), `NOTE_UPDATED` (line 552)
+
+Not transactional (fire-and-forget `auditService.log`):
+
+- `NOTE_GENERATED` success and failure (`web/src/actions/notes.ts:198`, `:249`)
+- `NOTE_ARCHIVED` (`web/src/actions/notes.ts:624`, a single UPDATE)
+- Read events: `PATIENT_VIEWED` (`web/src/app/dashboard/patients/[id]/page.tsx:40`), `NOTE_VIEWED` and `NOTE_HISTORY_VIEWED` (`web/src/app/dashboard/notes/[id]/page.tsx`)
 
 ---
 
@@ -117,14 +119,10 @@ export enum AuditAction {
 
 **Current Status:** Not Implemented
 
-**Gap:** No application-level capability to view or query audit logs exists. Currently:
-- No admin API endpoints for log retrieval
-- No admin dashboard or UI
-- Only method to view logs is direct database access
+**Gap:** No audit-log viewing or export capability exists in the application. The only code touching `audit_logs` is the insert-only DAL (`web/src/server/dal/audit-logs.ts`), and there is no admin route or page. The only way to view logs is direct database access.
 
 **Required Implementation:**
-- `GET /admin/audit-logs` - Paginated list with filters (date range, user, action, status)
-- Admin UI for log review (optional but recommended)
+- A paginated, filterable (date range, user, action, status) audit-log view restricted to authorized administrators
 - Alerting for suspicious patterns (optional)
 
 ---
@@ -144,7 +142,7 @@ export enum AuditAction {
 **Gap:** No export functionality exists.
 
 **Required Implementation:**
-- `GET /admin/audit-logs/export` - Export to CSV/JSON format
+- Export to CSV/JSON format, restricted to authorized administrators
 - Support for date range filtering
 - Support for filtering by user, action, status
 
@@ -161,11 +159,11 @@ export enum AuditAction {
 **What's Implemented:**
 - Application code only writes (never updates/deletes)
 - Separate `audit_logs` table with no application-level modification
-- Database triggers prevent UPDATE, DELETE, and TRUNCATE (migration `012_audit_log_immutability.sql`)
+- Database triggers prevent UPDATE, DELETE, and TRUNCATE (defined in `web/src/server/db/migrations/001_initial_schema.sql`; the migration directory currently holds 001 to 003 only)
   - `audit_logs_no_update` — raises exception on UPDATE
   - `audit_logs_no_delete` — raises exception on DELETE
   - `audit_logs_no_truncate` — raises exception on TRUNCATE (statement-level trigger)
-- Verification script: `pnpm db:verify:audit` confirms triggers are active
+- No test was found that exercises the `audit_logs` triggers (`web/src/test/integration/phi-migration.test.ts` tests the `note_versions` triggers only). The previously documented `pnpm db:verify:audit` script does not exist (no matching script in `web/package.json`)
 
 **Remaining considerations:**
 - No checksums or tamper-detection mechanisms (superusers can disable triggers — acceptable risk for current scale)
@@ -182,7 +180,7 @@ export enum AuditAction {
 **Current Status:** Partial
 
 **What's Documented:**
-- `docs/planning/MONITORING_SETUP.md` mentions monthly review of audit logs for suspicious patterns
+- Nothing. No review procedure is documented in the repository.
 
 **Gap:**
 - Without viewing tools, regular review is impractical
@@ -197,31 +195,31 @@ export enum AuditAction {
 
 | Requirement | Status | Evidence |
 |-------------|--------|----------|
-| **Event logging** | ✅ Complete | 29 audit action types covering all HIPAA-required events |
+| **Event logging** | Partial | 49 audit action types defined; 12 are never emitted (see "Defined but not emitted") |
 | **Data elements** | ✅ Complete | user_id, action, status, ip_address, user_agent, metadata, created_at |
-| **Audit service tests** | ✅ Complete | 17 unit tests in `audit-service.test.ts` (target: 90%+ coverage) |
+| **Audit service tests** | ✅ Complete | `web/src/server/services/audit.test.ts` |
 | **Application-level immutability** | ✅ Complete | Code only performs INSERT operations |
 
 ### Not Implemented (Critical)
 
 | Requirement | Priority | What's Needed |
 |-------------|----------|---------------|
-| **Log viewing capability** | Critical | Admin API endpoint: `GET /admin/audit-logs` with pagination and filters |
-| **Log export capability** | Critical | Admin API endpoint: `GET /admin/audit-logs/export` (CSV/JSON) |
+| **Log viewing capability** | Critical | Does not exist; needs an admin-restricted view with pagination and filters |
+| **Log export capability** | Critical | Does not exist; needs an admin-restricted CSV/JSON export |
 
 ### Partial / Needs Enhancement (High Priority)
 
 | Requirement | Priority | Current State | What's Needed |
 |-------------|----------|---------------|---------------|
-| **Retention enforcement** | High | No policy enforced | Documented 6-year policy + optional archival job |
-| **Log integrity protection** | ✅ Complete | Database triggers (migration 012) prevent UPDATE/DELETE/TRUNCATE | — |
-| **Regular review process** | High | Documented in MONITORING_SETUP.md | Tooling to make reviews practical |
+| **Retention enforcement** | High | No policy enforced; no Cloud Logging sink configured in `infra/` | Documented 6-year policy + sink/archival job |
+| **Log integrity protection** | ✅ Complete | Database triggers in `001_initial_schema.sql` prevent UPDATE/DELETE/TRUNCATE | — |
+| **Regular review process** | High | Not documented | Review procedure + tooling to make reviews practical |
 
 ---
 
 ## Implementation Status
 
-Core audit logging is implemented (audit-service.ts, 17 unit tests). Immutability protections are complete (migration 012 — database triggers). Remaining work — retention automation, admin endpoints — is tracked in [ROADMAP.md](../ROADMAP.md).
+Core audit logging is implemented (`web/src/server/services/audit.ts`, tests in `web/src/server/services/audit.test.ts`). Immutability protections are in place (database triggers in `001_initial_schema.sql`). Remaining work (retention, log viewing and export) is not implemented; see [ROADMAP.md](../ROADMAP.md) for tracking.
 
 ---
 
@@ -245,6 +243,7 @@ Core audit logging is implemented (audit-service.ts, 17 unit tests). Immutabilit
 | 1.1 | 2026-02-01 | Audit update: Added full AuditAction enum (29 types), reorganized gap summary, corrected test coverage status |
 | 1.2 | 2026-02-01 | Updated OPERATIONS.md references to MONITORING_SETUP.md (moved to planning folder) |
 | 1.3 | 2026-02-22 | Log integrity protection complete — database triggers implemented via migration 012 |
+| 1.4 | 2026-11-07 | Updated to current code: enum catalog now matches `AuditAction` (49 values) with a defined-but-not-emitted list; PHI audit write pattern (Rule 9); Cloud Logging sink noted as not configured; removed Express endpoint wording, deleted-doc references, test counts and the nonexistent `db:verify:audit` script; triggers now live in `001_initial_schema.sql` |
 
 ---
 

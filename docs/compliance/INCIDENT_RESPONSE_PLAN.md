@@ -1,11 +1,13 @@
 # FlashNote Incident Response Plan
 
 **Created:** February 2026
-**Last Updated:** February 2026
+**Last Updated:** 2026-11-07
 **Owner:** FlashNote Security Team
 **Review Cycle:** Annual (next review: February 2027)
 
 **Regulatory Basis:** HIPAA Security Rule (45 CFR §§ 164.308, 164.312), HIPAA Breach Notification Rule (45 CFR §§ 164.400–414), HITECH Act § 13402
+
+> **Status:** FlashNote is not deployed and holds no real PHI; it is not for clinical use (see `README.md`). This plan describes the procedures that apply once it is.
 
 ---
 
@@ -46,22 +48,27 @@ This plan establishes procedures for detecting, responding to, and recovering fr
 
 ## 3. FlashNote's PHI Posture
 
-**Current model: Pass-through processing only.**
+**Current model: PHI is stored.** Clinical input is sent to Google Vertex AI (Gemini) for note generation, and patients, clinical notes, and note versions are persisted in the application database (Cloud SQL PostgreSQL). Schema: `web/src/server/db/migrations/002_phi_storage.sql`.
 
-FlashNote processes PHI transiently during SOAP note generation. User-provided clinical input is sent to Google Vertex AI (Gemini) for processing and the generated note is returned to the user. No PHI is persisted in FlashNote's database, file systems, or logs.
+**PHI-bearing tables and columns (from the migration):**
 
-**What FlashNote stores:**
-- User account information (email, hashed passwords)
-- Audit logs (action metadata only — no clinical content)
-- Usage metrics (counts and timestamps — no PHI)
-- Billing data (Stripe customer/subscription IDs)
+| Table | PHI columns |
+|-------|-------------|
+| `patients` | `first_name`, `last_name`, `date_of_birth`, `phone`, `email`, `context` (free-text), `pronoun` |
+| `clinical_notes` | `content` (JSONB note sections), `quick_notes` (original shorthand input), `patient_context` (snapshot of `patients.context`); also `patient_id`, `modality`, `duration_minutes`, `note_type` |
+| `note_versions` | `content` (per-section text of each amendment; append-only, UPDATE/DELETE blocked by triggers) |
 
-**What FlashNote does NOT store:**
-- Patient names, dates of birth, or medical record numbers
-- Clinical note content (input or output)
-- Diagnosis or treatment details
+Records carry `user_id` and optional `organization_id`, so a breach scope is determined per owning user or organization. `patients` and `clinical_notes` use `archived_at` (soft delete), so archived records still exist in the database and are in scope.
 
-**Important:** This section must be updated when PHI Storage (Phase 2) is implemented. Persistent storage of patients, clinical notes, and note versions will change the breach impact analysis and notification requirements.
+**Stored but not PHI by design:**
+- `note_templates`, `note_template_sections`, `user_style_preferences` (template structure, prompts, and per-user verbosity/styling settings in the same migration)
+- User account information (email, hashed passwords), organizations and memberships
+- Audit logs (action metadata only; no clinical content intended)
+- Usage metrics and billing data (Stripe customer/subscription IDs)
+
+**Logs:** `web/src/server/lib/logger.ts` redacts a list of PHI field paths (`PHI_REDACT_PATHS`, for example `firstName`, `lastName`, `dateOfBirth`, `quickNotes`, `content`, `search`) with `[PHI_REDACTED]`. The file describes this as a backstop; the primary control is never passing PHI to the logger. It is path-based, so PHI under other key names or inside message strings is not redacted. Do not assume logs are PHI-free during an investigation.
+
+**Breach impact:** A database compromise, a backup exposure, or an authorization flaw in the DAL can expose patient identifiers and clinical content. Treat any such incident as a potential SEV-1 and run the four-factor assessment in Phase 3.
 
 ---
 
@@ -84,7 +91,7 @@ FlashNote processes PHI transiently during SOAP note generation. User-provided c
 
 **Detection sources:**
 - Audit log anomalies (unusual `ACCESS_DENIED`, `AUTH_FAILED` patterns)
-- Cloud monitoring alerts (Cloud Error Reporting, Cloud Monitoring)
+- Cloud Error Reporting / Cloud Logging (Pino `error`-level entries from `web/src/server/lib/logger.ts`). No alert policies are defined in `infra/*.tf` (grep for monitoring/alert returns nothing), so these must be checked manually.
 - User reports (support email, direct communication)
 - Subprocessor notifications (Google Cloud security advisories)
 - Automated scanning results (dependency vulnerabilities, DAST)
@@ -109,14 +116,14 @@ FlashNote processes PHI transiently during SOAP note generation. User-provided c
 | Take affected service offline | Active data exfiltration in progress |
 
 **Do NOT:**
-- Delete audit logs (immutability triggers prevent this — migration 012)
+- Delete audit logs (immutability triggers prevent this — `001_initial_schema.sql`)
 - Modify database records to "fix" the breach before investigation
 - Communicate externally before facts are established (except as required by BAA §5.1)
 
 ### Phase 3: Investigation (4–48 hours)
 
 **Evidence collection:**
-1. Preserve audit logs for the relevant time period (immutable — see `backend/src/db/migrations/012_audit_log_immutability.sql`)
+1. Preserve audit logs for the relevant time period (immutable — see the `audit_logs` triggers in `web/src/server/db/migrations/001_initial_schema.sql`)
 2. Export Cloud Logging entries for affected services
 3. Capture database query logs if available
 4. Document timeline of events with timestamps
@@ -176,7 +183,7 @@ Conduct this assessment for any incident involving PHI to determine whether noti
 
 ## 6. Evidence Preservation
 
-**Audit log immutability:** Database triggers (migration 012) prevent UPDATE, DELETE, and TRUNCATE operations on the `audit_logs` table. This ensures audit evidence cannot be tampered with during or after an incident.
+**Audit log immutability:** Database triggers (`web/src/server/db/migrations/001_initial_schema.sql`) prevent UPDATE, DELETE, and TRUNCATE operations on the `audit_logs` table. This ensures audit evidence cannot be tampered with during or after an incident.
 
 **Preservation requirements:**
 - Do not modify, delete, or overwrite any logs related to the incident
@@ -327,6 +334,7 @@ POST-INCIDENT REVIEW
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | February 2026 | Initial plan — covers pass-through PHI model |
+| 1.1 | 2026-11-07 | Updated to current code: PHI is now stored (patients, clinical_notes, note_versions); data inventory and breach scope rewritten from `002_phi_storage.sql`; logger PHI redaction noted; audit trigger references point to `001_initial_schema.sql`; added not-deployed/no-real-PHI status note |
 
 ---
 

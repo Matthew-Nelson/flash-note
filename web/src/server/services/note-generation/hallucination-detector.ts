@@ -9,7 +9,7 @@ import 'server-only';
  * notes. Flag-and-continue UX — we never block generation; the UI renders a
  * warning alert so the clinician reviews before saving.
  *
- * See .planning/phases/04-phi-storage/04-RESEARCH.md §7.2.
+ * See §7.2 of https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/.planning/phases/04-phi-storage/04-RESEARCH.md
  */
 
 export type HallucinationKind =

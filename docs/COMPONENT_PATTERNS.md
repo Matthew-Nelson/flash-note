@@ -2,7 +2,7 @@
 
 Code-level implementation patterns for the Refined Teal design system. Each pattern shows correct markup, ARIA attributes, and Tailwind classes.
 
-Design token reference: [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) | Component CSS classes: [DESIGN_SYSTEM.md#component-css-classes](./DESIGN_SYSTEM.md#component-css-classes)
+Live implementations: `web/src/components/Sidebar.tsx`, `web/src/components/TopBar.tsx`, `web/src/components/notes/`, `web/src/components/ui/`. Design token reference: [DESIGN_SYSTEM.md](./DESIGN_SYSTEM.md) | Component CSS classes: [DESIGN_SYSTEM.md#component-css-classes](./DESIGN_SYSTEM.md#component-css-classes)
 
 **Next.js note:** All internal links use `<Link>` from `next/link`, not raw `<a>` tags. Examples below use `Link` for client-side navigation.
 
@@ -56,7 +56,7 @@ Dark navigation panel. 240px fixed width, dark teal background.
   <ul className="flex-1 px-3 space-y-1">
     <li>
       <Link href="/dashboard"
-        className="flex items-center gap-3 px-3 py-2 rounded-fn-sm text-fn-sm font-medium
+        className="flex items-center gap-3 px-3 py-2 min-h-[44px] rounded-fn-sm text-fn-sm font-medium
                    text-fn-sidebar-text hover:bg-fn-sidebar-hover
                    aria-[current=page]:bg-fn-sidebar-active aria-[current=page]:text-fn-sidebar-text-active"
         aria-current="page">
@@ -69,7 +69,7 @@ Dark navigation panel. 240px fixed width, dark teal background.
   {/* CTA Button */}
   <div className="px-3 py-4">
     <Link href="/dashboard/notes/new"
-      className="flex items-center justify-center gap-2 w-full py-2.5 rounded-fn-base
+      className="flex items-center justify-center gap-2 w-full py-2.5 min-h-[44px] rounded-fn-base
                  bg-fn-primary-DEFAULT text-white text-fn-sm font-semibold
                  hover:bg-fn-accent-primary-hover transition-colors">
       <svg aria-hidden="true" .../>
@@ -102,7 +102,7 @@ Page header with optional back button, title/breadcrumbs, and action buttons.
 <header className="flex items-center justify-between px-6 py-4 border-b border-fn-border bg-fn-bg-card">
   <div className="flex items-center gap-3">
     <button aria-label="Go back" onClick={goBack}
-      className="w-8 h-8 flex items-center justify-center rounded-fn-sm
+      className="w-[44px] h-[44px] flex items-center justify-center rounded-fn-sm
                  text-fn-text-secondary hover:bg-fn-bg-secondary transition-colors">
       <svg aria-hidden="true" className="w-4 h-4" .../>
     </button>
@@ -280,6 +280,8 @@ Right-side panel with titled sections (background, last note, recent notes). Stu
 
 ## 9. Button Variants
 
+The `Button` component (`web/src/components/ui/Button.tsx`) wraps these classes with `variant` of `primary` (`btn-primary`), `secondary` (`btn-secondary`), or `destructive`, and `size` of `sm`, `md`, or `lg`. There is no `ghost` variant in the component; `btn-ghost` is a CSS class used directly.
+
 ### Primary (teal fill)
 ```tsx
 <button className="btn-primary px-4 py-2.5 text-fn-base">Save Note</button>
@@ -309,7 +311,7 @@ Right-side panel with titled sections (background, last note, recent notes). Stu
 
 ## 10. Icon Button
 
-Always requires `aria-label`. Consistent 32px hit target.
+Always requires `aria-label`. Interactive targets are 44px minimum (see the back button in `web/src/components/TopBar.tsx`); the 32px (`w-8 h-8`) examples elsewhere in this doc are compact in-card actions.
 
 ```tsx
 <button aria-label="Copy to clipboard"
