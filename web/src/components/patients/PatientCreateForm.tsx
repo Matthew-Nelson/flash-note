@@ -75,7 +75,7 @@ export function PatientCreateForm(): React.ReactElement {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="max-w-fn-content">
+    <form method="post" onSubmit={handleSubmit} noValidate className="max-w-fn-content">
       {/* Unconditional aria-live region (Rule 13) */}
       <div aria-live="assertive" aria-atomic="true">
         {errorCode && (
