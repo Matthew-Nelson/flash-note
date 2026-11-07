@@ -430,6 +430,42 @@ describe('updatePatientAction', () => {
     expect(queries).toContain('ROLLBACK');
     expect(h.logger.error).toHaveBeenCalled();
   });
+
+  it('blank optional fields are sent to the DAL as null so they are cleared', async () => {
+    h.updatePatient.mockResolvedValueOnce(createMockPatient({ id: PATIENT_ID }));
+
+    await updatePatientAction(
+      PATIENT_ID,
+      buildUpdateFormData({
+        firstName: 'Jane',
+        lastName: 'Doe',
+        dateOfBirth: '',
+        pronoun: '',
+        phone: '',
+        email: '',
+      }),
+    );
+
+    const [, , input] = h.updatePatient.mock.calls[0];
+    expect(input).toEqual({
+      firstName: 'Jane',
+      lastName: 'Doe',
+      dateOfBirth: null,
+      pronoun: null,
+      phone: null,
+      email: null,
+    });
+  });
+
+  it('a blank required name is rejected, not cleared', async () => {
+    const res = await updatePatientAction(
+      PATIENT_ID,
+      buildUpdateFormData({ firstName: '', lastName: 'Doe' }),
+    );
+
+    expect(res).toMatchObject({ success: false, error: 'validation_error' });
+    expect(h.updatePatient).not.toHaveBeenCalled();
+  });
 });
 
 // ===========================================================================

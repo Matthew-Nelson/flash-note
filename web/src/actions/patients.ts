@@ -42,16 +42,23 @@ const PATIENT_FORM_FIELDS = [
 ] as const;
 
 /**
- * Normalize FormData values for Zod. Optional fields sent as empty strings
- * should parse to `null`/absent so the DAL stores NULL rather than `""`.
+ * Normalize FormData values for Zod so the DAL stores NULL rather than `""`.
+ *
+ * `blank: 'drop'` (create) omits blank fields; the INSERT defaults them to
+ * NULL. `blank: 'null'` (update) sends them as null, because the DAL's partial
+ * UPDATE leaves an omitted column unchanged, so dropping would make a cleared
+ * field silently keep its old value. A blank required name becomes null and
+ * fails validation.
  */
-function normalizeFormData(formData: FormData): Record<string, unknown> {
+function normalizeFormData(
+  formData: FormData,
+  blank: 'drop' | 'null',
+): Record<string, unknown> {
   const raw = Object.fromEntries(formData);
   const cleaned: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value === 'string' && value.trim() === '') {
-      // Drop blank-string optional fields; Zod `.optional().nullable()` tolerates
-      // the absence and the DAL stores NULL.
+      if (blank === 'null') cleaned[key] = null;
       continue;
     }
     cleaned[key] = value;
@@ -86,7 +93,7 @@ export async function createPatientAction(
   const rate = await checkRateLimit(apiRateLimit, `patient:${session.userId}`);
   if (!rate.success) return { success: false, error: 'rate_limit_exceeded' };
 
-  const parsed = createPatientSchema.safeParse(normalizeFormData(formData));
+  const parsed = createPatientSchema.safeParse(normalizeFormData(formData, 'drop'));
   if (!parsed.success) {
     return {
       success: false,
@@ -165,7 +172,7 @@ export async function updatePatientAction(
   const idParsed = patientIdSchema.safeParse(patientId);
   if (!idParsed.success) return { success: false, error: 'patient_not_found' };
 
-  const parsed = updatePatientSchema.safeParse(normalizeFormData(formData));
+  const parsed = updatePatientSchema.safeParse(normalizeFormData(formData, 'null'));
   if (!parsed.success) {
     return {
       success: false,
