@@ -2,7 +2,7 @@ import 'server-only';
 
 import { Redis } from '@upstash/redis';
 
-import { config, isProduction } from '@/server/db/config';
+import { config, isBuildPhase, isProduction } from '@/server/db/config';
 
 /**
  * Singleton Upstash Redis client.
@@ -14,7 +14,8 @@ function createRedisClient(): Redis | null {
   const { UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN } = config;
 
   if (!UPSTASH_REDIS_REST_URL || !UPSTASH_REDIS_REST_TOKEN) {
-    if (isProduction) {
+    // Not during `next build`: secrets arrive at deploy (see isBuildPhase)
+    if (isProduction && !isBuildPhase) {
       // eslint-disable-next-line no-console
       console.error('FATAL: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are required in production');
       process.exit(1);
