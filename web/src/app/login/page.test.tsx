@@ -15,7 +15,6 @@ const mockPush = vi.fn();
 
 describe('LoginPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(useRouter).mockReturnValue({
       push: mockPush,
       replace: vi.fn(),
@@ -131,10 +130,12 @@ describe('LoginPage', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows generic error for unknown error codes', async () => {
+  it('shows generic error for unknown error codes and never renders the raw server message', async () => {
+    // Rule 2: a server string that is not a known code must not reach the UI
+    const rawServerMessage = 'Database connection refused at db-internal:5432';
     vi.mocked(loginAction).mockResolvedValueOnce({
       success: false,
-      error: 'some_unknown_error',
+      error: rawServerMessage,
     });
 
     const user = userEvent.setup();
@@ -147,6 +148,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(rawServerMessage)).not.toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -185,6 +187,7 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText('An unexpected error occurred. Please try again.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Network failure/)).not.toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

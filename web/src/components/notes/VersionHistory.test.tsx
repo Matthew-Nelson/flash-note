@@ -74,11 +74,11 @@ describe('VersionHistory', () => {
     const btn = screen.getByRole('button', { name: /History/i });
     const panelId = btn.getAttribute('aria-controls');
     expect(panelId).toBe('version-history-s1');
+    expect(screen.queryByRole('list')).not.toBeInTheDocument();
 
     await user.click(btn);
     expect(btn).toHaveAttribute('aria-expanded', 'true');
-    const list = document.getElementById(panelId!);
-    expect(list).not.toBeNull();
+    expect(screen.getByRole('list')).toHaveAttribute('id', panelId);
   });
 
   it('sorts versions DESC (current version first)', async () => {

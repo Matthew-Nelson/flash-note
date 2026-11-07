@@ -3,7 +3,7 @@
  *
  * Tests retry logic, delay calculation, and utility methods.
  */
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseLLMProvider } from './provider';
 import {
   LLMError,
@@ -81,12 +81,7 @@ describe('BaseLLMProvider', () => {
   let provider: TestProvider;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     provider = new TestProvider(FAST_RETRY_CONFIG);
-  });
-
-  afterEach(() => {
-    // no-op: mocks cleared in beforeEach
   });
 
   describe('calculateDelay', () => {

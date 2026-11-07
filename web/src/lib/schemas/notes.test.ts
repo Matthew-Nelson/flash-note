@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { z } from 'zod';
 import {
   generateNoteSchema,
   noteIdSchema,
@@ -6,6 +7,15 @@ import {
   updateNoteSectionsSchema,
   updateSectionStyleSchema,
 } from './notes';
+
+/** Rejected issues as path/code/message, so a test pins the rule that failed. */
+function issues(result: { error?: { issues: z.ZodIssue[] } }) {
+  return result.error?.issues.map(({ path, code, message }) => ({
+    path: path.join('.'),
+    code,
+    message,
+  }));
+}
 
 describe('generateNoteSchema', () => {
   const validInput = {
@@ -35,16 +45,14 @@ describe('generateNoteSchema', () => {
 
   it('rejects invalid note type', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, noteType: 'invalid' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'noteType', code: 'invalid_value' }]);
   });
 
   it('rejects quickNotes shorter than 10 characters', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, quickNotes: 'short' });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      const fieldErrors = result.error.flatten().fieldErrors;
-      expect(fieldErrors.quickNotes?.[0]).toContain('more detail');
-    }
+    expect(issues(result)).toMatchObject([
+      { path: 'quickNotes', code: 'too_small', message: 'Please provide more detail' },
+    ]);
   });
 
   it('rejects quickNotes longer than 5000 characters', () => {
@@ -52,7 +60,7 @@ describe('generateNoteSchema', () => {
       ...validInput,
       quickNotes: 'a'.repeat(5001),
     });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'quickNotes', code: 'too_big' }]);
   });
 
   it('rejects patientContext longer than 500 characters', () => {
@@ -60,7 +68,7 @@ describe('generateNoteSchema', () => {
       ...validInput,
       patientContext: 'a'.repeat(501),
     });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'patientContext', code: 'too_big' }]);
   });
 
   it('accepts empty string patientContext as optional', () => {
@@ -74,12 +82,12 @@ describe('generateNoteSchema', () => {
 
   it('rejects missing quickNotes', () => {
     const result = generateNoteSchema.safeParse({ noteType: 'daily_note' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'quickNotes', code: 'invalid_type' }]);
   });
 
   it('rejects missing noteType', () => {
     const result = generateNoteSchema.safeParse({ quickNotes: 'some valid notes here' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'noteType' }]);
   });
 
   // --- Modality ---
@@ -104,7 +112,7 @@ describe('generateNoteSchema', () => {
 
   it('rejects invalid modality', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, modality: 'invalid' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'modality', code: 'invalid_value' }]);
   });
 
   // --- Duration ---
@@ -127,22 +135,22 @@ describe('generateNoteSchema', () => {
 
   it('rejects negative duration', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, duration: '-1' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'duration', code: 'too_small' }]);
   });
 
   it('rejects duration above 480', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, duration: '481' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'duration', code: 'too_big' }]);
   });
 
   it('rejects non-integer duration', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, duration: '45.5' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'duration', code: 'invalid_type' }]);
   });
 
   it('rejects non-numeric duration', () => {
     const result = generateNoteSchema.safeParse({ ...validInput, duration: 'abc' });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'duration', code: 'invalid_type' }]);
   });
 
   it('rejects empty string duration with min validation error', () => {
@@ -150,11 +158,7 @@ describe('generateNoteSchema', () => {
     // This documents the behavior that the client MUST prevent by stripping the field
     // when the input is empty — otherwise a blank optional field causes a validation error.
     const result = generateNoteSchema.safeParse({ ...validInput, duration: '' });
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      const fieldErrors = result.error.flatten().fieldErrors;
-      expect(fieldErrors.duration).toBeDefined();
-    }
+    expect(issues(result)).toMatchObject([{ path: 'duration', code: 'too_small' }]);
   });
 
   // --- Phase 4 extensions (templateId, patientId) ---
@@ -172,7 +176,7 @@ describe('generateNoteSchema', () => {
       ...validInput,
       templateId: 'not-a-uuid',
     });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([{ path: 'templateId', code: 'invalid_format' }]);
   });
 
   it('accepts optional patientId UUID', () => {
@@ -201,7 +205,9 @@ describe('noteIdSchema', () => {
   });
 
   it('rejects non-UUID strings', () => {
-    expect(noteIdSchema.safeParse('not-a-uuid').success).toBe(false);
+    expect(issues(noteIdSchema.safeParse('not-a-uuid'))).toMatchObject([
+      { path: '', code: 'invalid_format' },
+    ]);
   });
 });
 
@@ -251,11 +257,15 @@ describe('saveNoteSchema', () => {
       ...validSave,
       patientContextSnapshot: 'a'.repeat(2001),
     });
-    expect(result.success).toBe(false);
+    expect(issues(result)).toMatchObject([
+      { path: 'patientContextSnapshot', code: 'too_big' },
+    ]);
   });
 
   it('rejects empty content array', () => {
-    expect(saveNoteSchema.safeParse({ ...validSave, content: [] }).success).toBe(false);
+    expect(issues(saveNoteSchema.safeParse({ ...validSave, content: [] }))).toMatchObject([
+      { path: 'content', code: 'too_small' },
+    ]);
   });
 
   it('rejects content over 20 sections', () => {
@@ -264,9 +274,9 @@ describe('saveNoteSchema', () => {
       title: `Section ${i}`,
       content: 'x',
     }));
-    expect(saveNoteSchema.safeParse({ ...validSave, content: tooMany }).success).toBe(
-      false
-    );
+    expect(issues(saveNoteSchema.safeParse({ ...validSave, content: tooMany }))).toMatchObject([
+      { path: 'content', code: 'too_big' },
+    ]);
   });
 
   it('rejects section content over 10000 chars', () => {
@@ -274,22 +284,24 @@ describe('saveNoteSchema', () => {
       ...validSave,
       content: [{ ...validSave.content[0], content: 'a'.repeat(10001) }],
     };
-    expect(saveNoteSchema.safeParse(big).success).toBe(false);
+    expect(issues(saveNoteSchema.safeParse(big))).toMatchObject([
+      { path: 'content.0.content', code: 'too_big' },
+    ]);
   });
 
   it('rejects invalid templateId (non-UUID)', () => {
     expect(
-      saveNoteSchema.safeParse({ ...validSave, templateId: 'bad' }).success
-    ).toBe(false);
+      issues(saveNoteSchema.safeParse({ ...validSave, templateId: 'bad' }))
+    ).toMatchObject([{ path: 'templateId', code: 'invalid_format' }]);
   });
 
   it('rejects invalid noteType', () => {
     expect(
-      saveNoteSchema.safeParse({
+      issues(saveNoteSchema.safeParse({
         ...validSave,
         noteType: 'not_a_type' as unknown as 'daily_note',
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([{ path: 'noteType', code: 'invalid_value' }]);
   });
 
   it('accepts valid modality and durationMinutes', () => {
@@ -303,8 +315,8 @@ describe('saveNoteSchema', () => {
 
   it('rejects durationMinutes over 480', () => {
     expect(
-      saveNoteSchema.safeParse({ ...validSave, durationMinutes: 481 }).success
-    ).toBe(false);
+      issues(saveNoteSchema.safeParse({ ...validSave, durationMinutes: 481 }))
+    ).toMatchObject([{ path: 'durationMinutes', code: 'too_big' }]);
   });
 });
 
@@ -327,41 +339,45 @@ describe('updateNoteSectionsSchema', () => {
 
   it('rejects non-UUID noteId', () => {
     expect(
-      updateNoteSectionsSchema.safeParse({ ...validUpdate, noteId: 'bad' }).success
-    ).toBe(false);
+      issues(updateNoteSectionsSchema.safeParse({ ...validUpdate, noteId: 'bad' }))
+    ).toMatchObject([{ path: 'noteId', code: 'invalid_format' }]);
   });
 
   it('rejects non-ISO expectedUpdatedAt', () => {
     expect(
-      updateNoteSectionsSchema.safeParse({
+      issues(updateNoteSectionsSchema.safeParse({
         ...validUpdate,
         expectedUpdatedAt: 'yesterday',
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([{ path: 'expectedUpdatedAt', code: 'invalid_format' }]);
   });
 
   it('rejects empty sections object', () => {
     expect(
-      updateNoteSectionsSchema.safeParse({ ...validUpdate, sections: {} }).success
-    ).toBe(false);
+      issues(updateNoteSectionsSchema.safeParse({ ...validUpdate, sections: {} }))
+    ).toMatchObject([
+      { path: 'sections', code: 'custom', message: 'At least one section must be provided' },
+    ]);
   });
 
   it('rejects section content over 10000 chars', () => {
     expect(
-      updateNoteSectionsSchema.safeParse({
+      issues(updateNoteSectionsSchema.safeParse({
         ...validUpdate,
         sections: { '00000000-0000-0000-0000-000000000011': 'a'.repeat(10001) },
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([
+      { path: 'sections.00000000-0000-0000-0000-000000000011', code: 'too_big' },
+    ]);
   });
 
   it('rejects sections with non-UUID keys', () => {
     expect(
-      updateNoteSectionsSchema.safeParse({
+      issues(updateNoteSectionsSchema.safeParse({
         ...validUpdate,
         sections: { 'not-a-uuid': 'text' },
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([{ path: 'sections.not-a-uuid', code: 'invalid_key' }]);
   });
 });
 
@@ -395,32 +411,33 @@ describe('updateSectionStyleSchema', () => {
   });
 
   it('rejects when neither verbosity nor styling is provided', () => {
-    expect(updateSectionStyleSchema.safeParse({ sectionId }).success).toBe(false);
+    expect(issues(updateSectionStyleSchema.safeParse({ sectionId }))).toMatchObject([
+      { path: '', code: 'custom', message: 'At least one of verbosity or styling is required' },
+    ]);
   });
 
   it('rejects invalid verbosity', () => {
     expect(
-      updateSectionStyleSchema.safeParse({
+      issues(updateSectionStyleSchema.safeParse({
         sectionId,
         verbosity: 'verbose' as unknown as 'concise',
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([{ path: 'verbosity', code: 'invalid_value' }]);
   });
 
   it('rejects invalid styling', () => {
     expect(
-      updateSectionStyleSchema.safeParse({
+      issues(updateSectionStyleSchema.safeParse({
         sectionId,
         styling: 'prose' as unknown as 'paragraph',
-      }).success
-    ).toBe(false);
+      }))
+    ).toMatchObject([{ path: 'styling', code: 'invalid_value' }]);
   });
 
   it('rejects non-UUID sectionId', () => {
     expect(
-      updateSectionStyleSchema.safeParse({ sectionId: 'bad', verbosity: 'concise' })
-        .success
-    ).toBe(false);
+      issues(updateSectionStyleSchema.safeParse({ sectionId: 'bad', verbosity: 'concise' }))
+    ).toMatchObject([{ path: 'sectionId', code: 'invalid_format' }]);
   });
 });
 

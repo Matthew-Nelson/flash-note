@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, mockClientQuery, resetMocks, createMockUserRow } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { ZodError } from 'zod';
+import { mockDbQuery, mockClientQuery, createMockUserRow } from '@/test/dal-helpers';
 import {
   findUserByEmail,
   findUserById,
@@ -16,10 +17,6 @@ import {
 } from './users';
 
 describe('User Queries', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('findUserByEmail', () => {
     it('should return user when found', async () => {
       const mockRow = createMockUserRow({ email: 'test@example.com' });
@@ -92,7 +89,7 @@ describe('User Queries', () => {
       const mockRow = createMockUserRow({ subscription_status: 'invalid_status' });
       mockDbQuery.mockResolvedValueOnce({ rows: [mockRow] });
 
-      await expect(findUserByEmail('test@example.com')).rejects.toThrow();
+      await expect(findUserByEmail('test@example.com')).rejects.toBeInstanceOf(ZodError);
     });
 
     it('should normalize email to lowercase for case-insensitive lookup', async () => {
@@ -292,8 +289,8 @@ describe('User Queries', () => {
       await updateUserSubscription('user-123', 'cus_abc', 'sub_xyz', 'active');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $4 AND NOT is_deleted'),
+        ['cus_abc', 'sub_xyz', 'active', 'user-123']
       );
     });
 
@@ -313,8 +310,8 @@ describe('User Queries', () => {
       await updateSubscriptionStatus('user-123', 'canceled');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $2 AND NOT is_deleted'),
+        ['canceled', 'user-123']
       );
     });
 
@@ -348,8 +345,8 @@ describe('User Queries', () => {
       await markEmailVerified('user-123');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $1 AND NOT is_deleted'),
+        ['user-123']
       );
     });
 
@@ -394,8 +391,8 @@ describe('User Queries', () => {
       await updatePassword('user-123', 'new-hash');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $2 AND NOT is_deleted'),
+        ['new-hash', 'user-123']
       );
     });
 
@@ -450,8 +447,8 @@ describe('User Queries', () => {
       await resetLockout('user-123');
 
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $1 AND NOT is_deleted'),
+        ['user-123']
       );
     });
 
@@ -520,8 +517,8 @@ describe('User Queries', () => {
       await updateUserOrganization(mockClient, 'user-123', 'org-456');
 
       expect(mockClientQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $2 AND NOT is_deleted'),
+        ['org-456', 'user-123']
       );
     });
 
@@ -546,8 +543,8 @@ describe('User Queries', () => {
       await clearUserOrganization(mockClient, 'user-123');
 
       expect(mockClientQuery).toHaveBeenCalledWith(
-        expect.stringContaining('AND NOT is_deleted'),
-        expect.any(Array)
+        expect.stringContaining('WHERE id = $1 AND NOT is_deleted'),
+        ['user-123']
       );
     });
 
@@ -574,13 +571,13 @@ describe('User Queries', () => {
       await recordFailedLoginAttempt('user-1');
 
       const query = mockDbQuery.mock.calls[0][0] as string;
-      // Verify lockout interval thresholds are present in the SQL
-      expect(query).toContain('15');   // 15-minute lockout for 5 attempts
-      expect(query).toContain('60');   // 60-minute lockout for 10 attempts
-      expect(query).toContain('1440'); // 24-hour (1440 min) lockout for 15 attempts
-      // Note: threshold attempt counts (5, 10, 15, 20) are also present but
-      // might collide with other values — validate the full CASE WHEN structure
-      // in a real DB integration test when available.
+      // Full clauses, not bare numbers: '15' also appears inside "15 minutes", so a
+      // substring check on '15' still passes after the 15-attempt tier is deleted.
+      expect(query).toContain("WHEN failed_login_attempts + 1 >= 5 THEN NOW() + INTERVAL '15 minutes'");
+      expect(query).toContain("WHEN failed_login_attempts + 1 >= 10 THEN NOW() + INTERVAL '60 minutes'");
+      expect(query).toContain("WHEN failed_login_attempts + 1 >= 15 THEN NOW() + INTERVAL '1440 minutes'");
+      expect(query).toContain('WHEN failed_login_attempts + 1 >= 20 THEN NULL');
+      // Still a structural guard only: real CASE evaluation needs a DB integration test.
     });
   });
 });

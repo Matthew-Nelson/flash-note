@@ -12,6 +12,16 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['tests/e2e/**', '.next/', 'node_modules/'],
     setupFiles: ['src/test/setup.ts'],
+    // Isolation by default: per-file clearAllMocks kept mockResolvedValue
+    // implementations alive across tests, so one test's arrangement could
+    // satisfy another's assertion. vi.fn(impl) still resets to impl.
+    mockReset: true,
+    restoreMocks: true,
+    unstubEnvs: true,
+    unstubGlobals: true,
+    // Tests that assert on logging mock the logger; real output only buries
+    // test failures under JSON lines.
+    env: { LOG_LEVEL: 'silent' },
 
     coverage: {
       provider: 'v8',

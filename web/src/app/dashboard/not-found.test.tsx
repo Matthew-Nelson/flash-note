@@ -6,7 +6,7 @@ describe('DashboardNotFound', () => {
   it('renders 404 message', () => {
     render(<DashboardNotFound />);
 
-    expect(screen.getByText('Page not found')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
     expect(screen.getByText(/doesn't exist or has been moved/)).toBeInTheDocument();
   });
 

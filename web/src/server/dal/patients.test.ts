@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery } from '@/test/dal-helpers';
 import { createMockPatientRow } from '@/test/factories/patient-factory';
 import type { QueryScope } from '@/lib/types';
 import {
@@ -19,10 +19,6 @@ const userScope: QueryScope = { type: 'user', userId: USER_A };
 const orgScope: QueryScope = { type: 'organization', organizationId: ORG_A };
 
 describe('patients DAL', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   // ---------------------------------------------------------------------------
   // createPatient
   // ---------------------------------------------------------------------------
@@ -40,7 +36,7 @@ describe('patients DAL', () => {
       expect(patient.firstName).toBe('Jane');
       expect(mockDbQuery).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO patients'),
-        expect.arrayContaining([USER_A, null, 'Jane', 'Doe'])
+        [USER_A, null, 'Jane', 'Doe', null, null, null, null, null]
       );
     });
 
@@ -125,9 +121,13 @@ describe('patients DAL', () => {
     });
 
     it('Rule 5: returns null when patient belongs to a different user', async () => {
-      // Scope is user A, but DB returns 0 rows (the patient belongs to user B).
+      // Scope is user B; the patient belongs to user A, so the scoped query matches no row.
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       const result = await findPatientById({ type: 'user', userId: USER_B }, PATIENT_1);
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE user_id = $1 AND id = $2');
+      expect(params).toEqual([USER_B, PATIENT_1]);
       expect(result).toBeNull();
     });
 
@@ -266,6 +266,37 @@ describe('patients DAL', () => {
       const [countSql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(countSql).toContain('archived_at IS NULL');
     });
+
+    it('scopes both count and list queries by user_id (Rule 5)', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findPatientsByScope(userScope, { search: 'jane' });
+
+      // count and list share one params array; the scope value sits at $1 in both.
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [listSql, listParams] = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      expect(countSql).toContain('WHERE user_id = $1 AND archived_at IS NULL');
+      expect(listSql).toContain('WHERE user_id = $1 AND archived_at IS NULL');
+      expect(countParams[0]).toBe(USER_A);
+      expect(listParams[0]).toBe(USER_A);
+    });
+
+    it('scopes both count and list queries by organization_id (Rule 5)', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findPatientsByScope(orgScope, { search: 'jane' });
+
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [listSql, listParams] = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      expect(countSql).toContain('WHERE organization_id = $1 AND archived_at IS NULL');
+      expect(listSql).toContain('WHERE organization_id = $1 AND archived_at IS NULL');
+      expect(countParams[0]).toBe(ORG_A);
+      expect(listParams[0]).toBe(ORG_A);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -313,8 +344,33 @@ describe('patients DAL', () => {
 
       await updatePatient(userScope, PATIENT_1, { firstName: 'Jane' });
 
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('user_id = $');
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE user_id = $2 AND id = $3 AND archived_at IS NULL');
+      expect(params).toEqual(['Jane', USER_A, PATIENT_1]);
+    });
+
+    it('scopes UPDATE by organization_id under org scope (Rule 5)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [createMockPatientRow()] });
+
+      await updatePatient(orgScope, PATIENT_1, { firstName: 'Janet' });
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $2 AND id = $3 AND archived_at IS NULL');
+      expect(params).toEqual(['Janet', ORG_A, PATIENT_1]);
+    });
+
+    it('Rule 5: UPDATE scoped to a different user matches no row', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const result = await updatePatient(
+        { type: 'user', userId: USER_B },
+        PATIENT_1,
+        { firstName: 'Janet' }
+      );
+
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual(['Janet', USER_B, PATIENT_1]);
+      expect(result).toBeNull();
     });
 
     it('returns null when UPDATE affects 0 rows (out of scope or archived)', async () => {
@@ -422,8 +478,19 @@ describe('patients DAL', () => {
     it('filters by organization_id under org scope', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [{ id: PATIENT_1 }] });
       await archivePatient(orgScope, PATIENT_1);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('organization_id = $1');
+      expect(params).toEqual([ORG_A, PATIENT_1]);
+    });
+
+    it('Rule 5: archive scoped to a different user matches no row', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+
+      const archived = await archivePatient({ type: 'user', userId: USER_B }, PATIENT_1);
+
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual([USER_B, PATIENT_1]);
+      expect(archived).toBe(false);
     });
   });
 });

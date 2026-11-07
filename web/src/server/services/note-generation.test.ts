@@ -124,8 +124,6 @@ function buildInput(overrides: Partial<GenerateNoteInput> = {}): GenerateNoteInp
 
 describe('generateNote', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-
     mockDetectSuspiciousPatterns.mockReturnValue({ detected: false, count: 0 });
     mockGetSystemPrompt.mockReturnValue('system prompt');
     mockAssembleUserPrompt.mockReturnValue('user prompt');
@@ -268,9 +266,7 @@ describe('generateNote', () => {
     const error = new Error('LLM unavailable');
     mockProvider.generatePTNote.mockRejectedValueOnce(error);
 
-    await expect(generateNote(buildInput({ quickNotes: 'notes text here' }))).rejects.toThrow(
-      'LLM unavailable',
-    );
+    await expect(generateNote(buildInput({ quickNotes: 'notes text here' }))).rejects.toBe(error);
   });
 
   it('handles undefined optional fields from LLM response', async () => {
@@ -344,10 +340,6 @@ describe('generateNote', () => {
 });
 
 describe('generateNote (mock AI mode)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('returns mock response when USE_MOCK_AI is true', async () => {
     // Reset module registry so the dynamic import gets fresh mocks
     vi.resetModules();
@@ -396,8 +388,8 @@ describe('generateNote (mock AI mode)', () => {
       patientContext: null,
     });
 
-    expect(result.content).toHaveLength(4);
-    expect(result.content.every((s) => typeof s.content === 'string')).toBe(true);
+    expect(result.content.map((s) => s.title)).toEqual(['Subjective', 'Objective', 'Assessment', 'Plan']);
+    expect(result.content[0].content).toContain('Patient reports pain level of 4/10');
     expect(result.metadata.model).toContain('mock');
     // Provider should NOT have been called
     expect(mockProvider.generatePTNote).not.toHaveBeenCalled();
@@ -417,7 +409,6 @@ describe('generateNote (non-SOAP template sections)', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockDetectSuspiciousPatterns.mockReturnValue({ detected: false, count: 0 });
     mockGetConfiguredProvider.mockReturnValue(mockProvider);
     mockProvider.generatePTNote.mockResolvedValue({
@@ -474,7 +465,6 @@ describe('generateNote (environment-dependent configuration)', () => {
   }
 
   beforeEach(() => {
-    vi.clearAllMocks();
     mockDetectSuspiciousPatterns.mockReturnValue({ detected: false, count: 0 });
     mockGetSystemPrompt.mockReturnValue('system prompt');
     mockAssembleUserPrompt.mockReturnValue('user prompt');
@@ -527,7 +517,7 @@ describe('generateNote (environment-dependent configuration)', () => {
     const result = await mod.generateNote(buildInput({ template }));
 
     expect(result.content[0]).toMatchObject({ sectionId: 'sec-s', title: 'Subjective' });
-    expect(result.content[0].content.length).toBeGreaterThan(0);
+    expect(result.content[0].content).toContain('Patient reports pain level of 4/10');
     expect(result.content[1]).toEqual({ sectionId: 'sec-x', title: 'Home Exercise Program', content: '' });
     expect(mockProvider.generatePTNote).not.toHaveBeenCalled();
   });

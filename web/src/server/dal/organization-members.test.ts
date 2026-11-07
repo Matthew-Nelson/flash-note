@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, mockClientQuery, resetMocks, createMockOrgMemberRow } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { ZodError } from 'zod';
+import { mockDbQuery, mockClientQuery, createMockOrgMemberRow } from '@/test/dal-helpers';
 
 import {
   addMember,
@@ -12,10 +13,6 @@ import {
 } from './organization-members';
 
 describe('Organization Member Queries', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('addMember', () => {
     it('should INSERT with parameterized query', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
@@ -62,13 +59,14 @@ describe('Organization Member Queries', () => {
       expect(result).toBeNull();
     });
 
-    it('should filter by removed_at IS NULL', async () => {
+    it('should filter by user_id and removed_at IS NULL', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       await findActiveMembership('user-123');
 
-      const [sql] = mockDbQuery.mock.calls[0] as [string];
-      expect(sql).toContain('removed_at IS NULL');
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE user_id = $1 AND removed_at IS NULL');
+      expect(params).toEqual(['user-123']);
     });
 
     it('should use explicit column list (no SELECT *)', async () => {
@@ -98,7 +96,7 @@ describe('Organization Member Queries', () => {
       const memberRow = createMockOrgMemberRow({ role: 'superadmin' });
       mockDbQuery.mockResolvedValueOnce({ rows: [memberRow] });
 
-      await expect(findActiveMembership('test-user-id')).rejects.toThrow();
+      await expect(findActiveMembership('test-user-id')).rejects.toBeInstanceOf(ZodError);
     });
   });
 
@@ -127,9 +125,10 @@ describe('Organization Member Queries', () => {
       const mockClient = { query: mockClientQuery } as never;
       await hasActiveMembership(mockClient, 'user-123');
 
-      const [sql] = mockClientQuery.mock.calls[0] as [string];
+      const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('FOR UPDATE');
-      expect(sql).toContain('removed_at IS NULL');
+      expect(sql).toContain('WHERE user_id = $1 AND removed_at IS NULL');
+      expect(params).toEqual(['user-123']);
     });
 
     it('should use transaction client (not pool)', async () => {
@@ -168,8 +167,10 @@ describe('Organization Member Queries', () => {
 
       await findMembershipRecord('org-123', 'user-123');
 
-      const [sql] = mockDbQuery.mock.calls[0] as [string];
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $1 AND user_id = $2');
       expect(sql).not.toContain('removed_at IS NULL');
+      expect(params).toEqual(['org-123', 'user-123']);
     });
   });
 
@@ -185,13 +186,14 @@ describe('Organization Member Queries', () => {
       expect(result!.removed_at).toBeNull();
     });
 
-    it('should filter by removed_at IS NULL', async () => {
+    it('should filter by organization_id, user_id and removed_at IS NULL', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
       await findActiveMemberByOrgAndUser('org-123', 'user-123');
 
-      const [sql] = mockDbQuery.mock.calls[0] as [string];
-      expect(sql).toContain('removed_at IS NULL');
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $1 AND user_id = $2 AND removed_at IS NULL');
+      expect(params).toEqual(['org-123', 'user-123']);
     });
 
     it('should return null when not found', async () => {
@@ -212,9 +214,9 @@ describe('Organization Member Queries', () => {
 
       expect(result).toBe(3);
 
-      const [sql] = mockClientQuery.mock.calls[0] as [string];
-      expect(sql).toContain('is_billable = TRUE');
-      expect(sql).toContain('removed_at IS NULL');
+      const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $1 AND removed_at IS NULL AND is_billable = TRUE');
+      expect(params).toEqual(['org-123']);
     });
 
     it('should return 0 when no billable members', async () => {
@@ -248,7 +250,7 @@ describe('Organization Member Queries', () => {
 
       const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('SET removed_at = NOW()');
-      expect(sql).toContain('removed_at IS NULL');
+      expect(sql).toContain('WHERE organization_id = $1 AND user_id = $2 AND removed_at IS NULL');
       expect(params).toEqual(['org-123', 'user-123']);
     });
 

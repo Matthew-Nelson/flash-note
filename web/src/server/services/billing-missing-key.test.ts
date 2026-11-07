@@ -21,14 +21,10 @@ const { getBillingService, BillingError } = await import('./billing');
 
 describe('getBillingService without STRIPE_SECRET_KEY', () => {
   it('throws BillingError(missing_stripe_key) on first use', () => {
-    let caught: unknown;
-    try {
-      getBillingService();
-    } catch (err) {
-      caught = err;
-    }
-    expect(caught).toBeInstanceOf(BillingError);
-    expect((caught as InstanceType<typeof BillingError>).code).toBe('missing_stripe_key');
+    expect(() => getBillingService()).toThrow(BillingError);
+    expect(() => getBillingService()).toThrow(
+      expect.objectContaining({ code: 'missing_stripe_key' }),
+    );
   });
 
   it('does not cache a failed construction — every call keeps failing closed', () => {

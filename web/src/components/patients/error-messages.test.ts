@@ -29,7 +29,7 @@ describe('patient error-messages', () => {
 
   it('mapPatientError returns mapped string for known code', () => {
     expect(mapPatientError('patient_not_found')).toBe(
-      PATIENT_ERROR_MESSAGES.patient_not_found,
+      "This patient no longer exists or you don't have access to it.",
     );
   });
 

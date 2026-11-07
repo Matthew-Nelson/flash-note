@@ -49,7 +49,10 @@ describe('redis', () => {
     }));
 
     const { redis } = await import('./redis');
-    expect(redis).not.toBeNull();
+    expect(redis).toMatchObject({
+      url: 'https://test.upstash.io',
+      token: 'test-token',
+    });
   });
 
   it('should call process.exit(1) in production without credentials', async () => {
@@ -67,6 +70,5 @@ describe('redis', () => {
     await import('./redis');
 
     expect(mockExit).toHaveBeenCalledWith(1);
-    mockExit.mockRestore();
   });
 });

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import type { SessionData } from '@/server/types';
 import { createMockPatient } from '@/test/factories/patient-factory';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // Mocks
 const mockGetSession = vi.fn<() => Promise<SessionData | null>>();
@@ -51,21 +52,11 @@ vi.mock('@/components/patients', () => ({
 import PatientsPage, { PatientsTable } from './page';
 
 function session(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'sess',
-    userId: 'user-1',
-    email: 'pt@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date('2026-06-01'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+  return createMockSession({ userId: 'user-1', ...overrides });
 }
 
 describe('PatientsPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
@@ -78,6 +69,7 @@ describe('PatientsPage', () => {
       PatientsPage({ searchParams: Promise.resolve({}) }),
     ).rejects.toThrow('NEXT_REDIRECT');
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockFindPatientsByScope).not.toHaveBeenCalled();
   });
 
   it('renders <main id="main-content"> (Rule 14)', async () => {
@@ -89,10 +81,8 @@ describe('PatientsPage', () => {
 
   it('renders exactly one <h1> with "Patients"', async () => {
     mockGetSession.mockResolvedValue(session());
-    const { container } = render(
-      await PatientsPage({ searchParams: Promise.resolve({}) }),
-    );
-    const h1s = container.querySelectorAll('h1');
+    render(await PatientsPage({ searchParams: Promise.resolve({}) }));
+    const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).toHaveTextContent('Patients');
   });
@@ -129,7 +119,6 @@ describe('PatientsPage', () => {
 // Suspense fallback rather than awaiting the inner async component.
 describe('PatientsTable', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFindPatientsByScope.mockResolvedValue({ patients: [], total: 0 });
   });
 
@@ -150,9 +139,10 @@ describe('PatientsTable', () => {
     expect(
       screen.getByText(/Create your first patient/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getAllByRole('link', { name: /add patient/i }).length,
-    ).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /add patient/i })).toHaveAttribute(
+      'href',
+      '/dashboard/patients/new',
+    );
   });
 
   it('renders search-scoped empty state when query yields no results', async () => {

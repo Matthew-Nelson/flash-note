@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // --- Mocks ---
 // These must be set up before the module under test is imported.
@@ -8,11 +8,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockSet = vi.fn();
 
 vi.mock('next/headers', () => ({
-  cookies: vi.fn().mockResolvedValue({
-    set: (...args: unknown[]): unknown => mockSet(...args),
-    get: vi.fn(),
-    delete: vi.fn(),
-  }),
+  cookies: vi.fn(() =>
+    Promise.resolve({
+      set: (...args: unknown[]): unknown => mockSet(...args),
+      get: vi.fn(),
+      delete: vi.fn(),
+    })
+  ),
 }));
 
 // Mock config with isProduction: true — must use a separate file because
@@ -25,10 +27,6 @@ vi.mock('@/server/db/config', () => ({
 const { setSessionCookie } = await import('./session-cookie');
 
 describe('session-cookie (production mode)', () => {
-  beforeEach(() => {
-    mockSet.mockReset();
-  });
-
   it('sets secure: true in production mode (HTTPS enforcement)', async () => {
     await setSessionCookie('test-token');
 

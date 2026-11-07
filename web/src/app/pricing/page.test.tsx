@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import PricingPage from './page';
 import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // Mock getSession
 const mockGetSession = vi.fn<() => Promise<SessionData | null>>();
@@ -41,24 +42,7 @@ vi.mock('./CheckoutButtons', () => ({
   ),
 }));
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-uuid',
-    userId: 'user-uuid',
-    email: 'therapist@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 describe('PricingPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('passes showDashboardLink={true} to MarketingNav when session exists', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
 
@@ -66,6 +50,7 @@ describe('PricingPage', () => {
 
     const nav = screen.getByTestId('marketing-nav');
     expect(nav).toHaveAttribute('data-show-dashboard', 'true');
+    expect(screen.getByTestId('checkout-buttons')).toHaveAttribute('data-authenticated', 'true');
   });
 
   it('passes showDashboardLink={false} to MarketingNav when session is null', async () => {
@@ -113,13 +98,18 @@ describe('PricingPage', () => {
     ).toBeInTheDocument();
   });
 
-  it('passes price IDs to CheckoutButtons', async () => {
+  it('passes the configured Stripe price IDs to CheckoutButtons', async () => {
+    // Price IDs are read from env at module load, so reload the page module after stubbing
+    vi.stubEnv('NEXT_PUBLIC_STRIPE_PRICE_MONTHLY', 'price_monthly_test');
+    vi.stubEnv('NEXT_PUBLIC_STRIPE_PRICE_ANNUAL', 'price_annual_test');
+    vi.resetModules();
+    const { default: ReloadedPricingPage } = await import('./page');
     mockGetSession.mockResolvedValue(null);
 
-    render(await PricingPage());
+    render(await ReloadedPricingPage());
 
-    // Both env vars default to '' in test env
     const checkoutButtons = screen.getByTestId('checkout-buttons');
-    expect(checkoutButtons).toBeInTheDocument();
+    expect(checkoutButtons).toHaveAttribute('data-price-monthly', 'price_monthly_test');
+    expect(checkoutButtons).toHaveAttribute('data-price-annual', 'price_annual_test');
   });
 });

@@ -14,7 +14,6 @@ vi.mock('@/actions/auth', () => ({
 
 describe('ResetPasswordPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Default: provide a valid token so the form renders
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams('token=valid-token') as ReturnType<typeof useSearchParams>
@@ -75,7 +74,7 @@ describe('ResetPasswordPage', () => {
       expect(screen.getByLabelText('New password')).toBeInTheDocument();
     });
     expect(screen.getByLabelText('Confirm new password')).toBeInTheDocument();
-    expect(screen.getByText('Reset password')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reset password' })).toBeInTheDocument();
   });
 
   it('should render AuthLayout elements in ready state', async () => {
@@ -93,10 +92,10 @@ describe('ResetPasswordPage', () => {
     render(<ResetPasswordPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Reset password')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Reset password' })).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
@@ -112,7 +111,7 @@ describe('ResetPasswordPage', () => {
     });
 
     await user.type(screen.getByLabelText('New password'), 'weak');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
@@ -128,7 +127,7 @@ describe('ResetPasswordPage', () => {
     });
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please confirm your password')).toBeInTheDocument();
@@ -145,7 +144,7 @@ describe('ResetPasswordPage', () => {
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Different1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
@@ -164,7 +163,7 @@ describe('ResetPasswordPage', () => {
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Password Reset Successfully')).toBeInTheDocument();
@@ -187,7 +186,7 @@ describe('ResetPasswordPage', () => {
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to reset password. The link may have expired.')).toBeInTheDocument();
@@ -206,7 +205,7 @@ describe('ResetPasswordPage', () => {
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
@@ -225,10 +224,33 @@ describe('ResetPasswordPage', () => {
 
     await user.type(screen.getByLabelText('New password'), 'Password1');
     await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
-    await user.click(screen.getByText('Reset password'));
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to reset password. The link may have expired.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/Server error/)).not.toBeInTheDocument();
+  });
+
+  it('never renders a raw server message from the action result', async () => {
+    // Rule 2: a server string that is not a known code must not reach the UI
+    const rawServerMessage = 'Token hash mismatch in password_reset_tokens';
+    const user = userEvent.setup();
+    render(<ResetPasswordPage />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('New password')).toBeInTheDocument();
+    });
+
+    mockResetPasswordAction.mockResolvedValueOnce({ success: false, error: rawServerMessage });
+
+    await user.type(screen.getByLabelText('New password'), 'Password1');
+    await user.type(screen.getByLabelText('Confirm new password'), 'Password1');
+    await user.click(screen.getByRole('button', { name: 'Reset password' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to reset password. The link may have expired.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(rawServerMessage)).not.toBeInTheDocument();
   });
 });

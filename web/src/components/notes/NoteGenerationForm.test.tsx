@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NoteGenerationForm, NOTE_ERROR_MESSAGES } from './NoteGenerationForm';
@@ -33,10 +33,6 @@ function buildSuccessResponse(overrides = {}) {
 }
 
 describe('NoteGenerationForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders noteType select with all four options', () => {
     render(<NoteGenerationForm />);
 

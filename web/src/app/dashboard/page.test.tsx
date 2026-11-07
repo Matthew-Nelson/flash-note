@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import DashboardPage from './page';
 import type { SessionData } from '@/server/types';
 import type { UsageData } from '@/server/dal/usage';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // Mock getSession
 const mockGetSession = vi.fn<() => Promise<SessionData | null>>();
@@ -41,19 +42,6 @@ vi.mock('@/actions/billing', () => ({
   createPortalAction: vi.fn(),
 }));
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-uuid',
-    userId: 'user-uuid',
-    email: 'therapist@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 function createMockUsage(overrides: Partial<UsageData> = {}): UsageData {
   return {
     currentMonth: '2026-02',
@@ -65,7 +53,6 @@ function createMockUsage(overrides: Partial<UsageData> = {}): UsageData {
 
 describe('DashboardPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Make redirect throw to halt execution (matches production behavior)
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
@@ -77,6 +64,7 @@ describe('DashboardPage', () => {
 
     await expect(DashboardPage()).rejects.toThrow('NEXT_REDIRECT');
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockGetUsageForUser).not.toHaveBeenCalled();
   });
 
   describe('TopBar and landmarks', () => {
@@ -242,9 +230,7 @@ describe('DashboardPage', () => {
 
       render(await DashboardPage());
 
-      const alerts = screen.getAllByRole('alert');
-      expect(alerts.length).toBeGreaterThan(0);
-      expect(screen.getByText(/Your payment is past due/)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Your payment is past due');
     });
 
     it('shows canceled banner for canceled status', async () => {
@@ -267,9 +253,7 @@ describe('DashboardPage', () => {
 
       render(await DashboardPage());
 
-      const alerts = screen.getAllByRole('alert');
-      expect(alerts.length).toBeGreaterThan(0);
-      expect(screen.getByText(/Your payment failed/)).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent('Your payment failed');
     });
 
     it('shows expired banner for unknown/default status', async () => {
@@ -323,9 +307,8 @@ describe('DashboardPage', () => {
 
       render(await DashboardPage());
 
-      expect(screen.getByRole('heading', { name: /Add a Patient/i })).toBeInTheDocument();
-      // Both quick action stubs share the same "Coming soon" text; verify at least one exists
-      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(1);
+      const heading = screen.getByRole('heading', { name: /Add a Patient/i });
+      expect(heading.parentElement).toHaveTextContent('Coming soon');
     });
 
     it('renders "Browse Templates" stub card with "Coming soon" text', async () => {
@@ -334,8 +317,8 @@ describe('DashboardPage', () => {
 
       render(await DashboardPage());
 
-      expect(screen.getByRole('heading', { name: /Browse Templates/i })).toBeInTheDocument();
-      expect(screen.getAllByText('Coming soon').length).toBeGreaterThanOrEqual(2);
+      const heading = screen.getByRole('heading', { name: /Browse Templates/i });
+      expect(heading.parentElement).toHaveTextContent('Coming soon');
     });
   });
 

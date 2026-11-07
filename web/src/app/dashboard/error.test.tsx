@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DashboardError from './error';
 
@@ -20,14 +20,15 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
-// Install a configurable clipboard stub before each test so both our spy and
-// userEvent.setup() (which calls attachClipboardStubToView) can coexist.
-// configurable: true allows userEvent to redefine the property without throwing.
-const mockClipboardWriteText = vi.fn().mockResolvedValue(undefined);
+const mockClipboardWriteText = vi.fn(() => Promise.resolve(undefined));
+
+let user: ReturnType<typeof userEvent.setup>;
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  mockClipboardWriteText.mockResolvedValue(undefined);
+  user = userEvent.setup();
+  // userEvent.setup() replaces navigator.clipboard with its own stub, so the spy
+  // must be installed after it or the Rule 4 clipboard assertions never see a call.
+  // configurable: true lets the property be redefined per test.
   Object.defineProperty(navigator, 'clipboard', {
     value: { writeText: mockClipboardWriteText },
     writable: true,
@@ -55,7 +56,6 @@ describe('DashboardError', () => {
   });
 
   it('calls reset when Try Again button is clicked', async () => {
-    const user = userEvent.setup();
     const error = new Error('test error');
     const reset = vi.fn();
 
@@ -81,7 +81,7 @@ describe('DashboardError', () => {
     mockLogoutAction.mockResolvedValue(undefined);
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(mockLogoutAction).toHaveBeenCalledOnce();
@@ -94,7 +94,7 @@ describe('DashboardError', () => {
     window.addEventListener('flashnote:logout', logoutListener);
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(logoutListener).toHaveBeenCalledOnce();
@@ -113,7 +113,7 @@ describe('DashboardError', () => {
     mockLogoutAction.mockResolvedValue(undefined);
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(mockClipboardWriteText).toHaveBeenCalledWith('');
@@ -135,7 +135,7 @@ describe('DashboardError', () => {
     );
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(screen.getByText('Signing out...')).toBeInTheDocument();
@@ -151,7 +151,7 @@ describe('DashboardError', () => {
     window.addEventListener('flashnote:logout', logoutListener);
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(window.location.href).toBe('/login');
@@ -169,7 +169,7 @@ describe('DashboardError', () => {
     mockLogoutAction.mockResolvedValue(undefined);
 
     render(<DashboardError error={new Error('test')} reset={vi.fn()} />);
-    fireEvent.click(screen.getByText('Return to sign in'));
+    await user.click(screen.getByText('Return to sign in'));
 
     await vi.waitFor(() => {
       expect(mockLogoutAction).toHaveBeenCalledOnce();

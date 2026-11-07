@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MarketingNav } from './MarketingNav';
 
 // Mock BetaBadge to isolate MarketingNav tests
@@ -64,63 +65,67 @@ describe('MarketingNav', () => {
     expect(screen.getByRole('button', { name: 'Open menu' })).toBeInTheDocument();
   });
 
-  it('opens mobile drawer when hamburger is clicked', () => {
+  it('opens mobile drawer when hamburger is clicked', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    // Drawer nav links are present in the DOM but visually translated off-screen
-    // Click the hamburger to open the drawer
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
-    // After open, close button should be visible
+    // Drawer is aria-hidden while closed, so its Close button is not in the accessibility tree
+    expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     expect(screen.getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
   });
 
-  it('closes mobile drawer when close button is clicked', () => {
+  it('closes mobile drawer when close button is clicked', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     expect(screen.getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Close menu' }));
-    // After close, backdrop element should be gone
+    await user.click(screen.getByRole('button', { name: 'Close menu' }));
+    expect(screen.queryByRole('button', { name: 'Close menu' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('menu-backdrop')).not.toBeInTheDocument();
   });
 
-  it('closes mobile drawer on Escape key', () => {
+  it('closes mobile drawer on Escape key', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     // Backdrop appears when open
     expect(screen.getByTestId('menu-backdrop')).toBeInTheDocument();
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(screen.queryByTestId('menu-backdrop')).not.toBeInTheDocument();
   });
 
-  it('closes mobile drawer on backdrop click', () => {
+  it('closes mobile drawer on backdrop click', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     const backdrop = screen.getByTestId('menu-backdrop');
     expect(backdrop).toBeInTheDocument();
-    fireEvent.click(backdrop);
+    await user.click(backdrop);
     expect(screen.queryByTestId('menu-backdrop')).not.toBeInTheDocument();
   });
 
-  it('closes mobile drawer when a nav link in the drawer is clicked', () => {
+  it('closes mobile drawer when a nav link in the drawer is clicked', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     expect(screen.getByTestId('menu-backdrop')).toBeInTheDocument();
-    // Click the first Pricing link (desktop is hidden by CSS, drawer is in the DOM)
-    // The drawer's links close the menu on click
+    // Desktop nav renders before the drawer in the DOM, so the last Pricing link is the drawer's
     const pricingLinks = screen.getAllByRole('link', { name: 'Pricing' });
-    // Click whichever pricing link is reachable (drawer or desktop)
-    fireEvent.click(pricingLinks[pricingLinks.length - 1]);
+    await user.click(pricingLinks[pricingLinks.length - 1]);
     expect(screen.queryByTestId('menu-backdrop')).not.toBeInTheDocument();
   });
 
-  it('renders close button with aria-label in mobile drawer', () => {
+  it('renders close button with aria-label in mobile drawer', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     expect(screen.getByRole('button', { name: 'Close menu' })).toBeInTheDocument();
   });
 
-  it('backdrop has role="presentation" and aria-hidden="true"', () => {
+  it('backdrop has role="presentation" and aria-hidden="true"', async () => {
+    const user = userEvent.setup();
     render(<MarketingNav />);
-    fireEvent.click(screen.getByRole('button', { name: 'Open menu' }));
+    await user.click(screen.getByRole('button', { name: 'Open menu' }));
     const backdrop = screen.getByTestId('menu-backdrop');
     expect(backdrop).toHaveAttribute('role', 'presentation');
     expect(backdrop).toHaveAttribute('aria-hidden', 'true');

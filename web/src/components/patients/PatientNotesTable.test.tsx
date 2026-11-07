@@ -126,7 +126,6 @@ describe('PatientNotesTable', () => {
     );
     // Truncated to 97 chars + ellipsis
     const preview = screen.getByText(/AAAAA/);
-    expect(preview.textContent.length).toBeLessThanOrEqual(101);
-    expect(preview.textContent).toMatch(/…$/);
+    expect(preview.textContent).toBe(`${'A'.repeat(97)}…`);
   });
 });

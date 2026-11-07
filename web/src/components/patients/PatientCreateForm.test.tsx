@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -18,10 +18,6 @@ vi.mock('next/navigation', () => ({
 import { PatientCreateForm } from './PatientCreateForm';
 
 describe('PatientCreateForm', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders labelled inputs for all fields', () => {
     render(<PatientCreateForm />);
     expect(screen.getByLabelText(/first name/i)).toBeInTheDocument();
@@ -52,6 +48,10 @@ describe('PatientCreateForm', () => {
     await user.type(screen.getByLabelText(/email/i), 'not-an-email');
     await user.click(screen.getByRole('button', { name: /save patient/i }));
     expect(h.createPatientAction).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/email/i)).toHaveAttribute('aria-invalid', 'true');
+    expect(
+      screen.getByText('Please check the highlighted fields and try again.'),
+    ).toBeInTheDocument();
   });
 
   it('submits to Server Action and redirects on success', async () => {
@@ -191,5 +191,6 @@ describe('PatientCreateForm', () => {
         screen.getByText(/please check the highlighted fields/i),
       ).toBeInTheDocument();
     });
+    expect(screen.getByText('Validation failed')).toBeInTheDocument();
   });
 });

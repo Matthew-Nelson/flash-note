@@ -26,12 +26,16 @@ vi.mock('@/server/db', () => ({
 }));
 
 /**
- * Reset all mocks between tests
+ * Route getPoolClient() to a client whose query is mockClientQuery, for
+ * DAL functions that open their own transaction.
  */
-export function resetMocks() {
-  mockDbQuery.mockReset();
-  mockClientQuery.mockReset();
-  mockGetPoolClient.mockReset();
+export function setupMockClient() {
+  const mockClient = {
+    query: mockClientQuery,
+    release: vi.fn(),
+  };
+  mockGetPoolClient.mockResolvedValue(mockClient);
+  return mockClient;
 }
 
 /**

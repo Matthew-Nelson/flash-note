@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 import type { ClinicalNoteWithPatient, NoteVersionWithSection } from '@/lib/types';
 
 vi.mock('next/navigation', () => ({
@@ -11,7 +11,7 @@ vi.mock('next/navigation', () => ({
   }),
 }));
 
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 const mockGetSession = vi.hoisted(() => vi.fn());
 const mockFindClinicalNoteById = vi.hoisted(() => vi.fn());
@@ -49,19 +49,6 @@ import NoteDetailPage from './page';
 
 const NOTE_ID = '55555555-5555-5555-5555-555555555555';
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 function createMockNote(): ClinicalNoteWithPatient {
   return {
     id: NOTE_ID,
@@ -86,15 +73,6 @@ function createMockNote(): ClinicalNoteWithPatient {
 
 describe('NoteDetailPage', () => {
   beforeEach(() => {
-    // Preserve the factory impl but reset call counts.
-    vi.mocked(redirect).mockClear();
-    vi.mocked(notFound).mockClear();
-    mockGetSession.mockReset();
-    mockFindClinicalNoteById.mockReset();
-    mockFindVersionsByNoteId.mockReset();
-    mockAuditLog.mockReset();
-    mockGetRequestContext.mockReset();
-
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent' });
     mockFindClinicalNoteById.mockResolvedValue(createMockNote());
     mockFindVersionsByNoteId.mockResolvedValue([] as NoteVersionWithSection[]);
@@ -106,10 +84,12 @@ describe('NoteDetailPage', () => {
       NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) }),
     ).rejects.toThrow('NEXT_REDIRECT');
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockFindClinicalNoteById).not.toHaveBeenCalled();
+    expect(mockAuditLog).not.toHaveBeenCalled();
   });
 
   it('calls notFound when id is not a valid UUID', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     await expect(
       NoteDetailPage({ params: Promise.resolve({ id: 'bad-id' }) }),
     ).rejects.toThrow('NEXT_NOT_FOUND');
@@ -117,15 +97,17 @@ describe('NoteDetailPage', () => {
   });
 
   it('calls notFound when findClinicalNoteById returns null', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     mockFindClinicalNoteById.mockResolvedValue(null);
     await expect(
       NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) }),
     ).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mockFindVersionsByNoteId).not.toHaveBeenCalled();
+    expect(mockAuditLog).not.toHaveBeenCalled();
   });
 
   it('calls findClinicalNoteById with scope + noteId (Rule 5)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     await NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) });
     expect(mockFindClinicalNoteById).toHaveBeenCalledWith(
       { type: 'user', userId: 'user-1' },
@@ -134,7 +116,7 @@ describe('NoteDetailPage', () => {
   });
 
   it('calls findVersionsByNoteId (Rule 5)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     await NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) });
     expect(mockFindVersionsByNoteId).toHaveBeenCalledWith(
       { type: 'user', userId: 'user-1' },
@@ -145,10 +127,11 @@ describe('NoteDetailPage', () => {
   // B-2: NOTE_VIEWED + NOTE_HISTORY_VIEWED audit verification (mirrors 04-02 PATIENT_VIEWED pattern)
 
   it('fires NOTE_VIEWED audit event on render (B-2)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     await NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) });
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
+        userId: 'user-1',
         action: 'NOTE_VIEWED',
         status: 'SUCCESS',
         metadata: expect.objectContaining({ noteId: NOTE_ID }),
@@ -157,7 +140,7 @@ describe('NoteDetailPage', () => {
   });
 
   it('fires NOTE_HISTORY_VIEWED audit event on render (B-2)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     mockFindVersionsByNoteId.mockResolvedValue([
       {
         id: 'v1',
@@ -181,7 +164,7 @@ describe('NoteDetailPage', () => {
   });
 
   it('fires both audit events in a single render call (B-2 verified)', async () => {
-    mockGetSession.mockResolvedValue(createMockSession());
+    mockGetSession.mockResolvedValue(createMockSession({ userId: 'user-1' }));
     await NoteDetailPage({ params: Promise.resolve({ id: NOTE_ID }) });
     expect(mockAuditLog).toHaveBeenCalledTimes(2);
   });

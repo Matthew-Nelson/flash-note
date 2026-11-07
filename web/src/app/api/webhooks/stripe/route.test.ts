@@ -31,11 +31,13 @@ const { POST } = await import('./route');
 // Helpers
 // ---------------------------------------------------------------------------
 
+const DEFAULT_BODY = '{"type":"test.event"}';
+
 function makeRequest(options: {
   signature?: string | null;
   body?: string;
 } = {}): NextRequest {
-  const body = options.body ?? '{"type":"test.event"}';
+  const body = options.body ?? DEFAULT_BODY;
   const hasSignature = !Object.hasOwn(options, 'signature') || options.signature !== null;
   const signature = hasSignature ? (options.signature ?? 'valid-stripe-signature') : undefined;
 
@@ -59,18 +61,18 @@ function makeRequest(options: {
 
 describe('POST /api/webhooks/stripe', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
-  it('returns 400 when stripe-signature header is missing', async () => {
+  it('returns 400 when stripe-signature header is missing, without verifying', async () => {
     const request = makeRequest({ signature: null });
 
     const response = await POST(request);
 
     expect(response.status).toBe(400);
     const body = await response.json() as { error: string };
-    expect(body.error).toContain('stripe-signature');
+    expect(body).toEqual({ error: 'Missing stripe-signature header' });
+    expect(mockHandleWebhook).not.toHaveBeenCalled();
   });
 
   it('returns 400 when billingService throws WebhookSignatureError (not 500)', async () => {
@@ -82,10 +84,12 @@ describe('POST /api/webhooks/stripe', () => {
 
     expect(response.status).toBe(400);
     const body = await response.json() as { error: string };
-    expect(body.error).toContain('signature');
+    expect(body).toEqual({ error: 'Invalid signature' });
+    // Signature verification itself runs in billingService; the route must hand it the raw bytes and header
+    expect(mockHandleWebhook).toHaveBeenCalledWith(Buffer.from(DEFAULT_BODY), 'bad-signature');
   });
 
-  it('returns 200 with { received: true } on success', async () => {
+  it('returns 200 with { received: true } on success and forwards raw bytes and signature', async () => {
     mockHandleWebhook.mockResolvedValue(undefined);
 
     const request = makeRequest();
@@ -93,7 +97,8 @@ describe('POST /api/webhooks/stripe', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json() as { received: boolean };
-    expect(body.received).toBe(true);
+    expect(body).toEqual({ received: true });
+    expect(mockHandleWebhook).toHaveBeenCalledWith(Buffer.from(DEFAULT_BODY), 'valid-stripe-signature');
   });
 
   it('returns 500 when billingService throws non-signature error (Stripe retries)', async () => {
@@ -103,7 +108,8 @@ describe('POST /api/webhooks/stripe', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(500);
+    // Exact match also proves the internal error message is not echoed to the caller
     const body = await response.json() as { error: string };
-    expect(body.error).toContain('failed');
+    expect(body).toEqual({ error: 'Webhook processing failed' });
   });
 });

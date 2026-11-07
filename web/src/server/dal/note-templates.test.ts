@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery } from '@/test/dal-helpers';
 import {
   createMockTemplateRow,
   createMockTemplateSectionRow,
@@ -22,10 +22,6 @@ const userScope: QueryScope = { type: 'user', userId: USER_A };
 const orgScope: QueryScope = { type: 'organization', organizationId: ORG_A };
 
 describe('note-templates DAL', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   // ---------------------------------------------------------------------------
   // findBuiltinTemplates
   // ---------------------------------------------------------------------------

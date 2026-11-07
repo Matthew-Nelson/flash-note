@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -27,10 +27,6 @@ function rowWrap(children: React.ReactNode): React.ReactElement {
 }
 
 describe('PatientRow', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders patient name as a link to their detail page', () => {
     const patient = createMockPatient({
       id: 'pid-1',
@@ -116,19 +112,19 @@ describe('PatientRow', () => {
     await waitFor(() => {
       // Text appears in both the sr-only aria-live region and the visible alert.
       expect(
-        screen.getAllByText(/we couldn't archive this patient/i).length,
+        screen.getAllByText("We couldn't archive this patient. Please try again.").length,
       ).toBeGreaterThan(0);
     });
     expect(h.refresh).not.toHaveBeenCalled();
   });
 
+  // Year is locale- and timezone-stable for these inputs; the full day is not.
   it('renders DOB from Date object', () => {
     const patient = createMockPatient({
       dateOfBirth: new Date('1980-01-15T00:00:00Z'),
     });
     render(rowWrap(<PatientRow patient={patient} />));
-    // Date string is locale-dependent; just assert it contains a day/year.
-    expect(screen.getByRole('row')).toHaveTextContent(/\d{4}/);
+    expect(screen.getByRole('row')).toHaveTextContent('1980');
   });
 
   it('renders DOB from string value', () => {
@@ -136,7 +132,7 @@ describe('PatientRow', () => {
       dateOfBirth: '1990-06-20' as unknown as Date,
     });
     render(rowWrap(<PatientRow patient={patient} />));
-    expect(screen.getByRole('row')).toHaveTextContent(/\d{4}/);
+    expect(screen.getByRole('row')).toHaveTextContent('1990');
   });
 
   it('renders em dash for invalid DOB', () => {
@@ -144,15 +140,14 @@ describe('PatientRow', () => {
       dateOfBirth: 'not-a-date' as unknown as Date,
     });
     render(rowWrap(<PatientRow patient={patient} />));
-    expect(screen.getByRole('row')).toHaveTextContent('—');
+    // Column order: name, DOB, pronoun, added, actions.
+    expect(screen.getAllByRole('cell')[1].textContent).toBe('—');
   });
 
   it('renders em dash for null DOB', () => {
     const patient = createMockPatient({ dateOfBirth: null });
     render(rowWrap(<PatientRow patient={patient} />));
-    // First row cell with em dash is DOB
-    const cells = screen.getByRole('row').querySelectorAll('td');
-    expect(Array.from(cells).some((td) => td.textContent === '—')).toBe(true);
+    expect(screen.getAllByRole('cell')[1].textContent).toBe('—');
   });
 
   it('Cancel ("Keep patient") closes the dialog without calling the action', async () => {

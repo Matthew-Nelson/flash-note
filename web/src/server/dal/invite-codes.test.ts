@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, mockClientQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery, mockClientQuery } from '@/test/dal-helpers';
 import {
   generateCodeString,
   generateUniqueCode,
@@ -40,10 +40,6 @@ function createMockInviteCodeRow(overrides: Partial<{
 }
 
 describe('Invite Code Queries', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('generateCodeString', () => {
     it('should generate code in XXXX-XXXX format', () => {
       const code = generateCodeString();
@@ -95,6 +91,7 @@ describe('Invite Code Queries', () => {
       await expect(generateUniqueCode()).rejects.toThrow(
         'Failed to generate unique invite code after maximum retries'
       );
+      expect(mockDbQuery).toHaveBeenCalledTimes(5);
     });
   });
 

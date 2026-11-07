@@ -1,10 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 import {
   mockDbQuery,
   mockClientQuery,
-  mockGetPoolClient,
-  resetMocks,
+  setupMockClient,
 } from '@/test/dal-helpers';
 
 import {
@@ -15,20 +14,7 @@ import {
   deleteExpiredTokens,
 } from './email-tokens';
 
-function setupMockClient() {
-  const mockClient = {
-    query: mockClientQuery,
-    release: vi.fn(),
-  };
-  mockGetPoolClient.mockResolvedValue(mockClient);
-  return mockClient;
-}
-
 describe('dal/email-tokens', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('createEmailToken', () => {
     it('invalidates existing tokens and inserts new one in a transaction', async () => {
       const mockClient = setupMockClient();
@@ -69,7 +55,10 @@ describe('dal/email-tokens', () => {
         createEmailToken('user-1', 'hash123', 'password_reset', new Date())
       ).rejects.toThrow('insert failed');
 
+      // Invalidation must not persist without the new token, so COMMIT must never run
+      expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
       expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -85,6 +74,7 @@ describe('dal/email-tokens', () => {
       ).rejects.toThrow('update failed');
 
       expect(mockClientQuery).toHaveBeenNthCalledWith(3, 'ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
   });
@@ -110,6 +100,12 @@ describe('dal/email-tokens', () => {
       const userId = await consumeToken('badhash', 'email_verification');
 
       expect(userId).toBeNull();
+
+      // Single-use and expiry are enforced in SQL; the mock returns no rows, so the
+      // clauses themselves are what keep a used or expired token from being consumed
+      const query = mockDbQuery.mock.calls[0][0] as string;
+      expect(query).toContain('used_at IS NULL');
+      expect(query).toContain('expires_at > NOW()');
     });
 
     it('returns null when token type does not match (type confusion prevention)', async () => {
@@ -121,10 +117,10 @@ describe('dal/email-tokens', () => {
 
       expect(userId).toBeNull();
 
-      // Verify the query uses the token_type parameter — not just the hash
-      const params = mockDbQuery.mock.calls[0][1] as unknown[];
-      expect(params[1]).toBe('email_verification');  // second param is token_type
-      // If the attacker submitted a password_reset token, this mismatch is enforced by SQL
+      // Verify the query filters on token_type, not just the hash
+      const [query, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(query).toContain('token_type = $2');
+      expect(params).toEqual(['password-reset-hash', 'email_verification']);
     });
 
     it('uses provided client instead of db pool', async () => {
@@ -156,6 +152,10 @@ describe('dal/email-tokens', () => {
         expect.stringContaining('SELECT 1 FROM email_tokens'),
         ['hash123', 'password_reset']
       );
+
+      const [query] = mockDbQuery.mock.calls[0] as [string];
+      expect(query).toContain('used_at IS NULL');
+      expect(query).toContain('expires_at > NOW()');
     });
 
     it('returns false for an invalid token', async () => {

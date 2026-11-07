@@ -17,7 +17,6 @@ const mockReplaceState = vi.hoisted(() => vi.fn());
 
 describe('CheckoutSuccessAlert', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockSearchParams.get.mockReturnValue(null);
     Object.defineProperty(window, 'history', {
       value: { replaceState: mockReplaceState },
@@ -34,7 +33,7 @@ describe('CheckoutSuccessAlert', () => {
 
     const { container } = render(<CheckoutSuccessAlert />);
 
-    expect(container.firstChild).toBeNull();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('renders alert when ?success=true', () => {
@@ -75,6 +74,6 @@ describe('CheckoutSuccessAlert', () => {
 
     const { container } = render(<CheckoutSuccessAlert />);
 
-    expect(container.firstChild).toBeNull();
+    expect(container).toBeEmptyDOMElement();
   });
 });

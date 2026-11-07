@@ -1,4 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+const mockResendCtor = vi.hoisted(() => vi.fn());
 
 const mockLogger = vi.hoisted(() => ({
   info: vi.fn(),
@@ -23,6 +25,9 @@ vi.mock('@/server/db/config', () => ({
 // Resend module still needs to be available (imported but not instantiated)
 vi.mock('resend', () => ({
   Resend: class MockResend {
+    constructor(apiKey: string) {
+      mockResendCtor(apiKey);
+    }
     emails = { send: vi.fn() };
   },
 }));
@@ -32,10 +37,6 @@ vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 import { sendVerificationEmail, sendPasswordResetEmail } from './email';
 
 describe('email service (dev mode — no Resend API key)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('logs verification email via logger instead of sending', async () => {
     await sendVerificationEmail('user@example.com', 'dev-token');
 
@@ -65,9 +66,9 @@ describe('email service (dev mode — no Resend API key)', () => {
   it('does not call Resend API', async () => {
     await sendVerificationEmail('user@example.com', 'token');
 
-    // The Resend constructor was never called with a real key,
-    // so the resend singleton is null — no API calls made
-    // We verify by checking logger.info was used instead
+    // Resend is only constructed when RESEND_API_KEY is set; with it empty the
+    // module-level client stays null, so no SDK instance can send anything.
+    expect(mockResendCtor).not.toHaveBeenCalled();
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'email_service' }),
       expect.stringContaining('Dev mode')

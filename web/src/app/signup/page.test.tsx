@@ -17,7 +17,6 @@ const mockPush = vi.fn();
 
 describe('SignupPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(useRouter).mockReturnValue({
       push: mockPush,
       replace: vi.fn(),
@@ -71,7 +70,7 @@ describe('SignupPage', () => {
     expect(registerAction).not.toHaveBeenCalled();
   });
 
-  it('calls registerAction and redirects to /verify-email on success', async () => {
+  it('calls registerAction with the submitted fields and redirects to /check-email on success', async () => {
     const successResult: ActionResult<{ user: SanitizedUser }> = {
       success: true,
       data: {
@@ -97,6 +96,12 @@ describe('SignupPage', () => {
       expect(mockPush).toHaveBeenCalledWith('/check-email');
     });
     expect(registerAction).toHaveBeenCalledTimes(1);
+    const formData = vi.mocked(registerAction).mock.calls[0][0];
+    expect(formData.get('email')).toBe('test@example.com');
+    expect(formData.get('password')).toBe('Password1');
+    expect(formData.get('confirmPassword')).toBe('Password1');
+    expect(formData.get('acceptedLegalTerms')).toBe('true');
+    expect(formData.has('inviteCode')).toBe(false);
   });
 
   it('shows curated error for registration_failed', async () => {
@@ -153,7 +158,28 @@ describe('SignupPage', () => {
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('shows generic error on unexpected exception', async () => {
+  it('shows generic error for an unknown error code and never renders the raw server message', async () => {
+    // Rule 2: a server string that is not a known code must not reach the UI
+    const rawServerMessage = 'Unique constraint violation on users.email';
+    vi.mocked(registerAction).mockResolvedValueOnce({
+      success: false,
+      error: rawServerMessage,
+    });
+
+    const user = userEvent.setup();
+    render(<SignupPage />);
+
+    await fillForm(user);
+    await user.click(screen.getByRole('button', { name: 'Create account' }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Something went wrong. Please try again.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(rawServerMessage)).not.toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('shows generic error on unexpected exception without rendering the thrown message', async () => {
     vi.mocked(registerAction).mockRejectedValueOnce(new Error('network failure'));
 
     const user = userEvent.setup();
@@ -165,6 +191,7 @@ describe('SignupPage', () => {
     await waitFor(() => {
       expect(screen.getByText('An unexpected error occurred. Please try again.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/network failure/)).not.toBeInTheDocument();
     expect(mockPush).not.toHaveBeenCalled();
   });
 

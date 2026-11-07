@@ -50,13 +50,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject plain URLs without postgres prefix', async () => {
@@ -66,13 +63,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject missing DATABASE_URL', async () => {
@@ -82,13 +76,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
   });
 
@@ -121,13 +112,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should accept USE_MOCK_AI without API key in non-production', async () => {
@@ -172,13 +160,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject missing ANTHROPIC_API_KEY when LLM_PROVIDER=claude', async () => {
@@ -191,13 +176,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should accept GEMINI_API_KEY when LLM_PROVIDER=gemini', async () => {
@@ -231,13 +213,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject direct Gemini API URL in production', async () => {
@@ -250,13 +229,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should accept Vertex AI URL in production', async () => {
@@ -331,13 +307,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject missing STRIPE_WEBHOOK_SECRET in production', async () => {
@@ -352,13 +325,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should accept Stripe keys as optional in non-production', async () => {
@@ -386,13 +356,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should accept missing CLEANUP_SECRET in non-production', async () => {
@@ -436,13 +403,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject a float value like "1.5" (.int() constraint)', async () => {
@@ -454,13 +418,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject a negative value like "-1" (.min(0) constraint)', async () => {
@@ -472,13 +433,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
 
     it('should reject a value exceeding the upper bound (.max(10) constraint)', async () => {
@@ -490,13 +448,10 @@ describe('Server Config', () => {
       const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
         throw new Error('process.exit called');
       });
-      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await expect(import('./config')).rejects.toThrow('process.exit called');
       expect(mockExit).toHaveBeenCalledWith(1);
-
-      mockExit.mockRestore();
-      mockConsoleError.mockRestore();
     });
   });
 

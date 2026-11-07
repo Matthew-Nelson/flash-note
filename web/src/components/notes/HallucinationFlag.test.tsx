@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { HallucinationFlag } from './HallucinationFlag';
 import type { HallucinationIssue } from '@/server/services/note-generation/hallucination-detector';
 
@@ -27,9 +27,8 @@ describe('HallucinationFlag', () => {
   });
 
   it('wraps content in aria-live="polite" region', () => {
-    const { container } = render(<HallucinationFlag issues={[issue()]} />);
-    const liveRegion = container.querySelector('[aria-live="polite"]');
-    expect(liveRegion).not.toBeNull();
+    render(<HallucinationFlag issues={[issue()]} />);
+    expect(screen.getByRole('alert').closest('[aria-live]')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('groups multiple issues by section title', () => {
@@ -42,11 +41,11 @@ describe('HallucinationFlag', () => {
         ]}
       />
     );
-    const alert = screen.getByRole('alert');
-    expect(alert.textContent).toMatch(/Objective/);
-    expect(alert.textContent).toMatch(/Assessment/);
-    expect(alert.textContent).toMatch(/120/);
-    expect(alert.textContent).toMatch(/90/);
+    const items = within(screen.getByRole('alert')).getAllByRole('listitem');
+    expect(items.map((li) => li.textContent)).toEqual([
+      'Objective: ROM measurement "120" not found in your quick notes; Strength grade "5" not found in your quick notes',
+      'Assessment: Goal percentage "90" not found in your quick notes',
+    ]);
   });
 
   it('uses labels for each hallucination kind', () => {
@@ -61,10 +60,10 @@ describe('HallucinationFlag', () => {
       />
     );
     const alert = screen.getByRole('alert');
-    expect(alert.textContent).toMatch(/ROM measurement/i);
-    expect(alert.textContent).toMatch(/Strength grade/i);
-    expect(alert.textContent).toMatch(/Billing time/i);
-    expect(alert.textContent).toMatch(/Goal percentage/i);
+    expect(alert.textContent).toContain('ROM measurement "120" not found in your quick notes');
+    expect(alert.textContent).toContain('Strength grade "5" not found in your quick notes');
+    expect(alert.textContent).toContain('Billing time "45" not found in your quick notes');
+    expect(alert.textContent).toContain('Goal percentage "90" not found in your quick notes');
   });
 
   it('does NOT render the per-issue context snippet (PHI — UI-only data)', () => {

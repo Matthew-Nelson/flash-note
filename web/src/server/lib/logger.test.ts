@@ -2,52 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import pino from 'pino';
 import { Writable } from 'stream';
 
+import { PHI_REDACT_PATHS } from './logger';
+
 /**
  * Tests for the Pino logger singleton and request logger.
  *
- * Strategy: Test PHI redaction against a real Pino instance with the same
- * redact config (verifying actual behavior, not mocks). Test the logger
- * singleton creation by importing it under controlled NODE_ENV.
- * Test createRequestLogger with mocked request headers.
+ * Strategy: Test PHI redaction against a real Pino instance configured with
+ * the exported PHI_REDACT_PATHS (verifying actual behavior, not mocks). The
+ * per-field expectations below are the spec: every path has a test, so removing
+ * one from production fails it. Test createRequestLogger with mocked request headers.
  */
-
-// PHI redaction paths -- must match the logger singleton config exactly.
-// Phase 2 paths kept at the top (regression guard); Phase 4 paths appended.
-const PHI_PATHS = [
-  // Phase 2 (02-01)
-  'patient',
-  'patientName',
-  'patientData',
-  'patientContext',
-  'diagnosis',
-  'treatment',
-  'noteContent',
-  'soapNote',
-  'quickNotes',
-  'shorthand',
-  'dateOfBirth',
-  'medicalRecordNumber',
-  'req.body',
-  'res.body',
-  // Phase 4 (04-01) — new PHI field names for patients + clinical_notes
-  'firstName',
-  'lastName',
-  'phone',
-  'context',
-  'content',
-  '*.firstName',
-  '*.lastName',
-  '*.dateOfBirth',
-  '*.phone',
-  '*.context',
-  '*.patientContext',
-  '*.quickNotes',
-  '*.content',
-  // Phase 5 — free-text search terms are matched against note content and
-  // patient names, so a term is PHI by construction.
-  'search',
-  '*.search',
-];
 
 /**
  * Create a test Pino instance that writes to a writable stream,
@@ -66,7 +30,7 @@ function createTestLogger() {
     {
       level: 'trace',
       redact: {
-        paths: PHI_PATHS,
+        paths: PHI_REDACT_PATHS,
         censor: '[PHI_REDACTED]',
       },
     },
@@ -271,6 +235,27 @@ describe('logger PHI redaction', () => {
     expect(output.record.firstName).toBe('[PHI_REDACTED]');
   });
 
+  it('redacts nested lastName via *.lastName wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { lastName: 'Doe' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.lastName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested phone via *.phone wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { phone: '555-0100' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.phone).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested context via *.context wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { context: 'post-op TKA' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.context).toBe('[PHI_REDACTED]');
+  });
+
   it('redacts nested dateOfBirth via *.dateOfBirth wildcard path', () => {
     const { logger, chunks } = createTestLogger();
     logger.info({ profile: { dateOfBirth: '1985-03-15' } }, 'test');
@@ -349,7 +334,6 @@ describe('createRequestLogger', () => {
 
   afterEach(() => {
     process.env = originalEnv;
-    vi.restoreAllMocks();
   });
 
   it('returns the base logger when no trace header is present', async () => {

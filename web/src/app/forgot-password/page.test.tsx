@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ForgotPasswordPage from './page';
@@ -10,17 +10,13 @@ vi.mock('@/actions/auth', () => ({
 }));
 
 describe('ForgotPasswordPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render the forgot password form with AuthLayout', () => {
     render(<ForgotPasswordPage />);
     expect(screen.getByText('FlashNote')).toBeInTheDocument();
     expect(screen.getByText('BETA')).toBeInTheDocument();
     expect(screen.getByText('Reset your password')).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
-    expect(screen.getByText('Send reset link')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send reset link' })).toBeInTheDocument();
   });
 
   it('should not have placeholder on email input', () => {
@@ -39,7 +35,7 @@ describe('ForgotPasswordPage', () => {
     const user = userEvent.setup();
     render(<ForgotPasswordPage />);
 
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -52,7 +48,7 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'not-an-email');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -66,7 +62,7 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
@@ -82,7 +78,7 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
@@ -95,7 +91,7 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
@@ -108,11 +104,12 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/network error/)).not.toBeInTheDocument();
   });
 
   it('should clear errors when resubmitting', async () => {
@@ -120,7 +117,7 @@ describe('ForgotPasswordPage', () => {
     render(<ForgotPasswordPage />);
 
     // First submit — triggers validation error
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
@@ -128,7 +125,7 @@ describe('ForgotPasswordPage', () => {
     // Type valid email and resubmit
     mockRequestPasswordResetAction.mockResolvedValueOnce({ success: true });
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send reset link'));
+    await user.click(screen.getByRole('button', { name: 'Send reset link' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();

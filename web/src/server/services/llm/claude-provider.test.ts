@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ClaudeProvider } from './claude-provider';
 import {
   RateLimitError,
@@ -24,9 +24,7 @@ const mockLogger = vi.hoisted(() => ({
 }));
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
-// Mock fetch globally
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 // Fast retry config for tests
 const FAST_RETRY_CONFIG: LLMRetryConfig = {
@@ -73,17 +71,13 @@ describe('ClaudeProvider', () => {
   });
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.clearAllMocks();
+    // unstubGlobals clears the stub before each test, so it must be re-armed here
+    vi.stubGlobal('fetch', mockFetch);
     provider = new ClaudeProvider({
       apiKey: 'test-api-key',
       model: 'claude-sonnet-4-20250514',
       retryConfig: FAST_RETRY_CONFIG,
     });
-  });
-
-  afterEach(() => {
-    // no-op: mocks cleared in beforeEach
   });
 
   describe('generatePTNote', () => {
@@ -270,7 +264,7 @@ describe('ClaudeProvider', () => {
     });
 
     it('should not log PHI in error messages', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: false,
         status: 500,
         headers: new Headers(),
@@ -280,11 +274,15 @@ describe('ClaudeProvider', () => {
           }),
       });
 
-      try {
-        await provider.generatePTNote('test system prompt', 'sensitive patient data', requestConfig);
-      } catch {
-        // Expected
-      }
+      const thrown: unknown = await provider
+        .generatePTNote('test system prompt', 'sensitive patient data', requestConfig)
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(thrown).toBeInstanceOf(ProviderError);
+      expect(String(thrown)).not.toContain('John Doe');
 
       expect(mockLogger.error).toHaveBeenCalled();
       const logCall = mockLogger.error.mock.calls[0];
@@ -340,7 +338,7 @@ describe('ClaudeProvider', () => {
         (call: unknown[]) => typeof call[0] === 'object' && call[0] !== null && 'source' in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).source === 'llm_service',
       );
       expect(warnCall).toBeDefined();
-      expect(warnCall![0]).toHaveProperty('delayMs');
+      expect(warnCall![0]).toHaveProperty('delayMs', 2000);
     });
 
     it('should not retry on auth error', async () => {

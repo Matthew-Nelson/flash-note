@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ResendVerificationPage from './page';
@@ -10,17 +10,13 @@ vi.mock('@/actions/auth', () => ({
 }));
 
 describe('ResendVerificationPage', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('should render the resend verification form with AuthLayout', () => {
     render(<ResendVerificationPage />);
     expect(screen.getByText('FlashNote')).toBeInTheDocument();
     expect(screen.getByText('BETA')).toBeInTheDocument();
     expect(screen.getByText('Resend verification email')).toBeInTheDocument();
     expect(screen.getByLabelText('Email address')).toBeInTheDocument();
-    expect(screen.getByText('Send verification email')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send verification email' })).toBeInTheDocument();
   });
 
   it('should not have placeholder on email input', () => {
@@ -39,7 +35,7 @@ describe('ResendVerificationPage', () => {
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -52,7 +48,7 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'bad');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
@@ -66,7 +62,7 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
@@ -82,7 +78,7 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Too many attempts. Please try again later.')).toBeInTheDocument();
@@ -95,7 +91,7 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();
@@ -108,25 +104,26 @@ describe('ResendVerificationPage', () => {
     render(<ResendVerificationPage />);
 
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Something went wrong. Please try again later.')).toBeInTheDocument();
     });
+    expect(screen.queryByText(/network error/)).not.toBeInTheDocument();
   });
 
   it('should clear errors when resubmitting', async () => {
     const user = userEvent.setup();
     render(<ResendVerificationPage />);
 
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
     await waitFor(() => {
       expect(screen.getByText('Please enter a valid email address')).toBeInTheDocument();
     });
 
     mockResendVerificationAction.mockResolvedValueOnce({ success: true });
     await user.type(screen.getByLabelText('Email address'), 'test@example.com');
-    await user.click(screen.getByText('Send verification email'));
+    await user.click(screen.getByRole('button', { name: 'Send verification email' }));
 
     await waitFor(() => {
       expect(screen.getByText('Check your email')).toBeInTheDocument();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { z } from 'zod';
 import {
   pronounSchema,
   patientIdSchema,
@@ -7,6 +8,11 @@ import {
   updatePatientContextSchema,
   patientSearchSchema,
 } from './patients';
+
+/** Rejected issues as path/code, so a test pins the rule that failed. */
+function issues(result: { error?: { issues: z.ZodIssue[] } }) {
+  return result.error?.issues.map(({ path, code }) => ({ path: path.join('.'), code }));
+}
 
 describe('pronounSchema', () => {
   it.each(['he/him', 'she/her', 'they/them', 'other'] as const)(
@@ -17,11 +23,15 @@ describe('pronounSchema', () => {
   );
 
   it('rejects arbitrary free-text pronoun', () => {
-    expect(pronounSchema.safeParse('ze/zir').success).toBe(false);
+    expect(issues(pronounSchema.safeParse('ze/zir'))).toEqual([
+      { path: '', code: 'invalid_value' },
+    ]);
   });
 
   it('rejects empty string', () => {
-    expect(pronounSchema.safeParse('').success).toBe(false);
+    expect(issues(pronounSchema.safeParse(''))).toEqual([
+      { path: '', code: 'invalid_value' },
+    ]);
   });
 });
 
@@ -33,7 +43,9 @@ describe('patientIdSchema', () => {
   });
 
   it('rejects non-UUID strings', () => {
-    expect(patientIdSchema.safeParse('not-a-uuid').success).toBe(false);
+    expect(issues(patientIdSchema.safeParse('not-a-uuid'))).toEqual([
+      { path: '', code: 'invalid_format' },
+    ]);
   });
 });
 
@@ -60,44 +72,47 @@ describe('createPatientSchema', () => {
   });
 
   it('rejects firstName shorter than 1 char (empty after trim)', () => {
-    expect(createPatientSchema.safeParse({ ...validInput, firstName: '   ' }).success).toBe(
-      false
-    );
+    expect(issues(createPatientSchema.safeParse({ ...validInput, firstName: '   ' }))).toEqual([
+      { path: 'firstName', code: 'too_small' },
+    ]);
   });
 
   it('rejects firstName longer than 100 chars', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, firstName: 'a'.repeat(101) })
-        .success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, firstName: 'a'.repeat(101) }))
+    ).toEqual([{ path: 'firstName', code: 'too_big' }]);
   });
 
   it('rejects lastName shorter than 1 char', () => {
-    expect(createPatientSchema.safeParse({ ...validInput, lastName: '' }).success).toBe(
-      false
-    );
+    expect(issues(createPatientSchema.safeParse({ ...validInput, lastName: '' }))).toEqual([
+      { path: 'lastName', code: 'too_small' },
+    ]);
   });
 
   it('rejects lastName longer than 100 chars', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, lastName: 'a'.repeat(101) }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, lastName: 'a'.repeat(101) }))
+    ).toEqual([{ path: 'lastName', code: 'too_big' }]);
   });
 
   it('rejects missing firstName', () => {
     const input: Record<string, unknown> = { lastName: 'Doe' };
-    expect(createPatientSchema.safeParse(input).success).toBe(false);
+    expect(issues(createPatientSchema.safeParse(input))).toEqual([
+      { path: 'firstName', code: 'invalid_type' },
+    ]);
   });
 
   it('rejects missing lastName', () => {
     const input: Record<string, unknown> = { firstName: 'Jane' };
-    expect(createPatientSchema.safeParse(input).success).toBe(false);
+    expect(issues(createPatientSchema.safeParse(input))).toEqual([
+      { path: 'lastName', code: 'invalid_type' },
+    ]);
   });
 
   it('rejects invalid dateOfBirth format (not YYYY-MM-DD)', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, dateOfBirth: '03/15/1985' }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, dateOfBirth: '03/15/1985' }))
+    ).toEqual([{ path: 'dateOfBirth', code: 'invalid_format' }]);
   });
 
   it('accepts null dateOfBirth', () => {
@@ -108,33 +123,33 @@ describe('createPatientSchema', () => {
 
   it('rejects invalid pronoun', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, pronoun: 'xe/xem' }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, pronoun: 'xe/xem' }))
+    ).toEqual([{ path: 'pronoun', code: 'invalid_value' }]);
   });
 
   it('rejects email without @', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, email: 'not-email' }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, email: 'not-email' }))
+    ).toEqual([{ path: 'email', code: 'invalid_format' }]);
   });
 
   it('rejects email longer than 255 chars', () => {
     const longLocal = 'a'.repeat(250);
     expect(
-      createPatientSchema.safeParse({ ...validInput, email: `${longLocal}@x.com` }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, email: `${longLocal}@x.com` }))
+    ).toEqual([{ path: 'email', code: 'too_big' }]);
   });
 
   it('rejects phone longer than 32 chars', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, phone: '1'.repeat(33) }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, phone: '1'.repeat(33) }))
+    ).toEqual([{ path: 'phone', code: 'too_big' }]);
   });
 
   it('rejects context longer than 2000 chars', () => {
     expect(
-      createPatientSchema.safeParse({ ...validInput, context: 'a'.repeat(2001) }).success
-    ).toBe(false);
+      issues(createPatientSchema.safeParse({ ...validInput, context: 'a'.repeat(2001) }))
+    ).toEqual([{ path: 'context', code: 'too_big' }]);
   });
 
   it('accepts context exactly 2000 chars', () => {
@@ -167,8 +182,8 @@ describe('updatePatientSchema', () => {
 
   it('still enforces max length on provided fields', () => {
     expect(
-      updatePatientSchema.safeParse({ firstName: 'a'.repeat(101) }).success
-    ).toBe(false);
+      issues(updatePatientSchema.safeParse({ firstName: 'a'.repeat(101) }))
+    ).toEqual([{ path: 'firstName', code: 'too_big' }]);
   });
 });
 
@@ -185,12 +200,14 @@ describe('updatePatientContextSchema', () => {
 
   it('rejects context longer than 2000 chars', () => {
     expect(
-      updatePatientContextSchema.safeParse({ context: 'a'.repeat(2001) }).success
-    ).toBe(false);
+      issues(updatePatientContextSchema.safeParse({ context: 'a'.repeat(2001) }))
+    ).toEqual([{ path: 'context', code: 'too_big' }]);
   });
 
   it('rejects missing context key', () => {
-    expect(updatePatientContextSchema.safeParse({}).success).toBe(false);
+    expect(issues(updatePatientContextSchema.safeParse({}))).toEqual([
+      { path: 'context', code: 'invalid_type' },
+    ]);
   });
 });
 
@@ -213,20 +230,26 @@ describe('patientSearchSchema', () => {
 
   it('rejects search longer than 100 chars', () => {
     expect(
-      patientSearchSchema.safeParse({ search: 'a'.repeat(101) }).success
-    ).toBe(false);
+      issues(patientSearchSchema.safeParse({ search: 'a'.repeat(101) }))
+    ).toEqual([{ path: 'search', code: 'too_big' }]);
   });
 
   it('clamps limit via max validation (rejects 101)', () => {
-    expect(patientSearchSchema.safeParse({ limit: 101 }).success).toBe(false);
+    expect(issues(patientSearchSchema.safeParse({ limit: 101 }))).toEqual([
+      { path: 'limit', code: 'too_big' },
+    ]);
   });
 
   it('rejects limit below 1', () => {
-    expect(patientSearchSchema.safeParse({ limit: 0 }).success).toBe(false);
+    expect(issues(patientSearchSchema.safeParse({ limit: 0 }))).toEqual([
+      { path: 'limit', code: 'too_small' },
+    ]);
   });
 
   it('rejects negative offset', () => {
-    expect(patientSearchSchema.safeParse({ offset: -1 }).success).toBe(false);
+    expect(issues(patientSearchSchema.safeParse({ offset: -1 }))).toEqual([
+      { path: 'offset', code: 'too_small' },
+    ]);
   });
 
   it('coerces string limit/offset to numbers', () => {
@@ -239,6 +262,8 @@ describe('patientSearchSchema', () => {
   });
 
   it('rejects fractional limit', () => {
-    expect(patientSearchSchema.safeParse({ limit: 50.5 }).success).toBe(false);
+    expect(issues(patientSearchSchema.safeParse({ limit: 50.5 }))).toEqual([
+      { path: 'limit', code: 'invalid_type' },
+    ]);
   });
 });

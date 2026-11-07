@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 import type { ClinicalNoteWithPatient } from '@/lib/types';
 
 // Mock getSession
@@ -53,19 +54,6 @@ vi.mock('@/components/notes', () => ({
 
 import NotesPage, { NotesTable } from './page';
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-uuid',
-    userId: 'user-uuid',
-    email: 'therapist@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 function makeSearchParams(
   value: Record<string, string | string[] | undefined> = {},
 ) {
@@ -96,7 +84,6 @@ function createMockNote(id = 'n1'): ClinicalNoteWithPatient {
 
 describe('NotesPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
@@ -109,20 +96,22 @@ describe('NotesPage', () => {
       'NEXT_REDIRECT',
     );
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockFindClinicalNotesByScope).not.toHaveBeenCalled();
   });
 
   it('renders TopBar with title "Notes"', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     render(await NotesPage({ searchParams: makeSearchParams() }));
-    expect(screen.getByTestId('top-bar')).toBeInTheDocument();
+    expect(screen.getByTestId('top-bar')).toHaveTextContent('Notes');
   });
 
   it('renders page h1 "Notes"', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     render(await NotesPage({ searchParams: makeSearchParams() }));
-    // Page h1 plus mocked TopBar — match the main-area h1 (Rule 14: single h1 per page)
+    // The mocked TopBar renders no heading, so this is the only h1 (Rule 14)
     const headings = screen.getAllByRole('heading', { level: 1 });
-    expect(headings.some((h) => h.textContent === 'Notes')).toBe(true);
+    expect(headings).toHaveLength(1);
+    expect(headings[0]).toHaveTextContent('Notes');
   });
 
   it('renders "New note" link to /dashboard/notes/new', async () => {
@@ -186,7 +175,6 @@ describe('NotesPage', () => {
 // fallback instead of awaiting the inner async component.
 describe('NotesTable', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockFindClinicalNotesByScope.mockResolvedValue({ notes: [], total: 0 });
   });
 

@@ -10,7 +10,7 @@ import { createGcpLoggingPinoConfig } from '@google-cloud/pino-logging-gcp-confi
  * This redaction catches accidental PHI leakage at the logging layer.
  * Pino uses fast-redact (~2% overhead) for path-based censoring.
  */
-const PHI_REDACT_PATHS = [
+export const PHI_REDACT_PATHS = [
   // Phase 2 paths (02-01) — MUST remain for regression compatibility
   'patient',
   'patientName',

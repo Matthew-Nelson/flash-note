@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { PatientTypeahead } from './PatientTypeahead';
 import { createMockPatient } from '@/test/factories/patient-factory';
 
@@ -14,13 +15,14 @@ function patients(n: number) {
 }
 
 describe('PatientTypeahead', () => {
+  // shouldAdvanceTime: RTL's asyncWrapper drains through a setTimeout that only
+  // advances under jest fake timers, so plain fake timers hang every userEvent call.
   beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    vi.clearAllMocks();
   });
 
   async function flushMicrotasks(): Promise<void> {
@@ -29,6 +31,15 @@ describe('PatientTypeahead', () => {
       await Promise.resolve();
       await Promise.resolve();
     });
+  }
+
+  // Types into the combobox, then fires the 250ms debounce and drains the fetch.
+  async function typeAndSettle(user: UserEvent, input: HTMLElement, text: string): Promise<void> {
+    await user.type(input, text);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+    await flushMicrotasks();
   }
 
   it('renders input with role=combobox + required ARIA attrs', () => {
@@ -46,6 +57,7 @@ describe('PatientTypeahead', () => {
   });
 
   it('does not fire search below min-query-length (<2 chars)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -54,15 +66,15 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'J' } });
+    await user.type(screen.getByRole('combobox'), 'J');
+    act(() => {
       vi.advanceTimersByTime(300);
     });
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it('debounces by 250ms and fires search once per keystroke cluster', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(2)));
     render(
       <PatientTypeahead
@@ -72,12 +84,16 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
+    await user.type(input, 'Ja');
+    act(() => {
       vi.advanceTimersByTime(100);
-      fireEvent.change(input, { target: { value: 'Jan' } });
+    });
+    await user.type(input, 'n');
+    act(() => {
       vi.advanceTimersByTime(100);
-      fireEvent.change(input, { target: { value: 'Jane' } });
+    });
+    await user.type(input, 'e');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     await flushMicrotasks();
@@ -87,6 +103,7 @@ describe('PatientTypeahead', () => {
   });
 
   it('cancels in-flight AbortController on rapid typing', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const aborted: boolean[] = [];
     const fetchFn = vi.fn((q: string, signal: AbortSignal) => {
       const p = new Promise<ReturnType<typeof patients>>((resolve) => {
@@ -107,18 +124,19 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
+    await user.type(input, 'Ja');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
+    await user.type(input, 'ne');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(aborted.length).toBeGreaterThanOrEqual(1);
   });
 
   it('announces result count via aria-live region', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     const { container } = render(
       <PatientTypeahead
@@ -127,17 +145,13 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
     const live = container.querySelector('[aria-live="polite"]');
     expect(live?.textContent).toMatch(/3 patients? found/);
   });
 
   it('announces no-results message when server returns empty', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(0)));
     const { container } = render(
       <PatientTypeahead
@@ -146,17 +160,13 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'zelda' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'zelda');
     const live = container.querySelector('[aria-live="polite"]');
     expect(live?.textContent).toMatch(/No patients match "zelda"/);
   });
 
   it('clamps to 10 visible options even when server returns more', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(25)));
     render(
       <PatientTypeahead
@@ -165,18 +175,14 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
     // 10 patient options + the "Showing first 10 — refine" helper option
     const options = screen.getAllByRole('option');
     expect(options.length).toBe(11);
   });
 
   it('ArrowDown opens listbox and focuses first option', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -186,16 +192,13 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'Jane');
     // activedescendant points at first option
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-0');
   });
 
   it('Enter selects the active option and fires onSelect', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onSelect = vi.fn();
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
@@ -205,19 +208,15 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Enter' });
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
+    await user.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'p0' }),
     );
   });
 
   it('Escape closes listbox but keeps input text', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(2)));
     render(
       <PatientTypeahead
@@ -227,18 +226,15 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole<HTMLInputElement>('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'Jane');
     expect(input).toHaveAttribute('aria-expanded', 'true');
-    fireEvent.keyDown(input, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(input).toHaveAttribute('aria-expanded', 'false');
     expect(input.value).toBe('Jane');
   });
 
-  it('Clear button unsets selection and refocuses input', () => {
+  it('Clear button unsets selection and refocuses input', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onSelect = vi.fn();
     const selected = createMockPatient({
       id: 'p1',
@@ -253,8 +249,9 @@ describe('PatientTypeahead', () => {
       />,
     );
     const clearBtn = screen.getByRole('button', { name: /clear selected patient/i });
-    fireEvent.click(clearBtn);
+    await user.click(clearBtn);
     expect(onSelect).toHaveBeenCalledWith(null);
+    expect(screen.getByRole('combobox')).toHaveFocus();
   });
 
   it('Clear button exposes 44px touch target (M-7)', () => {
@@ -289,6 +286,7 @@ describe('PatientTypeahead', () => {
   });
 
   it('listbox options expose 44px touch targets (M-7)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -297,12 +295,7 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
     const options = screen.getAllByRole('option');
     for (const opt of options) {
       expect(opt.className).toContain('min-h-[44px]');
@@ -326,6 +319,7 @@ describe('PatientTypeahead', () => {
   });
 
   it('editing while a patient is selected un-selects (onSelect(null))', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onSelect = vi.fn();
     const selected = createMockPatient({
       firstName: 'Alice',
@@ -338,15 +332,12 @@ describe('PatientTypeahead', () => {
         fetchPatients={() => Promise.resolve([])}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Al' } });
-      vi.advanceTimersByTime(0);
-    });
+    await user.type(screen.getByRole('combobox'), 'l');
     expect(onSelect).toHaveBeenCalledWith(null);
   });
 
   it('mousedown on an option selects it (prevents blur before click)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onSelect = vi.fn();
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
@@ -356,20 +347,17 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
     const options = screen.getAllByRole('option');
-    fireEvent.mouseDown(options[1]);
+    // Press only (no release): the selection must happen on mousedown itself.
+    await user.pointer({ keys: '[MouseLeft>]', target: options[1] });
     expect(onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'p1' }),
     );
   });
 
   it('mouseenter on an option updates the active index (for hover highlight)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -379,17 +367,14 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'Jane');
     const options = screen.getAllByRole('option');
-    fireEvent.mouseEnter(options[2]);
+    await user.hover(options[2]);
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-2');
   });
 
   it('arrow toggle button opens listbox when results present', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -399,19 +384,16 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Escape' });
+    await typeAndSettle(user, input, 'Jane');
+    await user.keyboard('{Escape}');
     expect(input).toHaveAttribute('aria-expanded', 'false');
     const arrow = screen.getByRole('button', { name: /show patient suggestions/i });
-    fireEvent.click(arrow);
+    await user.click(arrow);
     expect(input).toHaveAttribute('aria-expanded', 'true');
   });
 
-  it('arrow toggle is a no-op when no results are loaded', () => {
+  it('arrow toggle is a no-op when no results are loaded', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(
       <PatientTypeahead
         selectedPatient={null}
@@ -421,11 +403,12 @@ describe('PatientTypeahead', () => {
     );
     const input = screen.getByRole('combobox');
     const arrow = screen.getByRole('button', { name: /show patient suggestions/i });
-    fireEvent.click(arrow);
+    await user.click(arrow);
     expect(input).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('fetchPatients rejection surfaces as empty listbox and no-results announcement', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() =>
       Promise.reject<ReturnType<typeof patients>>(new Error('server down')),
     );
@@ -436,17 +419,15 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, screen.getByRole('combobox'), 'Jane');
     const live = container.querySelector('[aria-live="polite"]');
-    expect(live?.textContent).toMatch(/No patients/);
+    // Rule 2: the rejection's message must never reach the UI.
+    expect(live?.textContent).toBe('No patients found');
+    expect(document.body).not.toHaveTextContent('server down');
   });
 
   it('ArrowDown with closed listbox but existing results opens and focuses first', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -456,19 +437,16 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Escape' });
+    await typeAndSettle(user, input, 'Jane');
+    await user.keyboard('{Escape}');
     expect(input).toHaveAttribute('aria-expanded', 'false');
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    await user.keyboard('{ArrowDown}');
     expect(input).toHaveAttribute('aria-expanded', 'true');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-0');
   });
 
   it('ArrowDown wraps from last to first option', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -478,19 +456,16 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'Jane');
     // Cycle to last then one more to wrap.
-    fireEvent.keyDown(input, { key: 'End' });
+    await user.keyboard('{End}');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-2');
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    await user.keyboard('{ArrowDown}');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-0');
   });
 
   it('ArrowUp from first wraps to last option', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -500,17 +475,14 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'Jane');
     // activeIdx is 0 after initial results; ArrowUp wraps to last.
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    await user.keyboard('{ArrowUp}');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-2');
   });
 
   it('ArrowUp with closed listbox but results opens and focuses last', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -520,18 +492,15 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    await typeAndSettle(user, input, 'Jane');
+    await user.keyboard('{Escape}');
+    await user.keyboard('{ArrowUp}');
     expect(input).toHaveAttribute('aria-expanded', 'true');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-2');
   });
 
   it('ArrowDown/ArrowUp with no results is a no-op (no crash, no expansion)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(0)));
     render(
       <PatientTypeahead
@@ -541,20 +510,17 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'zz' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
+    await typeAndSettle(user, input, 'zz');
     // Escape to close listbox so the "no results when closed" path is hit.
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.keyDown(input, { key: 'ArrowDown' });
-    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    await user.keyboard('{Escape}');
+    await user.keyboard('{ArrowDown}');
+    await user.keyboard('{ArrowUp}');
     // No aria-activedescendant set.
     expect(input.getAttribute('aria-activedescendant')).toBeNull();
   });
 
   it('Enter with no active option is a no-op (no onSelect call)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const onSelect = vi.fn();
     const fetchFn = vi.fn(() => Promise.resolve(patients(0)));
     render(
@@ -564,17 +530,13 @@ describe('PatientTypeahead', () => {
         fetchPatients={fetchFn}
       />,
     );
-    const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'zz' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Enter' });
+    await typeAndSettle(user, screen.getByRole('combobox'), 'zz');
+    await user.keyboard('{Enter}');
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it('Escape when listbox is already closed is a no-op', () => {
+  it('Escape when listbox is already closed is a no-op', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(0)));
     render(
       <PatientTypeahead
@@ -584,11 +546,13 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    fireEvent.keyDown(input, { key: 'Escape' });
+    await user.click(input);
+    await user.keyboard('{Escape}');
     expect(input).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('Home/End with no results is a no-op (closed listbox)', () => {
+  it('Home/End with no results is a no-op (closed listbox)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(
       <PatientTypeahead
         selectedPatient={null}
@@ -597,12 +561,14 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    fireEvent.keyDown(input, { key: 'Home' });
-    fireEvent.keyDown(input, { key: 'End' });
+    await user.click(input);
+    await user.keyboard('{Home}');
+    await user.keyboard('{End}');
     expect(input).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('unrelated key is ignored (e.g. "a")', async () => {
+  it('unrelated key is ignored (e.g. Shift)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(2)));
     render(
       <PatientTypeahead
@@ -612,17 +578,15 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'a' });
+    await typeAndSettle(user, input, 'Ja');
+    // Shift is a modifier that inserts no text, so only the keydown handler sees it.
+    await user.keyboard('{Shift}');
     // No crash; listbox still open.
     expect(input).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('focusing the input re-opens the listbox if results already exist', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(3)));
     render(
       <PatientTypeahead
@@ -632,17 +596,16 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.focus(input);
+    await typeAndSettle(user, input, 'Ja');
+    await user.keyboard('{Escape}');
+    // Leave and re-enter the input so the focus event (not a keystroke) reopens it.
+    await user.tab();
+    await user.tab({ shift: true });
     expect(input).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('Home/End jump to first/last option when listbox is open', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const fetchFn = vi.fn(() => Promise.resolve(patients(4)));
     render(
       <PatientTypeahead
@@ -652,14 +615,10 @@ describe('PatientTypeahead', () => {
       />,
     );
     const input = screen.getByRole('combobox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
-      vi.advanceTimersByTime(250);
-    });
-    await flushMicrotasks();
-    fireEvent.keyDown(input, { key: 'End' });
+    await typeAndSettle(user, input, 'Ja');
+    await user.keyboard('{End}');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-3');
-    fireEvent.keyDown(input, { key: 'Home' });
+    await user.keyboard('{Home}');
     expect(input.getAttribute('aria-activedescendant')).toContain('-opt-0');
   });
 });

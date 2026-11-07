@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import NewNotePage from './page';
 import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 import type { NoteTemplateWithSections, Patient } from '@/lib/types';
 
 // Mock getSession
@@ -15,11 +16,12 @@ vi.mock('@/server/lib/get-session', () => ({
 const mockFindBuiltinTemplates = vi.fn<
   () => Promise<NoteTemplateWithSections[]>
 >();
-const mockFindPatientById = vi.fn<() => Promise<Patient | null>>();
+const mockFindPatientById = vi.fn<(scope: unknown, id: string) => Promise<Patient | null>>();
 vi.mock('@/server/dal', () => ({
   findBuiltinTemplates: (): Promise<NoteTemplateWithSections[]> =>
     mockFindBuiltinTemplates(),
-  findPatientById: (): Promise<Patient | null> => mockFindPatientById(),
+  findPatientById: (scope: unknown, id: string): Promise<Patient | null> =>
+    mockFindPatientById(scope, id),
 }));
 
 // Mock TopBar (Client Component)
@@ -48,26 +50,12 @@ vi.mock('@/components/notes/PatientContextPreview', () => ({
   ),
 }));
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-uuid',
-    userId: 'user-uuid',
-    email: 'therapist@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 function makeSearchParams(value: { patientId?: string } = {}): Promise<{ patientId?: string }> {
   return Promise.resolve(value);
 }
 
 describe('NewNotePage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
@@ -81,6 +69,8 @@ describe('NewNotePage', () => {
       'NEXT_REDIRECT',
     );
     expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockFindBuiltinTemplates).not.toHaveBeenCalled();
+    expect(mockFindPatientById).not.toHaveBeenCalled();
   });
 
   it('renders TopBar with title "New Note" and backHref "/dashboard"', async () => {
@@ -121,7 +111,10 @@ describe('NewNotePage', () => {
     await NewNotePage({
       searchParams: makeSearchParams({ patientId: 'patient-123' }),
     });
-    expect(mockFindPatientById).toHaveBeenCalled();
+    expect(mockFindPatientById).toHaveBeenCalledWith(
+      { type: 'user', userId: 'user-uuid' },
+      'patient-123',
+    );
   });
 
   it('forwards initialPatientId to NoteGenerationForm when query param provided', async () => {

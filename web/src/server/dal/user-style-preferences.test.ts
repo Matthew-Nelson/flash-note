@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery } from '@/test/dal-helpers';
 import { createMockUserStylePreferenceRow } from '@/test/factories/user-style-preference-factory';
 import {
   upsertUserSectionStyle,
@@ -10,10 +10,6 @@ const USER_A = '00000000-0000-0000-0000-0000000000a1';
 const SECTION_1 = '00000000-0000-0000-0000-000000000011';
 
 describe('user-style-preferences DAL', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   // ---------------------------------------------------------------------------
   // upsertUserSectionStyle
   // ---------------------------------------------------------------------------
@@ -42,6 +38,17 @@ describe('user-style-preferences DAL', () => {
       expect(sql).toContain(
         'COALESCE(EXCLUDED.styling,   user_style_preferences.styling)'
       );
+    });
+
+    it('writes only the row for the given user and section (Rule 5)', async () => {
+      mockDbQuery.mockResolvedValueOnce({
+        rows: [createMockUserStylePreferenceRow()],
+      });
+      await upsertUserSectionStyle(USER_A, SECTION_1, { verbosity: 'detailed' });
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('INSERT INTO user_style_preferences (user_id, section_id, verbosity, styling)');
+      expect(params.slice(0, 2)).toEqual([USER_A, SECTION_1]);
     });
 
     it('passes null for missing axis so COALESCE against template defaults works', async () => {

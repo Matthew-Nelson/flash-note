@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 const h = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -16,9 +17,10 @@ vi.mock('next/navigation', () => ({
 import { SearchPatients } from './SearchPatients';
 
 describe('SearchPatients', () => {
+  // shouldAdvanceTime: RTL's asyncWrapper drains through a setTimeout that only
+  // advances under jest fake timers, so plain fake timers hang every userEvent call.
   beforeEach(() => {
-    vi.useFakeTimers();
-    h.replace.mockReset();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
     h.searchParams = new URLSearchParams();
     h.pathname = '/dashboard/patients';
   });
@@ -35,12 +37,15 @@ describe('SearchPatients', () => {
   });
 
   it('debounces URL updates by 250ms', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     render(<SearchPatients initialQuery="" />);
     const input = screen.getByRole('searchbox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'J' } });
+    await user.type(input, 'J');
+    act(() => {
       vi.advanceTimersByTime(100);
-      fireEvent.change(input, { target: { value: 'Ja' } });
+    });
+    await user.type(input, 'a');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).toHaveBeenCalledTimes(1);
@@ -51,22 +56,22 @@ describe('SearchPatients', () => {
   });
 
   it('removes q param when the input is cleared', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     h.searchParams = new URLSearchParams('q=existing');
     render(<SearchPatients initialQuery="existing" />);
-    const input = screen.getByRole('searchbox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: '' } });
+    await user.clear(screen.getByRole('searchbox'));
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).toHaveBeenCalledWith('/dashboard/patients', { scroll: false });
   });
 
   it('resets page param when search changes', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     h.searchParams = new URLSearchParams('page=3');
     render(<SearchPatients initialQuery="" />);
-    const input = screen.getByRole('searchbox');
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
+    await user.type(screen.getByRole('searchbox'), 'Ja');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Ja', { scroll: false });
@@ -77,19 +82,20 @@ describe('SearchPatients', () => {
   // Component re-render (simulated here as a parent rerender with the new
   // `initialQuery` that mirrors what we just pushed).
   it('preserves focus and typed value when parent rerenders with echoed initialQuery', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { rerender } = render(<SearchPatients initialQuery="" />);
     const input = screen.getByRole<HTMLInputElement>('searchbox');
-    input.focus();
+    await user.click(input);
     expect(document.activeElement).toBe(input);
 
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jan' } });
+    await user.type(input, 'Jan');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).toHaveBeenCalledWith('/dashboard/patients?q=Jan', { scroll: false });
 
     // Simulate the parent Server Component re-rendering with the new URL.
-    await act(async () => { await Promise.resolve();
+    act(() => {
       rerender(<SearchPatients initialQuery="Jan" />);
     });
 
@@ -99,35 +105,34 @@ describe('SearchPatients', () => {
   });
 
   it('user can keep typing while a previous debounce is in flight (no mid-type reset)', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { rerender } = render(<SearchPatients initialQuery="" />);
     const input = screen.getByRole<HTMLInputElement>('searchbox');
-    input.focus();
+    await user.click(input);
 
     // First char + fire debounce
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'J' } });
+    await user.type(input, 'J');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     // Parent rerenders with echoed initialQuery (Server Component did re-run).
-    await act(async () => { await Promise.resolve();
+    act(() => {
       rerender(<SearchPatients initialQuery="J" />);
     });
 
     // User keeps typing — value must not be reset to "J".
-    await act(async () => { await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Ja' } });
-    });
+    await user.type(input, 'a');
     expect(input.value).toBe('Ja');
     expect(document.activeElement).toBe(input);
   });
 
-  it('external URL change (navigation) DOES sync into the input', async () => {
+  it('external URL change (navigation) DOES sync into the input', () => {
     const { rerender } = render(<SearchPatients initialQuery="" />);
     const input = screen.getByRole<HTMLInputElement>('searchbox');
 
     // External change (e.g. user clicked a "Clear search" link or used browser
     // back): initialQuery moves to a value we never pushed ourselves.
-    await act(async () => { await Promise.resolve();
+    act(() => {
       rerender(<SearchPatients initialQuery="external" />);
     });
     expect(input.value).toBe('external');
@@ -136,12 +141,11 @@ describe('SearchPatients', () => {
   // Regression (PR #118 review A2): an edit that trims to the current term
   // (a trailing space) must not reset pagination or refetch the list.
   it('does not touch the URL when the trimmed term equals the current q', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     h.searchParams = new URLSearchParams('q=Jane&page=3');
     render(<SearchPatients initialQuery="Jane" />);
-    const input = screen.getByRole('searchbox');
-    await act(async () => {
-      await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'Jane ' } });
+    await user.type(screen.getByRole('searchbox'), ' ');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).not.toHaveBeenCalled();
@@ -151,19 +155,17 @@ describe('SearchPatients', () => {
   // changes externally (back button, pagination link) must not fire and undo
   // that navigation.
   it('cancels a pending debounce when the URL changes externally', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const { rerender } = render(<SearchPatients initialQuery="" />);
     const input = screen.getByRole<HTMLInputElement>('searchbox');
-    await act(async () => {
-      await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'gait' } });
+    await user.type(input, 'gait');
+    act(() => {
       vi.advanceTimersByTime(100);
     });
-    await act(async () => {
-      await Promise.resolve();
+    act(() => {
       rerender(<SearchPatients initialQuery="external" />);
     });
-    await act(async () => {
-      await Promise.resolve();
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).not.toHaveBeenCalled();
@@ -181,17 +183,16 @@ describe('SearchPatients', () => {
   // A term typed back to the URL's current q while our own replace is still in
   // flight (searchParams not yet updated) must still be pushed.
   it('pushes a term equal to the stale URL q when a different term is in flight', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     h.searchParams = new URLSearchParams('q=knee');
     render(<SearchPatients initialQuery="knee" />);
     const input = screen.getByRole('searchbox');
-    await act(async () => {
-      await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'kneex' } });
+    await user.type(input, 'x');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
-    await act(async () => {
-      await Promise.resolve();
-      fireEvent.change(input, { target: { value: 'knee' } });
+    await user.type(input, '{Backspace}');
+    act(() => {
       vi.advanceTimersByTime(250);
     });
     expect(h.replace).toHaveBeenCalledTimes(2);

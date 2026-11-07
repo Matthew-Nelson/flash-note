@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // --- vi.hoisted mocks (must be before vi.mock factories) ---
 
@@ -54,12 +54,19 @@ vi.mock('stripe', () => ({
   },
 }));
 
+// Hoisted so individual tests can unset a field; beforeEach restores it.
+const mockConfig = vi.hoisted((): {
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  WEB_URL: string;
+} => ({
+  STRIPE_SECRET_KEY: 'sk_test_mock',
+  STRIPE_WEBHOOK_SECRET: 'whsec_test_mock',
+  WEB_URL: 'http://localhost:3000',
+}));
+
 vi.mock('@/server/db/config', () => ({
-  config: {
-    STRIPE_SECRET_KEY: 'sk_test_mock',
-    STRIPE_WEBHOOK_SECRET: 'whsec_test_mock',
-    WEB_URL: 'http://localhost:3000',
-  },
+  config: mockConfig,
 }));
 
 vi.mock('@/server/dal/users', () => ({
@@ -154,14 +161,10 @@ describe('getBillingService', () => {
 
 describe('BillingService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockConfig.STRIPE_WEBHOOK_SECRET = 'whsec_test_mock';
     mockTryMarkWebhookProcessed.mockResolvedValue(true);
     mockDeleteProcessedWebhookEvent.mockResolvedValue(undefined);
     mockAuditLog.mockResolvedValue(undefined);
-  });
-
-  afterEach(() => {
-    // no-op: mocks cleared in beforeEach
   });
 
   // -------------------------------------------------------------------------
@@ -254,6 +257,7 @@ describe('BillingService', () => {
       await expect(
         billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly')
       ).rejects.toThrow(SubscriptionExistsError);
+      expect(mockStripeCheckoutCreate).not.toHaveBeenCalled();
     });
 
     it('throws SubscriptionExistsError for past_due user with existing subscription (H-2)', async () => {
@@ -265,6 +269,7 @@ describe('BillingService', () => {
       await expect(
         billingService.createCheckoutSession('user-123', 'test@example.com', 'price_monthly')
       ).rejects.toThrow(SubscriptionExistsError);
+      expect(mockStripeCheckoutCreate).not.toHaveBeenCalled();
     });
 
     it('throws BillingError when Stripe returns no URL', async () => {
@@ -327,17 +332,13 @@ describe('BillingService', () => {
 
   describe('handleWebhook — signature verification', () => {
     it('throws BillingError with missing_webhook_secret when STRIPE_WEBHOOK_SECRET not configured', async () => {
-      const { config } = await import('@/server/db/config');
-      const original = config.STRIPE_WEBHOOK_SECRET;
-      config.STRIPE_WEBHOOK_SECRET = undefined;
+      mockConfig.STRIPE_WEBHOOK_SECRET = undefined;
 
-      try {
-        await expect(
-          billingService.handleWebhook(Buffer.from('{}'), 'sig')
-        ).rejects.toMatchObject({ code: 'missing_webhook_secret' });
-      } finally {
-        config.STRIPE_WEBHOOK_SECRET = original;
-      }
+      await expect(
+        billingService.handleWebhook(Buffer.from('{}'), 'sig')
+      ).rejects.toMatchObject({ code: 'missing_webhook_secret' });
+      // Fail closed: no payload is verified or processed without a secret
+      expect(mockStripeWebhooksConstructEvent).not.toHaveBeenCalled();
     });
 
     it('throws WebhookSignatureError when signature invalid (Rule 6)', async () => {
@@ -349,6 +350,43 @@ describe('BillingService', () => {
       await expect(
         billingService.handleWebhook(body, 'bad-signature')
       ).rejects.toBeInstanceOf(WebhookSignatureError);
+      // Raw bytes, header, and secret must reach the Stripe verifier unmodified
+      expect(mockStripeWebhooksConstructEvent).toHaveBeenCalledWith(body, 'bad-signature', 'whsec_test_mock');
+      expect(mockUpdateUserSubscription).not.toHaveBeenCalled();
+    });
+
+    // The Stripe mock above stubs constructEvent for the wiring tests. These two
+    // delegate to the real SDK verifier so the signature check itself runs.
+    it('rejects a payload signed with a different secret (real Stripe verification, Rule 6)', async () => {
+      const actual = await vi.importActual<typeof import('stripe')>('stripe');
+      const realWebhooks = new actual.default('sk_test_mock').webhooks;
+      mockStripeWebhooksConstructEvent.mockImplementation(
+        (payload: Buffer, header: string, secret: string) =>
+          realWebhooks.constructEvent(payload, header, secret)
+      );
+      const payload = JSON.stringify({ id: 'evt-123', type: 'charge.dispute.created', data: { object: {} } });
+      const header = realWebhooks.generateTestHeaderString({ payload, secret: 'whsec_attacker' });
+
+      await expect(
+        billingService.handleWebhook(Buffer.from(payload), header)
+      ).rejects.toBeInstanceOf(WebhookSignatureError);
+      // Verification fails before the idempotency row is written
+      expect(mockTryMarkWebhookProcessed).not.toHaveBeenCalled();
+    });
+
+    it('accepts a payload signed with the configured secret (real Stripe verification control)', async () => {
+      const actual = await vi.importActual<typeof import('stripe')>('stripe');
+      const realWebhooks = new actual.default('sk_test_mock').webhooks;
+      mockStripeWebhooksConstructEvent.mockImplementation(
+        (payload: Buffer, header: string, secret: string) =>
+          realWebhooks.constructEvent(payload, header, secret)
+      );
+      const payload = JSON.stringify({ id: 'evt-123', type: 'charge.dispute.created', data: { object: {} } });
+      const header = realWebhooks.generateTestHeaderString({ payload, secret: 'whsec_test_mock' });
+
+      await billingService.handleWebhook(Buffer.from(payload), header);
+
+      expect(mockTryMarkWebhookProcessed).toHaveBeenCalledWith('evt-123', 'charge.dispute.created');
     });
 
     it('WebhookSignatureError is discriminated with instanceof (Rule 6)', async () => {
@@ -356,12 +394,9 @@ describe('BillingService', () => {
         throw new Error('No signatures found matching the expected signature');
       });
 
-      try {
-        await billingService.handleWebhook(Buffer.from('{}'), 'bad-sig');
-        expect.fail('Should have thrown');
-      } catch (err) {
-        expect(err).toBeInstanceOf(WebhookSignatureError);
-      }
+      await expect(
+        billingService.handleWebhook(Buffer.from('{}'), 'bad-sig')
+      ).rejects.toBeInstanceOf(WebhookSignatureError);
     });
   });
 
@@ -679,8 +714,6 @@ describe('BillingService', () => {
   describe('handleSubscriptionUpdate', () => {
     it('updates status for valid statuses', async () => {
       for (const status of ['trialing', 'active', 'canceled', 'past_due', 'unpaid']) {
-        vi.clearAllMocks();
-        mockTryMarkWebhookProcessed.mockResolvedValue(true);
         mockUpdateSubscriptionStatus.mockResolvedValue(undefined);
 
         const subscription = makeSubscription({ status });
@@ -689,7 +722,7 @@ describe('BillingService', () => {
 
         await billingService.handleWebhook(Buffer.from('{}'), 'sig');
 
-        expect(mockUpdateSubscriptionStatus).toHaveBeenCalledWith(TEST_USER_ID, status);
+        expect(mockUpdateSubscriptionStatus).toHaveBeenLastCalledWith(TEST_USER_ID, status);
       }
     });
 

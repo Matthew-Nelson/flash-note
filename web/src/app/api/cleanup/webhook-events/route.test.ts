@@ -11,15 +11,16 @@ const mockLogger = vi.hoisted(() => ({
   debug: vi.fn(),
   child: vi.fn(),
 }));
+const mockConfig = vi.hoisted((): { CLEANUP_SECRET: string | undefined } => ({
+  CLEANUP_SECRET: 'a-32-character-minimum-secret-key',
+}));
 
 vi.mock('@/server/dal/webhooks', () => ({
   cleanupOldWebhookEvents: mockCleanupOldWebhookEvents,
 }));
 
 vi.mock('@/server/db/config', () => ({
-  config: {
-    CLEANUP_SECRET: 'a-32-character-minimum-secret-key',
-  },
+  config: mockConfig,
 }));
 
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
@@ -59,7 +60,7 @@ function makeRequest(options: {
 
 describe('POST /api/cleanup/webhook-events', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockConfig.CLEANUP_SECRET = 'a-32-character-minimum-secret-key';
   });
 
   it('returns 401 when authorization header is missing', async () => {
@@ -70,6 +71,7 @@ describe('POST /api/cleanup/webhook-events', () => {
     expect(response.status).toBe(401);
     const body = await response.json() as { error: string };
     expect(body.error).toBe('Unauthorized');
+    expect(mockCleanupOldWebhookEvents).not.toHaveBeenCalled();
   });
 
   it('returns 401 when wrong secret is provided', async () => {
@@ -78,6 +80,7 @@ describe('POST /api/cleanup/webhook-events', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(401);
+    expect(mockCleanupOldWebhookEvents).not.toHaveBeenCalled();
   });
 
   it('returns 401 when no Bearer prefix', async () => {
@@ -86,6 +89,29 @@ describe('POST /api/cleanup/webhook-events', () => {
     const response = await POST(request);
 
     expect(response.status).toBe(401);
+    expect(mockCleanupOldWebhookEvents).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for a same-length wrong secret, not only a length mismatch', async () => {
+    const sameLengthWrong = `Bearer ${'b'.repeat(VALID_SECRET.length)}`;
+    const request = makeRequest({ authorization: sameLengthWrong });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(mockCleanupOldWebhookEvents).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with 401 when CLEANUP_SECRET is unset', async () => {
+    // Without the !expectedSecret guard, the template `Bearer ${undefined}` would
+    // accept this header, so it is the case that proves the guard exists.
+    mockConfig.CLEANUP_SECRET = undefined;
+    const request = makeRequest({ authorization: 'Bearer undefined' });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    expect(mockCleanupOldWebhookEvents).not.toHaveBeenCalled();
   });
 
   it('returns 200 with deleted count on success', async () => {
@@ -96,7 +122,7 @@ describe('POST /api/cleanup/webhook-events', () => {
 
     expect(response.status).toBe(200);
     const body = await response.json() as { deleted: number };
-    expect(body.deleted).toBe(42);
+    expect(body).toEqual({ deleted: 42 });
   });
 
   it('calls cleanupOldWebhookEvents with 7 days retention', async () => {
@@ -108,7 +134,7 @@ describe('POST /api/cleanup/webhook-events', () => {
     expect(mockCleanupOldWebhookEvents).toHaveBeenCalledWith(7);
   });
 
-  it('returns 500 when cleanupOldWebhookEvents throws', async () => {
+  it('returns 500 and logs at error level when cleanupOldWebhookEvents throws', async () => {
     mockCleanupOldWebhookEvents.mockRejectedValue(new Error('DB error'));
 
     const request = makeRequest();
@@ -116,6 +142,10 @@ describe('POST /api/cleanup/webhook-events', () => {
 
     expect(response.status).toBe(500);
     const body = await response.json() as { error: string };
-    expect(body.error).toBe('Cleanup failed');
+    expect(body).toEqual({ error: 'Cleanup failed' });
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'cleanup_webhook_events', errorType: 'cleanup_failed' }),
+      'Webhook event cleanup failed'
+    );
   });
 });

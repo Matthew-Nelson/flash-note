@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import DashboardLayout from './layout';
 import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // Mock getSession
 const mockGetSession = vi.fn<() => Promise<SessionData | null>>();
@@ -17,22 +18,8 @@ vi.mock('@/components/DashboardShell', () => ({
   ),
 }));
 
-function createMockSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-uuid',
-    userId: 'user-uuid',
-    email: 'therapist@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 describe('DashboardLayout', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
