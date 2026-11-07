@@ -65,26 +65,35 @@ test.describe('Note generation', () => {
     await expect(page.getByText(MOCK_SUBJECTIVE)).toHaveCount(0);
   });
 
-  test('signing out clears the generated note, and Back does not bring it back (Rule 4)', async ({ page }) => {
-    const user = await signInNewUser(page, { label: 'phi-logout' });
+  test('signing out clears the note and the clipboard before the session ends (Rule 4)', async ({ context, page }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await signInNewUser(page, { label: 'phi-logout' });
     const shorthand = `Pt ${uniqueWord('marker')} reports knee pain`;
     await generateNote(page, shorthand);
     await expect(page.getByText(MOCK_SUBJECTIVE)).toBeVisible();
+    await page.getByRole('button', { name: 'Copy full SOAP note' }).click();
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain(MOCK_SUBJECTIVE);
+
+    // Hold the logout Server Action so the page stays mounted. Once /login
+    // replaces it, the form's state is gone regardless of whether logout
+    // cleared it, so clearing can only be observed before the redirect.
+    let releaseLogout!: () => void;
+    const logoutHeld = new Promise<void>((resolve) => { releaseLogout = resolve; });
+    await page.route('**/dashboard/notes/new', async (route) => {
+      const request = route.request();
+      if (request.method() === 'POST' && request.headers()['next-action']) await logoutHeld;
+      await route.continue();
+    });
 
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await expect(page).toHaveURL('/login');
 
-    await page.goBack();
-    await expect(page).toHaveURL('/login');
+    await expect(page).toHaveURL('/dashboard/notes/new');
     await expect(page.getByText(MOCK_SUBJECTIVE)).toHaveCount(0);
-
-    // Signing back in starts from an empty form, not the previous session's input
-    await fill(page.getByLabel('Email address'), user.email);
-    await fill(page.getByLabel('Password'), user.password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForURL('/dashboard');
-    await page.goto('/dashboard/notes/new');
     await expect(page.getByLabel('Session Notes')).toHaveValue('');
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('');
+
+    releaseLogout();
+    await expect(page).toHaveURL('/login');
   });
 });
 

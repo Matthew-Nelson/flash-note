@@ -820,7 +820,7 @@ jobs:
 
 ### Required CI Checks
 
-All of these must pass before merge:
+All of these must pass before merge. E2E is not listed: it runs after merge, on pushes to `main` (`.github/workflows/e2e.yml`).
 
 | Check | Blocking | Threshold | Status |
 |-------|----------|-----------|--------|
@@ -832,7 +832,6 @@ All of these must pass before merge:
 | Coverage (extension) | Yes | 80% minimum | ✅ Enforced (~93%) |
 | Coverage (web) | Yes | 80% minimum | ✅ Enforced (~92%) |
 | Integration tests | Yes | All pass | Not configured |
-| E2E tests | Main only (post-merge) | All pass | ✅ `.github/workflows/e2e.yml` |
 | DAST scan | Yes (main only) | No high/critical | Not configured |
 
 ---

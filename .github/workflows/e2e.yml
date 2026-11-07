@@ -14,7 +14,8 @@ on:
 
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a running post-merge check; a newer push queues behind it
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '20'

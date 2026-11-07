@@ -62,8 +62,9 @@ export default defineConfig({
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
-      // Next skips .env.local when NODE_ENV=test, so a developer's real Stripe,
-      // Upstash, Resend and Gemini keys never reach the e2e server.
+      // Next skips .env.local when NODE_ENV=test, so keys kept there never reach
+      // the e2e server. It still loads .env, .env.test and .env.test.local, so
+      // those must hold no real Stripe, Upstash, Resend or Gemini keys.
       NODE_ENV: 'test',
       // A separate build dir: Next allows one `next dev` per dir, and this lets
       // the suite run while a developer's own dev server is up.
