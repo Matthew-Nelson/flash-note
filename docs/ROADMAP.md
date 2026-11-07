@@ -43,7 +43,7 @@ PHI storage is built, but nothing in the UI calls `saveNoteAction`, so a clinici
 
 ### 2. Triage the bug backlog
 
-Work through [BUGS.md](./BUGS.md). Start with the security items: the template ownership check, the auth forms' missing `method="post"`, and raw Zod messages in auth actions.
+Work through [BUGS.md](./BUGS.md). Start with its "Security and data integrity" section: forms that GET credentials or PHI before hydration, the template ownership check, and patient fields that can't be cleared.
 
 ### 3. Note management features
 

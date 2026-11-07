@@ -1,45 +1,54 @@
 # Bug Backlog
 
-Open bugs and suspected bugs. This is the only bug list in the repo. Feature work lives in [ROADMAP.md](./ROADMAP.md).
+Open bugs and suspected bugs. This is the only bug list in the repo. Feature work lives in [ROADMAP.md](./ROADMAP.md). Two bugs are tracked as GitHub issues instead: #124 (notes list not announced to screen readers) and #125 (dev-only Dependabot alerts).
 
-Entries here are short on purpose. **Triage before fixing:** reproduce the bug with a failing test, then either fix it or delete the entry. When something is fixed, remove the line; the commit is the record.
+Entries here are short on purpose. **Before fixing one, reproduce it with a failing test**, then fix it or delete the entry. When something is fixed, remove the line; the commit is the record.
 
-## Confirmed
+Paths are relative to `web/src/`. Everything below was re-verified against the code on 2026-11-07. That check read the code; it did not run failing tests.
 
-| Location | Problem |
-|---|---|
-| `web/src/actions/notes.ts:348` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. Patients, the notes list, and the note detail pages only show notes seeded directly into the DB. |
-| `web/src/components/notes/NoteGenerationForm.tsx:402` | BUG-UI-12: the generated note renders below the form on the same page instead of in its own view. |
-
-## Reported in earlier reviews, not yet triaged
-
-Found in the October 2026 test-suite audit and the PR #126 and #127 work. Not re-verified since.
+## Security and data integrity
 
 | Location | Problem |
 |---|---|
-| `web/src/server/dal/note-templates.ts:156-166` | `generateNoteAction` doesn't check that the requested template belongs to the user. |
-| Auth pages (login, signup, reset forms) | Forms lack `method="post"`. A submit before hydration sends a GET with the password in the URL. |
-| `web/src/actions/auth.ts` | Auth actions return raw Zod messages to the client (Rule 2). |
-| Dashboard pages + `TopBar` | Six dashboard pages render two `<h1>` elements (TopBar and page). Unit tests mock TopBar, which hides it. |
-| `web/src/components/Sidebar.tsx` | When the mobile drawer is closed, it isn't `inert` or `aria-hidden`. |
-| `web/src/actions/patients.ts` | A patient update can't clear an optional field. |
-| `web/src/server/services/llm/gemini-provider.ts` | `getADCToken` runs outside the `try` and has no timeout. |
-| `web/src/server/services/llm/*-provider.ts` | Providers parse the response body before checking `response.ok`. |
-| `web/src/components/auth/LogoutButton.tsx` | A failure to clear the clipboard on logout is swallowed silently (Rule 4). |
-| Auth actions / `getSession` | `unauthenticated` and `email_not_verified` are used inconsistently. |
-| `web/src/server/dal/users.ts`, `web/src/server/services/lockout.ts` | Lockout thresholds are defined twice: the SQL in the DAL is enforced, and the service only audits. |
-| Several components | `<Link><Button>` nesting puts an interactive element inside another. |
-| Patient detail page | There is no link from a patient to "new note for this patient". |
+| `app/{login,signup,reset-password,forgot-password,resend-verification}/page.tsx`, `components/notes/NoteGenerationForm.tsx`, `components/patients/{PatientCreateForm,PatientInfoCard}.tsx` | Each form only has an `onSubmit` handler; none sets `method` or `action`. If someone submits before hydration, the browser sends a GET, and the passwords, emails, session notes, or patient fields end up in the URL. That puts them in browser history and load-balancer logs. |
+| `actions/notes.ts` (`generateNoteAction`, `saveNoteAction`), `server/dal/note-templates.ts:102-108,156-164` | Neither generation nor save checks that the template is builtin or owned by the user/org; the DAL lookups filter only on `id` and `archived_at`. Save also accepts archived templates. Not reachable today because nothing creates non-builtin templates. |
+| `actions/patients.ts:52` | `normalizeFormData` drops blank strings, so `updatePatientAction` can't clear `dateOfBirth`, `pronoun`, `phone`, or `email`. The save still reports success and the stale PHI stays. (`context` can be cleared through `updatePatientContextAction`.) |
+| `actions/notes.ts:509` | `updateNoteSectionsAction` reads the note with `findClinicalNoteById(scope, …)` without the transaction client, so the read happens outside the transaction it writes in. The `updated_at` optimistic lock probably covers it. |
 
-## Suspected, from the 2026-11-07 docs audit
-
-Noticed in passing while reading code. These are lower confidence.
+## Generate → save loop (ROADMAP "Next up" item 1)
 
 | Location | Problem |
 |---|---|
-| `web/src/server/db/config.ts:68` | Default `ANTHROPIC_MODEL` is `claude-sonnet-4-20250514`, which may be retired. Dev-only: production rejects `LLM_PROVIDER=claude`. |
-| `web/src/server/services/auth.ts:83,94,118` | Logs use `source: 'dal_auth'` from a service module, which breaks the naming convention and misleads log searches. |
-| `web/src/server/types.ts` (`AuditAction`) | 12 audit actions are defined but no non-test code emits them. Failed logins are audited (`LOGIN_FAILED`, `services/auth.ts:104`), but `LOGIN_BLOCKED_LOCKED` never is. Check whether a login attempt against a locked account leaves any audit row. Full list: [compliance/AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md). |
-| `web/src/components/notes/HallucinationFlag.tsx:4` | A Client Component type-imports from a `server-only` module. It works because the import is type-only, but changing it to a value import would break the build. |
-| `web/src/components/notes/NoteGenerationForm.tsx:340` | The free-text "Additional Context" input is marked TEMPORARY until PHI storage shipped, and PHI storage has now shipped. Decide whether to keep it alongside the patient selector or remove it. |
-| `web/src/proxy.ts:106` | The matcher excludes `/api/*`, so API responses get no CSP header. Probably fine for JSON, but undocumented. |
+| `actions/notes.ts:348` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. |
+| `components/notes/NoteGenerationForm.tsx:402` | BUG-UI-12: the generated note renders below the form on the same page instead of in its own view. |
+| Patient detail page, `components/patients/PatientNotesTable.tsx` | Nothing links to `/dashboard/notes/new?patientId=…`, not even the "no notes yet" empty state. The new-note patient field is read-only, so the UI has no way to link a note to a patient. `PatientTypeahead.tsx` is built but rendered nowhere. |
+| `app/dashboard/notes/new/page.tsx:31` | `?patientId=` goes to the DAL without Zod validation (Rule 3). A non-UUID value likely errors with a 500 (not run). |
+| `components/notes/NoteGenerationForm.tsx:340` | "Additional Context" is free text marked TEMPORARY. When a linked patient has stored context, `generateNoteAction` ignores the typed text without telling the user. `saveNoteAction` doesn't persist it, so for an unlinked note the context that shaped generation is lost. Decide whether to keep it, merge it, or remove it. |
+
+## Accessibility
+
+| Location | Problem |
+|---|---|
+| `components/TopBar.tsx:66` + six pages | The notes, notes/new, notes/[id], patients, patients/new, and patients/[id] pages each render two `<h1>`: TopBar's and the page's own (Rule 14). Page tests mock TopBar, so the "exactly one h1" assertions pass. |
+| `app/dashboard/patients/page.tsx` (2), `app/dashboard/notes/page.tsx` (3), `components/patients/PatientCreateForm.tsx` (1) | `<Link><Button>` nesting puts a `<button>` inside an `<a>`. In `PatientCreateForm`, a disabled Cancel still navigates. |
+| `components/Sidebar.tsx:221` | The closed mobile drawer is only translated off-screen; it isn't `inert`, so its links stay focusable. The drawer also has no dialog semantics and doesn't move focus in on open or return it on close. |
+
+## Error handling and observability
+
+| Location | Problem |
+|---|---|
+| `server/services/llm/gemini-provider.ts:170` | `getADCToken` runs before the timeout and outside the `try`, using a raw `fetch` with no timeout. A network failure surfaces as `internal_error` rather than `ai_unavailable`. A hang waits on Node's default timeouts rather than `GEMINI_TIMEOUT_MS`. |
+| `server/services/llm/{gemini,claude}-provider.ts` | Both providers call `response.json()` before checking `response.ok`. A non-JSON 429/5xx body becomes `NetworkError` (`ai_unavailable`), not `RateLimitError`, and `Retry-After` is lost. |
+| `components/auth/LogoutButton.tsx:24` | The clipboard clear on logout fails silently into an empty catch: no telemetry, and the user isn't warned that PHI may still be on the clipboard (Rule 4). |
+| `server/services/auth.ts`, `server/services/lockout.ts` | A login against a locked account is audited as `LOGIN_FAILED`, never `LOGIN_BLOCKED_LOCKED`. With a wrong password the audit row has no user ID or lockout reason; with the right password, two `LOGIN_FAILED` rows are written. Also, 8 org/invite `AuditAction` members plus `AUTH_FAILED`, `CSRF_FAILED`, and `EMAIL_VERIFICATION_SENT` are never emitted (see [compliance/AUDIT_LOGGING_REQUIREMENTS.md](./compliance/AUDIT_LOGGING_REQUIREMENTS.md)). |
+| `server/dal/users.ts:272`, `server/services/lockout.ts:16,47` | Lockout thresholds exist in three copies. The DAL SQL sets `locked_until`; the service's table drives the audit metadata and the returned status. They agree today, and no test would catch them drifting apart. |
+| `server/services/auth.ts:83,94,118,288` | These log `source: 'dal_auth'` from a service module. The same file also uses `service_auth` and `registration`. CLAUDE.md's source-naming table has no pattern for services. |
+
+## Low priority
+
+| Location | Problem |
+|---|---|
+| `actions/auth.ts` | On `validation_error`, auth actions return unsanitized Zod `fieldErrors`, unlike notes, patients, and templates, which use `sanitizeFieldErrors`. No auth UI renders them, and they expose schema limits only. |
+| `actions/*.ts` | For an unverified-email session, the 8 notes/patients/templates actions return `unauthenticated`, while `generateNoteAction` and the billing actions return `email_not_verified`. The dashboard layout redirect keeps the UI from hitting this. |
+| `server/db/config.ts:68` | The default `ANTHROPIC_MODEL` `claude-sonnet-4-20250514` was retired on 2026-06-15, so the dev-only Claude provider fails on defaults. The replacement is `claude-sonnet-5-5`. Production rejects `LLM_PROVIDER=claude`. |
+| `components/notes/HallucinationFlag.tsx:4` | A Client Component type-imports `HallucinationIssue` from a `server-only` module. It works, but it breaks the `lib/` vs `server/` layering, and no lint rule enforces the boundary. |
