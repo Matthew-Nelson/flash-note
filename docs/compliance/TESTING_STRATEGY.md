@@ -63,7 +63,7 @@ This document defines the testing strategy, guidelines, and requirements for Fla
 1. ~~**Extension:** No testing infrastructure~~ ✅ **DONE** - 14 test files, ~93% coverage
 2. ~~**Web:** No testing infrastructure~~ ✅ **DONE** - 19 test files, ~92% coverage
 3. ~~**CI/CD:** No automated test execution in pipelines~~ ✅ **DONE** - GitHub Actions configured
-4. **E2E:** Foundation complete (37 Playwright tests) — gaps remain (error handling, token refresh, copy functionality)
+4. **E2E:** 89 Playwright tests against an isolated `flashnote_e2e` database (auth, lockout, verification, password reset, notes, patients, cross-account authorization) — gaps remain (clipboard/copy, rate-limit UX, Stripe checkout)
 5. **Security:** DAST (OWASP ZAP) not yet configured; secret scanning (GitLeaks) not implemented
 
 ---
@@ -820,7 +820,7 @@ jobs:
 
 ### Required CI Checks
 
-All of these must pass before merge:
+All of these must pass before merge. E2E is not listed: it runs after merge, on pushes to `main` (`.github/workflows/e2e.yml`).
 
 | Check | Blocking | Threshold | Status |
 |-------|----------|-----------|--------|
@@ -832,7 +832,6 @@ All of these must pass before merge:
 | Coverage (extension) | Yes | 80% minimum | ✅ Enforced (~93%) |
 | Coverage (web) | Yes | 80% minimum | ✅ Enforced (~92%) |
 | Integration tests | Yes | All pass | Not configured |
-| E2E tests | Yes | All pass | Not configured |
 | DAST scan | Yes (main only) | No high/critical | Not configured |
 
 ---
@@ -895,7 +894,7 @@ export default defineConfig({
 
 ---
 
-> **Implementation status:** Unit testing is complete across all 3 packages (backend 38 files, extension 14 files, web 19 files). E2E foundation exists (37 Playwright tests). Integration tests, DAST, and secret scanning remain. See [ROADMAP.md Testing](../ROADMAP.md#testing) for remaining work items.
+> **Implementation status:** Unit testing is complete across all 3 packages (backend 38 files, extension 14 files, web 19 files). E2E covers the core workflows (89 Playwright tests, run on main after merge). Integration tests, DAST, and secret scanning remain. See [ROADMAP.md Testing](../ROADMAP.md#testing) for remaining work items.
 
 ---
 
@@ -907,7 +906,7 @@ export default defineConfig({
 |----------|------|---------|---------|--------|
 | Unit/Integration | Vitest | 4.x | Fast, TypeScript-native testing | ✅ All packages |
 | React Testing | @testing-library/react | 16.x | Component testing | ✅ Extension + Web |
-| E2E | Playwright | 1.x | Browser automation | ✅ 37 tests |
+| E2E | Playwright | 1.x | Browser automation | ✅ 89 tests |
 | API Testing | Supertest | 6.x | HTTP assertions | ✅ Backend |
 | Mocking | vitest (built-in) | - | Mocks and spies | ✅ All packages |
 | Coverage | @vitest/coverage-v8 | 4.x | Code coverage | ✅ All packages |
@@ -972,11 +971,12 @@ pnpm --filter backend test auth-service.test.ts
 # Run in watch mode
 pnpm --filter backend test --watch
 
-# Run E2E tests
-pnpm --filter e2e test
+# Run E2E tests (recreates the flashnote_e2e database and starts its own
+# dev server on :3100; needs local Postgres, no API keys)
+cd web && pnpm test:e2e
 
 # Run E2E tests with UI
-pnpm --filter e2e test --ui
+cd web && pnpm test:e2e:ui
 ```
 
 ---

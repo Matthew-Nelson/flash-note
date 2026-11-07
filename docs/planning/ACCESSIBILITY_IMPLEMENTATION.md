@@ -409,7 +409,7 @@ Create `extension/tests/e2e/accessibility.spec.ts` with equivalent tests for the
 
 ### CI Integration
 
-No changes needed. These run via existing `.github/workflows/e2e.yml` which triggers on `web/**` and `extension/**` changes and executes `pnpm test:e2e:ci`.
+No changes needed. These run via existing `.github/workflows/e2e.yml`, which runs `pnpm test:e2e` on pushes to `main`.
 
 ---
 

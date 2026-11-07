@@ -277,6 +277,10 @@ export async function findClinicalNotesByScope(
 /**
  * Update note content with optimistic locking on `updated_at`.
  *
+ * The comparison truncates to milliseconds: the client's token came through a
+ * JS Date, which drops Postgres's microseconds, so an exact match would fail on
+ * nearly every edit and report a false conflict.
+ *
  * Returns null when the UPDATE affected 0 rows — ambiguous between "note not
  * found / out of scope / archived" and "optimistic lock failed". Caller maps
  * both to the `conflict` error code (Research §3.3, §5.5 minor refinement).
@@ -302,7 +306,7 @@ export async function updateClinicalNoteContent(
     `UPDATE clinical_notes SET content = $1::jsonb, updated_at = NOW()
      WHERE ${scopeSql}
        AND id = $${idIndex}
-       AND updated_at = $${lockIndex}
+       AND date_trunc('milliseconds', updated_at) = $${lockIndex}
        AND archived_at IS NULL
      RETURNING ${CLINICAL_NOTE_COLUMNS}`,
     params

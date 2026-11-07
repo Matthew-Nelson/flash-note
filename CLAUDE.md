@@ -269,6 +269,7 @@ pnpm dev          # Start Next.js dev server
 pnpm build        # Build for production
 pnpm start        # Start production server
 pnpm test         # Run tests
+pnpm test:e2e     # Playwright: recreates flashnote_e2e, starts its own server on :3100
 pnpm db:migrate   # Run migrations
 ```
 

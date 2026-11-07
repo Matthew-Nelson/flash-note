@@ -1,78 +1,76 @@
-import { test as baseTest, expect as baseExpect } from '@playwright/test';
-import { test as authTest, expect as authExpect } from './fixtures/web';
+import { test, expect } from '@playwright/test';
+
+import { SHARED_USER_STATE } from './fixtures/web';
 
 /**
- * Navigation and routing E2E tests.
- *
- * Focus: Protected route redirects, auth-aware routing, cross-page flows.
- * These are security-critical tests for route protection.
+ * Navigation and routing E2E tests: protected-route redirects and auth-aware
+ * routing. Route protection is security-critical (Rule 8).
  */
 
-baseTest.describe('Protected Routes (Unauthenticated)', () => {
-  baseTest('redirects /dashboard to /login when not authenticated', async ({ page }) => {
-    await page.goto('/dashboard');
-    await baseExpect(page).toHaveURL('/login', { timeout: 10000 });
-  });
+test.describe('Protected Routes (Unauthenticated)', () => {
+  for (const path of [
+    '/dashboard',
+    '/dashboard/settings',
+    '/dashboard/notes',
+    '/dashboard/notes/new',
+    '/dashboard/patients',
+    '/dashboard/templates',
+  ]) {
+    test(`redirects ${path} to /login`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL('/login');
+    });
+  }
 
-  baseTest('redirects /dashboard/settings to /login when not authenticated', async ({ page }) => {
-    await page.goto('/dashboard/settings');
-    await baseExpect(page).toHaveURL('/login', { timeout: 10000 });
+  test('a forged session cookie is rejected by the server, not just the proxy', async ({ context, page }) => {
+    // The proxy only checks that a cookie exists; getSession() must reject an unknown token
+    await context.addCookies([
+      { name: 'session_id', value: 'forged-token', domain: 'localhost', path: '/' },
+    ]);
+    await page.goto('/dashboard');
+    // The message only appears on the server-rejection path (?reason=session_expired);
+    // SessionAlert then strips the param, so the URL alone is racy.
+    await expect(page).toHaveURL(/\/login/);
+    await expect(page.getByText('Your session has expired. Please sign in again.')).toBeVisible();
   });
 });
 
-authTest.describe('Authenticated Route Behavior', () => {
-  authTest('login page redirects to dashboard when already authenticated', async ({
-    authenticatedPage: page,
-  }) => {
+test.describe('Authenticated Route Behavior', () => {
+  test.use({ storageState: SHARED_USER_STATE });
+
+  test('login page redirects to dashboard when already authenticated', async ({ page }) => {
     await page.goto('/login');
-    await authExpect(page).toHaveURL('/dashboard', { timeout: 15000 });
+    await expect(page).toHaveURL('/dashboard');
   });
 
-  authTest('signup page redirects to dashboard when already authenticated', async ({
-    authenticatedPage: page,
-  }) => {
+  test('signup page redirects to dashboard when already authenticated', async ({ page }) => {
     await page.goto('/signup');
-    await authExpect(page).toHaveURL('/dashboard', { timeout: 15000 });
+    await expect(page).toHaveURL('/dashboard');
   });
 
-  authTest('dashboard is accessible when authenticated', async ({ authenticatedPage: page }) => {
-    await page.goto('/dashboard');
-    await authExpect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({
-      timeout: 15000,
-    });
-  });
-
-  authTest('settings is accessible when authenticated', async ({ authenticatedPage: page }) => {
+  test('settings is accessible when authenticated', async ({ page }) => {
     await page.goto('/dashboard/settings');
-    await authExpect(page.getByRole('heading', { name: 'Account Settings' })).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(page.getByRole('heading', { name: 'Account Settings', level: 1 })).toBeVisible();
   });
 });
 
-baseTest.describe('Cross-Page Navigation Flows', () => {
-  baseTest('complete signup-to-login navigation flow', async ({ page }) => {
-    // Start at landing page
+test.describe('Cross-Page Navigation Flows', () => {
+  test('landing → signup → login → forgot password → login → signup', async ({ page }) => {
     await page.goto('/');
 
-    // Navigate to signup
     await page.getByRole('link', { name: 'Get Started' }).click();
-    await baseExpect(page).toHaveURL('/signup');
+    await expect(page).toHaveURL('/signup');
 
-    // Navigate from signup to login
     await page.getByRole('link', { name: 'Sign in' }).click();
-    await baseExpect(page).toHaveURL('/login');
+    await expect(page).toHaveURL('/login');
 
-    // Navigate from login to forgot password
     await page.getByRole('link', { name: 'Forgot password?' }).click();
-    await baseExpect(page).toHaveURL('/forgot-password');
+    await expect(page).toHaveURL('/forgot-password');
 
-    // Navigate back to login
     await page.getByRole('link', { name: 'Back to login' }).click();
-    await baseExpect(page).toHaveURL('/login');
+    await expect(page).toHaveURL('/login');
 
-    // Navigate to signup from login
     await page.getByRole('link', { name: 'Sign up' }).click();
-    await baseExpect(page).toHaveURL('/signup');
+    await expect(page).toHaveURL('/signup');
   });
 });

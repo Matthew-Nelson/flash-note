@@ -1,122 +1,85 @@
 name: E2E Tests
 
+# Post-merge only: e2e runs on main after a PR lands, plus on demand.
+# PRs are gated by the CI workflow (lint, unit tests, build); a failure here
+# turns main red rather than blocking the PR.
 on:
-  # push:
-  #   branches: [main, develop]
-  #   paths:
-  #     - 'web/**'
-  #     - '.github/workflows/e2e.yml'
-  # pull_request:
-  #   branches: [main, develop]
-  #   paths:
-  #     - 'web/**'
-  #     - '.github/workflows/e2e.yml'
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**/*.md'
+      - '.claude/**'
   workflow_dispatch:
 
 concurrency:
   group: e2e-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a running post-merge check; a newer push queues behind it
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '10'
 
 jobs:
-  # TODO: Rewrite for Next.js embedded database
-  # web-e2e:
-  #   name: Web E2E
-  #   runs-on: ubuntu-latest
-  #   timeout-minutes: 30
-  #
-  #   services:
-  #     postgres:
-  #       image: postgres:16
-  #       env:
-  #         POSTGRES_USER: test
-  #         POSTGRES_PASSWORD: test
-  #         POSTGRES_DB: flashnote_test
-  #       ports:
-  #         - 5432:5432
-  #       options: >-
-  #         --health-cmd pg_isready
-  #         --health-interval 10s
-  #         --health-timeout 5s
-  #         --health-retries 5
-  #
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: pnpm/action-setup@v2
-  #       with:
-  #         version: ${{ env.PNPM_VERSION }}
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #         cache: 'pnpm'
-  #
-  #     - name: Install dependencies
-  #       run: pnpm install --frozen-lockfile
-  #
-  #     - name: Setup database
-  #       run: pnpm db:migrate
-  #       working-directory: ./web
-  #       env:
-  #         NODE_ENV: test
-  #         DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-  #
-  #     - name: Build Next.js app
-  #       run: pnpm build
-  #       working-directory: ./web
-  #
-  #     - name: Start Next.js server
-  #       run: |
-  #         pnpm start &
-  #         echo $! > /tmp/web.pid
-  #       working-directory: ./web
-  #       env:
-  #         NODE_ENV: test
-  #         DATABASE_URL: postgres://test:test@localhost:5432/flashnote_test
-  #
-  #     - name: Wait for server
-  #       run: |
-  #         for i in {1..30}; do
-  #           curl -sf http://localhost:3000 > /dev/null && echo "Server ready" && exit 0
-  #           sleep 2
-  #         done
-  #         echo "Server failed to start" && exit 1
-  #
-  #     - name: Install Playwright browsers
-  #       run: pnpm exec playwright install --with-deps chromium
-  #       working-directory: ./web
-  #
-  #     - name: Run E2E tests
-  #       run: pnpm test:e2e:ci --project=chromium
-  #       working-directory: ./web
-  #       env:
-  #         CI: true
-  #         WEB_URL: http://localhost:3000
-  #
-  #     - name: Upload Playwright report
-  #       uses: actions/upload-artifact@v4
-  #       if: ${{ !cancelled() }}
-  #       with:
-  #         name: web-playwright-report
-  #         path: web/playwright-report/
-  #         retention-days: 7
-  #
-  #     - name: Upload test results
-  #       uses: actions/upload-artifact@v4
-  #       if: ${{ !cancelled() }}
-  #       with:
-  #         name: web-test-results
-  #         path: web/test-results/
-  #         retention-days: 7
-  #
-  #     - name: Stop server
-  #       if: always()
-  #       run: kill $(cat /tmp/web.pid) 2>/dev/null || true
-
-  placeholder:
-    name: E2E (disabled)
+  web-e2e:
+    name: Web E2E
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        # Matches Cloud SQL (infra/database.tf)
+        image: postgres:15
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
-      - run: echo "E2E tests disabled — pending rewrite for Next.js embedded database architecture"
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: ./web
+
+      # Playwright's webServer recreates flashnote_e2e, runs migrations, and
+      # starts `next dev` with mock AI and no third-party keys (playwright.config.ts).
+      - name: Run E2E tests
+        run: pnpm test:e2e
+        working-directory: ./web
+        env:
+          E2E_DATABASE_URL: postgres://test:test@localhost:5432/flashnote_e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: web-playwright-report
+          path: web/playwright-report/
+          retention-days: 7
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: web-test-results
+          path: web/test-results/
+          retention-days: 7

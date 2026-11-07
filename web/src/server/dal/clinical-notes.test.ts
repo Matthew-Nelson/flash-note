@@ -477,7 +477,7 @@ describe('clinical-notes DAL', () => {
   // ---------------------------------------------------------------------------
 
   describe('updateClinicalNoteContent', () => {
-    it('includes optimistic-lock updated_at = $N in WHERE clause', async () => {
+    it('compares the optimistic-lock token at millisecond precision', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [createMockNoteRow()] });
 
       const expectedAt = new Date('2026-01-01T00:00:00Z').toISOString();
@@ -493,7 +493,9 @@ describe('clinical-notes DAL', () => {
         string,
         unknown[],
       ];
-      expect(sql).toContain('updated_at = $');
+      // The token round-trips through a JS Date (ms precision) but updated_at is
+      // stored in microseconds, so an untruncated comparison never matches.
+      expect(sql).toMatch(/date_trunc\('milliseconds', updated_at\) = \$\d+/);
       expect(sql).toContain('archived_at IS NULL');
       expect(params[params.length - 1]).toBe(expectedAt);
     });
