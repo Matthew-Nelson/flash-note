@@ -455,6 +455,61 @@ describe('Server Config', () => {
     });
   });
 
+  // `next build` imports server modules in production mode, but Cloud Run
+  // supplies secrets only at deploy, so the build environment has none.
+  describe('next build phase', () => {
+    function clearRuntimeSecrets(): void {
+      for (const key of [
+        'DATABASE_URL', 'STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET', 'CLEANUP_SECRET',
+        'GEMINI_API_KEY', 'GEMINI_USE_ADC', 'GEMINI_API_URL', 'ANTHROPIC_API_KEY',
+        'LLM_PROVIDER', 'USE_MOCK_AI', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN',
+      ]) {
+        delete env[key];
+      }
+    }
+
+    it('loads in production with no runtime secrets during next build', async () => {
+      clearRuntimeSecrets();
+      env.NODE_ENV = 'production';
+      env.NEXT_PHASE = 'phase-production-build';
+      const mockExit = vi.spyOn(process, 'exit');
+
+      const { config, isBuildPhase } = await import('./config');
+
+      expect(mockExit).not.toHaveBeenCalled();
+      expect(isBuildPhase).toBe(true);
+      // Unroutable (.invalid) so any build-time connection attempt fails loudly
+      expect(new URL(config.DATABASE_URL).hostname).toMatch(/\.invalid$/);
+    });
+
+    it('still rejects a malformed value during next build', async () => {
+      clearRuntimeSecrets();
+      env.NODE_ENV = 'production';
+      env.NEXT_PHASE = 'phase-production-build';
+      env.DATABASE_URL = 'mysql://localhost:3306/flashnote';
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+    });
+
+    it('exits at production runtime with the same missing secrets', async () => {
+      clearRuntimeSecrets();
+      env.NODE_ENV = 'production';
+      delete env.NEXT_PHASE;
+      const mockExit = vi.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await expect(import('./config')).rejects.toThrow('process.exit called');
+      expect(mockExit).toHaveBeenCalledWith(1);
+    });
+  });
+
   describe('constants', () => {
     it('should export BCRYPT_ROUNDS as 12', async () => {
       env.DATABASE_URL = 'postgres://localhost:5432/flashnote';

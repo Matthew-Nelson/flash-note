@@ -7,6 +7,7 @@ vi.mock('@/server/db/config', () => ({
     UPSTASH_REDIS_REST_TOKEN: undefined,
   },
   isProduction: false,
+  isBuildPhase: false,
 }));
 
 // Mock @upstash/redis with a proper constructor
@@ -33,6 +34,7 @@ describe('redis', () => {
         UPSTASH_REDIS_REST_TOKEN: undefined,
       },
       isProduction: false,
+      isBuildPhase: false,
     }));
 
     const { redis } = await import('./redis');
@@ -46,6 +48,7 @@ describe('redis', () => {
         UPSTASH_REDIS_REST_TOKEN: 'test-token',
       },
       isProduction: false,
+      isBuildPhase: false,
     }));
 
     const { redis } = await import('./redis');
@@ -65,10 +68,29 @@ describe('redis', () => {
         UPSTASH_REDIS_REST_TOKEN: undefined,
       },
       isProduction: true,
+      isBuildPhase: false,
     }));
 
     await import('./redis');
 
     expect(mockExit).toHaveBeenCalledWith(1);
+  });
+
+  it('should return null without exiting during next build in production', async () => {
+    const mockExit = vi.spyOn(process, 'exit');
+
+    vi.doMock('@/server/db/config', () => ({
+      config: {
+        UPSTASH_REDIS_REST_URL: undefined,
+        UPSTASH_REDIS_REST_TOKEN: undefined,
+      },
+      isProduction: true,
+      isBuildPhase: true,
+    }));
+
+    const { redis } = await import('./redis');
+
+    expect(redis).toBeNull();
+    expect(mockExit).not.toHaveBeenCalled();
   });
 });

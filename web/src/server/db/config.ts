@@ -22,7 +22,7 @@ const envBoolean = z
  * Only includes variables needed by the DAL and database layer.
  * Expand in later phases as services are ported.
  */
-const envSchema = z.object({
+const baseSchema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
   // L-7 fix: Validate DATABASE_URL starts with postgres:// or postgresql://
@@ -78,7 +78,9 @@ const envSchema = z.object({
   STRIPE_PRICE_ANNUAL: z.string().startsWith('price_').optional(),
   // Cleanup job auth (webhook event cleanup Route Handler called by Cloud Scheduler)
   CLEANUP_SECRET: z.string().min(32).optional(),
-}).superRefine((data, ctx) => {
+});
+
+const envSchema = baseSchema.superRefine((data, ctx) => {
   // Block USE_MOCK_AI in production
   if (data.USE_MOCK_AI && data.NODE_ENV === 'production') {
     ctx.addIssue({
@@ -150,8 +152,26 @@ const envSchema = z.object({
   }
 });
 
+/**
+ * True inside `next build`. Next imports server modules in production mode to
+ * collect page data, but Cloud Run supplies secrets only at deploy time, so
+ * the build has none. Requiring them here only made every secret-less build
+ * (CI, the Docker image) fail; the runtime check below still enforces them.
+ */
+export const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build';
+
+// Unroutable by definition (RFC 2606 .invalid), so a build-time connection
+// attempt fails loudly instead of reaching a real database.
+const BUILD_PHASE_DATABASE_URL = 'postgres://build-phase.invalid:5432/unused';
+
 function loadConfig() {
-  const parsed = envSchema.safeParse(process.env);
+  // Shape checks still apply at build; only the presence of secrets is deferred.
+  const parsed = isBuildPhase
+    ? baseSchema.safeParse({
+        ...process.env,
+        DATABASE_URL: process.env.DATABASE_URL ?? BUILD_PHASE_DATABASE_URL,
+      })
+    : envSchema.safeParse(process.env);
 
   if (!parsed.success) {
     // eslint-disable-next-line no-console
