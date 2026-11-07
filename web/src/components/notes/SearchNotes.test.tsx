@@ -16,9 +16,10 @@ vi.mock('next/navigation', () => ({
 import { SearchNotes } from './SearchNotes';
 
 describe('SearchNotes', () => {
+  // fireEvent, not userEvent: RTL's asyncWrapper awaits a setTimeout that
+  // vitest's fake timers never fire, so userEvent hangs while timers are faked.
   beforeEach(() => {
     vi.useFakeTimers();
-    h.replace.mockReset();
     h.searchParams = new URLSearchParams();
     h.pathname = '/dashboard/notes';
   });

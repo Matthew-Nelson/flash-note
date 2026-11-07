@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock next/headers cookies()
 const mockSet = vi.fn();
@@ -8,11 +8,13 @@ const mockGet = vi.fn();
 const mockDelete = vi.fn();
 
 vi.mock('next/headers', () => ({
-  cookies: vi.fn().mockResolvedValue({
-    set: (...args: unknown[]): unknown => mockSet(...args),
-    get: (...args: unknown[]): unknown => mockGet(...args),
-    delete: (...args: unknown[]): unknown => mockDelete(...args),
-  }),
+  cookies: vi.fn(() =>
+    Promise.resolve({
+      set: (...args: unknown[]): unknown => mockSet(...args),
+      get: (...args: unknown[]): unknown => mockGet(...args),
+      delete: (...args: unknown[]): unknown => mockDelete(...args),
+    })
+  ),
 }));
 
 // Mock config to control isProduction
@@ -25,12 +27,6 @@ const { setSessionCookie, getSessionToken, clearSessionCookie, hashSessionToken 
   await import('./session-cookie');
 
 describe('session-cookie', () => {
-  beforeEach(() => {
-    mockSet.mockReset();
-    mockGet.mockReset();
-    mockDelete.mockReset();
-  });
-
   describe('setSessionCookie', () => {
     it('should set the cookie with correct options', async () => {
       await setSessionCookie('test-token-123');

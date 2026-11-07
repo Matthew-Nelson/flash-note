@@ -55,7 +55,6 @@ describe('VersionRow', () => {
 
   it('renders relative time label', () => {
     render(<VersionRow version={row()} isCurrent />);
-    // Either "2h ago" or a relative-time synonym.
-    expect(screen.getByText(/ago|just now|\d{1,2}[hmd]/i)).toBeInTheDocument();
+    expect(screen.getByText('2h ago')).toBeInTheDocument();
   });
 });

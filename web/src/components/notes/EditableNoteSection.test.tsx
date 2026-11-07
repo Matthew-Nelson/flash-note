@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { EditableNoteSection } from './EditableNoteSection';
@@ -18,10 +18,6 @@ function section(content = 'Original subjective content.'): NoteSection {
 }
 
 describe('EditableNoteSection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders read mode by default with Edit button', () => {
     render(
       <EditableNoteSection
@@ -121,7 +117,7 @@ describe('EditableNoteSection', () => {
 
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     const alert = screen.getByRole('alert');
-    expect(alert.textContent).toMatch(/modified elsewhere|Refresh/i);
+    expect(alert).toHaveTextContent('This note was modified elsewhere. Refresh to see the latest version.');
     expect(screen.getByRole('button', { name: /Refresh/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Copy my changes/i })).toBeInTheDocument();
 
@@ -132,7 +128,7 @@ describe('EditableNoteSection', () => {
   it('aria-live="assertive" on conflict alert container (Rule 13)', async () => {
     mockAction.mockResolvedValue({ success: false, error: 'conflict' });
     const user = userEvent.setup();
-    const { container } = render(
+    render(
       <EditableNoteSection
         noteId={NOTE_ID}
         section={section()}
@@ -143,8 +139,7 @@ describe('EditableNoteSection', () => {
     await user.click(screen.getByRole('button', { name: /Edit Subjective section/i }));
     await user.click(screen.getByRole('button', { name: /Save section/i }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
-    const assertiveRegion = container.querySelector('[aria-live="assertive"]');
-    expect(assertiveRegion).not.toBeNull();
+    expect(screen.getByRole('alert').closest('[aria-live]')).toHaveAttribute('aria-live', 'assertive');
   });
 
   it('renders generic curated error for non-conflict errors (Rule 2)', async () => {
@@ -162,7 +157,7 @@ describe('EditableNoteSection', () => {
     await user.click(screen.getByRole('button', { name: /Save section/i }));
     await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
     // mapNoteError('internal_error') → "Something went wrong. Please try again."
-    expect(screen.getByRole('alert').textContent).toMatch(/Something went wrong/i);
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong. Please try again.');
   });
 
   describe('logout (Rule 4)', () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { mockDbQuery } from '@/test/dal-helpers';
 import { checkDbHealth } from './health';
 
 const mockLogger = vi.hoisted(() => ({
@@ -13,11 +13,6 @@ const mockLogger = vi.hoisted(() => ({
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 describe('checkDbHealth', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockLogger.error.mockReset();
-  });
-
   afterEach(() => {
     vi.useRealTimers();
   });

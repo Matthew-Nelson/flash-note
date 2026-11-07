@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { LogoutButton } from './LogoutButton';
 
 // Mock logoutAction
@@ -29,14 +29,14 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
-// Install a configurable clipboard stub before each test so both our spy and
-// userEvent.setup() (which calls attachClipboardStubToView) can coexist.
-// configurable: true allows userEvent to redefine the property without throwing.
-// We install fresh before each test so vi.clearAllMocks() + re-stub keeps state clean.
 const mockClipboardWriteText = vi.fn().mockResolvedValue(undefined);
 
+let user: UserEvent;
+
+// userEvent.setup() attaches its own navigator.clipboard stub, so it must run before
+// our mock is defined; otherwise writeText calls would go to userEvent's stub.
 beforeEach(() => {
-  vi.clearAllMocks();
+  user = userEvent.setup();
   mockClipboardWriteText.mockResolvedValue(undefined);
   Object.defineProperty(navigator, 'clipboard', {
     value: { writeText: mockClipboardWriteText },
@@ -48,15 +48,14 @@ beforeEach(() => {
 describe('LogoutButton', () => {
   it('renders Sign out button', () => {
     render(<LogoutButton />);
-    expect(screen.getByText('Sign out')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument();
   });
 
   it('calls logoutAction on click', async () => {
     mockLogoutAction.mockResolvedValue(undefined);
-    const user = userEvent.setup();
 
     render(<LogoutButton />);
-    await user.click(screen.getByText('Sign out'));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     expect(mockLogoutAction).toHaveBeenCalledOnce();
   });
@@ -69,13 +68,11 @@ describe('LogoutButton', () => {
         resolveLogout = resolve;
       })
     );
-    const user = userEvent.setup();
 
     render(<LogoutButton />);
-    await user.click(screen.getByText('Sign out'));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
-    expect(screen.getByText('Signing out...')).toBeInTheDocument();
-    expect(screen.getByRole('button')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Signing out...' })).toBeDisabled();
 
     resolveLogout();
   });
@@ -84,10 +81,7 @@ describe('LogoutButton', () => {
     mockLogoutAction.mockResolvedValue(undefined);
 
     render(<LogoutButton />);
-    // Use fireEvent rather than userEvent here so that userEvent does not replace
-    // navigator.clipboard with its own stub (attachClipboardStubToView), which would
-    // disconnect our mockClipboardWriteText from the active clipboard object.
-    fireEvent.click(screen.getByText('Sign out'));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     // Wait for both calls to complete before checking invocation order.
     await vi.waitFor(() => {
@@ -105,9 +99,10 @@ describe('LogoutButton', () => {
     mockLogoutAction.mockResolvedValue(undefined);
     const logoutListener = vi.fn();
     window.addEventListener('flashnote:logout', logoutListener);
+    onTestFinished(() => window.removeEventListener('flashnote:logout', logoutListener));
 
     render(<LogoutButton />);
-    fireEvent.click(screen.getByText('Sign out'));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await vi.waitFor(() => {
       expect(logoutListener).toHaveBeenCalledOnce();
@@ -118,8 +113,6 @@ describe('LogoutButton', () => {
     const eventCallOrder = logoutListener.mock.invocationCallOrder[0];
     const logoutCallOrder = mockLogoutAction.mock.invocationCallOrder[0];
     expect(eventCallOrder).toBeLessThan(logoutCallOrder);
-
-    window.removeEventListener('flashnote:logout', logoutListener);
   });
 
   it('still calls logoutAction even if clipboard.writeText rejects', async () => {
@@ -127,8 +120,7 @@ describe('LogoutButton', () => {
     mockLogoutAction.mockResolvedValue(undefined);
 
     render(<LogoutButton />);
-    // Use fireEvent for the same reason: prevents userEvent from replacing the clipboard stub.
-    fireEvent.click(screen.getByText('Sign out'));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
 
     await vi.waitFor(() => {
       expect(mockLogoutAction).toHaveBeenCalledOnce();

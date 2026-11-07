@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { checkSubscriptionAccess } from './subscription';
-import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 
 const mockGetOrgSubscription = vi.hoisted(() => vi.fn());
 
@@ -8,27 +8,10 @@ vi.mock('@/server/dal/organizations', () => ({
   getOrgSubscription: mockGetOrgSubscription,
 }));
 
-function createSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 describe('checkSubscriptionAccess', () => {
-  beforeEach(() => {
-    mockGetOrgSubscription.mockReset();
-  });
-
   it('allows active individual subscription', async () => {
     const result = await checkSubscriptionAccess(
-      createSession({ subscriptionStatus: 'active' })
+      createMockSession({ subscriptionStatus: 'active' })
     );
     expect(result).toEqual({ allowed: true });
     expect(mockGetOrgSubscription).not.toHaveBeenCalled();
@@ -36,7 +19,7 @@ describe('checkSubscriptionAccess', () => {
 
   it('allows valid individual trial', async () => {
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'trialing',
         trialEndsAt: new Date(Date.now() + 1000 * 60 * 60), // 1 hour from now
       })
@@ -46,7 +29,7 @@ describe('checkSubscriptionAccess', () => {
 
   it('denies expired individual trial (no org)', async () => {
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'trialing',
         trialEndsAt: new Date(Date.now() - 1000), // expired
         organizationId: null,
@@ -57,7 +40,7 @@ describe('checkSubscriptionAccess', () => {
 
   it('denies canceled subscription (no org)', async () => {
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'canceled',
         organizationId: null,
       })
@@ -72,7 +55,8 @@ describe('checkSubscriptionAccess', () => {
     });
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
+        userId: 'user-1',
         subscriptionStatus: 'canceled',
         organizationId: 'org-1',
       })
@@ -89,7 +73,7 @@ describe('checkSubscriptionAccess', () => {
     });
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'canceled',
         organizationId: 'org-1',
       })
@@ -105,7 +89,7 @@ describe('checkSubscriptionAccess', () => {
     });
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'canceled',
         organizationId: 'org-1',
       })
@@ -121,7 +105,7 @@ describe('checkSubscriptionAccess', () => {
     });
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'canceled',
         organizationId: 'org-1',
       })
@@ -134,7 +118,7 @@ describe('checkSubscriptionAccess', () => {
     mockGetOrgSubscription.mockResolvedValueOnce(null);
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'trialing',
         trialEndsAt: new Date(Date.now() - 1000),
         organizationId: 'org-1',
@@ -148,7 +132,7 @@ describe('checkSubscriptionAccess', () => {
     mockGetOrgSubscription.mockResolvedValueOnce(null);
 
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'past_due',
         organizationId: 'org-1',
       })
@@ -159,7 +143,7 @@ describe('checkSubscriptionAccess', () => {
 
   it('skips org lookup when organizationId is null', async () => {
     const result = await checkSubscriptionAccess(
-      createSession({
+      createMockSession({
         subscriptionStatus: 'canceled',
         organizationId: null,
       })

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, mockClientQuery, resetMocks, createMockOrgRow } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery, mockClientQuery, createMockOrgRow } from '@/test/dal-helpers';
 
 import {
   createOrganization,
@@ -9,10 +9,6 @@ import {
 } from './organizations';
 
 describe('Organization Queries', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('createOrganization', () => {
     it('should INSERT with parameterized query and RETURNING', async () => {
       const orgRow = createMockOrgRow();
@@ -148,7 +144,8 @@ describe('Organization Queries', () => {
 
       const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('JOIN organization_members');
-      expect(sql).toContain('removed_at IS NULL');
+      // The membership filter is what stops a user from reading a subscription for an org they left
+      expect(sql).toContain('WHERE o.id = $1 AND om.user_id = $2 AND om.removed_at IS NULL');
       expect(params).toEqual(['org-123', 'user-123']);
     });
 

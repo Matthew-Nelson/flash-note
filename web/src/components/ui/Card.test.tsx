@@ -10,12 +10,12 @@ describe('Card', () => {
 
   it('should apply card class', () => {
     render(<Card data-testid="card">Content</Card>);
-    expect(screen.getByTestId('card').className).toContain('card');
+    expect(screen.getByTestId('card')).toHaveClass('card');
   });
 
   it('should forward additional className', () => {
     render(<Card className="extra" data-testid="card">Content</Card>);
-    expect(screen.getByTestId('card').className).toContain('extra');
+    expect(screen.getByTestId('card')).toHaveClass('extra');
   });
 });
 
@@ -27,7 +27,7 @@ describe('CardHeader', () => {
 
   it('should apply card-header class', () => {
     render(<CardHeader data-testid="header">Header</CardHeader>);
-    expect(screen.getByTestId('header').className).toContain('card-header');
+    expect(screen.getByTestId('header')).toHaveClass('card-header');
   });
 });
 

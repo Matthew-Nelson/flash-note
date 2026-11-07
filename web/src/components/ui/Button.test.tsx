@@ -20,11 +20,16 @@ describe('Button', () => {
     expect(screen.getByRole('button').className).toContain('btn-secondary');
   });
 
-  it.each(['sm', 'md', 'lg'] as const)('should apply %s size', (size) => {
+  it.each([
+    ['sm', 'px-3 py-1.5 text-sm'],
+    ['md', 'px-4 py-2 text-base'],
+    ['lg', 'px-6 py-3 text-lg'],
+  ] as const)('should apply %s size', (size, classes) => {
     render(<Button size={size}>Sized</Button>);
     const btn = screen.getByRole('button');
-    // Each size has distinct px- class
-    expect(btn.className).toBeTruthy();
+    for (const cls of classes.split(' ')) {
+      expect(btn).toHaveClass(cls);
+    }
   });
 
   it('should be disabled when disabled prop is true', () => {

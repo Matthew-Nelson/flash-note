@@ -50,12 +50,6 @@ describe('db/index', () => {
   beforeEach(() => {
     vi.resetModules();
     delete globalForDb._flashnoteDb;
-    mockPool.on.mockClear();
-    mockPool.connect.mockClear();
-    MockPool.mockClear();
-    mockLogger.info.mockClear();
-    mockLogger.warn.mockClear();
-    mockLogger.error.mockClear();
   });
 
   it('exports db as a Pool instance', async () => {
@@ -100,17 +94,6 @@ describe('db/index', () => {
     // Simulate HMR: reset modules so the next import re-evaluates the module body
     vi.resetModules();
 
-    // Re-register mocks so the freshly-evaluated module can find them.
-    // Note: vi.mock() calls inside test bodies are NOT hoisted, but they are
-    // registered synchronously before the await import() below.
-    vi.mock('server-only', () => ({}));
-    vi.mock('./config', () => ({
-      config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
-    }));
-    vi.mock('pg', () => ({
-      default: { Pool: MockPool },
-    }));
-
     // Second import re-evaluates the module. globalThis cache is still set,
     // so Pool constructor should NOT be called again.
     mockLogger.info.mockClear();
@@ -127,21 +110,10 @@ describe('db/index', () => {
   it('does not write pool to globalThis in production', async () => {
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('./config', () => ({
-      config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
-    }));
-    vi.mock('pg', () => ({
-      default: { Pool: MockPool },
-    }));
 
     vi.stubEnv('NODE_ENV', 'production');
-    try {
-      await import('./index');
-      expect(globalForDb._flashnoteDb).toBeUndefined();
-    } finally {
-      vi.unstubAllEnvs();
-    }
+    await import('./index');
+    expect(globalForDb._flashnoteDb).toBeUndefined();
   });
 
   it('does not attach duplicate error handlers when globalThis cache is populated', async () => {
@@ -152,13 +124,6 @@ describe('db/index', () => {
     // Simulate HMR: reset modules so the next import re-evaluates the module body
     vi.resetModules();
 
-    vi.mock('server-only', () => ({}));
-    vi.mock('./config', () => ({
-      config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
-    }));
-    vi.mock('pg', () => ({
-      default: { Pool: MockPool },
-    }));
 
     // Second import reuses the cached pool — isNewPool is false, so on() is NOT called again
     await import('./index');
@@ -175,8 +140,8 @@ describe('db/index', () => {
     });
 
     afterEach(() => {
-      processOnSpy.mockRestore();
-      processExitSpy.mockRestore();
+      // Fake timers must not outlive a failed assertion in the force-exit test.
+      vi.useRealTimers();
       process.removeAllListeners('SIGTERM');
       process.removeAllListeners('SIGINT');
     });
@@ -193,13 +158,6 @@ describe('db/index', () => {
       expect(sigTermCalls).toHaveLength(1);
 
       vi.resetModules();
-      vi.mock('server-only', () => ({}));
-      vi.mock('./config', () => ({
-        config: { DATABASE_URL: 'postgres://localhost:5432/flashnote_test' },
-      }));
-      vi.mock('pg', () => ({
-        default: { Pool: MockPool },
-      }));
 
       // Restore the previous spy before creating a new one. Chaining
       // vi.spyOn() on an already-spied method (spy2 wrapping spy1) causes
@@ -257,8 +215,6 @@ describe('db/index', () => {
       await vi.advanceTimersByTimeAsync(5000);
 
       expect(processExitSpy).toHaveBeenCalledWith(1);
-
-      vi.useRealTimers();
     });
 
     it('handles SIGINT the same as SIGTERM', async () => {

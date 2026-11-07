@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, resetMocks, createMockOrgMemberRow, createMockOrgRow } from '@/test/dal-helpers';
+import { describe, it, expect, vi } from 'vitest';
+import { mockDbQuery, createMockOrgMemberRow, createMockOrgRow } from '@/test/dal-helpers';
 import { getUsageForUser, incrementUsage } from './usage';
 
 // Mock organization-members and organizations DAL modules
@@ -24,12 +24,6 @@ vi.mock('./organizations', () => ({
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 describe('getUsageForUser', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockFindActiveMembership.mockReset();
-    mockFindOrganizationById.mockReset();
-  });
-
   it('returns notesGenerated: 0 when no usage row exists', async () => {
     mockDbQuery.mockResolvedValueOnce({ rows: [] });
 
@@ -51,14 +45,16 @@ describe('getUsageForUser', () => {
   it('resolves organization context when user has active membership', async () => {
     mockDbQuery.mockResolvedValueOnce({ rows: [{ notes_generated: 10 }] });
 
-    const mockMember = createMockOrgMemberRow({ organization_id: 'org-1', role: 'member' });
+    // The org ID passed in and the membership's org differ on purpose: the lookup must
+    // use the membership record, not the users.organization_id value that may be stale.
+    const mockMember = createMockOrgMemberRow({ organization_id: 'org-membership', role: 'member' });
     mockFindActiveMembership.mockResolvedValueOnce({
       organizationId: mockMember.organization_id,
       role: mockMember.role,
       isBillable: mockMember.is_billable,
     });
 
-    const mockOrg = createMockOrgRow({ id: 'org-1', name: 'Acme PT' });
+    const mockOrg = createMockOrgRow({ id: 'org-membership', name: 'Acme PT' });
     mockFindOrganizationById.mockResolvedValueOnce({
       id: mockOrg.id,
       name: mockOrg.name,
@@ -71,11 +67,11 @@ describe('getUsageForUser', () => {
       updatedAt: mockOrg.updated_at,
     });
 
-    const result = await getUsageForUser('user-1', 'org-1');
+    const result = await getUsageForUser('user-1', 'org-stale');
 
     expect(result.organization).toEqual({ name: 'Acme PT', role: 'member' });
     expect(mockFindActiveMembership).toHaveBeenCalledWith('user-1');
-    expect(mockFindOrganizationById).toHaveBeenCalledWith('org-1');
+    expect(mockFindOrganizationById).toHaveBeenCalledExactlyOnceWith('org-membership');
   });
 
   it('returns organization: null when user has no org (organizationId is null)', async () => {
@@ -126,11 +122,6 @@ describe('getUsageForUser', () => {
 });
 
 describe('incrementUsage', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockLogger.error.mockClear();
-  });
-
   it('executes UPSERT with correct parameters', async () => {
     mockDbQuery.mockResolvedValueOnce({ rows: [] });
 

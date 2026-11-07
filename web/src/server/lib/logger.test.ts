@@ -2,52 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import pino from 'pino';
 import { Writable } from 'stream';
 
+import { PHI_REDACT_PATHS } from './logger';
+
 /**
  * Tests for the Pino logger singleton and request logger.
  *
- * Strategy: Test PHI redaction against a real Pino instance with the same
- * redact config (verifying actual behavior, not mocks). Test the logger
- * singleton creation by importing it under controlled NODE_ENV.
- * Test createRequestLogger with mocked request headers.
+ * Strategy: Test PHI redaction against a real Pino instance configured with
+ * the exported PHI_REDACT_PATHS (verifying actual behavior, not mocks). The
+ * per-field expectations below are the spec: removing a path from production
+ * fails the matching test. Test the logger singleton creation by importing it
+ * under controlled NODE_ENV. Test createRequestLogger with mocked request headers.
  */
-
-// PHI redaction paths -- must match the logger singleton config exactly.
-// Phase 2 paths kept at the top (regression guard); Phase 4 paths appended.
-const PHI_PATHS = [
-  // Phase 2 (02-01)
-  'patient',
-  'patientName',
-  'patientData',
-  'patientContext',
-  'diagnosis',
-  'treatment',
-  'noteContent',
-  'soapNote',
-  'quickNotes',
-  'shorthand',
-  'dateOfBirth',
-  'medicalRecordNumber',
-  'req.body',
-  'res.body',
-  // Phase 4 (04-01) — new PHI field names for patients + clinical_notes
-  'firstName',
-  'lastName',
-  'phone',
-  'context',
-  'content',
-  '*.firstName',
-  '*.lastName',
-  '*.dateOfBirth',
-  '*.phone',
-  '*.context',
-  '*.patientContext',
-  '*.quickNotes',
-  '*.content',
-  // Phase 5 — free-text search terms are matched against note content and
-  // patient names, so a term is PHI by construction.
-  'search',
-  '*.search',
-];
 
 /**
  * Create a test Pino instance that writes to a writable stream,
@@ -66,7 +31,7 @@ function createTestLogger() {
     {
       level: 'trace',
       redact: {
-        paths: PHI_PATHS,
+        paths: PHI_REDACT_PATHS,
         censor: '[PHI_REDACTED]',
       },
     },
@@ -349,7 +314,6 @@ describe('createRequestLogger', () => {
 
   afterEach(() => {
     process.env = originalEnv;
-    vi.restoreAllMocks();
   });
 
   it('returns the base logger when no trace header is present', async () => {

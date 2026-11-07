@@ -12,7 +12,7 @@ import {
   mockDbQuery,
   mockClientQuery,
   mockGetPoolClient,
-  resetMocks,
+  setupMockClient,
   createMockSessionWithUserRow,
 } from '@/test/dal-helpers';
 import {
@@ -29,27 +29,24 @@ import {
 // Mock audit service
 vi.mock('@/server/services/audit', () => ({
   auditService: {
-    log: vi.fn().mockResolvedValue(undefined),
-    logWithClient: vi.fn().mockResolvedValue(undefined),
+    log: vi.fn(() => Promise.resolve(undefined)),
+    logWithClient: vi.fn(() => Promise.resolve(undefined)),
   },
 }));
-
-// Mock crypto.randomUUID for deterministic tests
-vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-token' as `${string}-${string}-${string}-${string}-${string}`);
 
 const { auditService } = await import('@/server/services/audit');
 
 describe('Session DAL', () => {
   beforeEach(() => {
-    resetMocks();
-    vi.mocked(auditService.log).mockClear();
-    vi.mocked(auditService.logWithClient).mockClear();
+    // Mock crypto.randomUUID for deterministic tests; restoreMocks undoes this after each test
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-token' as `${string}-${string}-${string}-${string}-${string}`);
   });
 
   // --- createSession ---
 
   describe('createSession', () => {
     it('should create a session with correct params in own transaction', async () => {
+      const mockClient = setupMockClient();
       // BEGIN
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
       // enforceSessionLimit COUNT query
@@ -58,12 +55,6 @@ describe('Session DAL', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [{ id: 'new-session-id' }] });
       // COMMIT
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
-
-      const mockClient = {
-        query: mockClientQuery,
-        release: vi.fn(),
-      };
-      mockGetPoolClient.mockResolvedValueOnce(mockClient);
 
       const result = await createSession('user-123', {
         ipAddress: '192.168.1.1',
@@ -80,15 +71,20 @@ describe('Session DAL', () => {
       expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
 
-      // Verify INSERT uses SHA-256 hash, not raw token
+      // Verify INSERT stores the SHA-256 hash in the token_hash position, never the raw token
       const insertCall = mockClientQuery.mock.calls.find(
         (call) => typeof call[0] === 'string' && String(call[0]).includes('INSERT INTO sessions')
       );
       expect(insertCall).toBeDefined();
       const tokenHash = crypto.createHash('sha256').update('test-uuid-token').digest('hex');
-      expect(insertCall![1]).toEqual(
-        expect.arrayContaining([tokenHash])
-      );
+      expect(insertCall![1]).toEqual([
+        'user-123',
+        tokenHash,
+        expect.any(Date),
+        '192.168.1.1',
+        'Mozilla/5.0',
+      ]);
+      expect(insertCall![1]).not.toContain('test-uuid-token');
     });
 
     it('should return raw token for cookie (not hash)', async () => {
@@ -96,10 +92,7 @@ describe('Session DAL', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ id: 'sess-id' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
-      mockGetPoolClient.mockResolvedValueOnce({
-        query: mockClientQuery,
-        release: vi.fn(),
-      });
+      setupMockClient();
 
       const result = await createSession('user-123');
       expect(result.token).toBe('test-uuid-token');
@@ -112,10 +105,7 @@ describe('Session DAL', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [{ count: '0' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [{ id: 'sess-id' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
-      mockGetPoolClient.mockResolvedValueOnce({
-        query: mockClientQuery,
-        release: vi.fn(),
-      });
+      setupMockClient();
 
       await createSession('user-123', { ipAddress: 'not-an-ip' });
 
@@ -153,10 +143,7 @@ describe('Session DAL', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [{ id: 'new-sess' }] });
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // COMMIT
 
-      mockGetPoolClient.mockResolvedValueOnce({
-        query: mockClientQuery,
-        release: vi.fn(),
-      });
+      setupMockClient();
 
       await createSession('user-123');
 
@@ -173,14 +160,13 @@ describe('Session DAL', () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // Empty RETURNING (INSERT)
       // ROLLBACK will also be called
       mockClientQuery.mockResolvedValueOnce({ rows: [] });
-      mockGetPoolClient.mockResolvedValueOnce({
-        query: mockClientQuery,
-        release: vi.fn(),
-      });
+      setupMockClient();
 
       await expect(
         createSession('user-123')
       ).rejects.toThrow('Session insert returned no rows');
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
     });
 
     it('should ROLLBACK on error and release client', async () => {
@@ -189,14 +175,13 @@ describe('Session DAL', () => {
       mockClientQuery.mockRejectedValueOnce(new Error('DB error')); // INSERT fails
       mockClientQuery.mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
-      const mockRelease = vi.fn();
-      mockGetPoolClient.mockResolvedValueOnce({
-        query: mockClientQuery,
-        release: mockRelease,
-      });
+      const mockClient = setupMockClient();
 
       await expect(createSession('user-123')).rejects.toThrow('DB error');
-      expect(mockRelease).toHaveBeenCalled();
+      expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
+      expect(mockClient.release).toHaveBeenCalled();
     });
   });
 
@@ -389,9 +374,15 @@ describe('Session DAL', () => {
       // COUNT + DELETE
       expect(mockClientQuery).toHaveBeenCalledTimes(2);
 
+      // Both queries must be scoped to the user, or another user's sessions could be counted or evicted
+      const [countSql, countParams] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(countSql).toContain('WHERE user_id = $1');
+      expect(countParams).toEqual(['user-123']);
+
       // Verify delete query deletes 1 session (5 - 5 + 1)
       const deleteCall = mockClientQuery.mock.calls[1];
       expect(deleteCall[0]).toContain('DELETE FROM sessions');
+      expect(deleteCall[0]).toContain('WHERE user_id = $1');
       expect(deleteCall[1]).toEqual(['user-123', 1]);
     });
 

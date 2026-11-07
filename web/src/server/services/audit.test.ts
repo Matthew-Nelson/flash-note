@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest';
 import { AuditAction } from '@/server/types';
 
 // Create a typed mock for the db query function
@@ -33,13 +33,7 @@ describe('AuditService', () => {
   });
 
   beforeEach(() => {
-    mockDbQuery.mockReset();
     mockDbQuery.mockResolvedValue({ rows: [] });
-    vi.clearAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   describe('log', () => {
@@ -165,7 +159,7 @@ describe('AuditService', () => {
           action: AuditAction.LOGIN,
           status: 'SUCCESS',
         })
-      ).resolves.not.toThrow();
+      ).resolves.toBeUndefined();
     });
 
     it('should log error to console with structured context when database query fails', async () => {
@@ -201,7 +195,8 @@ describe('AuditService', () => {
         auditService.log({ userId: null, action: AuditAction.LOGIN_FAILED, status: 'FAILURE' }),
       ];
 
-      await expect(Promise.all(logPromises)).resolves.not.toThrow();
+      await Promise.all(logPromises);
+      expect(mockDbQuery).toHaveBeenCalledTimes(3);
     });
   });
 
@@ -361,9 +356,12 @@ describe('AuditService', () => {
           action: AuditAction.LOGIN,
           status: 'SUCCESS',
         })
-      ).resolves.not.toThrow();
+      ).resolves.toBeUndefined();
 
-      expect(mockLogger.error).toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'audit_service', errorType: 'audit_write_failed' }),
+        'Audit write failed (fire-and-forget)',
+      );
     });
 
     it('should handle connection pool exhaustion gracefully', async () => {
@@ -375,7 +373,7 @@ describe('AuditService', () => {
           action: AuditAction.LOGIN,
           status: 'SUCCESS',
         })
-      ).resolves.not.toThrow();
+      ).resolves.toBeUndefined();
     });
 
     it('should handle constraint violation errors gracefully', async () => {
@@ -389,7 +387,7 @@ describe('AuditService', () => {
           action: AuditAction.LOGIN,
           status: 'SUCCESS',
         })
-      ).resolves.not.toThrow();
+      ).resolves.toBeUndefined();
     });
   });
 });

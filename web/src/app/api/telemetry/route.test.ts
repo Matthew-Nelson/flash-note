@@ -74,7 +74,6 @@ function makeRequest(body: unknown, options?: {
 
 describe('POST /api/telemetry', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({
       success: true,
       limit: 20,
@@ -250,7 +249,7 @@ describe('POST /api/telemetry', () => {
     expect(mockLoggerError).toHaveBeenCalledTimes(1);
   });
 
-  it('truncates oversized message field via Zod max', async () => {
+  it('drops an oversized message field via Zod max', async () => {
     const payload = {
       type: 'unhandled_error',
       message: 'x'.repeat(1001), // Exceeds max 1000
@@ -276,6 +275,7 @@ describe('POST /api/telemetry', () => {
 
     expect(response.status).toBe(200);
     expect(data).toEqual({ ok: true });
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(null, '192.168.1.1');
     expect(mockLoggerError).not.toHaveBeenCalled();
   });
 

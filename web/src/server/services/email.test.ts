@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock config with RESEND_API_KEY set (production-like)
 vi.mock('@/server/db/config', () => ({
@@ -25,10 +25,6 @@ vi.mock('resend', () => ({
 import { sendVerificationEmail, sendPasswordResetEmail } from './email';
 
 describe('email service', () => {
-  beforeEach(() => {
-    mockSend.mockReset();
-  });
-
   describe('sendVerificationEmail', () => {
     it('sends email with correct parameters', async () => {
       mockSend.mockResolvedValueOnce({ error: null });
@@ -50,7 +46,7 @@ describe('email service', () => {
       await sendVerificationEmail('user@example.com', 'abc+/=123');
 
       const call = mockSend.mock.calls[0][0] as Record<string, string>;
-      expect(call.html).toContain('https://app.flashnote.test/verify-email?token=');
+      expect(call.html).toContain('https://app.flashnote.test/verify-email?token=abc%2B%2F%3D123');
     });
   });
 

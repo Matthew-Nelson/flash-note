@@ -12,12 +12,11 @@
  * The real bcrypt path is still exercised; only the work factor is reduced.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   mockDbQuery,
   mockClientQuery,
   mockGetPoolClient,
-  resetMocks,
   createMockUserRow,
 } from '@/test/dal-helpers';
 
@@ -37,15 +36,18 @@ vi.mock('@/server/db/config', () => ({
 }));
 
 vi.mock('@/server/services/email', () => ({
-  sendVerificationEmail: vi.fn().mockResolvedValue(undefined),
-  sendPasswordResetEmail: vi.fn().mockResolvedValue(undefined),
+  sendVerificationEmail: vi.fn(() => Promise.resolve(undefined)),
+  sendPasswordResetEmail: vi.fn(() => Promise.resolve(undefined)),
 }));
 
-const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+// log() runs outside a transaction; logWithClient() must receive the
+// transaction's client (Rule 9), so the two are kept as separate mocks.
+const mockAuditLog = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
+const mockAuditLogWithClient = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 vi.mock('@/server/services/audit', () => ({
   auditService: {
     log: mockAuditLog,
-    logWithClient: mockAuditLog,
+    logWithClient: mockAuditLogWithClient,
   },
 }));
 
@@ -56,11 +58,6 @@ import bcrypt from 'bcryptjs';
 const context = { ipAddress: '127.0.0.1', userAgent: 'IntegrationTest/1.0' };
 
 describe('auth service integration', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockAuditLog.mockReset().mockResolvedValue(undefined);
-  });
-
   // ---------------------------------------------------------------------------
   // register()
   // ---------------------------------------------------------------------------
@@ -94,6 +91,11 @@ describe('auth service integration', () => {
         expect(result.token).toBeDefined();
         expect(result.user.email).toBe('new@example.com'); // register uses the input email
       }
+      // One acceptance per document in LEGAL_DOCUMENT_VERSIONS, all on the transaction client
+      const legalInserts = mockClientQuery.mock.calls.filter(
+        ([sql]) => String(sql).includes('INSERT INTO legal_acceptances')
+      );
+      expect(legalInserts).toHaveLength(3);
       // Transaction must be committed
       expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
       expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
@@ -119,12 +121,12 @@ describe('auth service integration', () => {
 
       await register('new@example.com', 'Password1!', context);
 
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({ action: 'REGISTER', status: 'SUCCESS' })
       );
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({ action: 'LEGAL_CONSENT_ACCEPTED', status: 'SUCCESS' })
       );
     });
@@ -134,10 +136,7 @@ describe('auth service integration', () => {
 
       const result = await register('existing@example.com', 'Password1!', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('email_exists');
-      }
+      expect(result).toEqual({ success: false, error: 'email_exists' });
       // No transaction should be started
       expect(mockClientQuery).not.toHaveBeenCalled();
     });
@@ -155,6 +154,7 @@ describe('auth service integration', () => {
 
       await expect(register('new@example.com', 'Password1!', context)).rejects.toThrow('DB failure');
       expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
   });
@@ -209,10 +209,7 @@ describe('auth service integration', () => {
 
       const result = await login('test@example.com', 'wrong-password', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
       // recordFailedAttempt should have been called (2nd DB call)
       expect(mockDbQuery).toHaveBeenCalledTimes(2);
     });
@@ -231,10 +228,7 @@ describe('auth service integration', () => {
 
       const result = await login('test@example.com', testPassword, context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
       // LOGIN_FAILED audit must fire for locked account with correct password
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -265,6 +259,10 @@ describe('auth service integration', () => {
       const userId = await verifyEmail('valid-token-value');
 
       expect(userId).toBe('user-1');
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('email_verified = TRUE'),
+        ['user-1']
+      );
       expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
@@ -281,6 +279,8 @@ describe('auth service integration', () => {
       const result = await verifyEmail('invalid-token');
 
       expect(result).toBeNull();
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
   });
@@ -308,12 +308,14 @@ describe('auth service integration', () => {
 
       const result = await completePasswordReset('valid-reset-token', 'NewPass1!', context);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.userId).toBe('user-1');
-      }
+      expect(result).toEqual({ success: true, userId: 'user-1' });
       // Verify transaction sequence
       expect(mockClientQuery).toHaveBeenCalledWith('BEGIN');
+      expect(mockClientQuery).toHaveBeenCalledWith('DELETE FROM sessions WHERE user_id = $1', ['user-1']);
+      expect(mockClientQuery).toHaveBeenCalledWith(
+        expect.stringContaining('failed_login_attempts = 0'),
+        ['user-1']
+      );
       expect(mockClientQuery).toHaveBeenCalledWith('COMMIT');
       // Verify audit log fired after commit
       expect(mockAuditLog).toHaveBeenCalledWith(
@@ -333,10 +335,9 @@ describe('auth service integration', () => {
 
       const result = await completePasswordReset('expired-token', 'NewPass1!', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_token');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_token' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
   });

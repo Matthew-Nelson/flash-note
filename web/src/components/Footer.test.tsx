@@ -59,8 +59,8 @@ describe('Footer', () => {
 
   it('renders dynamic copyright year', () => {
     render(<Footer />);
-    const year = new Date().getFullYear().toString();
-    expect(screen.getByText(new RegExp(year))).toBeInTheDocument();
+    const year = new Date().getFullYear();
+    expect(screen.getByText(`© ${year} FlashNote. All rights reserved.`)).toBeInTheDocument();
   });
 
   it('footer links have min-h-[44px] for touch target compliance', () => {

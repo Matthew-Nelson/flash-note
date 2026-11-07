@@ -14,15 +14,10 @@ const mockReplaceState = vi.fn();
 
 describe('SessionAlert', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams() as ReturnType<typeof useSearchParams>
     );
-    // Mock window.history.replaceState
-    Object.defineProperty(window, 'history', {
-      value: { replaceState: mockReplaceState },
-      writable: true,
-    });
+    vi.stubGlobal('history', { replaceState: mockReplaceState });
   });
 
   it('should render nothing when no reason param', () => {
@@ -43,7 +38,7 @@ describe('SessionAlert', () => {
       new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
-    expect(screen.getByText(/session has expired/i)).toBeInTheDocument();
+    expect(screen.getByText('Your session has expired. Please sign in again.')).toBeInTheDocument();
   });
 
   it('should show message for session_invalidated', () => {
@@ -51,7 +46,11 @@ describe('SessionAlert', () => {
       new URLSearchParams('reason=session_invalidated') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
-    expect(screen.getByText(/session was invalidated/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Your session was invalidated. This may happen after a password reset. Please sign in again.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('should show message for session_limit', () => {
@@ -59,7 +58,9 @@ describe('SessionAlert', () => {
       new URLSearchParams('reason=session_limit') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
-    expect(screen.getByText(/signed in on another device/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('You were signed out because you signed in on another device.')
+    ).toBeInTheDocument();
   });
 
   it('should show message for session_revoked', () => {
@@ -67,15 +68,18 @@ describe('SessionAlert', () => {
       new URLSearchParams('reason=session_revoked') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
-    expect(screen.getByText(/revoked for security reasons/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('Your session was revoked for security reasons. Please sign in again.')
+    ).toBeInTheDocument();
   });
 
   it('should clear URL param on mount', () => {
+    vi.stubGlobal('location', { href: 'http://localhost:3000/login?reason=session_expired' });
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams('reason=session_expired') as ReturnType<typeof useSearchParams>
     );
     render(<SessionAlert />);
-    expect(mockReplaceState).toHaveBeenCalled();
+    expect(mockReplaceState).toHaveBeenCalledWith({}, '', 'http://localhost:3000/login');
   });
 
   it('should dismiss when dismiss button is clicked', async () => {
@@ -85,9 +89,9 @@ describe('SessionAlert', () => {
     const user = userEvent.setup();
     render(<SessionAlert />);
 
-    expect(screen.getByText(/session has expired/i)).toBeInTheDocument();
+    expect(screen.getByText('Your session has expired. Please sign in again.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /dismiss/i }));
-    expect(screen.queryByText(/session has expired/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Your session has expired. Please sign in again.')).not.toBeInTheDocument();
   });
 
   it('should render as warning variant', () => {

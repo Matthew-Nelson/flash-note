@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { mockDbQuery, mockClientQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery, mockClientQuery } from '@/test/dal-helpers';
 import {
   createMockNoteRow,
   createMockNoteSection,
@@ -29,10 +29,6 @@ function mockClient() {
 }
 
 describe('clinical-notes DAL', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   // ---------------------------------------------------------------------------
   // createClinicalNote — transactional only
   // ---------------------------------------------------------------------------
@@ -132,7 +128,7 @@ describe('clinical-notes DAL', () => {
         }
       );
       const [, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
-      expect(params[1]).toBe(ORG_A);
+      expect(params.slice(0, 2)).toEqual([USER_A, ORG_A]);
     });
   });
 
@@ -168,14 +164,19 @@ describe('clinical-notes DAL', () => {
         { type: 'user', userId: USER_B },
         NOTE_1
       );
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.user_id = $1 AND cn.id = $2');
+      expect(params).toEqual([USER_B, NOTE_1]);
       expect(result).toBeNull();
     });
 
     it('scopes by organization_id under org scope', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       await findClinicalNoteById(orgScope, NOTE_1);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('cn.organization_id = $1');
+      expect(params).toEqual([ORG_A, NOTE_1]);
     });
 
     it('returns null when no rows match', async () => {
@@ -263,8 +264,9 @@ describe('clinical-notes DAL', () => {
         string,
         unknown[],
       ];
-      expect(countSql).toContain('cn.patient_id = $');
-      expect(countParams).toContain(PATIENT_1);
+      expect(countSql).toContain('cn.user_id = $1');
+      expect(countSql).toContain('cn.patient_id = $2');
+      expect(countParams.slice(0, 2)).toEqual([USER_A, PATIENT_1]);
     });
 
     it('applies noteType filter when provided', async () => {
@@ -437,6 +439,37 @@ describe('clinical-notes DAL', () => {
       const result = await findClinicalNotesByScope(userScope);
       expect(result.total).toBe(0);
     });
+
+    it('scopes both count and list queries by user_id (Rule 5)', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope({ type: 'user', userId: USER_B });
+
+      // count and list share one params array; the scope value sits at $1 in both.
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [listSql, listParams] = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      expect(countSql).toContain('WHERE cn.user_id = $1 AND cn.archived_at IS NULL');
+      expect(listSql).toContain('WHERE cn.user_id = $1 AND cn.archived_at IS NULL');
+      expect(countParams[0]).toBe(USER_B);
+      expect(listParams[0]).toBe(USER_B);
+    });
+
+    it('scopes both count and list queries by organization_id (Rule 5)', async () => {
+      mockDbQuery
+        .mockResolvedValueOnce({ rows: [{ total: 0 }] })
+        .mockResolvedValueOnce({ rows: [] });
+
+      await findClinicalNotesByScope(orgScope);
+
+      const [countSql, countParams] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [listSql, listParams] = mockDbQuery.mock.calls[1] as [string, unknown[]];
+      expect(countSql).toContain('WHERE cn.organization_id = $1 AND cn.archived_at IS NULL');
+      expect(listSql).toContain('WHERE cn.organization_id = $1 AND cn.archived_at IS NULL');
+      expect(countParams[0]).toBe(ORG_A);
+      expect(listParams[0]).toBe(ORG_A);
+    });
   });
 
   // ---------------------------------------------------------------------------
@@ -480,17 +513,54 @@ describe('clinical-notes DAL', () => {
 
     it('filters by user_id in WHERE (Rule 5)', async () => {
       mockClientQuery.mockResolvedValueOnce({ rows: [createMockNoteRow()] });
+      const expectedAt = new Date('2026-01-01T00:00:00Z').toISOString();
 
       await updateClinicalNoteContent(
         mockClient(),
         userScope,
         NOTE_1,
         [createMockNoteSection()],
-        new Date().toISOString()
+        expectedAt
       );
 
-      const [sql] = mockClientQuery.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('user_id = $');
+      const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE user_id = $2');
+      expect(sql).toContain('AND id = $3');
+      expect(params.slice(1, 3)).toEqual([USER_A, NOTE_1]);
+    });
+
+    it('scopes UPDATE by organization_id under org scope (Rule 5)', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [createMockNoteRow()] });
+      const expectedAt = new Date('2026-01-01T00:00:00Z').toISOString();
+
+      await updateClinicalNoteContent(
+        mockClient(),
+        orgScope,
+        NOTE_1,
+        [createMockNoteSection()],
+        expectedAt
+      );
+
+      const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $2');
+      expect(params.slice(1, 3)).toEqual([ORG_A, NOTE_1]);
+    });
+
+    it('Rule 5: UPDATE scoped to a different user matches no row', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      const expectedAt = new Date('2026-01-01T00:00:00Z').toISOString();
+
+      const result = await updateClinicalNoteContent(
+        mockClient(),
+        { type: 'user', userId: USER_B },
+        NOTE_1,
+        [createMockNoteSection()],
+        expectedAt
+      );
+
+      const [, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(params.slice(1, 3)).toEqual([USER_B, NOTE_1]);
+      expect(result).toBeNull();
     });
 
     it('returns updated ClinicalNote when successful', async () => {
@@ -540,10 +610,30 @@ describe('clinical-notes DAL', () => {
     it('sets archived_at = NOW() and scopes by user_id', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [{ id: NOTE_1 }] });
       await archiveClinicalNote(userScope, NOTE_1);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('archived_at = NOW()');
-      expect(sql).toContain('user_id = $1');
+      expect(sql).toContain('WHERE user_id = $1 AND id = $2');
       expect(sql).toContain('archived_at IS NULL');
+      expect(params).toEqual([USER_A, NOTE_1]);
+    });
+
+    it('scopes by organization_id under org scope (Rule 5)', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [{ id: NOTE_1 }] });
+      await archiveClinicalNote(orgScope, NOTE_1);
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE organization_id = $1 AND id = $2');
+      expect(params).toEqual([ORG_A, NOTE_1]);
+    });
+
+    it('Rule 5: archive scoped to a different user matches no row', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      const archived = await archiveClinicalNote(
+        { type: 'user', userId: USER_B },
+        NOTE_1
+      );
+      const [, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(params).toEqual([USER_B, NOTE_1]);
+      expect(archived).toBe(false);
     });
   });
 
@@ -558,7 +648,7 @@ describe('clinical-notes DAL', () => {
       ).toBe(true);
     });
 
-    it('rejects an empty array — wait, spec is min(1) for save but here schema allows any', () => {
+    it('accepts an empty array (schema has no min length)', () => {
       // NoteContentSchema is z.array(NoteSectionSchema) — no min. Empty OK.
       expect(NoteContentSchema.safeParse([]).success).toBe(true);
     });
@@ -570,6 +660,3 @@ describe('clinical-notes DAL', () => {
     });
   });
 });
-
-// Silence lint about unused imports
-void vi;

@@ -7,6 +7,8 @@ import {
 } from './notes';
 import type { SessionData } from '@/server/types';
 import type { GeneratedNoteResult } from '@/server/services/note-generation';
+import { toFormData } from '@/test/form-data';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // --- Mocks ---
 
@@ -101,39 +103,15 @@ vi.mock('@/server/types', () => ({
 // --- Helpers ---
 
 function makeFormData(overrides: Record<string, string> = {}): FormData {
-  const data = new FormData();
-  const defaults: Record<string, string> = {
+  return toFormData({
     noteType: 'daily_note',
     quickNotes: 'pt reports pain 5/10, ROM improving, strength getting better',
     ...overrides,
-  };
-  for (const [key, value] of Object.entries(defaults)) {
-    data.set(key, value);
-  }
-  return data;
-}
-
-function makeFormDataWithOptionals(overrides: Record<string, string | undefined> = {}): FormData {
-  const data = new FormData();
-  data.set('noteType', 'daily_note');
-  data.set('quickNotes', 'pt reports pain 5/10, ROM improving, strength getting better');
-  for (const [key, value] of Object.entries(overrides)) {
-    if (value !== undefined) data.set(key, value);
-  }
-  return data;
+  });
 }
 
 function createSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+  return createMockSession({ userId: 'user-1', ...overrides });
 }
 
 const SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
@@ -189,7 +167,6 @@ function createGenerateResult(overrides: Partial<GeneratedNoteResult> = {}): Gen
 
 describe('generateNoteAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetSession.mockResolvedValue(createSession());
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' });
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 30, remaining: 29, reset: 0 });
@@ -207,47 +184,41 @@ describe('generateNoteAction', () => {
 
   it('returns validation_error with fieldErrors for invalid input', async () => {
     const result = await generateNoteAction(makeFormData({ quickNotes: 'short' }));
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-      expect(result.fieldErrors).toBeDefined();
-      // Verify field errors are sanitized (field names preserved, messages generic)
-      expect(result.fieldErrors?.quickNotes).toBeDefined();       // Field name preserved
-      expect(result.fieldErrors?.quickNotes?.[0]).toBe('Validation failed');  // Generic message
-      // Verify no Zod-specific messages
-      expect(result.fieldErrors?.quickNotes?.[0]).not.toContain('Please provide more detail');
-    }
+    // Field names preserved, Zod messages replaced by the generic string (Rule 2)
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { quickNotes: ['Validation failed'] },
+    });
   });
 
   it('returns validation_error with fieldErrors for missing noteType', async () => {
     const fd = new FormData();
     fd.set('quickNotes', 'pt reports pain 5/10, ROM improving');
     const result = await generateNoteAction(fd);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-      expect(result.fieldErrors).toBeDefined();
-      expect(result.fieldErrors?.noteType).toBeDefined();
-    }
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { noteType: ['Validation failed'] },
+    });
   });
 
   it('returns validation_error with fieldErrors for invalid noteType', async () => {
     const result = await generateNoteAction(makeFormData({ noteType: 'invalid_type' }));
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-      expect(result.fieldErrors).toBeDefined();
-    }
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { noteType: ['Validation failed'] },
+    });
   });
 
   it('rejects whitespace-only input for quickNotes', async () => {
     const result = await generateNoteAction(makeFormData({ quickNotes: '     ' }));
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-      expect(result.fieldErrors?.quickNotes).toBeDefined();  // Field name preserved
-      expect(result.fieldErrors?.quickNotes?.[0]).toBe('Validation failed');
-    }
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { quickNotes: ['Validation failed'] },
+    });
   });
 
   it('accepts patientContext after trimming', async () => {
@@ -255,7 +226,7 @@ describe('generateNoteAction', () => {
       patientContext: '  65 y/o female  ',
       quickNotes: 'valid text with more than ten characters'
     }));
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true });
     expect(mockGenerateNote).toHaveBeenCalledWith(
       expect.objectContaining({
         quickNotes: 'valid text with more than ten characters',
@@ -270,7 +241,7 @@ describe('generateNoteAction', () => {
     const result = await generateNoteAction(makeFormData({
       quickNotes: '  pt reports improvement in strength and balance  '
     }));
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true });
     // Verify the trimmed value was passed to generateNote
     expect(mockGenerateNote).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -288,12 +259,15 @@ describe('generateNoteAction', () => {
     mockGetSession.mockResolvedValue(null);
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
+    expect(mockFindTemplateWithUserStyle).not.toHaveBeenCalled();
   });
 
   it('returns email_not_verified when email not verified', async () => {
     mockGetSession.mockResolvedValue(createSession({ emailVerified: false }));
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'email_not_verified' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
   // --- Subscription ---
@@ -302,18 +276,21 @@ describe('generateNoteAction', () => {
     mockCheckSubscriptionAccess.mockResolvedValue({ allowed: false, reason: 'trial_expired' });
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'trial_expired' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
   it('returns subscription_required when no subscription', async () => {
     mockCheckSubscriptionAccess.mockResolvedValue({ allowed: false, reason: 'subscription_required' });
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'subscription_required' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
   it('returns clinic_subscription_expired for org denial', async () => {
     mockCheckSubscriptionAccess.mockResolvedValue({ allowed: false, reason: 'clinic_subscription_expired' });
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'clinic_subscription_expired' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
   it('logs ACCESS_DENIED audit when trial is expired (Fix 5 / HIPAA)', async () => {
@@ -326,8 +303,7 @@ describe('generateNoteAction', () => {
 
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toBe('trial_expired');
+    expect(result).toEqual({ success: false, error: 'trial_expired' });
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'ACCESS_DENIED',
@@ -343,6 +319,7 @@ describe('generateNoteAction', () => {
     mockCheckRateLimit.mockResolvedValue({ success: false, limit: 30, remaining: 0, reset: 0 });
     const result = await generateNoteAction(makeFormData());
     expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+    expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
   it('uses IP:userId compound key for rate limiting', async () => {
@@ -354,7 +331,7 @@ describe('generateNoteAction', () => {
 
   it('logs note generation start at info level', async () => {
     const result = await generateNoteAction(makeFormData());
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true });
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'action_generate_note', userId: expect.any(String), noteType: expect.any(String) }),
       'Note generation started'
@@ -363,7 +340,7 @@ describe('generateNoteAction', () => {
 
   it('logs note generation completion at info level', async () => {
     const result = await generateNoteAction(makeFormData());
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true });
     expect(mockLogger.info).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'action_generate_note', userId: expect.any(String), durationMs: expect.any(Number) }),
       'Note generation completed'
@@ -373,36 +350,39 @@ describe('generateNoteAction', () => {
   it('returns SOAP note on success', async () => {
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.subjective).toBe('Patient reports pain 4/10.');
-      expect(result.data.objective).toBe('ROM: Flexion 60°.');
-      expect(result.data.assessment).toBe('Progressing well.');
-      expect(result.data.plan).toBe('Continue PT 2x/week.');
-    }
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        subjective: 'Patient reports pain 4/10.',
+        objective: 'ROM: Flexion 60°.',
+        assessment: 'Progressing well.',
+        plan: 'Continue PT 2x/week.',
+      },
+    });
   });
 
   it('includes billing, alerts, and metadata in response', async () => {
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.billing).toBeDefined();
-      expect(result.data.alerts).toEqual(['Check billing codes.']);
-      expect(result.data.metadata.generationTimeMs).toBe(1500);
-    }
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        billing: { suggestedCodes: [{ cptCode: '97110', description: 'Therapeutic Exercise' }] },
+        alerts: ['Check billing codes.'],
+        metadata: { generationTimeMs: 1500 },
+      },
+    });
   });
 
   it('strips model and token counts from response (security)', async () => {
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      // metadata should only have generationTimeMs + optional modality/duration, not model/tokens
-      expect(result.data.metadata).toEqual({ generationTimeMs: 1500, modality: undefined, duration: undefined });
-      expect((result.data.metadata as Record<string, unknown>)['model']).toBeUndefined();
-      expect((result.data.metadata as Record<string, unknown>)['inputTokens']).toBeUndefined();
-    }
+    // metadata should only have generationTimeMs + optional modality/duration, not model/tokens.
+    // toEqual fails on any extra defined key, so model/inputTokens/outputTokens cannot leak.
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({ metadata: { generationTimeMs: 1500 } }),
+    });
   });
 
   it('passes patientContext to generateNote when provided', async () => {
@@ -577,10 +557,7 @@ describe('generateNoteAction', () => {
 
   it('validates input before checking session', async () => {
     const result = await generateNoteAction(makeFormData({ quickNotes: '' }));
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-    }
+    expect(result).toMatchObject({ success: false, error: 'validation_error' });
     expect(mockGetSession).not.toHaveBeenCalled();
   });
 
@@ -599,23 +576,17 @@ describe('generateNoteAction', () => {
   // --- Modality and duration fields ---
 
   it('includes modality in response metadata', async () => {
-    const result = await generateNoteAction(makeFormDataWithOptionals({ modality: 'in_person' }));
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.metadata.modality).toBe('in_person');
-    }
+    const result = await generateNoteAction(makeFormData({ modality: 'in_person' }));
+    expect(result).toMatchObject({ success: true, data: { metadata: { modality: 'in_person' } } });
   });
 
   it('includes duration in response metadata', async () => {
-    const result = await generateNoteAction(makeFormDataWithOptionals({ duration: '45' }));
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.metadata.duration).toBe(45);
-    }
+    const result = await generateNoteAction(makeFormData({ duration: '45' }));
+    expect(result).toMatchObject({ success: true, data: { metadata: { duration: 45 } } });
   });
 
   it('includes modality and duration in audit metadata', async () => {
-    await generateNoteAction(makeFormDataWithOptionals({ modality: 'telehealth', duration: '60' }));
+    await generateNoteAction(makeFormData({ modality: 'telehealth', duration: '60' }));
 
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -631,11 +602,10 @@ describe('generateNoteAction', () => {
 
   it('accepts submission without modality and duration', async () => {
     const result = await generateNoteAction(makeFormData());
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.metadata.modality).toBeUndefined();
-      expect(result.data.metadata.duration).toBeUndefined();
-    }
+    expect(result).toEqual({
+      success: true,
+      data: expect.objectContaining({ metadata: { generationTimeMs: 1500 } }),
+    });
   });
 
   // --- Plan 04-03 Task 3: findTemplateWithUserStyle + findPatientById wiring ---
@@ -665,7 +635,8 @@ describe('generateNoteAction', () => {
       context: 'SERVER_DB_PATIENT_CONTEXT',
     });
 
-    await generateNoteAction(makeFormDataWithOptionals({ patientId: PATIENT_ID }));
+    // userId in the form is client-supplied; the patient lookup must use the session user.
+    await generateNoteAction(makeFormData({ patientId: PATIENT_ID, userId: 'user-2' }));
 
     expect(mockFindPatientById).toHaveBeenCalledWith(
       { type: 'user', userId: 'user-1' },
@@ -679,7 +650,7 @@ describe('generateNoteAction', () => {
   it('returns patient_not_found when patientId supplied but DAL returns null', async () => {
     mockFindPatientById.mockResolvedValueOnce(null);
     const result = await generateNoteAction(
-      makeFormDataWithOptionals({ patientId: '11111111-1111-1111-1111-111111111111' }),
+      makeFormData({ patientId: '11111111-1111-1111-1111-111111111111' }),
     );
     expect(result).toEqual({ success: false, error: 'patient_not_found' });
     expect(mockGenerateNote).not.toHaveBeenCalled();
@@ -688,7 +659,7 @@ describe('generateNoteAction', () => {
   it('includes templateId + patientId in NOTE_GENERATED audit metadata', async () => {
     const PATIENT_ID = '22222222-2222-2222-2222-222222222222';
     mockFindPatientById.mockResolvedValueOnce({ id: PATIENT_ID, firstName: 'P', lastName: 'Z', context: 'ctx' });
-    await generateNoteAction(makeFormDataWithOptionals({ patientId: PATIENT_ID }));
+    await generateNoteAction(makeFormData({ patientId: PATIENT_ID }));
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'NOTE_GENERATED',
@@ -717,9 +688,8 @@ function createMockPoolClient() {
 const PATIENT_ID = '11111111-1111-1111-1111-111111111111';
 const NOTE_ID = '55555555-5555-5555-5555-555555555555';
 
-function makeSaveFormData(overrides: Record<string, string | undefined> = {}): FormData {
-  const fd = new FormData();
-  const defaults: Record<string, string> = {
+function makeSaveFormData(overrides: Record<string, string> = {}): FormData {
+  return toFormData({
     templateId: SOAP_TEMPLATE_ID,
     noteType: 'daily_note',
     content: JSON.stringify([
@@ -729,21 +699,14 @@ function makeSaveFormData(overrides: Record<string, string | undefined> = {}): F
       { sectionId: PLA_ID, title: 'Plan', content: 'P content' },
     ]),
     quickNotes: 'pt reports pain 5/10, ROM improving, strength gaining',
-  };
-  const merged: Record<string, string> = { ...defaults };
-  for (const [k, v] of Object.entries(overrides)) {
-    if (v === undefined) delete merged[k];
-    else merged[k] = v;
-  }
-  for (const [k, v] of Object.entries(merged)) fd.set(k, v);
-  return fd;
+    ...overrides,
+  });
 }
 
 describe('saveNoteAction', () => {
   let poolClient: ReturnType<typeof createMockPoolClient>;
 
   beforeEach(() => {
-    vi.clearAllMocks();
     poolClient = createMockPoolClient();
     mockGetSession.mockResolvedValue(createSession());
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' });
@@ -770,12 +733,14 @@ describe('saveNoteAction', () => {
     const result = await saveNoteAction(makeSaveFormData());
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
     expect(mockGetPoolClient).not.toHaveBeenCalled();
+    expect(mockCreateClinicalNote).not.toHaveBeenCalled();
   });
 
   it('returns unauthenticated when email not verified', async () => {
     mockGetSession.mockResolvedValueOnce(createSession({ emailVerified: false }));
     const result = await saveNoteAction(makeSaveFormData());
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockCreateClinicalNote).not.toHaveBeenCalled();
   });
 
   it('returns rate_limit_exceeded when rate limited', async () => {
@@ -789,11 +754,11 @@ describe('saveNoteAction', () => {
 
   it('returns validation_error with fieldErrors on bad FormData', async () => {
     const result = await saveNoteAction(makeSaveFormData({ templateId: 'not-a-uuid' }));
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('validation_error');
-      expect(result.fieldErrors?.templateId).toBeDefined();
-    }
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { templateId: ['Validation failed'] },
+    });
   });
 
   it('returns validation_error when content is not valid JSON', async () => {
@@ -806,7 +771,8 @@ describe('saveNoteAction', () => {
   // --- Happy path transactional flow (Rule 1 + Rule 9) ---
 
   it('wraps create + initial versions + audit in BEGIN/COMMIT', async () => {
-    await saveNoteAction(makeSaveFormData());
+    // userId in the form is client-supplied; the note must be created for the session user.
+    await saveNoteAction(makeSaveFormData({ userId: 'user-2' }));
 
     expect(poolClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(mockCreateClinicalNote).toHaveBeenCalledWith(
@@ -881,6 +847,7 @@ describe('saveNoteAction', () => {
 
     expect(result).toEqual({ success: false, error: 'patient_not_found' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockCreateClinicalNote).not.toHaveBeenCalled();
     expect(mockAuditLogWithClient).not.toHaveBeenCalled();
     expect(poolClient.release).toHaveBeenCalled();
@@ -895,6 +862,7 @@ describe('saveNoteAction', () => {
 
     expect(result).toEqual({ success: false, error: 'internal_error' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockAuditLogWithClient).not.toHaveBeenCalled();
     expect(poolClient.release).toHaveBeenCalled();
   });
@@ -936,20 +904,13 @@ describe('saveNoteAction', () => {
 // Task 3: updateNoteSectionsAction
 // ---------------------------------------------------------------------------
 
-function makeUpdateFormData(overrides: Record<string, string | undefined> = {}): FormData {
-  const fd = new FormData();
-  const defaults: Record<string, string> = {
+function makeUpdateFormData(overrides: Record<string, string> = {}): FormData {
+  return toFormData({
     noteId: NOTE_ID,
     expectedUpdatedAt: '2026-04-18T00:00:00.000Z',
     sections: JSON.stringify({ [SUB_ID]: 'new subjective text' }),
-  };
-  const merged: Record<string, string> = { ...defaults };
-  for (const [k, v] of Object.entries(overrides)) {
-    if (v === undefined) delete merged[k];
-    else merged[k] = v;
-  }
-  for (const [k, v] of Object.entries(merged)) fd.set(k, v);
-  return fd;
+    ...overrides,
+  });
 }
 
 describe('updateNoteSectionsAction', () => {
@@ -979,7 +940,6 @@ describe('updateNoteSectionsAction', () => {
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
     poolClient = createMockPoolClient();
     mockGetSession.mockResolvedValue(createSession());
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' });
@@ -998,12 +958,15 @@ describe('updateNoteSectionsAction', () => {
     mockGetSession.mockResolvedValueOnce(null);
     const result = await updateNoteSectionsAction(makeUpdateFormData());
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockGetPoolClient).not.toHaveBeenCalled();
+    expect(mockFindClinicalNoteById).not.toHaveBeenCalled();
   });
 
   it('returns rate_limit_exceeded when rate limited', async () => {
     mockCheckRateLimit.mockResolvedValueOnce({ success: false, limit: 100, remaining: 0, reset: 0 });
     const result = await updateNoteSectionsAction(makeUpdateFormData());
     expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+    expect(mockGetPoolClient).not.toHaveBeenCalled();
   });
 
   it('returns validation_error when sections is not parseable JSON', async () => {
@@ -1018,6 +981,7 @@ describe('updateNoteSectionsAction', () => {
     const result = await updateNoteSectionsAction(makeUpdateFormData());
     expect(result).toEqual({ success: false, error: 'note_not_found' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockUpdateClinicalNoteContent).not.toHaveBeenCalled();
     expect(mockAuditLogWithClient).not.toHaveBeenCalled();
     expect(poolClient.release).toHaveBeenCalled();
@@ -1030,6 +994,7 @@ describe('updateNoteSectionsAction', () => {
     const result = await updateNoteSectionsAction(fd);
     expect(result).toEqual({ success: false, error: 'invalid_section_id' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockUpdateClinicalNoteContent).not.toHaveBeenCalled();
   });
 
@@ -1038,6 +1003,7 @@ describe('updateNoteSectionsAction', () => {
     const result = await updateNoteSectionsAction(makeUpdateFormData());
     expect(result).toEqual({ success: false, error: 'conflict' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockCreateVersionForSection).not.toHaveBeenCalled();
     expect(mockAuditLogWithClient).not.toHaveBeenCalled();
   });
@@ -1052,13 +1018,19 @@ describe('updateNoteSectionsAction', () => {
 
     expect(result).toEqual({ success: false, error: 'conflict' });
     expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
     expect(mockAuditLogWithClient).not.toHaveBeenCalled();
     expect(poolClient.release).toHaveBeenCalled();
   });
 
   it('commits successfully on happy path and writes NOTE_UPDATED audit in-transaction (Rule 9)', async () => {
-    const result = await updateNoteSectionsAction(makeUpdateFormData());
-    expect(result.success).toBe(true);
+    // userId in the form is client-supplied; note access must use the session user.
+    const result = await updateNoteSectionsAction(makeUpdateFormData({ userId: 'user-2' }));
+    expect(result).toEqual({
+      success: true,
+      data: { note: expect.objectContaining({ id: NOTE_ID }) },
+    });
+    expect(mockFindClinicalNoteById).toHaveBeenCalledWith({ type: 'user', userId: 'user-1' }, NOTE_ID);
     expect(poolClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
     expect(mockCreateVersionForSection).toHaveBeenCalledWith(
       poolClient,
@@ -1096,7 +1068,6 @@ describe('updateNoteSectionsAction', () => {
 
 describe('archiveNoteAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetSession.mockResolvedValue(createSession());
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' });
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 100, remaining: 99, reset: 0 });
@@ -1108,6 +1079,7 @@ describe('archiveNoteAction', () => {
     mockGetSession.mockResolvedValueOnce(null);
     const result = await archiveNoteAction(NOTE_ID);
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockArchiveClinicalNote).not.toHaveBeenCalled();
   });
 
   it('returns validation_error when noteId is not a UUID', async () => {
@@ -1120,6 +1092,7 @@ describe('archiveNoteAction', () => {
     mockCheckRateLimit.mockResolvedValueOnce({ success: false, limit: 100, remaining: 0, reset: 0 });
     const result = await archiveNoteAction(NOTE_ID);
     expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+    expect(mockArchiveClinicalNote).not.toHaveBeenCalled();
   });
 
   it('returns archive_failed when DAL returns false (not found / out-of-scope)', async () => {
@@ -1132,6 +1105,7 @@ describe('archiveNoteAction', () => {
   it('writes NOTE_ARCHIVED audit on success', async () => {
     const result = await archiveNoteAction(NOTE_ID);
     expect(result).toEqual({ success: true });
+    expect(mockArchiveClinicalNote).toHaveBeenCalledWith({ type: 'user', userId: 'user-1' }, NOTE_ID);
     expect(mockAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'NOTE_ARCHIVED',

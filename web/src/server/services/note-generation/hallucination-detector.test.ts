@@ -55,8 +55,10 @@ describe('detectHallucinations — ROM degrees', () => {
       'some notes',
       [{ title: 'Objective', content: 'ROM 45 degrees and elbow 30 deg.' }],
     );
-    expect(issues).toHaveLength(2);
-    expect(issues.every((i) => i.kind === 'rom_degrees')).toBe(true);
+    expect(titles(issues)).toEqual([
+      'rom_degrees:45@Objective',
+      'rom_degrees:30@Objective',
+    ]);
   });
 });
 
@@ -74,10 +76,8 @@ describe('detectHallucinations — MMT grades', () => {
       'quad strong',
       [{ title: 'Objective', content: 'Hip abductors 3/5 and quadriceps 4/5.' }],
     );
-    // "4" is already in allowed via the "5" at the right-hand-side of the /5 tokens?
-    // No — allowed comes from input "quad strong" which has no numbers.
     const mmtIssues = issues.filter((i) => i.kind === 'mmt_grade');
-    expect(mmtIssues.length).toBeGreaterThanOrEqual(2);
+    expect(mmtIssues).toHaveLength(2);
     expect(mmtIssues.map((i) => i.value).sort()).toEqual(['3', '4']);
   });
 
@@ -145,6 +145,7 @@ describe('detectHallucinations — context snippet', () => {
     expect(issues.length).toBeGreaterThan(0);
     for (const i of issues) {
       expect(i.context.length).toBeLessThanOrEqual(40);
+      expect(i.context).toContain(i.value);
     }
   });
 });

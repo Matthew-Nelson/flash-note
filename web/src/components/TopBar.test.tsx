@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TopBar } from './TopBar';
 
 // Mock useSidebar context hook
@@ -9,10 +10,6 @@ vi.mock('./DashboardShell', () => ({
 }));
 
 describe('TopBar', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders h1 with title text', () => {
     render(<TopBar title="Dashboard" />);
     expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
@@ -50,10 +47,11 @@ describe('TopBar', () => {
     expect(hamburger).toHaveClass('lg:hidden');
   });
 
-  it('hamburger calls openSidebar on click', () => {
+  it('hamburger calls openSidebar on click', async () => {
+    const user = userEvent.setup();
     render(<TopBar title="Dashboard" />);
     const hamburger = screen.getByRole('button', { name: 'Open navigation menu' });
-    fireEvent.click(hamburger);
+    await user.click(hamburger);
     expect(mockOpenSidebar).toHaveBeenCalledTimes(1);
   });
 

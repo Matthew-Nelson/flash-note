@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -14,10 +14,6 @@ import { PatientContextField } from './PatientContextField';
 import { createMockPatient } from '@/test/factories/patient-factory';
 
 describe('PatientContextField (view/edit toggle)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   // -------------------------------------------------------------------------
   // View mode
   // -------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Sidebar } from './Sidebar';
 
 // Mock usePathname
@@ -180,26 +181,29 @@ describe('Sidebar', () => {
     expect(backdrop).not.toBeInTheDocument();
   });
 
-  it('calls onClose when backdrop is clicked', () => {
+  it('calls onClose when backdrop is clicked', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     renderSidebar({ isOpen: true, onClose });
     const backdrop = document.querySelector('[aria-hidden="true"].fixed.inset-0');
     expect(backdrop).toBeInTheDocument();
-    fireEvent.click(backdrop!);
+    await user.click(backdrop!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose on Escape key when open', () => {
+  it('calls onClose on Escape key when open', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     renderSidebar({ isOpen: true, onClose });
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not call onClose on Escape key when closed', () => {
+  it('does not call onClose on Escape key when closed', async () => {
+    const user = userEvent.setup();
     const onClose = vi.fn();
     renderSidebar({ isOpen: false, onClose });
-    fireEvent.keyDown(document, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -229,7 +233,8 @@ describe('Sidebar', () => {
       return drawer as HTMLElement;
     }
 
-    it('calls onClose when a nav link inside the mobile drawer is clicked', () => {
+    it('calls onClose when a nav link inside the mobile drawer is clicked', async () => {
+      const user = userEvent.setup();
       const onClose = vi.fn();
       renderSidebar({ isOpen: true, onClose });
       const drawer = getMobileDrawerLinks();
@@ -237,38 +242,42 @@ describe('Sidebar', () => {
         'a[href="/dashboard/patients"]',
       );
       expect(patientsLink).not.toBeNull();
-      fireEvent.click(patientsLink!);
+      await user.click(patientsLink!);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when Dashboard link in mobile drawer is clicked', () => {
+    it('calls onClose when Dashboard link in mobile drawer is clicked', async () => {
+      const user = userEvent.setup();
       const onClose = vi.fn();
       renderSidebar({ isOpen: true, onClose });
       const drawer = getMobileDrawerLinks();
       const link = drawer.querySelector('a[href="/dashboard"]');
-      fireEvent.click(link!);
+      await user.click(link!);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when Settings link in mobile drawer is clicked', () => {
+    it('calls onClose when Settings link in mobile drawer is clicked', async () => {
+      const user = userEvent.setup();
       const onClose = vi.fn();
       renderSidebar({ isOpen: true, onClose });
       const drawer = getMobileDrawerLinks();
       const link = drawer.querySelector('a[href="/dashboard/settings"]');
-      fireEvent.click(link!);
+      await user.click(link!);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onClose when the New Note CTA in mobile drawer is clicked', () => {
+    it('calls onClose when the New Note CTA in mobile drawer is clicked', async () => {
+      const user = userEvent.setup();
       const onClose = vi.fn();
       renderSidebar({ isOpen: true, onClose });
       const drawer = getMobileDrawerLinks();
       const link = drawer.querySelector('a[href="/dashboard/notes/new"]');
-      fireEvent.click(link!);
+      await user.click(link!);
       expect(onClose).toHaveBeenCalledTimes(1);
     });
 
-    it('does NOT call onClose when a DESKTOP nav link is clicked', () => {
+    it('does NOT call onClose when a DESKTOP nav link is clicked', async () => {
+      const user = userEvent.setup();
       const onClose = vi.fn();
       renderSidebar({ isOpen: false, onClose });
       // Desktop sidebar lives in `.hidden.lg\:flex`; click its Dashboard link.
@@ -277,7 +286,7 @@ describe('Sidebar', () => {
       const link = (desktop as HTMLElement).querySelector(
         'a[href="/dashboard"]',
       );
-      fireEvent.click(link!);
+      await user.click(link!);
       expect(onClose).not.toHaveBeenCalled();
     });
   });

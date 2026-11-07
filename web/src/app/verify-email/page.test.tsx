@@ -17,7 +17,6 @@ const mockPush = vi.fn();
 
 describe('VerifyEmailPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(useSearchParams).mockReturnValue(
       new URLSearchParams('token=verify-token') as ReturnType<typeof useSearchParams>
     );
@@ -93,6 +92,7 @@ describe('VerifyEmailPage', () => {
     expect(
       screen.getByText('Invalid or expired verification link. Please request a new one.')
     ).toBeInTheDocument();
+    expect(screen.queryByText(/Server error/)).not.toBeInTheDocument();
   });
 
   it('should render request new link button on error', async () => {

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ClientNoteDetail } from './ClientNoteDetail';
 import type { ClinicalNoteWithPatient } from '@/lib/types';
@@ -48,10 +48,6 @@ function createNote(overrides: Partial<ClinicalNoteWithPatient> = {}): ClinicalN
 }
 
 describe('ClientNoteDetail', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders h1 heading', () => {
     render(<ClientNoteDetail note={createNote()} versions={[]} />);
     expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
@@ -64,7 +60,7 @@ describe('ClientNoteDetail', () => {
         versions={[]}
       />,
     );
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/Jane Doe/);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Note — Jane Doe');
   });
 
   it('renders one EditableNoteSection per section in note.content', () => {
@@ -91,9 +87,7 @@ describe('ClientNoteDetail', () => {
     const user = userEvent.setup();
     render(<ClientNoteDetail note={createNote()} versions={[]} />);
     await user.click(screen.getByRole('button', { name: /Archive note/i }));
-    // The confirm button within the dialog has label "Archive"
-    const confirmBtns = screen.getAllByRole('button', { name: /^Archive$/i });
-    await user.click(confirmBtns[confirmBtns.length - 1]);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(mockArchive).toHaveBeenCalledWith(NOTE_ID));
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/dashboard/notes'));
   });
@@ -103,10 +97,9 @@ describe('ClientNoteDetail', () => {
     const user = userEvent.setup();
     render(<ClientNoteDetail note={createNote()} versions={[]} />);
     await user.click(screen.getByRole('button', { name: /Archive note/i }));
-    const confirmBtns = screen.getAllByRole('button', { name: /^Archive$/i });
-    await user.click(confirmBtns[confirmBtns.length - 1]);
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive' }));
     await waitFor(() =>
-      expect(screen.getByText(/couldn't archive this note/i)).toBeInTheDocument(),
+      expect(screen.getByText("We couldn't archive this note. Please try again.")).toBeInTheDocument(),
     );
   });
 });

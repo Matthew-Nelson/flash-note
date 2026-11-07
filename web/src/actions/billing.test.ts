@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { SessionData } from '@/server/types';
+import { toFormData } from '@/test/form-data';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // --- vi.hoisted mocks ---
 
@@ -53,28 +55,11 @@ const { createCheckoutAction, createPortalAction } = await import('./billing');
 // ---------------------------------------------------------------------------
 
 function createSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+  return createMockSession({ userId: 'user-1', email: 'test@example.com', ...overrides });
 }
 
 function makeFormData(overrides: Record<string, string> = {}): FormData {
-  const data = new FormData();
-  const defaults: Record<string, string> = {
-    priceId: 'price_monthly_test',
-    ...overrides,
-  };
-  for (const [key, value] of Object.entries(defaults)) {
-    data.set(key, value);
-  }
-  return data;
+  return toFormData({ priceId: 'price_monthly_test', ...overrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -83,7 +68,6 @@ function makeFormData(overrides: Record<string, string> = {}): FormData {
 
 describe('createCheckoutAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
@@ -94,6 +78,7 @@ describe('createCheckoutAction', () => {
     const result = await createCheckoutAction(makeFormData());
 
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('returns email_not_verified when email not verified', async () => {
@@ -102,6 +87,7 @@ describe('createCheckoutAction', () => {
     const result = await createCheckoutAction(makeFormData());
 
     expect(result).toEqual({ success: false, error: 'email_not_verified' });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('returns invalid_price_id for empty priceId', async () => {
@@ -110,6 +96,7 @@ describe('createCheckoutAction', () => {
     const result = await createCheckoutAction(makeFormData({ priceId: '' }));
 
     expect(result).toEqual({ success: false, error: 'invalid_price_id' });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('returns invalid_price_id for price ID not in allowlist', async () => {
@@ -118,6 +105,7 @@ describe('createCheckoutAction', () => {
     const result = await createCheckoutAction(makeFormData({ priceId: 'price_bogus' }));
 
     expect(result).toEqual({ success: false, error: 'invalid_price_id' });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('returns success with checkoutUrl on success', async () => {
@@ -132,12 +120,11 @@ describe('createCheckoutAction', () => {
     });
   });
 
-  it('calls billingService with correct args', async () => {
-    const session = createSession();
-    mockGetSession.mockResolvedValue(session);
+  it('calls billingService with session userId, not a client-supplied one', async () => {
+    mockGetSession.mockResolvedValue(createSession());
     mockCreateCheckoutSession.mockResolvedValue('https://checkout.stripe.com/sess');
 
-    await createCheckoutAction(makeFormData({ priceId: 'price_annual_test' }));
+    await createCheckoutAction(makeFormData({ priceId: 'price_annual_test', userId: 'attacker-user' }));
 
     expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
       'user-1',
@@ -206,7 +193,6 @@ describe('createCheckoutAction', () => {
 
 describe('createPortalAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
@@ -217,6 +203,7 @@ describe('createPortalAction', () => {
     const result = await createPortalAction();
 
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockCreatePortalSession).not.toHaveBeenCalled();
   });
 
   it('returns email_not_verified when email not verified', async () => {
@@ -225,6 +212,7 @@ describe('createPortalAction', () => {
     const result = await createPortalAction();
 
     expect(result).toEqual({ success: false, error: 'email_not_verified' });
+    expect(mockCreatePortalSession).not.toHaveBeenCalled();
   });
 
   it('returns success with portalUrl on success', async () => {
@@ -292,7 +280,6 @@ describe('createPortalAction', () => {
 
 describe('H-1: price ID allowlist', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 5, remaining: 4, reset: 0 });
   });
@@ -303,7 +290,10 @@ describe('H-1: price ID allowlist', () => {
 
     const result = await createCheckoutAction(makeFormData({ priceId: 'price_monthly_test' }));
 
-    expect(result.success).toBe(true);
+    expect(result).toEqual({
+      success: true,
+      data: { checkoutUrl: 'https://checkout.stripe.com/sess' },
+    });
   });
 
   it('accepts STRIPE_PRICE_ANNUAL from config', async () => {
@@ -312,7 +302,10 @@ describe('H-1: price ID allowlist', () => {
 
     const result = await createCheckoutAction(makeFormData({ priceId: 'price_annual_test' }));
 
-    expect(result.success).toBe(true);
+    expect(result).toEqual({
+      success: true,
+      data: { checkoutUrl: 'https://checkout.stripe.com/sess' },
+    });
   });
 
   it('rejects price IDs not in allowlist', async () => {

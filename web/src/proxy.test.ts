@@ -1,12 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 import { proxy, config } from './proxy';
 
 describe('Proxy', () => {
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   function createRequest(
     url = 'https://flashnote.co/dashboard',
     options?: { cookies?: Record<string, string> }
@@ -89,7 +85,7 @@ describe('Proxy', () => {
       expect(csp).toContain("img-src 'self' data: blob:");
     });
 
-    it('should set x-nonce on request headers as a valid UUID', () => {
+    it('uses a UUID-formatted nonce in the CSP header', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = proxy(createRequest('https://flashnote.co/'));
       const csp = response.headers.get('Content-Security-Policy')!;
@@ -113,12 +109,14 @@ describe('Proxy', () => {
       expect(response.headers.get('Location')).toBe('https://flashnote.co/login');
     });
 
+    // The proxy checks cookie presence only (no DB), so the forged 'abc123' token
+    // passes here. Validity is enforced by getSession() in the Server Component.
     it('does NOT redirect /dashboard when session_id cookie present', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = proxy(
         createRequest('https://flashnote.co/dashboard', { cookies: { session_id: 'abc123' } })
       );
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
       expect(response.headers.has('Content-Security-Policy')).toBe(true);
     });
 
@@ -127,7 +125,7 @@ describe('Proxy', () => {
       const publicRoutes = ['/', '/pricing', '/terms', '/privacy', '/baa', '/forgot-password'];
       for (const route of publicRoutes) {
         const response = proxy(createRequest(`https://flashnote.co${route}`));
-        expect(response.status).not.toBe(307);
+        expect(response.status).toBe(200);
       }
     });
 
@@ -152,13 +150,13 @@ describe('Proxy', () => {
     it('does NOT redirect /login when no session_id cookie', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = proxy(createRequest('https://flashnote.co/login'));
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
 
     it('does NOT redirect /signup when no session_id cookie', () => {
       vi.stubEnv('NODE_ENV', 'production');
       const response = proxy(createRequest('https://flashnote.co/signup'));
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
 
     it('sets CSP headers on authenticated redirect from /login', () => {
@@ -181,7 +179,7 @@ describe('Proxy', () => {
         createRequest(`https://flashnote.co/login?reason=${reason}`, { cookies: { session_id: 'stale-token' } })
       );
       // Should NOT redirect — allows the login page to render
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
       // Should delete the stale cookie
       const setCookie = response.headers.get('set-cookie');
       expect(setCookie).toContain('session_id');
@@ -220,7 +218,7 @@ describe('Proxy', () => {
       const response = proxy(
         createRequest('https://flashnote.co/login', { cookies: { session_id: '' } })
       );
-      expect(response.status).not.toBe(307);
+      expect(response.status).toBe(200);
     });
 
     it('sets CSP headers on redirected responses', () => {

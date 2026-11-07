@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { GeminiProvider } from './gemini-provider';
 import {
   RateLimitError,
@@ -23,9 +23,7 @@ const mockLogger = vi.hoisted(() => ({
 }));
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
-// Mock fetch globally
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 // Fast retry config for tests
 const FAST_RETRY_CONFIG: LLMRetryConfig = {
@@ -52,18 +50,14 @@ describe('GeminiProvider', () => {
   };
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.clearAllMocks();
+    // unstubGlobals runs after every test, so the stub must be re-armed here
+    vi.stubGlobal('fetch', mockFetch);
     provider = new GeminiProvider({
       apiKey: 'test-api-key',
       model: 'gemini-2.5-flash',
       apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
       retryConfig: FAST_RETRY_CONFIG,
     });
-  });
-
-  afterEach(() => {
-    // no-op: mocks cleared in beforeEach
   });
 
   describe('generatePTNote', () => {
@@ -338,11 +332,16 @@ describe('GeminiProvider', () => {
       };
       mockFetch.mockResolvedValue(errorResponse);
 
-      try {
-        await provider.generatePTNote('test system prompt', 'sensitive patient data', requestConfig);
-      } catch {
-        // Expected
-      }
+      const thrown: unknown = await provider
+        .generatePTNote('test system prompt', 'sensitive patient data', requestConfig)
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+
+      expect(thrown).toBeInstanceOf(ProviderError);
+      expect(String(thrown)).not.toContain('John Doe');
+      expect(String(thrown)).not.toContain('1990-01-01');
 
       expect(mockLogger.error).toHaveBeenCalled();
       const logCall = mockLogger.error.mock.calls[0];
@@ -413,7 +412,7 @@ describe('GeminiProvider', () => {
         (call: unknown[]) => typeof call[0] === 'object' && call[0] !== null && 'source' in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).source === 'llm_service',
       );
       expect(warnCall).toBeDefined();
-      expect(warnCall![0]).toHaveProperty('delayMs');
+      expect(warnCall![0]).toHaveProperty('delayMs', 2000);
     });
 
     it('should not retry on auth error', async () => {

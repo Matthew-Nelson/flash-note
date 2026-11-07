@@ -56,8 +56,7 @@ describe('AuthLayout', () => {
 
   it('should link logo to home page', () => {
     render(<AuthLayout>content</AuthLayout>);
-    const logoLink = screen.getByText('FlashNote').closest('a');
-    expect(logoLink).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: /flashnote/i })).toHaveAttribute('href', '/');
   });
 
   it('applies shadow-fn-base to the card container', () => {

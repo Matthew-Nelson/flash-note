@@ -29,7 +29,6 @@ const mockLogger = vi.hoisted(() => ({
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 const FAST_RETRY_CONFIG: LLMRetryConfig = {
   maxRetries: 1,
@@ -55,8 +54,8 @@ describe('Gemini safety settings (PROMPT-01)', () => {
   let provider: GeminiProvider;
 
   beforeEach(() => {
-    mockFetch.mockReset();
-    vi.clearAllMocks();
+    // unstubGlobals runs after every test, so the stub must be re-armed here
+    vi.stubGlobal('fetch', mockFetch);
 
     provider = new GeminiProvider({
       apiKey: 'test-api-key',
@@ -142,7 +141,12 @@ describe('Gemini safety settings (PROMPT-01)', () => {
     expect(mockFetch.mock.calls).toHaveLength(3);
     for (const call of mockFetch.mock.calls) {
       const body = JSON.parse((call[1] as { body: string }).body);
-      expect(body.safetySettings).toHaveLength(4);
+      expect((body.safetySettings as { threshold: string }[]).map((s) => s.threshold)).toEqual([
+        'BLOCK_ONLY_HIGH',
+        'BLOCK_ONLY_HIGH',
+        'BLOCK_ONLY_HIGH',
+        'BLOCK_ONLY_HIGH',
+      ]);
     }
   });
 

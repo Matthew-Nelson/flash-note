@@ -1,16 +1,20 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GeneratedNote } from './GeneratedNote';
 import type { GenerateNoteResponse } from '@/actions/notes';
 
-// Mock navigator.clipboard — set once at module level to establish the property descriptor.
 const mockWriteText = vi.fn();
-Object.defineProperty(navigator, 'clipboard', {
-  value: { writeText: mockWriteText },
-  writable: true,
-  configurable: true,
-});
+
+// userEvent.setup() replaces navigator.clipboard with its own stub, so a test
+// that copies must attach this mock after calling setup().
+function armClipboardMock() {
+  Object.defineProperty(navigator, 'clipboard', {
+    value: { writeText: mockWriteText },
+    writable: true,
+    configurable: true,
+  });
+}
 
 type NoteResponse = GenerateNoteResponse;
 
@@ -26,24 +30,8 @@ function buildNote(overrides: Partial<NoteResponse> = {}): NoteResponse {
 }
 
 describe('GeneratedNote', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    // Restore navigator.clipboard after vi.clearAllMocks() in case any test set it to undefined.
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: mockWriteText },
-      writable: true,
-      configurable: true,
-    });
-  });
-
   afterEach(() => {
-    // Ensure navigator.clipboard is always restored to the mock after each test,
-    // including tests that temporarily set it to undefined.
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: mockWriteText },
-      writable: true,
-      configurable: true,
-    });
+    vi.useRealTimers();
   });
 
   it('renders all four SOAP sections', () => {
@@ -64,8 +52,8 @@ describe('GeneratedNote', () => {
     render(<GeneratedNote note={buildNote()} />);
 
     // Each SOAP section is a <section> element with card + accent bar classes
-    const sections = document.querySelectorAll('section[aria-labelledby]');
-    expect(sections.length).toBe(4);
+    const sections = screen.getAllByRole('region');
+    expect(sections).toHaveLength(4);
     sections.forEach((section) => {
       expect(section.className).toContain('border-l-[3px]');
       expect(section.className).toContain('border-fn-primary');
@@ -86,27 +74,17 @@ describe('GeneratedNote', () => {
     render(<GeneratedNote note={buildNote()} />);
 
     // SOAP section headings must be h3 to maintain h1 > h2 > h3 hierarchy
-    const h3Headings = document.querySelectorAll('h3');
-    const h3Texts = Array.from(h3Headings).map((h) => h.textContent?.trim());
-    expect(h3Texts).toContain('Subjective');
-    expect(h3Texts).toContain('Objective');
-    expect(h3Texts).toContain('Assessment');
-    expect(h3Texts).toContain('Plan');
-
-    // Verify these are NOT h2
-    const h2Headings = document.querySelectorAll('h2');
-    const h2Texts = Array.from(h2Headings).map((h) => h.textContent?.trim());
-    expect(h2Texts).not.toContain('Subjective');
-    expect(h2Texts).not.toContain('Objective');
+    for (const title of ['Subjective', 'Objective', 'Assessment', 'Plan']) {
+      expect(screen.getByRole('heading', { level: 3, name: title })).toBeInTheDocument();
+      expect(screen.queryByRole('heading', { level: 2, name: title })).not.toBeInTheDocument();
+    }
   });
 
   it('renders metadata bar with generation time', () => {
     render(<GeneratedNote note={buildNote({ metadata: { generationTimeMs: 1500 } })} />);
 
     // Generation time in the metadata bar (1500ms = 1.5s)
-    // The footer also has generation time; use getAllByText for both
-    const timeElements = screen.getAllByText('1.5s');
-    expect(timeElements.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText('1.5s')).toBeInTheDocument();
   });
 
   it('renders metadata bar with duration when provided', () => {
@@ -189,14 +167,10 @@ describe('GeneratedNote', () => {
     const user = userEvent.setup();
     render(<GeneratedNote note={buildNote()} />);
 
-    const star4 = screen.getByRole('button', { name: 'Rate 4 out of 5 stars' });
-    await user.click(star4);
+    await user.click(screen.getByRole('button', { name: 'Rate 4 out of 5 stars' }));
 
-    await vi.waitFor(() => {
-      const liveRegions = document.querySelectorAll('[aria-live="polite"]');
-      const announcements = Array.from(liveRegions).map((r) => r.textContent);
-      expect(announcements).toContain('Rated 4 out of 5 stars');
-    });
+    const announcement = await screen.findByText('Rated 4 out of 5 stars');
+    expect(announcement).toHaveAttribute('aria-live', 'polite');
   });
 
   it('section copy buttons have 44px touch target', () => {
@@ -218,6 +192,8 @@ describe('GeneratedNote', () => {
 
   it('copy icon swaps to checkmark on success without text change', async () => {
     mockWriteText.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    armClipboardMock();
 
     render(<GeneratedNote note={buildNote()} />);
 
@@ -225,7 +201,7 @@ describe('GeneratedNote', () => {
     // Button has no visible text before click
     expect(copyButton.textContent?.trim()).toBe('');
 
-    fireEvent.click(copyButton);
+    await user.click(copyButton);
 
     await vi.waitFor(() => {
       // Still no text — just icon swap
@@ -528,11 +504,13 @@ describe('GeneratedNote', () => {
 
   it('copy button triggers navigator.clipboard.writeText with section content', async () => {
     mockWriteText.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    armClipboardMock();
 
     render(<GeneratedNote note={buildNote()} />);
 
     const copySubjectiveButton = screen.getByRole('button', { name: 'Copy Subjective section' });
-    fireEvent.click(copySubjectiveButton);
+    await user.click(copySubjectiveButton);
 
     await vi.waitFor(() => {
       expect(mockWriteText).toHaveBeenCalledWith('Patient reports left knee pain 5/10.');
@@ -542,9 +520,12 @@ describe('GeneratedNote', () => {
   it('resets copy icon back after 2 seconds', async () => {
     vi.useFakeTimers();
     mockWriteText.mockResolvedValue(undefined);
+    armClipboardMock();
 
     render(<GeneratedNote note={buildNote()} />);
 
+    // fireEvent, not userEvent: RTL's asyncWrapper awaits a setTimeout that
+    // vitest's fake timers never fire, so userEvent hangs while timers are faked.
     const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
     fireEvent.click(copyButton);
 
@@ -564,17 +545,17 @@ describe('GeneratedNote', () => {
 
     // Announcement should clear
     expect(liveRegion).toHaveTextContent('');
-
-    vi.useRealTimers();
   });
 
   it('shows fallback textarea when clipboard.writeText rejects', async () => {
     mockWriteText.mockRejectedValue(new Error('Clipboard permission denied'));
+    const user = userEvent.setup();
+    armClipboardMock();
 
     render(<GeneratedNote note={buildNote()} />);
 
     const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
-    fireEvent.click(copyButton);
+    await user.click(copyButton);
 
     await vi.waitFor(() => {
       expect(screen.getByText('Clipboard unavailable — Select All to copy manually:')).toBeInTheDocument();
@@ -588,8 +569,9 @@ describe('GeneratedNote', () => {
   });
 
   it('shows fallback textarea when navigator.clipboard is unavailable', async () => {
-    // Simulate environment where clipboard API does not exist
-    const originalClipboard = navigator.clipboard;
+    const user = userEvent.setup();
+    // Simulate environment where clipboard API does not exist. Set after setup(),
+    // which would otherwise install its own stub.
     Object.defineProperty(navigator, 'clipboard', {
       value: undefined,
       writable: true,
@@ -599,28 +581,23 @@ describe('GeneratedNote', () => {
     render(<GeneratedNote note={buildNote()} />);
 
     const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
-    fireEvent.click(copyButton);
+    await user.click(copyButton);
 
     await vi.waitFor(() => {
       expect(screen.getByText('Clipboard unavailable — Select All to copy manually:')).toBeInTheDocument();
-    });
-
-    // Restore
-    Object.defineProperty(navigator, 'clipboard', {
-      value: originalClipboard,
-      writable: true,
-      configurable: true,
     });
   });
 
   it('"Copy full SOAP note" button copies the full formatted note text', async () => {
     mockWriteText.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    armClipboardMock();
     const note = buildNote();
 
     render(<GeneratedNote note={note} />);
 
     const copyFullButton = screen.getByRole('button', { name: 'Copy full SOAP note' });
-    fireEvent.click(copyFullButton);
+    await user.click(copyFullButton);
 
     await vi.waitFor(() => {
       expect(mockWriteText).toHaveBeenCalledWith(
@@ -644,26 +621,23 @@ describe('GeneratedNote', () => {
   it('CopyButton clears timeout on unmount (no stale state update)', async () => {
     vi.useFakeTimers();
     mockWriteText.mockResolvedValue(undefined);
+    armClipboardMock();
 
     const { unmount } = render(<GeneratedNote note={buildNote()} />);
 
-    const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
-    fireEvent.click(copyButton);
+    // fireEvent, not userEvent: see the note in "resets copy icon back after 2 seconds"
+    fireEvent.click(screen.getByRole('button', { name: 'Copy Subjective section' }));
 
     // Wait for async clipboard write to resolve
     await act(async () => {
       await Promise.resolve();
     });
+    const pendingTimers = vi.getTimerCount();
 
-    // Unmount before the 2s timeout fires
+    // Unmount before the 2s reset timer fires; the cleanup must clear exactly that timer
     unmount();
 
-    // Advance past the timeout — should not throw or warn about state update on unmounted component
-    act(() => {
-      vi.advanceTimersByTime(3000);
-    });
-
-    vi.useRealTimers();
+    expect(vi.getTimerCount()).toBe(pendingTimers - 1);
   });
 
   it('displays generationTimeMs as "Generated in X.Xs" in footer', () => {
@@ -676,19 +650,19 @@ describe('GeneratedNote', () => {
 
   it('has a persistent aria-live region that announces copy success', async () => {
     mockWriteText.mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    armClipboardMock();
 
     render(<GeneratedNote note={buildNote()} />);
 
     // The aria-live region should exist BEFORE any click (Rule 13: container must pre-exist)
-    const liveRegions = document.querySelectorAll('[aria-live="polite"]');
-    expect(liveRegions.length).toBeGreaterThan(0);
-
-    // Click copy
     const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
-    fireEvent.click(copyButton);
+    const liveRegion = copyButton.parentElement?.querySelector('[aria-live="polite"][aria-atomic="true"]');
+    expect(liveRegion).toBeEmptyDOMElement();
+
+    await user.click(copyButton);
 
     await vi.waitFor(() => {
-      const liveRegion = copyButton.parentElement?.querySelector('[aria-live="polite"][aria-atomic="true"]');
       expect(liveRegion).toHaveTextContent('Copied to clipboard');
     });
   });
@@ -698,6 +672,7 @@ describe('GeneratedNote', () => {
 
     const copyButton = screen.getByRole('button', { name: 'Copy Subjective section' });
     const svgs = copyButton.querySelectorAll('svg');
+    expect(svgs).toHaveLength(1);
     svgs.forEach(svg => {
       expect(svg).toHaveAttribute('aria-hidden', 'true');
     });
@@ -754,11 +729,7 @@ describe('GeneratedNote', () => {
 
     await user.click(screen.getByRole('button', { name: 'Edit Subjective section' }));
 
-    const sections = document.querySelectorAll('section[aria-labelledby]');
-    const subjectiveSection = Array.from(sections).find((s) =>
-      s.querySelector('#section-heading-subjective')
-    );
-    expect(subjectiveSection?.className).toContain('ring-2');
+    expect(screen.getByRole('region', { name: 'Subjective' })).toHaveClass('ring-2');
   });
 
   it('save updates section content with edited text', async () => {
@@ -809,6 +780,7 @@ describe('GeneratedNote', () => {
   it('Copy All includes edited content after save', async () => {
     mockWriteText.mockResolvedValue(undefined);
     const user = userEvent.setup();
+    armClipboardMock();
     render(<GeneratedNote note={buildNote()} />);
 
     // Edit and save Subjective
@@ -818,17 +790,8 @@ describe('GeneratedNote', () => {
     await user.type(textarea, 'Edited subjective.');
     await user.click(screen.getByRole('button', { name: 'Save Subjective section' }));
 
-    // userEvent.setup() replaces navigator.clipboard with its own stub.
-    // Restore our mock before triggering the copy so the component's
-    // writeToClipboard() calls our mockWriteText, not the userEvent stub.
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: mockWriteText },
-      writable: true,
-      configurable: true,
-    });
-
     const copyAllButton = screen.getByRole('button', { name: 'Copy full SOAP note' });
-    fireEvent.click(copyAllButton);
+    await user.click(copyAllButton);
 
     await vi.waitFor(() => {
       const [copyText] = mockWriteText.mock.calls[0];
@@ -844,11 +807,7 @@ describe('GeneratedNote', () => {
     await user.click(screen.getByRole('button', { name: 'Save Subjective section' }));
 
     // The section's aria-live region announces the save
-    await vi.waitFor(() => {
-      const liveRegions = document.querySelectorAll('[aria-live="polite"]');
-      const texts = Array.from(liveRegions).map((r) => r.textContent);
-      expect(texts).toContain('Subjective section saved');
-    });
+    expect(await screen.findByText('Subjective section saved')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('aria-live announces cancel result', async () => {
@@ -858,11 +817,7 @@ describe('GeneratedNote', () => {
     await user.click(screen.getByRole('button', { name: 'Edit Subjective section' }));
     await user.click(screen.getByRole('button', { name: 'Cancel editing Subjective section' }));
 
-    await vi.waitFor(() => {
-      const liveRegions = document.querySelectorAll('[aria-live="polite"]');
-      const texts = Array.from(liveRegions).map((r) => r.textContent);
-      expect(texts).toContain('Subjective section edit cancelled');
-    });
+    expect(await screen.findByText('Subjective section edit cancelled')).toHaveAttribute('aria-live', 'polite');
   });
 
   it('edit textarea has accessible label', async () => {

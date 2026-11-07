@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ConfirmDialog } from './ConfirmDialog';
 
@@ -62,17 +62,19 @@ describe('ConfirmDialog', () => {
     expect(document.activeElement).toBe(cancel);
   });
 
-  it('Escape key calls onCancel when not loading', () => {
+  it('Escape key calls onCancel when not loading', async () => {
+    const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel })} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('Escape key is ignored while loading', () => {
+  it('Escape key is ignored while loading', async () => {
+    const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel, loading: true })} />);
-    fireEvent.keyDown(window, { key: 'Escape' });
+    await user.keyboard('{Escape}');
     expect(onCancel).not.toHaveBeenCalled();
   });
 
@@ -102,22 +104,24 @@ describe('ConfirmDialog', () => {
     expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('Tab focus-trap: shift+Tab on first focusable wraps to last', () => {
+  it('Tab focus-trap: shift+Tab on first focusable wraps to last', async () => {
+    const user = userEvent.setup();
     render(<ConfirmDialog {...baseProps()} />);
     const cancel = screen.getByRole('button', { name: 'Keep patient' });
     const confirm = screen.getByRole('button', { name: 'Archive patient' });
     // Cancel is first focusable; shift+Tab should jump to last (confirm).
     cancel.focus();
-    fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(confirm);
   });
 
-  it('Tab focus-trap: Tab on last focusable wraps to first', () => {
+  it('Tab focus-trap: Tab on last focusable wraps to first', async () => {
+    const user = userEvent.setup();
     render(<ConfirmDialog {...baseProps()} />);
     const cancel = screen.getByRole('button', { name: 'Keep patient' });
     const confirm = screen.getByRole('button', { name: 'Archive patient' });
     confirm.focus();
-    fireEvent.keyDown(window, { key: 'Tab' });
+    await user.tab();
     expect(document.activeElement).toBe(cancel);
   });
 
@@ -208,22 +212,23 @@ describe('ConfirmDialog', () => {
     ).toBeDisabled();
   });
 
-  it('Tab in the middle of the focusables does NOT wrap', () => {
+  it('Tab in the middle of the focusables does NOT wrap', async () => {
+    const user = userEvent.setup();
     render(<ConfirmDialog {...baseProps()} />);
     const cancel = screen.getByRole('button', { name: 'Keep patient' });
     const confirm = screen.getByRole('button', { name: 'Archive patient' });
     // Start with cancel focused (initial focus); Tab should let native browser
     // move focus, so our trap should not preventDefault or reassign focus.
     cancel.focus();
-    fireEvent.keyDown(window, { key: 'Tab' });
-    // Either cancel or confirm is OK — the trap should NOT hijack in middle.
-    expect([cancel, confirm]).toContain(document.activeElement);
+    await user.tab();
+    expect(document.activeElement).toBe(confirm);
   });
 
-  it('non-Escape / non-Tab key is ignored by the handler', () => {
+  it('non-Escape / non-Tab key is ignored by the handler', async () => {
+    const user = userEvent.setup();
     const onCancel = vi.fn();
     render(<ConfirmDialog {...baseProps({ onCancel })} />);
-    fireEvent.keyDown(window, { key: 'a' });
+    await user.keyboard('a');
     expect(onCancel).not.toHaveBeenCalled();
   });
 });

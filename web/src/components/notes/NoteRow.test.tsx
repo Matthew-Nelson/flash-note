@@ -74,7 +74,7 @@ describe('NoteRow', () => {
 
   it('renders modality with underscore replaced', () => {
     renderInTable(<NoteRow note={note({ modality: 'in_person' })} />);
-    expect(screen.getByText(/in person/i)).toBeInTheDocument();
+    expect(screen.getByText('in person')).toBeInTheDocument();
   });
 
   it('truncates long preview to ~100 chars with ellipsis', () => {
@@ -86,8 +86,6 @@ describe('NoteRow', () => {
         })}
       />,
     );
-    const preview = screen.getByText(/AAAAA/);
-    expect(preview.textContent.length).toBeLessThanOrEqual(101);
-    expect(preview.textContent).toMatch(/…$/);
+    expect(screen.getByText('A'.repeat(97) + '…')).toBeInTheDocument();
   });
 });

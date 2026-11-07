@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { updateSectionStyleAction } from './templates';
 import type { SessionData } from '@/server/types';
+import { toFormData } from '@/test/form-data';
+import { createMockSession } from '@/test/factories/session-factory';
 
 const mockGetSession = vi.hoisted(() => vi.fn());
 const mockGetRequestContext = vi.hoisted(() => vi.fn());
@@ -34,27 +36,11 @@ vi.mock('@/server/types', () => ({
 const SECTION_ID = '00000000-0000-0000-0000-000000000011';
 
 function createSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
-function makeFormData(fields: Record<string, string> = {}): FormData {
-  const fd = new FormData();
-  for (const [k, v] of Object.entries(fields)) fd.set(k, v);
-  return fd;
+  return createMockSession({ userId: 'user-1', ...overrides });
 }
 
 describe('updateSectionStyleAction', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockGetSession.mockResolvedValue(createSession());
     mockGetRequestContext.mockResolvedValue({ ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' });
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 100, remaining: 99, reset: 0 });
@@ -72,46 +58,56 @@ describe('updateSectionStyleAction', () => {
 
   it('returns unauthenticated when no session', async () => {
     mockGetSession.mockResolvedValueOnce(null);
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
     expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('returns unauthenticated when email not verified', async () => {
     mockGetSession.mockResolvedValueOnce(createSession({ emailVerified: false }));
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
     expect(result).toEqual({ success: false, error: 'unauthenticated' });
+    expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('returns rate_limit_exceeded when rate limited', async () => {
     mockCheckRateLimit.mockResolvedValueOnce({ success: false, limit: 100, remaining: 0, reset: 0 });
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
     expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
+    expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('returns validation_error when sectionId is not a UUID', async () => {
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: 'not-a-uuid', verbosity: 'detailed' }));
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toBe('validation_error');
+    const result = await updateSectionStyleAction(toFormData({ sectionId: 'not-a-uuid', verbosity: 'detailed' }));
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { sectionId: ['Validation failed'] },
+    });
+    expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('returns validation_error when neither verbosity nor styling supplied', async () => {
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID }));
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toBe('validation_error');
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID }));
+    expect(result).toMatchObject({ success: false, error: 'validation_error' });
     expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('returns validation_error for invalid verbosity enum value', async () => {
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'loud' }));
-    expect(result.success).toBe(false);
-    if (!result.success) expect(result.error).toBe('validation_error');
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'loud' }));
+    expect(result).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { verbosity: ['Validation failed'] },
+    });
+    expect(mockUpsertUserSectionStyle).not.toHaveBeenCalled();
   });
 
   it('upserts and audits on happy path — verbosity only', async () => {
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
+    // userId in the form is client-supplied; the upsert must use the session user.
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'detailed', userId: 'user-2' }));
 
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true, data: { preference: { id: 'pref-1' } } });
     expect(mockUpsertUserSectionStyle).toHaveBeenCalledWith('user-1', SECTION_ID, {
       verbosity: 'detailed',
       styling: undefined,
@@ -130,9 +126,9 @@ describe('updateSectionStyleAction', () => {
   });
 
   it('upserts and audits on happy path — styling only', async () => {
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, styling: 'bullets' }));
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, styling: 'bullets' }));
 
-    expect(result.success).toBe(true);
+    expect(result).toMatchObject({ success: true, data: { preference: { id: 'pref-1' } } });
     expect(mockUpsertUserSectionStyle).toHaveBeenCalledWith('user-1', SECTION_ID, {
       verbosity: undefined,
       styling: 'bullets',
@@ -146,7 +142,7 @@ describe('updateSectionStyleAction', () => {
   });
 
   it('audit metadata includes both fields when both submitted', async () => {
-    await updateSectionStyleAction(makeFormData({
+    await updateSectionStyleAction(toFormData({
       sectionId: SECTION_ID,
       verbosity: 'concise',
       styling: 'bullets',
@@ -162,13 +158,13 @@ describe('updateSectionStyleAction', () => {
 
   it('returns style_prefs_save_failed when DAL throws', async () => {
     mockUpsertUserSectionStyle.mockRejectedValueOnce(new Error('db down'));
-    const result = await updateSectionStyleAction(makeFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
+    const result = await updateSectionStyleAction(toFormData({ sectionId: SECTION_ID, verbosity: 'detailed' }));
     expect(result).toEqual({ success: false, error: 'style_prefs_save_failed' });
   });
 
   it('M-2: catch-block logger never includes PHI (metadata has sectionId only)', async () => {
     mockUpsertUserSectionStyle.mockRejectedValueOnce(new Error('db down'));
-    await updateSectionStyleAction(makeFormData({
+    await updateSectionStyleAction(toFormData({
       sectionId: SECTION_ID,
       verbosity: 'detailed',
       styling: 'bullets',

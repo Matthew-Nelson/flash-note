@@ -1,12 +1,8 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { describe, it, expect } from 'vitest';
+import { mockDbQuery } from '@/test/dal-helpers';
 import { tryMarkWebhookProcessed, cleanupOldWebhookEvents, deleteProcessedWebhookEvent } from './webhooks';
 
 describe('Webhook Queries', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   describe('tryMarkWebhookProcessed', () => {
     it('should return true for new event (rowCount = 1)', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [], rowCount: 1 });
@@ -43,7 +39,7 @@ describe('Webhook Queries', () => {
       );
       expect(mockDbQuery).toHaveBeenCalledWith(
         expect.stringContaining('ON CONFLICT (event_id) DO NOTHING'),
-        expect.any(Array)
+        ['evt_123', 'invoice.paid']
       );
     });
 
@@ -55,8 +51,7 @@ describe('Webhook Queries', () => {
       const [query, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(query).toContain('event_id');
       expect(query).toContain('event_type');
-      expect(params).toContain('evt_abc');
-      expect(params).toContain('customer.subscription.updated');
+      expect(params).toEqual(['evt_abc', 'customer.subscription.updated']);
     });
   });
 
@@ -99,7 +94,7 @@ describe('Webhook Queries', () => {
 
       expect(result).toBe(10);
       expect(mockDbQuery).toHaveBeenCalledWith(
-        expect.any(String),
+        expect.stringContaining('DELETE FROM processed_webhook_events'),
         [30]
       );
     });

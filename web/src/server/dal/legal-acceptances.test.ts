@@ -99,6 +99,7 @@ describe('legal-acceptances queries', () => {
         'Mozilla/5.0'
       );
 
+      expect(mockClient.query).toHaveBeenCalledTimes(3);
       for (const call of mockClient.query.mock.calls) {
         const params = call[1] as string[];
         expect(params[3]).toBe('192.168.1.1');
@@ -127,6 +128,8 @@ describe('legal-acceptances queries', () => {
       );
 
       // sanitizeIpAddress should have converted the invalid IP to null
+      // Guard against the loop below passing vacuously if no INSERTs ran
+      expect(mockClient.query).toHaveBeenCalledTimes(3);
       for (const call of mockClient.query.mock.calls) {
         const params = call[1] as (string | null)[];
         expect(params[3]).toBeNull();

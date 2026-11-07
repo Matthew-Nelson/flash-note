@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { redirect } from 'next/navigation';
 import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
 
 const mockGetSession = vi.fn<() => Promise<SessionData | null>>();
 vi.mock('@/server/lib/get-session', () => ({
@@ -21,21 +22,11 @@ vi.mock('@/components/patients', () => ({
 import NewPatientPage from './page';
 
 function session(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 's',
-    userId: 'user-1',
-    email: 'pt@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date('2026-06-01'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+  return createMockSession({ userId: 'user-1', ...overrides });
 }
 
 describe('NewPatientPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
@@ -55,8 +46,8 @@ describe('NewPatientPage', () => {
 
   it('renders single <h1> "Add patient"', async () => {
     mockGetSession.mockResolvedValue(session());
-    const { container } = render(await NewPatientPage());
-    const h1s = container.querySelectorAll('h1');
+    render(await NewPatientPage());
+    const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).toHaveTextContent('Add patient');
   });

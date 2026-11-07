@@ -28,6 +28,7 @@ vi.mock('next/navigation', () => ({
 
 // Mock window.history.replaceState and window.location.href
 const mockReplaceState = vi.fn();
+const originalHistory = window.history;
 const originalLocation = window.location;
 
 // ---------------------------------------------------------------------------
@@ -50,7 +51,6 @@ function renderButtons(overrides: Partial<React.ComponentProps<typeof CheckoutBu
 
 describe('CheckoutButtons', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockSearchParams.get.mockReturnValue(null);
     mockIsAllowedRedirectUrl.mockReturnValue(true);
 
@@ -66,6 +66,10 @@ describe('CheckoutButtons', () => {
 
   afterEach(() => {
     cleanup();
+    Object.defineProperty(window, 'history', {
+      value: originalHistory,
+      writable: true,
+    });
     Object.defineProperty(window, 'location', {
       value: originalLocation,
       writable: true,
@@ -169,6 +173,31 @@ describe('CheckoutButtons', () => {
     await waitFor(() => {
       expect(window.location.href).toBe(checkoutUrl);
     });
+    expect(mockIsAllowedRedirectUrl).toHaveBeenCalledWith(checkoutUrl);
+  });
+
+  it('does not redirect when the checkout URL fails redirect validation', async () => {
+    // Open-redirect guard: a server-supplied URL outside the allowlist must never become window.location
+    const user = userEvent.setup();
+    const untrustedUrl = 'https://evil.example.com/steal';
+    mockCreateCheckoutAction.mockResolvedValue({
+      success: true,
+      data: { checkoutUrl: untrustedUrl },
+    });
+    mockIsAllowedRedirectUrl.mockReturnValue(false);
+
+    renderButtons();
+
+    const [monthlyButton] = screen.getAllByRole('button', { name: /subscribe now/i });
+    await act(async () => {
+      await user.click(monthlyButton);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to start checkout. Please try again.')).toBeInTheDocument();
+    });
+    expect(mockIsAllowedRedirectUrl).toHaveBeenCalledWith(untrustedUrl);
+    expect(window.location.href).toBe('');
   });
 
   it('shows error for email_not_verified (Rule 2: curated message)', async () => {
@@ -226,6 +255,27 @@ describe('CheckoutButtons', () => {
     await waitFor(() => {
       expect(screen.getByText(/Failed to start checkout/i)).toBeInTheDocument();
     });
+  });
+
+  it('never renders a raw server message from the action result (Rule 2)', async () => {
+    const user = userEvent.setup();
+    const rawServerMessage = 'Stripe API key expired for acct_live_123';
+    mockCreateCheckoutAction.mockResolvedValue({
+      success: false,
+      error: rawServerMessage,
+    });
+
+    renderButtons();
+
+    const [monthlyButton] = screen.getAllByRole('button', { name: /subscribe now/i });
+    await act(async () => {
+      await user.click(monthlyButton);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Failed to start checkout. Please try again.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(rawServerMessage)).not.toBeInTheDocument();
   });
 
   it('shows error when price IDs are not configured', async () => {

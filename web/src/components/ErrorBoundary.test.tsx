@@ -18,7 +18,6 @@ function ThrowOnRender({ shouldThrow }: { shouldThrow: boolean }) {
 
 describe('ErrorBoundary', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     // Suppress React's error boundary console output
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
@@ -49,7 +48,7 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
     expect(mockReportErrorBoundary).toHaveBeenCalledWith(
-      expect.any(Error)
+      expect.objectContaining({ message: 'Test error' })
     );
   });
 
@@ -92,11 +91,7 @@ describe('ErrorBoundary', () => {
   it('should call window.location.reload when Refresh Page is clicked', async () => {
     const user = userEvent.setup();
     const reloadMock = vi.fn();
-    Object.defineProperty(window, 'location', {
-      value: { ...window.location, reload: reloadMock },
-      writable: true,
-      configurable: true,
-    });
+    vi.stubGlobal('location', { ...window.location, reload: reloadMock });
 
     render(
       <ErrorBoundary>
@@ -112,19 +107,15 @@ describe('ErrorBoundary', () => {
     'never renders the raw error message or stack (NODE_ENV=%s, Rule 7)',
     (nodeEnv) => {
       vi.stubEnv('NODE_ENV', nodeEnv);
-      try {
-        const { container } = render(
-          <ErrorBoundary>
-            <ThrowOnRender shouldThrow={true} />
-          </ErrorBoundary>
-        );
+      const { container } = render(
+        <ErrorBoundary>
+          <ThrowOnRender shouldThrow={true} />
+        </ErrorBoundary>
+      );
 
-        expect(screen.getByText('Something went wrong')).toBeInTheDocument();
-        expect(container.textContent).not.toContain('Test error');
-        expect(container.textContent).not.toContain('ThrowOnRender');
-      } finally {
-        vi.unstubAllEnvs();
-      }
+      expect(screen.getByText('Something went wrong')).toBeInTheDocument();
+      expect(container.textContent).not.toContain('Test error');
+      expect(container.textContent).not.toContain('ThrowOnRender');
     }
   );
 });

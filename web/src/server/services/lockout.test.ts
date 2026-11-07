@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock config before importing (config.ts calls process.exit without DATABASE_URL)
 vi.mock('@/server/db/config', () => ({}));
 
-import { mockDbQuery, resetMocks } from '@/test/dal-helpers';
+import { mockDbQuery } from '@/test/dal-helpers';
 
 // Mock audit service
-const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockAuditLog = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 vi.mock('@/server/services/audit', () => ({
   auditService: { log: mockAuditLog },
 }));
@@ -19,11 +19,6 @@ import {
 } from './lockout';
 
 describe('lockout service', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockAuditLog.mockReset();
-  });
-
   describe('getAccountLockoutStatus', () => {
     it('returns unlocked for user with no failed attempts', async () => {
       mockDbQuery.mockResolvedValueOnce({
@@ -134,6 +129,7 @@ describe('lockout service', () => {
       const status = await recordFailedAttempt('user-1', context);
 
       expect(status.isLocked).toBe(true);
+      expect(status.lockedUntil).toBe(lockedUntil);
       expect(status.failedAttempts).toBe(5);
       expect(status.isPermanentlyLocked).toBe(false);
       expect(mockAuditLog).toHaveBeenCalledWith(

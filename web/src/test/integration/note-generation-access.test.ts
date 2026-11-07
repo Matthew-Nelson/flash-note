@@ -17,7 +17,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { SessionData } from '@/server/types';
+import { createMockSession } from '@/test/factories/session-factory';
+import { toFormData } from '@/test/form-data';
 
 // --- Hoisted mock declarations ---
 
@@ -25,7 +26,7 @@ const mockGetSession = vi.hoisted(() => vi.fn());
 const mockGetOrgSubscription = vi.hoisted(() => vi.fn());
 const mockGenerateNote = vi.hoisted(() => vi.fn());
 const mockIncrementUsage = vi.hoisted(() => vi.fn());
-const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockAuditLog = vi.hoisted(() => vi.fn());
 const mockCheckRateLimit = vi.hoisted(() => vi.fn());
 
 // --- Mocks ---
@@ -35,10 +36,12 @@ vi.mock('@/server/lib/get-session', () => ({
 }));
 
 vi.mock('@/server/lib/request-context', () => ({
-  getRequestContext: vi.fn().mockResolvedValue({
-    ipAddress: '127.0.0.1',
-    userAgent: 'IntegrationTest/1.0',
-  }),
+  getRequestContext: vi.fn(() =>
+    Promise.resolve({
+      ipAddress: '127.0.0.1',
+      userAgent: 'IntegrationTest/1.0',
+    })
+  ),
 }));
 
 vi.mock('@/server/lib/rate-limit', () => ({
@@ -72,10 +75,10 @@ const soapTemplate = vi.hoisted(() => ({
   sections: [] as unknown[],
 }));
 vi.mock('@/server/dal', () => ({
-  findTemplateById: vi.fn().mockResolvedValue(soapTemplate),
-  findTemplateWithUserStyle: vi.fn().mockResolvedValue(soapTemplate),
-  findBuiltinTemplates: vi.fn().mockResolvedValue([soapTemplate]),
-  findPatientById: vi.fn().mockResolvedValue(null),
+  findTemplateById: vi.fn(() => Promise.resolve(soapTemplate)),
+  findTemplateWithUserStyle: vi.fn(() => Promise.resolve(soapTemplate)),
+  findBuiltinTemplates: vi.fn(() => Promise.resolve([soapTemplate])),
+  findPatientById: vi.fn(() => Promise.resolve(null)),
   createClinicalNote: vi.fn(),
   findClinicalNoteById: vi.fn(),
   updateClinicalNoteContent: vi.fn(),
@@ -124,30 +127,12 @@ import { generateNoteAction } from '@/actions/notes';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createSession(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 'session-1',
-    userId: 'user-1',
-    email: 'test@example.com',
-    subscriptionStatus: 'active',
-    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
-}
-
 function makeFormData(overrides: Record<string, string> = {}): FormData {
-  const fd = new FormData();
-  const defaults: Record<string, string> = {
+  return toFormData({
     noteType: 'daily_note',
     quickNotes: 'pt reports pain 5/10, ROM improving, strength gaining',
     ...overrides,
-  };
-  for (const [key, value] of Object.entries(defaults)) {
-    fd.set(key, value);
-  }
-  return fd;
+  });
 }
 
 function createGenerateResult() {
@@ -179,7 +164,6 @@ function createGenerateResult() {
 
 describe('note generation access control (real checkSubscriptionAccess)', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     mockCheckRateLimit.mockResolvedValue({ success: true, limit: 30, remaining: 29, reset: 0 });
     mockGenerateNote.mockResolvedValue(createGenerateResult());
     mockIncrementUsage.mockResolvedValue(undefined);
@@ -192,7 +176,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('allows access and calls LLM for active individual subscription', async () => {
-    mockGetSession.mockResolvedValue(createSession({ subscriptionStatus: 'active' }));
+    mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'active' }));
 
     const result = await generateNoteAction(makeFormData());
 
@@ -208,7 +192,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
 
   it('allows access for trialing user with trial end date in the future', async () => {
     const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'trialing',
       trialEndsAt,
     }));
@@ -227,7 +211,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
 
   it('denies access and logs ACCESS_DENIED audit when trial is expired', async () => {
     const trialEndsAt = new Date(Date.now() - 24 * 60 * 60 * 1000); // 1 day ago
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'trialing',
       trialEndsAt,
       organizationId: null, // no org fallback
@@ -236,10 +220,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
     const result = await generateNoteAction(makeFormData());
 
     // Real checkSubscriptionAccess returns trial_expired for expired trial with no org
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('trial_expired');
-    }
+    expect(result).toEqual({ success: false, error: 'trial_expired' });
     // LLM must NOT be called (gated by subscription check)
     expect(mockGenerateNote).not.toHaveBeenCalled();
     // HIPAA: ACCESS_DENIED audit must fire (Fix 5 verification)
@@ -260,7 +241,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('allows access via org fallback when individual subscription is canceled but org is active', async () => {
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'canceled',
       organizationId: 'org-1',
     }));
@@ -275,7 +256,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
     expect(result.success).toBe(true);
     expect(mockGenerateNote).toHaveBeenCalledOnce();
     // Org subscription DAL must be called for the fallback check
-    expect(mockGetOrgSubscription).toHaveBeenCalledWith('org-1', 'user-1');
+    expect(mockGetOrgSubscription).toHaveBeenCalledWith('org-1', 'user-uuid');
   });
 
   // -------------------------------------------------------------------------
@@ -283,7 +264,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('denies access with clinic_subscription_expired when both individual and org subscriptions are lapsed', async () => {
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'canceled',
       organizationId: 'org-1',
     }));
@@ -295,10 +276,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
 
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('clinic_subscription_expired');
-    }
+    expect(result).toEqual({ success: false, error: 'clinic_subscription_expired' });
     expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
@@ -307,28 +285,25 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('denies access with subscription_required when user has no active subscription and no org', async () => {
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'canceled',
       organizationId: null,
     }));
 
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('subscription_required');
-    }
+    expect(result).toEqual({ success: false, error: 'subscription_required' });
     expect(mockGenerateNote).not.toHaveBeenCalled();
     // No org → org subscription DAL not called
     expect(mockGetOrgSubscription).not.toHaveBeenCalled();
   });
 
   // -------------------------------------------------------------------------
-  // Scenario 7: Org fallback — trialing org with future trial end date → allowed
+  // Scenario 7: Org fallback — trialing org with future end date → allowed
   // -------------------------------------------------------------------------
 
   it('allows access via org fallback when org subscription is trialing with future end date', async () => {
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'canceled',
       organizationId: 'org-1',
     }));
@@ -349,7 +324,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('denies access with clinic_subscription_expired when org trial is also expired', async () => {
-    mockGetSession.mockResolvedValue(createSession({
+    mockGetSession.mockResolvedValue(createMockSession({
       subscriptionStatus: 'canceled',
       organizationId: 'org-1',
     }));
@@ -361,10 +336,7 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
 
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('clinic_subscription_expired');
-    }
+    expect(result).toEqual({ success: false, error: 'clinic_subscription_expired' });
     expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
@@ -373,15 +345,12 @@ describe('note generation access control (real checkSubscriptionAccess)', () => 
   // -------------------------------------------------------------------------
 
   it('enforces rate limit after subscription check passes', async () => {
-    mockGetSession.mockResolvedValue(createSession({ subscriptionStatus: 'active' }));
+    mockGetSession.mockResolvedValue(createMockSession({ subscriptionStatus: 'active' }));
     mockCheckRateLimit.mockResolvedValue({ success: false, limit: 30, remaining: 0, reset: Date.now() });
 
     const result = await generateNoteAction(makeFormData());
 
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      expect(result.error).toBe('rate_limit_exceeded');
-    }
+    expect(result).toEqual({ success: false, error: 'rate_limit_exceeded' });
     // Rate limit fires before LLM
     expect(mockGenerateNote).not.toHaveBeenCalled();
   });

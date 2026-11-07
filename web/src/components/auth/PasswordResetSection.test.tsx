@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PasswordResetSection } from './PasswordResetSection';
@@ -49,13 +49,9 @@ vi.mock('@/components/ui', () => ({
 }));
 
 describe('PasswordResetSection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders send button', () => {
     render(<PasswordResetSection email="test@clinic.com" />);
-    expect(screen.getByText('Send Password Reset Email')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send Password Reset Email' })).toBeInTheDocument();
   });
 
   it('shows success alert after successful send', async () => {
@@ -63,7 +59,7 @@ describe('PasswordResetSection', () => {
     const user = userEvent.setup();
 
     render(<PasswordResetSection email="test@clinic.com" />);
-    await user.click(screen.getByText('Send Password Reset Email'));
+    await user.click(screen.getByRole('button', { name: 'Send Password Reset Email' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('alert-success')).toHaveTextContent(
@@ -77,7 +73,7 @@ describe('PasswordResetSection', () => {
     const user = userEvent.setup();
 
     render(<PasswordResetSection email="jane@clinic.com" />);
-    await user.click(screen.getByText('Send Password Reset Email'));
+    await user.click(screen.getByRole('button', { name: 'Send Password Reset Email' }));
 
     await waitFor(() => {
       expect(mockRequestPasswordResetAction).toHaveBeenCalledOnce();
@@ -94,7 +90,7 @@ describe('PasswordResetSection', () => {
     const user = userEvent.setup();
 
     render(<PasswordResetSection email="test@clinic.com" />);
-    await user.click(screen.getByText('Send Password Reset Email'));
+    await user.click(screen.getByRole('button', { name: 'Send Password Reset Email' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('alert-error')).toHaveTextContent(
@@ -111,7 +107,7 @@ describe('PasswordResetSection', () => {
     const user = userEvent.setup();
 
     render(<PasswordResetSection email="test@clinic.com" />);
-    await user.click(screen.getByText('Send Password Reset Email'));
+    await user.click(screen.getByRole('button', { name: 'Send Password Reset Email' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('alert-error')).toHaveTextContent(
@@ -128,13 +124,13 @@ describe('PasswordResetSection', () => {
     const user = userEvent.setup();
 
     render(<PasswordResetSection email="test@clinic.com" />);
-    await user.click(screen.getByText('Send Password Reset Email'));
+    await user.click(screen.getByRole('button', { name: 'Send Password Reset Email' }));
 
     await waitFor(() => {
       expect(screen.getByTestId('alert-error')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('dismiss'));
+    await user.click(screen.getByRole('button', { name: 'dismiss' }));
 
     expect(screen.queryByTestId('alert-error')).not.toBeInTheDocument();
   });

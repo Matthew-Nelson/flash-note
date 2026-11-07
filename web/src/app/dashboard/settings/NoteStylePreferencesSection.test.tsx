@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { NoteStylePreferencesSection } from './NoteStylePreferencesSection';
@@ -26,10 +26,6 @@ function section(overrides: Partial<NoteTemplateSection> = {}): NoteTemplateSect
 }
 
 describe('NoteStylePreferencesSection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders a section block per template section', () => {
     render(
       <NoteStylePreferencesSection
@@ -92,6 +88,7 @@ describe('NoteStylePreferencesSection', () => {
     );
     const concise = screen.getByLabelText(/concise/i);
     expect(concise).toBeChecked();
+    expect(screen.queryByText('style_prefs_save_failed')).not.toBeInTheDocument();
   });
 
   it('announces save confirmation via sr-only aria-live region', async () => {

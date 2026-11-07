@@ -42,13 +42,15 @@ describe('Spinner', () => {
 
 describe('LoadingSpinner', () => {
   it('should render loading dots', () => {
-    const { container } = render(<LoadingSpinner />);
-    expect(container.querySelector('.loading-spinner')).toBeTruthy();
-    expect(container.querySelector('.loading-dots')).toBeTruthy();
+    render(<LoadingSpinner />);
+    const status = screen.getByRole('status');
+    expect(status).toHaveClass('loading-spinner');
+    // The dots are presentational spans with no role, so the class is the only handle.
+    expect(status.querySelector('.loading-dots')).toBeInTheDocument();
   });
 
   it('should forward className', () => {
-    const { container } = render(<LoadingSpinner className="extra" />);
-    expect(container.querySelector('.loading-spinner')?.className).toContain('extra');
+    render(<LoadingSpinner className="extra" />);
+    expect(screen.getByRole('status')).toHaveClass('extra');
   });
 });

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock redis to return null (no Redis in test)
 vi.mock('./redis', () => ({
@@ -22,10 +22,6 @@ const {
 } = await import('./rate-limit');
 
 describe('rate-limit', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('checkRateLimit', () => {
     it('should return success when limiter is null (no Redis)', async () => {
       const result = await checkRateLimit(null, 'test-key');
@@ -73,8 +69,13 @@ describe('rate-limit', () => {
 
       const result = await checkRateLimit(mockLimiter as never, 'attacker-ip');
 
-      expect(result.success).toBe(false);
-      expect(result.remaining).toBe(0);
+      expect(mockLimiter.limit).toHaveBeenCalledWith('attacker-ip');
+      expect(result).toEqual({
+        success: false,
+        limit: 5,
+        remaining: 0,
+        reset: 1700000000000,
+      });
     });
   });
 

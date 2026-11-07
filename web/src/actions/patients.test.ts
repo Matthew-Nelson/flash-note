@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AuditAction } from '@/server/types';
+import type { SessionData } from '@/server/types';
+import { toFormData } from '@/test/form-data';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks (avoid top-level await + let us reset between tests)
@@ -104,25 +107,12 @@ const USER_ID = '00000000-0000-0000-0000-000000000001';
 const OTHER_USER_ID = '00000000-0000-0000-0000-000000000002';
 const PATIENT_ID = '11111111-1111-1111-1111-111111111111';
 
-function validSession(overrides: Partial<Record<string, unknown>> = {}) {
-  return {
-    sessionId: 'session-id',
-    userId: USER_ID,
-    email: 'pt@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date(),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+function validSession(overrides: Partial<SessionData> = {}): SessionData {
+  return createMockSession({ userId: USER_ID, ...overrides });
 }
 
 function buildCreateFormData(overrides: Record<string, string> = {}): FormData {
-  const fd = new FormData();
-  fd.set('firstName', 'Jane');
-  fd.set('lastName', 'Doe');
-  for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
-  return fd;
+  return toFormData({ firstName: 'Jane', lastName: 'Doe', ...overrides });
 }
 
 // ---------------------------------------------------------------------------
@@ -130,11 +120,8 @@ function buildCreateFormData(overrides: Record<string, string> = {}): FormData {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  vi.clearAllMocks();
   // Mock the PoolClient returned by getPoolClient — reset between tests.
-  h.poolClient.query.mockReset();
   h.poolClient.query.mockResolvedValue({ rows: [] });
-  h.poolClient.release.mockReset();
   h.getPoolClient.mockResolvedValue(h.poolClient);
 
   h.getSession.mockResolvedValue(validSession());
@@ -161,6 +148,7 @@ describe('createPatientAction', () => {
     const res = await createPatientAction(buildCreateFormData());
     expect(res).toEqual({ success: false, error: 'unauthenticated' });
     expect(h.getPoolClient).not.toHaveBeenCalled();
+    expect(h.createPatient).not.toHaveBeenCalled();
   });
 
   it('returns unauthenticated when email not verified', async () => {
@@ -168,6 +156,7 @@ describe('createPatientAction', () => {
     const res = await createPatientAction(buildCreateFormData());
     expect(res).toEqual({ success: false, error: 'unauthenticated' });
     expect(h.getPoolClient).not.toHaveBeenCalled();
+    expect(h.createPatient).not.toHaveBeenCalled();
   });
 
   it('returns rate_limit_exceeded when limiter denies', async () => {
@@ -180,15 +169,17 @@ describe('createPatientAction', () => {
     const res = await createPatientAction(buildCreateFormData());
     expect(res).toEqual({ success: false, error: 'rate_limit_exceeded' });
     expect(h.getPoolClient).not.toHaveBeenCalled();
+    expect(h.createPatient).not.toHaveBeenCalled();
   });
 
   it('returns validation_error with sanitized fieldErrors when schema fails', async () => {
     const fd = new FormData(); // missing firstName/lastName
     const res = await createPatientAction(fd);
-    expect(res.success).toBe(false);
-    if (res.success) return;
-    expect(res.error).toBe('validation_error');
-    expect(res.fieldErrors).toBeDefined();
+    expect(res).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { firstName: ['Validation failed'], lastName: ['Validation failed'] },
+    });
     // sanitizeFieldErrors was called with allow list including firstName/lastName
     expect(h.sanitizeFieldErrors).toHaveBeenCalled();
     const call = h.sanitizeFieldErrors.mock.calls[0];
@@ -298,13 +289,13 @@ describe('createPatientAction', () => {
     expect(h.poolClient.release).toHaveBeenCalled();
   });
 
-  it('passes organizationId to createPatient when session has org', async () => {
+  it('passes session organizationId to createPatient, not a client-supplied one', async () => {
     h.getSession.mockResolvedValueOnce(
       validSession({ organizationId: 'org-1' }),
     );
     h.createPatient.mockResolvedValueOnce(createMockPatient({ id: PATIENT_ID }));
 
-    await createPatientAction(buildCreateFormData());
+    await createPatientAction(buildCreateFormData({ userId: OTHER_USER_ID, organizationId: 'org-evil' }));
 
     expect(h.createPatient).toHaveBeenCalledWith(
       expect.objectContaining({ userId: USER_ID, organizationId: 'org-1' }),
@@ -332,15 +323,14 @@ describe('updatePatientAction', () => {
   function buildUpdateFormData(
     overrides: Record<string, string> = { firstName: 'Renamed' },
   ): FormData {
-    const fd = new FormData();
-    for (const [k, v] of Object.entries(overrides)) fd.set(k, v);
-    return fd;
+    return toFormData(overrides);
   }
 
   it('returns unauthenticated when session is null', async () => {
     h.getSession.mockResolvedValueOnce(null);
     const res = await updatePatientAction(PATIENT_ID, buildUpdateFormData());
     expect(res).toEqual({ success: false, error: 'unauthenticated' });
+    expect(h.updatePatient).not.toHaveBeenCalled();
   });
 
   it('returns patient_not_found when patientId is not a UUID', async () => {
@@ -358,7 +348,7 @@ describe('updatePatientAction', () => {
       buildUpdateFormData({ firstName: 'Renamed', lastName: 'Doe' }),
     );
 
-    expect(res.success).toBe(true);
+    expect(res).toEqual({ success: true, data: { patient } });
     const queries = h.poolClient.query.mock.calls.map((c: unknown[]): unknown => c[0]);
     expect(queries[0]).toBe('BEGIN');
     expect(queries[queries.length - 1]).toBe('COMMIT');
@@ -416,7 +406,7 @@ describe('updatePatientAction', () => {
     h.getSession.mockResolvedValueOnce(validSession({ userId: USER_ID }));
     h.updatePatient.mockResolvedValueOnce(createMockPatient({ id: PATIENT_ID }));
 
-    await updatePatientAction(PATIENT_ID, buildUpdateFormData());
+    await updatePatientAction(PATIENT_ID, buildUpdateFormData({ firstName: 'Renamed', userId: OTHER_USER_ID }));
 
     expect(h.updatePatient).toHaveBeenCalledWith(
       { type: 'user', userId: USER_ID },
@@ -451,6 +441,7 @@ describe('archivePatientAction', () => {
     h.getSession.mockResolvedValueOnce(null);
     const res = await archivePatientAction(PATIENT_ID);
     expect(res).toEqual({ success: false, error: 'unauthenticated' });
+    expect(h.archivePatient).not.toHaveBeenCalled();
   });
 
   it('returns patient_not_found when patientId is not a UUID', async () => {
@@ -468,6 +459,7 @@ describe('archivePatientAction', () => {
     });
     const res = await archivePatientAction(PATIENT_ID);
     expect(res).toEqual({ success: false, error: 'rate_limit_exceeded' });
+    expect(h.archivePatient).not.toHaveBeenCalled();
   });
 
   it('happy path: BEGIN → archivePatient(client) → logWithClient(client) → COMMIT → redirect', async () => {
@@ -553,14 +545,17 @@ describe('updatePatientContextAction', () => {
     h.getSession.mockResolvedValueOnce(null);
     const res = await updatePatientContextAction(PATIENT_ID, 'new context');
     expect(res).toEqual({ success: false, error: 'unauthenticated' });
+    expect(h.updatePatient).not.toHaveBeenCalled();
   });
 
   it('returns validation_error when context exceeds 2000 chars', async () => {
     const tooLong = 'a'.repeat(2001);
     const res = await updatePatientContextAction(PATIENT_ID, tooLong);
-    expect(res.success).toBe(false);
-    if (res.success) return;
-    expect(res.error).toBe('validation_error');
+    expect(res).toEqual({
+      success: false,
+      error: 'validation_error',
+      fieldErrors: { context: ['Validation failed'] },
+    });
     expect(h.getPoolClient).not.toHaveBeenCalled();
   });
 

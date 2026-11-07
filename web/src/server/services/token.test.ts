@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock config before importing token service (config.ts calls process.exit without DATABASE_URL)
 vi.mock('@/server/db/config', () => ({
@@ -32,10 +32,6 @@ import {
 } from './token';
 
 describe('token service', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('generateToken', () => {
     it('generates a token with URL-safe characters', () => {
       const { token } = generateToken();
@@ -84,6 +80,10 @@ describe('token service', () => {
         'email_verification',
         expect.any(Date) // expiresAt
       );
+      // Only the hash may reach storage; the plain token is emailed and never persisted.
+      const storedHash = mockCreateEmailToken.mock.calls[0][1];
+      expect(storedHash).toBe(hashToken(token));
+      expect(storedHash).not.toBe(token);
     });
 
     it('propagates DAL errors', async () => {
@@ -153,6 +153,8 @@ describe('token service', () => {
 
       expect(first).toBe('user-1');
       expect(second).toBeNull();
+      // The service holds no state; single-use is enforced by the DAL UPDATE (used_at IS NULL).
+      expect(mockConsumeToken).toHaveBeenNthCalledWith(2, hashToken('token'), 'password_reset', undefined);
     });
 
     it('passes client through to consumeToken when provided', async () => {

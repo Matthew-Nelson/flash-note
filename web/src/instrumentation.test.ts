@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 const mockLogger = vi.hoisted(() => ({
   info: vi.fn(),
@@ -13,10 +13,6 @@ vi.mock('@/server/lib/logger', () => ({
 }));
 
 describe('instrumentation', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('onRequestError', () => {
     it('logs the error through Pino with source, err, routePath, and method', async () => {
       const { onRequestError } = await import('./instrumentation');
@@ -37,7 +33,7 @@ describe('instrumentation', () => {
           method: 'GET',
           url: '/dashboard',
         }),
-        expect.stringContaining('Test server error')
+        '[page] Test server error'
       );
     });
 

@@ -4,9 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockGet = vi.fn<(name: string) => string | null>();
 
 vi.mock('next/headers', () => ({
-  headers: vi.fn().mockResolvedValue({
-    get: (name: string): string | null => mockGet(name),
-  }),
+  headers: vi.fn(() =>
+    Promise.resolve({
+      get: (name: string): string | null => mockGet(name),
+    })
+  ),
 }));
 
 // Mock config — start with Cloud Run default (TRUSTED_PROXY_COUNT=1)
@@ -20,7 +22,6 @@ const { getRequestContext } = await import('./request-context');
 
 describe('getRequestContext', () => {
   beforeEach(() => {
-    mockGet.mockReset();
     mockConfig.TRUSTED_PROXY_COUNT = 1;
   });
 

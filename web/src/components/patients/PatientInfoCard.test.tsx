@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
@@ -14,10 +14,6 @@ import { PatientInfoCard } from './PatientInfoCard';
 import { createMockPatient } from '@/test/factories/patient-factory';
 
 describe('PatientInfoCard', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('renders read-only profile fields by default', () => {
     const patient = createMockPatient({
       firstName: 'Jane',
@@ -70,6 +66,12 @@ describe('PatientInfoCard', () => {
         expect.any(FormData),
       );
     });
+    const fd = h.updatePatientAction.mock.calls[0]?.[1] as FormData;
+    expect(fd.get('firstName')).toBe('Jane');
+    expect(fd.get('lastName')).toBe('Doe');
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
+    });
   });
 
   it('Cancel reverts changes and exits edit mode', async () => {
@@ -83,6 +85,9 @@ describe('PatientInfoCard', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }));
     // Back to read mode — Edit button visible again
     expect(screen.getByRole('button', { name: /edit/i })).toBeInTheDocument();
+    // Re-entering edit shows the saved value, not the discarded draft.
+    await user.click(screen.getByRole('button', { name: /edit/i }));
+    expect(screen.getByLabelText<HTMLInputElement>(/first name/i)).toHaveValue('Jane');
   });
 
   it('displays curated error on Server Action failure', async () => {
@@ -133,7 +138,9 @@ describe('PatientInfoCard', () => {
     const email = screen.getByLabelText<HTMLInputElement>(/email/i);
     await user.type(email, '.co');
     // All onChange branches exercised — values now differ.
-    expect(first.value).toMatch(/updated/);
+    expect(first.value).toBe('Jane updated');
+    expect(last.value).toBe('Doe updated');
+    expect(email.value).toBe('jane@example.com.co');
     expect(pronoun.value).toBe('he/him');
   });
 

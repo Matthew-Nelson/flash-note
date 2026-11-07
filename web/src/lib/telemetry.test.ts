@@ -33,9 +33,6 @@ describe('telemetry client', () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    mockSendBeacon.mockReset().mockReturnValue(true);
-    mockFetch.mockReset().mockResolvedValue(new Response());
-    mockAddEventListener.mockReset();
 
     setGlobal('navigator', { sendBeacon: mockSendBeacon });
     setGlobal('window', {

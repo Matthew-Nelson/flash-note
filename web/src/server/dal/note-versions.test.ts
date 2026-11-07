@@ -1,7 +1,7 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { mockDbQuery, mockClientQuery, resetMocks } from '@/test/dal-helpers';
+import { mockDbQuery, mockClientQuery } from '@/test/dal-helpers';
 import {
   createMockVersionRow,
   createMockVersionWithSectionRow,
@@ -16,6 +16,7 @@ import {
 } from './note-versions';
 
 const USER_A = '00000000-0000-0000-0000-0000000000a1';
+const USER_B = '00000000-0000-0000-0000-0000000000b2';
 const ORG_A = '00000000-0000-0000-0000-00000000c0a1';
 const NOTE_1 = '00000000-0000-0000-0000-0000000cdcde';
 const SECTION_1 = '00000000-0000-0000-0000-000000000011';
@@ -28,10 +29,6 @@ function mockClient() {
 }
 
 describe('note-versions DAL', () => {
-  beforeEach(() => {
-    resetMocks();
-  });
-
   // ---------------------------------------------------------------------------
   // Append-only invariant — no UPDATE/DELETE SQL in the module
   // ---------------------------------------------------------------------------
@@ -219,16 +216,28 @@ describe('note-versions DAL', () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       await findVersionsByNoteId(userScope, NOTE_1);
 
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
       expect(sql).toContain('INNER JOIN clinical_notes cn');
-      expect(sql).toContain('cn.user_id = $1');
+      expect(sql).toContain('WHERE cn.user_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([USER_A, NOTE_1]);
+    });
+
+    it('Rule 5: returns no versions when the note belongs to another user', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      const result = await findVersionsByNoteId({ type: 'user', userId: USER_B }, NOTE_1);
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.user_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([USER_B, NOTE_1]);
+      expect(result).toEqual([]);
     });
 
     it('scopes by organization_id under org scope', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       await findVersionsByNoteId(orgScope, NOTE_1);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('cn.organization_id = $1');
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.organization_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([ORG_A, NOTE_1]);
     });
 
     it('joins note_template_sections for section_title', async () => {
@@ -279,8 +288,27 @@ describe('note-versions DAL', () => {
     it('scopes by user_id', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] });
       await findLatestVersionsByNoteId(userScope, NOTE_1);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('cn.user_id = $1');
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.user_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([USER_A, NOTE_1]);
+    });
+
+    it('Rule 5: returns no latest versions when the note belongs to another user', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      const result = await findLatestVersionsByNoteId({ type: 'user', userId: USER_B }, NOTE_1);
+
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.user_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([USER_B, NOTE_1]);
+      expect(result).toEqual([]);
+    });
+
+    it('scopes by organization_id under org scope', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      await findLatestVersionsByNoteId(orgScope, NOTE_1);
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('WHERE cn.organization_id = $1 AND nv.note_id = $2');
+      expect(params).toEqual([ORG_A, NOTE_1]);
     });
 
     it('returns mapped NoteVersionWithSection rows', async () => {

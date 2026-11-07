@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const h = vi.hoisted(() => ({
@@ -25,10 +25,6 @@ import { ClientPatientDetail } from './ClientPatientDetail';
 import { createMockPatient } from '@/test/factories/patient-factory';
 
 describe('ClientPatientDetail', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   it('wires usePhiCleanup with a cleanup ref (Rule 4)', () => {
     const patient = createMockPatient();
     render(
@@ -91,7 +87,7 @@ describe('ClientPatientDetail', () => {
     );
     // Open the dialog via the footer button, then confirm inside dialog.
     await user.click(screen.getByRole('button', { name: 'Archive patient' }));
-    const confirm = screen.getAllByRole('button', { name: 'Archive patient' })[1];
+    const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive patient' });
     await user.click(confirm);
     await waitFor(() => {
       expect(h.archivePatientAction).toHaveBeenCalledWith('p-1');
@@ -113,11 +109,11 @@ describe('ClientPatientDetail', () => {
       </ClientPatientDetail>,
     );
     await user.click(screen.getByRole('button', { name: 'Archive patient' }));
-    const confirm = screen.getAllByRole('button', { name: 'Archive patient' })[1];
+    const confirm = within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive patient' });
     await user.click(confirm);
     await waitFor(() => {
       expect(
-        screen.getAllByText(/we couldn't archive this patient/i).length,
+        screen.getAllByText("We couldn't archive this patient. Please try again.").length,
       ).toBeGreaterThan(0);
     });
     expect(h.push).not.toHaveBeenCalled();
@@ -139,21 +135,27 @@ describe('ClientPatientDetail', () => {
     );
     // Open dialog and trigger archive → error
     await user.click(screen.getByRole('button', { name: 'Archive patient' }));
-    const confirmBtn = screen.getAllByRole('button', { name: 'Archive patient' })[1];
+    const confirmBtn = within(screen.getByRole('dialog')).getByRole('button', { name: 'Archive patient' });
     await user.click(confirmBtn);
     await waitFor(() => {
       expect(
-        screen.getAllByText(/we couldn't archive this patient/i).length,
+        screen.getAllByText("We couldn't archive this patient. Please try again.").length,
       ).toBeGreaterThan(0);
     });
     const [arg] = h.usePhiCleanup.mock.calls[0] as unknown as [
       { current: () => void },
     ];
     // Invoke the registered cleanup — should close dialog + clear error.
-    arg.current();
+    act(() => {
+      arg.current();
+    });
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
+    // Reopening must show no stale error (cleanup cleared errorCode).
+    await user.click(screen.getByRole('button', { name: 'Archive patient' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('Cancel closes the dialog without calling archive action', async () => {

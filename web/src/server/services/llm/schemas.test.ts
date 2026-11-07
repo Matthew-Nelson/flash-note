@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { ZodError } from 'zod';
 import {
   PTNoteOutputSchema,
   BillingChargeSchema,
@@ -29,7 +30,7 @@ describe('LLM Schemas', () => {
         description: 'Therapeutic Exercise',
       };
 
-      expect(() => SuggestedCodeSchema.parse(code)).toThrow();
+      expect(() => SuggestedCodeSchema.parse(code)).toThrow(ZodError);
     });
 
     it('should reject missing description', () => {
@@ -37,7 +38,7 @@ describe('LLM Schemas', () => {
         cptCode: '97110',
       };
 
-      expect(() => SuggestedCodeSchema.parse(code)).toThrow();
+      expect(() => SuggestedCodeSchema.parse(code)).toThrow(ZodError);
     });
   });
 
@@ -62,7 +63,7 @@ describe('LLM Schemas', () => {
         units: 1,
       };
 
-      expect(() => BillingChargeSchema.parse(charge)).toThrow();
+      expect(() => BillingChargeSchema.parse(charge)).toThrow(ZodError);
     });
 
     it('should reject zero units', () => {
@@ -73,7 +74,7 @@ describe('LLM Schemas', () => {
         units: 0,
       };
 
-      expect(() => BillingChargeSchema.parse(charge)).toThrow();
+      expect(() => BillingChargeSchema.parse(charge)).toThrow(ZodError);
     });
   });
 
@@ -209,7 +210,7 @@ describe('LLM Schemas', () => {
         status: 'invalid_status',
       };
 
-      expect(() => GoalStatusSchema.parse(goal)).toThrow();
+      expect(() => GoalStatusSchema.parse(goal)).toThrow(ZodError);
     });
 
     it('should reject percentComplete over 100', () => {
@@ -219,7 +220,7 @@ describe('LLM Schemas', () => {
         percentComplete: 150,
       };
 
-      expect(() => GoalStatusSchema.parse(goal)).toThrow();
+      expect(() => GoalStatusSchema.parse(goal)).toThrow(ZodError);
     });
 
     it('should reject negative percentComplete', () => {
@@ -229,7 +230,7 @@ describe('LLM Schemas', () => {
         percentComplete: -10,
       };
 
-      expect(() => GoalStatusSchema.parse(goal)).toThrow();
+      expect(() => GoalStatusSchema.parse(goal)).toThrow(ZodError);
     });
   });
 
@@ -373,7 +374,7 @@ describe('LLM Schemas', () => {
         // Missing assessment and plan
       };
 
-      expect(() => PTNoteOutputSchema.parse(invalidNote)).toThrow();
+      expect(() => PTNoteOutputSchema.parse(invalidNote)).toThrow(ZodError);
     });
   });
 
@@ -435,7 +436,7 @@ describe('LLM Schemas', () => {
     it('should throw for invalid input', () => {
       const input = { invalid: 'data' };
 
-      expect(() => validatePTNoteOutput(input)).toThrow();
+      expect(() => validatePTNoteOutput(input)).toThrow(ZodError);
     });
   });
 
@@ -490,7 +491,7 @@ describe('LLM Schemas', () => {
             // PLAN missing
           },
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
 
     it('accepts optional top-level billing / goals / alerts / uncertainAreas fields', () => {
@@ -515,7 +516,7 @@ describe('LLM Schemas', () => {
 
     it('rejects a response without the sections object entirely', () => {
       const schema = buildPTNoteOutputSchema([SUB]);
-      expect(() => schema.parse({})).toThrow();
+      expect(() => schema.parse({})).toThrow(ZodError);
     });
   });
 });

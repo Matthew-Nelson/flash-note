@@ -60,12 +60,6 @@ function createMockSessionRow(overrides: Record<string, unknown> = {}) {
 
 describe('getSession', () => {
   beforeEach(() => {
-    mockGetSessionToken.mockReset();
-    mockHashSessionToken.mockReset();
-    mockFindSessionByTokenHash.mockReset();
-    mockRefreshSessionExpiry.mockReset();
-    mockLogger.debug.mockClear();
-    mockLogger.error.mockClear();
     vi.spyOn(console, 'error').mockImplementation(() => {});
   });
 
@@ -89,6 +83,21 @@ describe('getSession', () => {
     expect(result).toBeNull();
     expect(mockHashSessionToken).toHaveBeenCalledWith('raw-token');
     expect(mockFindSessionByTokenHash).toHaveBeenCalledWith('hashed-token');
+  });
+
+  // The DAL query filters on `s.expires_at > NOW()` and joins users with
+  // NOT is_deleted (see dal/sessions.test.ts). Expired and revoked (deleted)
+  // sessions reach this layer as a missing row; they must never resolve to
+  // SessionData or be refreshed back to life.
+  it('rejects an expired or revoked session without refreshing it', async () => {
+    mockGetSessionToken.mockResolvedValueOnce('raw-token');
+    mockHashSessionToken.mockReturnValueOnce('hashed-token');
+    mockFindSessionByTokenHash.mockResolvedValueOnce(null);
+
+    const result = await getSession();
+
+    expect(result).toBeNull();
+    expect(mockRefreshSessionExpiry).not.toHaveBeenCalled();
   });
 
   it('should return SessionData for a valid session', async () => {
@@ -203,8 +212,7 @@ describe('getSession', () => {
     const result = await getSession();
 
     // Session is valid — refresh failure should NOT log the user out
-    expect(result).not.toBeNull();
-    expect(result!.sessionId).toBe('session-uuid');
+    expect(result).toMatchObject({ sessionId: 'session-uuid', userId: 'user-uuid' });
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'session', errorType: 'refresh_failed', err: expect.any(Error) }),
       'Session refresh failed'

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import type { SessionData } from '@/server/types';
 import { AuditAction } from '@/server/types';
 import { createMockPatient } from '@/test/factories/patient-factory';
+import { createMockSession } from '@/test/factories/session-factory';
 
 // Extend the global next/navigation mock (setup.ts) with `notFound`.
 vi.mock('next/navigation', () => ({
@@ -107,23 +108,13 @@ vi.mock('@/components/patients', () => ({
 import PatientDetailPage from './page';
 
 function session(overrides: Partial<SessionData> = {}): SessionData {
-  return {
-    sessionId: 's',
-    userId: 'user-1',
-    email: 'pt@example.com',
-    subscriptionStatus: 'trialing',
-    trialEndsAt: new Date('2026-06-01'),
-    emailVerified: true,
-    organizationId: null,
-    ...overrides,
-  };
+  return createMockSession({ userId: 'user-1', ...overrides });
 }
 
 const PATIENT_ID = '00000000-0000-0000-0000-000000000001';
 
 describe('PatientDetailPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
     vi.mocked(redirect).mockImplementation((): never => {
       throw new Error('NEXT_REDIRECT');
     });
@@ -140,6 +131,10 @@ describe('PatientDetailPage', () => {
     await expect(
       PatientDetailPage({ params: Promise.resolve({ id: PATIENT_ID }) }),
     ).rejects.toThrow('NEXT_REDIRECT');
+    expect(redirect).toHaveBeenCalledWith('/login?reason=session_expired');
+    expect(mockFindPatientById).not.toHaveBeenCalled();
+    expect(mockFindClinicalNotesByScope).not.toHaveBeenCalled();
+    expect(mockAuditLog).not.toHaveBeenCalled();
   });
 
   it('notFound when patientId is not a UUID', async () => {
@@ -156,6 +151,8 @@ describe('PatientDetailPage', () => {
     await expect(
       PatientDetailPage({ params: Promise.resolve({ id: PATIENT_ID }) }),
     ).rejects.toThrow('NEXT_NOT_FOUND');
+    expect(mockAuditLog).not.toHaveBeenCalled();
+    expect(mockFindClinicalNotesByScope).not.toHaveBeenCalled();
   });
 
   it('fires PATIENT_VIEWED audit with patientId metadata', async () => {
@@ -230,12 +227,12 @@ describe('PatientDetailPage', () => {
         lastName: 'Doe',
       }),
     );
-    const { container } = render(
+    render(
       await PatientDetailPage({
         params: Promise.resolve({ id: PATIENT_ID }),
       }),
     );
-    const h1s = container.querySelectorAll('h1');
+    const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
     expect(h1s[0]).toHaveTextContent('Jane Doe');
   });
@@ -269,6 +266,20 @@ describe('PatientDetailPage', () => {
     expect(mockFindPatientById).toHaveBeenCalledWith(
       { type: 'user', userId: 'alpha' },
       PATIENT_ID,
+    );
+  });
+
+  it('clinical notes DAL is called with user scope and patient id from session (Rule 5)', async () => {
+    mockGetSession.mockResolvedValue(session({ userId: 'alpha' }));
+    mockFindPatientById.mockResolvedValueOnce(
+      createMockPatient({ id: PATIENT_ID }),
+    );
+    await PatientDetailPage({
+      params: Promise.resolve({ id: PATIENT_ID }),
+    });
+    expect(mockFindClinicalNotesByScope).toHaveBeenCalledWith(
+      { type: 'user', userId: 'alpha' },
+      { patientId: PATIENT_ID },
     );
   });
 });

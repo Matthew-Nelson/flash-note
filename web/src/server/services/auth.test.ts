@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock config before importing (config.ts calls process.exit without DATABASE_URL)
 vi.mock('@/server/db/config', () => ({
@@ -18,7 +18,7 @@ import {
   mockDbQuery,
   mockClientQuery,
   mockGetPoolClient,
-  resetMocks,
+  setupMockClient,
   createMockUserRow,
 } from '@/test/dal-helpers';
 
@@ -34,7 +34,7 @@ const mockLogger = vi.hoisted(() => ({
 
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
-const mockAuditLog = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+const mockAuditLog = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 const mockGetAccountLockoutStatus = vi.hoisted(() => vi.fn());
 const mockRecordFailedAttempt = vi.hoisted(() => vi.fn());
 const mockResetFailedAttempts = vi.hoisted(() => vi.fn());
@@ -66,7 +66,7 @@ vi.mock('./email', () => ({
 vi.mock('bcryptjs', () => ({
   default: {
     compare: vi.fn(),
-    hash: vi.fn().mockResolvedValue('$2a$12$hashedvalue'),
+    hash: vi.fn(() => Promise.resolve('$2a$12$hashedvalue')),
   },
 }));
 
@@ -100,33 +100,9 @@ function buildUser(overrides: Partial<User> = {}): User {
   };
 }
 
-function setupMockClient() {
-  const mockClient = {
-    query: mockClientQuery,
-    release: vi.fn(),
-  };
-  mockGetPoolClient.mockResolvedValue(mockClient);
-  return mockClient;
-}
-
 const context = { ipAddress: '127.0.0.1', userAgent: 'TestAgent/1.0' };
 
 describe('auth service', () => {
-  beforeEach(() => {
-    resetMocks();
-    mockAuditLog.mockReset();
-    mockGetAccountLockoutStatus.mockReset();
-    mockRecordFailedAttempt.mockReset();
-    mockResetFailedAttempts.mockReset();
-    mockCreateToken.mockReset();
-    mockValidateAndConsumeToken.mockReset();
-    mockSendVerificationEmail.mockReset();
-    mockLogger.info.mockClear();
-    mockLogger.error.mockClear();
-    vi.mocked(bcrypt.compare).mockReset();
-    vi.mocked(bcrypt.hash).mockReset().mockResolvedValue('$2a$12$hashedvalue' as never);
-  });
-
   describe('login', () => {
     it('returns user and token on successful login', async () => {
       const userRow = createMockUserRow({ email_verified: true });
@@ -148,13 +124,12 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'password123', context);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.user.id).toBe('test-user-id');
-        expect(result.user.email).toBe('test@example.com');
-        expect(result.token).toBeDefined();
-        expect(result.emailVerificationRequired).toBe(false);
-      }
+      expect(result).toMatchObject({
+        success: true,
+        user: { id: 'test-user-id', email: 'test@example.com' },
+        token: expect.any(String),
+        emailVerificationRequired: false,
+      });
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -189,10 +164,7 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'wrong', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
       // recordFailedAttempt called with real user ID (not null) when user exists
       expect(mockRecordFailedAttempt).toHaveBeenCalledWith('test-user-id', context);
     });
@@ -208,10 +180,10 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'password123', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
+      // A locked account must not reach session creation or reset its counter
+      expect(mockGetPoolClient).not.toHaveBeenCalled();
+      expect(mockResetFailedAttempts).not.toHaveBeenCalled();
     });
 
     it('fails secure when lockout check throws', async () => {
@@ -222,10 +194,10 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'password123', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
+      // Fail-secure: no session may be created when lockout state is unknown
+      expect(mockGetPoolClient).not.toHaveBeenCalled();
+      expect(mockResetFailedAttempts).not.toHaveBeenCalled();
     });
 
     it('still allows login if recordFailedAttempt throws (for valid user, wrong password)', async () => {
@@ -236,8 +208,11 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'wrong', context);
 
-      // Should still return error (not throw)
-      expect(result.success).toBe(false);
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({ source: 'dal_auth', errorType: 'lockout_record_failed' }),
+        'Lockout service error during failed attempt recording'
+      );
     });
 
     it('fires LOGIN_FAILED audit when locked account submits correct password', async () => {
@@ -254,10 +229,7 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'correct-password', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_credentials');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_credentials' });
       // Verify LOGIN_FAILED audit fired with reason: account_locked
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -333,11 +305,11 @@ describe('auth service', () => {
 
       const result = await login('test@example.com', 'password123', context);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.user.id).toBe('test-user-id');
-        expect(result.token).toEqual(expect.any(String));
-      }
+      expect(result).toMatchObject({
+        success: true,
+        user: { id: 'test-user-id' },
+        token: expect.any(String),
+      });
       expect(mockLogger.error).toHaveBeenCalledWith(
         { err: resetErr, source: 'dal_auth', errorType: 'lockout_reset_failed', audit: true },
         'Lockout service error during failed attempts reset'
@@ -422,12 +394,16 @@ describe('auth service', () => {
 
       const result = await register('new@example.com', 'Password1', context);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.user.email).toBe('test@example.com'); // from mock row
-        expect(result.token).toBeDefined();
-      }
+      // Email comes from the mocked user row, not the request
+      expect(result).toMatchObject({
+        success: true,
+        user: { email: 'test@example.com' },
+        token: expect.any(String),
+      });
       expect(mockClient.release).toHaveBeenCalled();
+      // All writes ride one transaction: BEGIN first, COMMIT last
+      expect(mockClientQuery.mock.calls[0][0]).toBe('BEGIN');
+      expect(mockClientQuery.mock.calls[7][0]).toBe('COMMIT');
     });
 
     it('returns email_exists when user already registered', async () => {
@@ -435,10 +411,7 @@ describe('auth service', () => {
 
       const result = await register('existing@example.com', 'Password1', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('email_exists');
-      }
+      expect(result).toEqual({ success: false, error: 'email_exists' });
     });
 
     it('rolls back transaction on failure', async () => {
@@ -452,6 +425,8 @@ describe('auth service', () => {
 
       await expect(register('new@example.com', 'Password1', context))
         .rejects.toThrow('insert failed');
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -469,10 +444,9 @@ describe('auth service', () => {
 
       const result = await register('race@example.com', 'Password1', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('email_exists');
-      }
+      expect(result).toEqual({ success: false, error: 'email_exists' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -526,8 +500,9 @@ describe('auth service', () => {
 
       const result = await register('new@example.com', 'Password1', context);
 
-      // Registration should still succeed
-      expect(result.success).toBe(true);
+      // Registration should still succeed, and no email is sent without a token
+      expect(result).toMatchObject({ success: true });
+      expect(mockSendVerificationEmail).not.toHaveBeenCalled();
     });
 
     it('logs verification email failures (including non-Error rejections) without failing registration', async () => {
@@ -712,10 +687,7 @@ describe('auth service', () => {
         inviteCode: 'CLIN5678',
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.user.organizationId).toBe('org-1');
-      }
+      expect(result).toMatchObject({ success: true, user: { organizationId: 'org-1' } });
       expect(mockClient.release).toHaveBeenCalled();
 
       // Verify addMember was called (9th client query = INSERT INTO organization_members)
@@ -758,10 +730,9 @@ describe('auth service', () => {
         inviteCode: 'BADCODE1',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_invite_code');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_invite_code' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -799,10 +770,12 @@ describe('auth service', () => {
         inviteCode: 'FULL1234',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('no_seats_available');
-      }
+      expect(result).toEqual({ success: false, error: 'no_seats_available' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
+      expect(
+        mockClientQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO organization_members'))
+      ).toBe(false);
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -833,10 +806,9 @@ describe('auth service', () => {
         inviteCode: 'EXPIRED1',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_invite_code');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_invite_code' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -872,10 +844,9 @@ describe('auth service', () => {
         inviteCode: 'NOORG123',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_invite_code');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_invite_code' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -912,10 +883,9 @@ describe('auth service', () => {
         inviteCode: 'BADORG12',
       });
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_invite_code');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_invite_code' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -952,6 +922,7 @@ describe('auth service', () => {
       const userId = await verifyEmail('bad-token');
 
       expect(userId).toBeNull();
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -964,6 +935,8 @@ describe('auth service', () => {
         .mockResolvedValueOnce({ rows: [] }); // ROLLBACK
 
       await expect(verifyEmail('valid-token')).rejects.toThrow('db error');
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -1023,10 +996,7 @@ describe('auth service', () => {
 
       const result = await completePasswordReset('valid-token', 'NewPass1', context);
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.userId).toBe('user-1');
-      }
+      expect(result).toEqual({ success: true, userId: 'user-1' });
       expect(mockClient.release).toHaveBeenCalled();
 
       // Verify transaction sequence
@@ -1035,6 +1005,7 @@ describe('auth service', () => {
       expect(mockClientQuery.mock.calls[2][0]).toContain('DELETE FROM sessions');
       expect(mockClientQuery.mock.calls[3][0]).toContain('failed_login_attempts = 0');
       expect(mockClientQuery.mock.calls[4][0]).toBe('COMMIT');
+      expect(mockDbQuery).not.toHaveBeenCalled();
     });
 
     it('returns invalid_token when token is invalid/expired/consumed', async () => {
@@ -1046,10 +1017,9 @@ describe('auth service', () => {
 
       const result = await completePasswordReset('bad-token', 'NewPass1', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('invalid_token');
-      }
+      expect(result).toEqual({ success: false, error: 'invalid_token' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -1083,10 +1053,9 @@ describe('auth service', () => {
 
       const result = await completePasswordReset('valid-token', 'NewPass1', context);
 
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error).toBe('not_found');
-      }
+      expect(result).toEqual({ success: false, error: 'not_found' });
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 
@@ -1100,6 +1069,8 @@ describe('auth service', () => {
 
       await expect(completePasswordReset('valid-token', 'NewPass1', context))
         .rejects.toThrow('update failed');
+      expect(mockClientQuery).toHaveBeenCalledWith('ROLLBACK');
+      expect(mockClientQuery).not.toHaveBeenCalledWith('COMMIT');
       expect(mockClient.release).toHaveBeenCalled();
     });
 

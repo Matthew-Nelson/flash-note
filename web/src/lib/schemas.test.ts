@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { z } from 'zod';
 import {
   emailSchema,
   passwordSchema,
@@ -10,6 +11,15 @@ import {
   getValidationError,
 } from './schemas';
 
+/** Rejected issues as path/code/message, so a test pins the rule that failed. */
+function issues(result: { error?: { issues: z.ZodIssue[] } }) {
+  return result.error?.issues.map(({ path, code, message }) => ({
+    path: path.join('.'),
+    code,
+    message,
+  }));
+}
+
 describe('Web Validation Schemas', () => {
   describe('emailSchema', () => {
     it('should accept valid email', () => {
@@ -17,13 +27,18 @@ describe('Web Validation Schemas', () => {
     });
 
     it('should reject empty string', () => {
-      const result = emailSchema.safeParse('');
-      expect(result.success).toBe(false);
+      expect(issues(emailSchema.safeParse(''))).toMatchObject([
+        { path: '', message: 'Please enter a valid email address' },
+      ]);
     });
 
     it('should reject invalid email', () => {
-      expect(emailSchema.safeParse('not-an-email').success).toBe(false);
-      expect(emailSchema.safeParse('@').success).toBe(false);
+      expect(issues(emailSchema.safeParse('not-an-email'))).toMatchObject([
+        { path: '', message: 'Please enter a valid email address' },
+      ]);
+      expect(issues(emailSchema.safeParse('@'))).toMatchObject([
+        { path: '', message: 'Please enter a valid email address' },
+      ]);
     });
   });
 
@@ -33,23 +48,37 @@ describe('Web Validation Schemas', () => {
     });
 
     it('should reject empty string', () => {
-      expect(passwordSchema.safeParse('').success).toBe(false);
+      // Empty input fails every rule, not just the length floor.
+      expect(issues(passwordSchema.safeParse(''))).toMatchObject([
+        { message: 'Password must be at least 8 characters' },
+        { message: 'Password must contain at least one uppercase letter' },
+        { message: 'Password must contain at least one lowercase letter' },
+        { message: 'Password must contain at least one number' },
+      ]);
     });
 
     it('should reject password shorter than 8 characters', () => {
-      expect(passwordSchema.safeParse('Pass1').success).toBe(false);
+      expect(issues(passwordSchema.safeParse('Pass1'))).toMatchObject([
+        { message: 'Password must be at least 8 characters' },
+      ]);
     });
 
     it('should reject password without uppercase', () => {
-      expect(passwordSchema.safeParse('password1').success).toBe(false);
+      expect(issues(passwordSchema.safeParse('password1'))).toMatchObject([
+        { message: 'Password must contain at least one uppercase letter' },
+      ]);
     });
 
     it('should reject password without lowercase', () => {
-      expect(passwordSchema.safeParse('PASSWORD1').success).toBe(false);
+      expect(issues(passwordSchema.safeParse('PASSWORD1'))).toMatchObject([
+        { message: 'Password must contain at least one lowercase letter' },
+      ]);
     });
 
     it('should reject password without number', () => {
-      expect(passwordSchema.safeParse('Password').success).toBe(false);
+      expect(issues(passwordSchema.safeParse('Password'))).toMatchObject([
+        { message: 'Password must contain at least one number' },
+      ]);
     });
 
     it('should accept password of exactly 72 characters (bcrypt boundary)', () => {
@@ -62,11 +91,9 @@ describe('Web Validation Schemas', () => {
       // Passwords >72 chars are CPU-intensive but provide no extra security.
       // Enforcing .max(72) prevents CPU DoS against unauthenticated endpoints.
       const password73 = 'A1a' + 'b'.repeat(70); // 3 + 70 = 73 chars
-      const result = passwordSchema.safeParse(password73);
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.error.issues[0].message).toBe('Password must be 72 characters or fewer');
-      }
+      expect(issues(passwordSchema.safeParse(password73))).toMatchObject([
+        { message: 'Password must be 72 characters or fewer' },
+      ]);
     });
   });
 
@@ -84,7 +111,9 @@ describe('Web Validation Schemas', () => {
         email: 'not-an-email',
         password: 'password',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'email', message: 'Please enter a valid email address' },
+      ]);
     });
 
     it('should reject empty email', () => {
@@ -92,7 +121,9 @@ describe('Web Validation Schemas', () => {
         email: '',
         password: 'password',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'email', message: 'Please enter a valid email address' },
+      ]);
     });
 
     it('should reject empty password', () => {
@@ -100,13 +131,22 @@ describe('Web Validation Schemas', () => {
         email: 'test@example.com',
         password: '',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'password', message: 'Password is required' },
+      ]);
     });
 
     it('should reject missing fields', () => {
-      expect(loginSchema.safeParse({}).success).toBe(false);
-      expect(loginSchema.safeParse({ email: 'test@example.com' }).success).toBe(false);
-      expect(loginSchema.safeParse({ password: 'password' }).success).toBe(false);
+      expect(issues(loginSchema.safeParse({}))).toMatchObject([
+        { path: 'email', code: 'invalid_type' },
+        { path: 'password', code: 'invalid_type' },
+      ]);
+      expect(issues(loginSchema.safeParse({ email: 'test@example.com' }))).toMatchObject([
+        { path: 'password', code: 'invalid_type' },
+      ]);
+      expect(issues(loginSchema.safeParse({ password: 'password' }))).toMatchObject([
+        { path: 'email', code: 'invalid_type' },
+      ]);
     });
   });
 
@@ -129,7 +169,9 @@ describe('Web Validation Schemas', () => {
         password: 'Pass1',
         confirmPassword: 'Pass1',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'password', message: 'Password must be at least 8 characters' },
+      ]);
     });
 
     it('should reject password without uppercase letter', () => {
@@ -138,7 +180,9 @@ describe('Web Validation Schemas', () => {
         password: 'password1',
         confirmPassword: 'password1',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'password', message: 'Password must contain at least one uppercase letter' },
+      ]);
     });
 
     it('should reject password without lowercase letter', () => {
@@ -147,7 +191,9 @@ describe('Web Validation Schemas', () => {
         password: 'PASSWORD1',
         confirmPassword: 'PASSWORD1',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'password', message: 'Password must contain at least one lowercase letter' },
+      ]);
     });
 
     it('should reject password without number', () => {
@@ -156,7 +202,9 @@ describe('Web Validation Schemas', () => {
         password: 'Password',
         confirmPassword: 'Password',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'password', message: 'Password must contain at least one number' },
+      ]);
     });
 
     it('should reject empty confirmPassword', () => {
@@ -164,11 +212,10 @@ describe('Web Validation Schemas', () => {
         ...validData,
         confirmPassword: '',
       });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const messages = result.error.issues.map((e) => e.message);
-        expect(messages).toContain('Please confirm your password');
-      }
+      expect(issues(result)).toMatchObject([
+        { path: 'confirmPassword', message: 'Please confirm your password' },
+        { path: 'confirmPassword', message: 'Passwords do not match' },
+      ]);
     });
 
     it('should reject mismatched passwords', () => {
@@ -176,11 +223,9 @@ describe('Web Validation Schemas', () => {
         ...validData,
         confirmPassword: 'Different1',
       });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const paths = result.error.issues.map((e) => e.path.join('.'));
-        expect(paths).toContain('confirmPassword');
-      }
+      expect(issues(result)).toMatchObject([
+        { path: 'confirmPassword', message: 'Passwords do not match' },
+      ]);
     });
 
     it('should reject invalid email', () => {
@@ -188,7 +233,9 @@ describe('Web Validation Schemas', () => {
         ...validData,
         email: 'not-an-email',
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'email', message: 'Please enter a valid email address' },
+      ]);
     });
 
     it('should reject when acceptedLegalTerms is false', () => {
@@ -196,13 +243,17 @@ describe('Web Validation Schemas', () => {
         ...validData,
         acceptedLegalTerms: false,
       });
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'acceptedLegalTerms', message: 'You must accept the legal terms to create an account' },
+      ]);
     });
 
     it('should reject when acceptedLegalTerms is missing', () => {
       const { acceptedLegalTerms: _, ...noConsent } = validData;
       const result = registerSchema.safeParse(noConsent);
-      expect(result.success).toBe(false);
+      expect(issues(result)).toMatchObject([
+        { path: 'acceptedLegalTerms', message: 'You must accept the legal terms to create an account' },
+      ]);
     });
   });
 
@@ -217,22 +268,31 @@ describe('Web Validation Schemas', () => {
     });
 
     it('should reject empty password', () => {
-      expect(resetPasswordSchema.safeParse({ ...validData, password: '' }).success).toBe(false);
+      expect(issues(resetPasswordSchema.safeParse({ ...validData, password: '' }))).toMatchObject([
+        { path: 'password', message: 'Password must be at least 8 characters' },
+        { path: 'password', message: 'Password must contain at least one uppercase letter' },
+        { path: 'password', message: 'Password must contain at least one lowercase letter' },
+        { path: 'password', message: 'Password must contain at least one number' },
+        { path: 'confirmPassword', message: 'Passwords do not match' },
+      ]);
     });
 
     it('should reject weak password', () => {
       expect(
-        resetPasswordSchema.safeParse({ ...validData, password: 'short', confirmPassword: 'short' }).success
-      ).toBe(false);
+        issues(resetPasswordSchema.safeParse({ ...validData, password: 'short', confirmPassword: 'short' }))
+      ).toMatchObject([
+        { path: 'password', message: 'Password must be at least 8 characters' },
+        { path: 'password', message: 'Password must contain at least one uppercase letter' },
+        { path: 'password', message: 'Password must contain at least one number' },
+      ]);
     });
 
     it('should reject empty confirmPassword', () => {
       const result = resetPasswordSchema.safeParse({ ...validData, confirmPassword: '' });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const messages = result.error.issues.map((e) => e.message);
-        expect(messages).toContain('Please confirm your password');
-      }
+      expect(issues(result)).toMatchObject([
+        { path: 'confirmPassword', message: 'Please confirm your password' },
+        { path: 'confirmPassword', message: 'Passwords do not match' },
+      ]);
     });
 
     it('should reject mismatched passwords', () => {
@@ -240,11 +300,9 @@ describe('Web Validation Schemas', () => {
         ...validData,
         confirmPassword: 'Different1',
       });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        const paths = result.error.issues.map((e) => e.path.join('.'));
-        expect(paths).toContain('confirmPassword');
-      }
+      expect(issues(result)).toMatchObject([
+        { path: 'confirmPassword', message: 'Passwords do not match' },
+      ]);
     });
   });
 
@@ -263,10 +321,10 @@ describe('Web Validation Schemas', () => {
 
     it('should return errors for invalid input', () => {
       const result = validateLogin({ email: '', password: '' });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.errors.length).toBeGreaterThan(0);
-      }
+      expect(result).toEqual({
+        success: false,
+        errors: ['Please enter a valid email address', 'Password is required'],
+      });
     });
   });
 
@@ -290,10 +348,16 @@ describe('Web Validation Schemas', () => {
         password: 'short',
         confirmPassword: 'mismatch',
       });
-      expect(result.success).toBe(false);
-      if (!result.success) {
-        expect(result.errors.length).toBeGreaterThan(0);
-      }
+      expect(result).toEqual({
+        success: false,
+        errors: [
+          'Please enter a valid email address',
+          'Password must be at least 8 characters',
+          'Password must contain at least one uppercase letter',
+          'Password must contain at least one number',
+          'You must accept the legal terms to create an account',
+        ],
+      });
     });
   });
 
@@ -308,9 +372,9 @@ describe('Web Validation Schemas', () => {
     });
 
     it('should return first error message for invalid data', () => {
-      const error = getValidationError(loginSchema, { email: '', password: '' });
-      expect(error).toBeTypeOf('string');
-      expect(error!.length).toBeGreaterThan(0);
+      expect(getValidationError(loginSchema, { email: '', password: '' })).toBe(
+        'Please enter a valid email address'
+      );
     });
 
     it('should return "Validation failed" if no error messages', () => {

@@ -6,14 +6,9 @@ import { ManageSubscriptionButton } from './ManageSubscriptionButton';
 // --- vi.hoisted mocks ---
 
 const mockCreatePortalAction = vi.hoisted(() => vi.fn());
-const mockIsAllowedRedirectUrl = vi.hoisted(() => vi.fn());
 
 vi.mock('@/actions/billing', () => ({
   createPortalAction: mockCreatePortalAction,
-}));
-
-vi.mock('@/lib/utils/redirect-validation', () => ({
-  isAllowedRedirectUrl: mockIsAllowedRedirectUrl,
 }));
 
 // Mock window.location.href
@@ -21,9 +16,6 @@ const originalLocation = window.location;
 
 describe('ManageSubscriptionButton', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockIsAllowedRedirectUrl.mockReturnValue(true);
-
     // Mock window.location.href setter
     Object.defineProperty(window, 'location', {
       value: { href: '' },
@@ -79,19 +71,20 @@ describe('ManageSubscriptionButton', () => {
       await user.click(button);
     });
 
-    await waitFor(() => {
-      // Rule 2: error message is a curated string, not the raw error code
-      expect(screen.getByText(/Failed to open billing portal/i)).toBeInTheDocument();
-    });
+    // Rule 2: error message is a curated string, not the raw error code
+    expect(
+      await screen.findByText('Failed to open billing portal. Please try again or contact support.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/billing_error/)).not.toBeInTheDocument();
+    expect(window.location.href).toBe('');
   });
 
-  it('shows error when portal URL is invalid (open redirect guard)', async () => {
+  it('shows error and does not navigate when portal URL is not a Stripe host (open redirect guard)', async () => {
     const user = userEvent.setup();
     mockCreatePortalAction.mockResolvedValue({
       success: true,
       data: { portalUrl: 'https://evil.example.com/steal' },
     });
-    mockIsAllowedRedirectUrl.mockReturnValue(false);
 
     render(<ManageSubscriptionButton />);
 
@@ -100,9 +93,10 @@ describe('ManageSubscriptionButton', () => {
       await user.click(button);
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/Invalid billing portal URL/i)).toBeInTheDocument();
-    });
+    expect(
+      await screen.findByText('Invalid billing portal URL. Please contact support.')
+    ).toBeInTheDocument();
+    expect(window.location.href).toBe('');
   });
 
   it('sets window.location.href on success', async () => {
@@ -112,7 +106,6 @@ describe('ManageSubscriptionButton', () => {
       success: true,
       data: { portalUrl },
     });
-    mockIsAllowedRedirectUrl.mockReturnValue(true);
 
     render(<ManageSubscriptionButton />);
 

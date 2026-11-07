@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { DashboardShell, useSidebar } from './DashboardShell';
 
 // Mock Sidebar to isolate DashboardShell tests
@@ -66,7 +67,8 @@ describe('DashboardShell', () => {
     expect(screen.getByTestId('open-btn')).toBeInTheDocument();
   });
 
-  it('openSidebar sets sidebar to open state', () => {
+  it('openSidebar sets sidebar to open state', async () => {
+    const user = userEvent.setup();
     render(
       <DashboardShell user={{ email: 'test@example.com' }}>
         <ContextReader />
@@ -76,12 +78,13 @@ describe('DashboardShell', () => {
     const sidebar = screen.getByTestId('sidebar');
     expect(sidebar).toHaveAttribute('data-open', 'false');
 
-    fireEvent.click(screen.getByTestId('open-btn'));
+    await user.click(screen.getByTestId('open-btn'));
 
     expect(sidebar).toHaveAttribute('data-open', 'true');
   });
 
-  it('onClose sets sidebar to closed state', () => {
+  it('onClose sets sidebar to closed state', async () => {
+    const user = userEvent.setup();
     render(
       <DashboardShell user={{ email: 'test@example.com' }}>
         <ContextReader />
@@ -90,11 +93,11 @@ describe('DashboardShell', () => {
 
     const sidebar = screen.getByTestId('sidebar');
     // First open
-    fireEvent.click(screen.getByTestId('open-btn'));
+    await user.click(screen.getByTestId('open-btn'));
     expect(sidebar).toHaveAttribute('data-open', 'true');
 
     // Close via sidebar's onClick (which calls onClose)
-    fireEvent.click(sidebar);
+    await user.click(sidebar);
     expect(sidebar).toHaveAttribute('data-open', 'false');
   });
 });
