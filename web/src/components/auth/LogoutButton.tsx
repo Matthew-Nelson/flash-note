@@ -13,9 +13,12 @@ export function LogoutButton() {
       size="sm"
       disabled={isPending}
       onClick={() => {
+        // Notify client components to clear PHI state before logout — Rule 4.
+        // Dispatched outside the transition on purpose: state updates made inside
+        // an async transition don't commit until the whole action resolves, so
+        // the PHI would stay on screen for the length of the logout request.
+        window.dispatchEvent(new CustomEvent('flashnote:logout'));
         startTransition(async () => {
-          // Notify client components to clear PHI state before logout — Rule 4
-          window.dispatchEvent(new CustomEvent('flashnote:logout'));
           // Clear clipboard to remove any PHI (copied SOAP notes) — Rule 4
           if (typeof navigator !== 'undefined' && navigator.clipboard) {
             await navigator.clipboard.writeText('').catch(() => {});

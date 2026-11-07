@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, onTestFinished } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent, { type UserEvent } from '@testing-library/user-event';
+import { useEffect, useState } from 'react';
 import { LogoutButton } from './LogoutButton';
 
 // Mock logoutAction
@@ -113,6 +114,33 @@ describe('LogoutButton', () => {
     const eventCallOrder = logoutListener.mock.invocationCallOrder[0];
     const logoutCallOrder = mockLogoutAction.mock.invocationCallOrder[0];
     expect(eventCallOrder).toBeLessThan(logoutCallOrder);
+  });
+
+  it('lets listeners clear PHI while logoutAction is still pending (Rule 4)', async () => {
+    // Never resolves: the screen must already be clear before the server answers
+    mockLogoutAction.mockReturnValue(new Promise<void>(() => {}));
+
+    function PhiHolder() {
+      const [phi, setPhi] = useState('SOAP note content');
+      useEffect(() => {
+        const clear = (): void => setPhi('');
+        window.addEventListener('flashnote:logout', clear);
+        return () => window.removeEventListener('flashnote:logout', clear);
+      }, []);
+      return <p>{phi || 'cleared'}</p>;
+    }
+
+    render(
+      <>
+        <PhiHolder />
+        <LogoutButton />
+      </>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+
+    expect(await screen.findByText('cleared')).toBeInTheDocument();
+    expect(screen.queryByText('SOAP note content')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Signing out...' })).toBeDisabled();
   });
 
   it('still calls logoutAction even if clipboard.writeText rejects', async () => {
