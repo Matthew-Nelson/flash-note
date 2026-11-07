@@ -76,7 +76,7 @@ export function PatientInfoCard({ patient }: PatientInfoCardProps): React.ReactE
       const fd = new FormData();
       fd.set('firstName', firstName.trim());
       fd.set('lastName', lastName.trim());
-      // Empty string is how the action's normalizer signals "no change / null"
+      // An empty string clears the field: the update action stores it as NULL
       fd.set('dateOfBirth', dob.trim());
       fd.set('pronoun', pronoun);
       fd.set('phone', phone.trim());
