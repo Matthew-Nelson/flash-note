@@ -5,9 +5,10 @@ import { findBuiltinTemplates, findPatientById } from '@/server/dal';
 import { TopBar } from '@/components/TopBar';
 import { NoteGenerationForm } from '@/components/notes';
 import { PatientContextPreview } from '@/components/notes/PatientContextPreview';
+import { patientIdSchema } from '@/lib/schemas/patients';
 
 interface Props {
-  searchParams: Promise<{ patientId?: string }>;
+  searchParams: Promise<{ patientId?: string | string[] }>;
 }
 
 /**
@@ -28,8 +29,11 @@ export default async function NewNotePage({ searchParams }: Props) {
 
   const sp = await searchParams;
   const templates = await findBuiltinTemplates();
-  const selectedPatient = sp.patientId
-    ? await findPatientById({ type: 'user', userId: session.userId }, sp.patientId)
+  // An invalid or repeated ?patientId= is ignored rather than 404ing: the
+  // param only preselects a patient, and the page works without one.
+  const patientId = patientIdSchema.safeParse(sp.patientId);
+  const selectedPatient = patientId.success
+    ? await findPatientById({ type: 'user', userId: session.userId }, patientId.data)
     : null;
 
   return (
@@ -42,7 +46,7 @@ export default async function NewNotePage({ searchParams }: Props) {
             <NoteGenerationForm
               templates={templates}
               selectedPatient={selectedPatient}
-              initialPatientId={sp.patientId ?? null}
+              initialPatientId={selectedPatient?.id ?? null}
             />
           </div>
           <div className="hidden xl:block w-72 flex-shrink-0">

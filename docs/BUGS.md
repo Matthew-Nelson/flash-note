@@ -6,12 +6,6 @@ Entries here are short on purpose. **Before fixing one, reproduce it with a fail
 
 Paths are relative to `web/src/`. Everything below was re-verified against the code on 2026-11-07. That check read the code; it did not run failing tests.
 
-## Data integrity
-
-| Location | Problem |
-|---|---|
-| `actions/notes.ts:503` | `updateNoteSectionsAction` reads the note with `findClinicalNoteById(scope, …)` without the transaction client, so the read happens outside the transaction it writes in. The `updated_at` optimistic lock probably covers it. |
-
 ## Generate → save loop (ROADMAP "Next up" item 1)
 
 | Location | Problem |
@@ -19,7 +13,6 @@ Paths are relative to `web/src/`. Everything below was re-verified against the c
 | `actions/notes.ts:337` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. |
 | `components/notes/NoteGenerationForm.tsx:402` | BUG-UI-12: the generated note renders below the form on the same page instead of in its own view. |
 | Patient detail page, `components/patients/PatientNotesTable.tsx` | Nothing links to `/dashboard/notes/new?patientId=…`, not even the "no notes yet" empty state. The new-note patient field is read-only, so the UI has no way to link a note to a patient. `PatientTypeahead.tsx` is built but rendered nowhere. |
-| `app/dashboard/notes/new/page.tsx:31` | `?patientId=` goes to the DAL without Zod validation (Rule 3). A non-UUID value likely errors with a 500 (not run). |
 | `components/notes/NoteGenerationForm.tsx:340` | "Additional Context" is free text marked TEMPORARY. When a linked patient has stored context, `generateNoteAction` ignores the typed text without telling the user. `saveNoteAction` doesn't persist it, so for an unlinked note the context that shaped generation is lost. Decide whether to keep it, merge it, or remove it. |
 
 ## Accessibility
@@ -51,6 +44,7 @@ Paths are relative to `web/src/`. Everything below was re-verified against the c
 
 | Location | Problem |
 |---|---|
+| `actions/notes.ts:503` | `updateNoteSectionsAction` reads the note with `findClinicalNoteById(scope, …)` outside its transaction; the DAL function takes no client. No wrong result follows: the UPDATE matches only when `updated_at` equals the client's `expectedUpdatedAt`, so a concurrent edit returns `conflict`. |
 | `actions/auth.ts` | On `validation_error`, auth actions return unsanitized Zod `fieldErrors`, unlike notes, patients, and templates, which use `sanitizeFieldErrors`. No auth UI renders them, and they expose schema limits only. |
 | `actions/*.ts` | For an unverified-email session, the 8 notes/patients/templates actions return `unauthenticated`, while `generateNoteAction` and the billing actions return `email_not_verified`. The dashboard layout redirect keeps the UI from hitting this. |
 | `server/db/config.ts:68` | The default `ANTHROPIC_MODEL` `claude-sonnet-4-20250514` was retired on 2026-06-15, so the dev-only Claude provider fails on defaults. The replacement is `claude-sonnet-5-5`. Production rejects `LLM_PROVIDER=claude`. |
