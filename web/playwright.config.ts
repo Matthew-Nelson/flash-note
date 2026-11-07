@@ -1,97 +1,82 @@
 import { defineConfig, devices } from '@playwright/test';
-import path from 'path';
+
+import { E2E_BASE_URL, E2E_DATABASE_URL, E2E_PORT } from './tests/e2e/setup/env';
 
 /**
- * Playwright configuration for FlashNote Web App E2E tests.
+ * Playwright configuration for FlashNote web E2E tests.
  *
- * Unlike the extension tests (single worker, persistent context),
- * web tests use standard browser contexts and can run in parallel.
- *
- * Running tests:
- * - Local: `pnpm test:e2e` (automatically starts backend + Next.js dev server)
- * - CI: Backend and web server are started separately by .github/workflows/e2e.yml
+ * `pnpm test:e2e` recreates the flashnote_e2e database, then starts its own
+ * `next dev` on port 3100 against it. The same path runs locally and in CI.
  */
 export default defineConfig({
   testDir: './tests/e2e',
 
-  // Web tests can run in parallel (unlike extension tests)
   fullyParallel: true,
 
   // Fail CI if .only() is left in tests
   forbidOnly: !!process.env.CI,
 
-  // Retry failed tests in CI
   retries: process.env.CI ? 2 : 0,
 
-  // Use half the available CPUs in CI, more locally
   workers: process.env.CI ? 2 : undefined,
 
-  // Reporter configuration
-  reporter: process.env.CI ? 'github' : 'html',
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'html',
 
-  // Global test timeout
-  timeout: 30000,
+  // The dev server compiles each route on first request, so the first test to
+  // hit a route pays for the compile.
+  timeout: 60000,
 
-  // Expect timeout for assertions
   expect: {
     timeout: 10000,
   },
 
   use: {
-    // Base URL for web app
-    baseURL: process.env.WEB_URL || 'http://localhost:3000',
-
-    // Capture trace on first retry for debugging
+    baseURL: E2E_BASE_URL,
     trace: 'on-first-retry',
-
-    // Screenshot on failure
     screenshot: 'only-on-failure',
-
-    // Video on first retry
     video: 'on-first-retry',
-
-    // Required for CI environments running as root
-    launchOptions: {
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
   },
 
-  // Output directory for test artifacts
   outputDir: './test-results',
 
-  // Single browser - Chrome covers 95%+ of PT users
-  // Add Firefox/Webkit later if cross-browser issues arise
   projects: [
     {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+    {
+      // Single browser: Chrome covers 95%+ of PT users
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      dependencies: ['setup'],
     },
   ],
 
-  // Server lifecycle (local development only)
-  // In CI, servers are started separately by the workflow
-  webServer: process.env.CI
-    ? undefined
-    : [
-        // Start the backend API
-        {
-          command: 'NODE_ENV=test pnpm dev',
-          cwd: path.resolve(__dirname, '../backend'),
-          port: 4000,
-          reuseExistingServer: true,
-          timeout: 120000,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        },
-        // Start the Next.js dev server
-        {
-          command: 'pnpm dev',
-          cwd: __dirname,
-          port: 3000,
-          reuseExistingServer: true,
-          timeout: 120000,
-          stdout: 'pipe',
-          stderr: 'pipe',
-        },
-      ],
+  webServer: {
+    command: 'pnpm exec tsx tests/e2e/setup/prepare-db.ts && pnpm exec next dev --port ' + E2E_PORT,
+    url: E2E_BASE_URL,
+    // Always start fresh: a reused server would keep the previous run's data
+    // and might be a developer's server pointed at the dev database.
+    reuseExistingServer: false,
+    timeout: 180000,
+    stdout: 'pipe',
+    stderr: 'pipe',
+    env: {
+      // Next skips .env.local when NODE_ENV=test, so a developer's real Stripe,
+      // Upstash, Resend and Gemini keys never reach the e2e server.
+      NODE_ENV: 'test',
+      // A separate build dir: Next allows one `next dev` per dir, and this lets
+      // the suite run while a developer's own dev server is up.
+      NEXT_DIST_DIR: '.next-e2e',
+      DISABLE_DEV_INDICATORS: 'true',
+      DATABASE_URL: E2E_DATABASE_URL,
+      E2E_DATABASE_URL,
+      WEB_URL: E2E_BASE_URL,
+      USE_MOCK_AI: 'true',
+      REGISTRATION_MODE: 'open',
+      // No proxy in front of the dev server
+      TRUSTED_PROXY_COUNT: '0',
+      LOG_LEVEL: 'warn',
+    },
+  },
 });

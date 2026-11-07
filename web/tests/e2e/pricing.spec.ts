@@ -1,52 +1,45 @@
-import { test as baseTest, expect as baseExpect } from '@playwright/test';
-import { test as authTest, expect as authExpect } from './fixtures/web';
+import { test, expect } from '@playwright/test';
+
+import { SHARED_USER_STATE } from './fixtures/web';
 
 /**
  * Pricing page E2E tests.
  *
- * Focus: CTAs work correctly, checkout flow handling, auth-aware behavior.
- * Deleted: Pure visibility checks for pricing copy/FAQ content.
+ * The e2e server has no Stripe keys, so these cover everything up to the
+ * Stripe redirect: auth-aware CTAs and the canceled-checkout return.
  */
 
-baseTest.describe('Pricing Page (Unauthenticated)', () => {
-  baseTest.beforeEach(async ({ page }) => {
+test.describe('Pricing Page (Unauthenticated)', () => {
+  test('plan CTA sends a visitor to signup with the plan', async ({ page }) => {
     await page.goto('/pricing');
+    await page.getByRole('button', { name: 'Start Free Trial' }).first().click();
+    await expect(page).toHaveURL(/\/signup\?plan=/);
   });
 
-  baseTest.describe('CTA Buttons', () => {
-    baseTest('clicking plan CTA redirects to signup', async ({ page }) => {
-      const buttons = page.getByRole('button', { name: 'Start Free Trial' });
-      await buttons.first().click();
-      await baseExpect(page).toHaveURL(/\/signup/);
-    });
-  });
+  test('returning from a canceled checkout shows a dismissible alert and cleans the URL', async ({ page }) => {
+    await page.goto('/pricing?canceled=true');
 
-  baseTest.describe('Checkout Flow', () => {
-    baseTest('shows canceled alert when returning from Stripe', async ({ page }) => {
-      await page.goto('/pricing?canceled=true');
-      await baseExpect(page.getByText(/checkout was canceled/i)).toBeVisible();
-    });
+    const alert = page.getByText('Checkout was canceled. No charges were made.');
+    await expect(alert).toBeVisible();
+    await expect(page).toHaveURL('/pricing');
 
-    baseTest('canceled alert can be dismissed', async ({ page }) => {
-      await page.goto('/pricing?canceled=true');
-      const alert = page.getByText(/checkout was canceled/i);
-      await baseExpect(alert).toBeVisible();
-
-      await page.getByRole('button', { name: 'Dismiss' }).click();
-      await baseExpect(alert).not.toBeVisible();
-    });
+    await page.getByRole('button', { name: 'Dismiss' }).click();
+    await expect(alert).toHaveCount(0);
   });
 });
 
-authTest.describe('Pricing Page (Authenticated)', () => {
-  authTest('shows Dashboard link when authenticated', async ({ authenticatedPage: page }) => {
+test.describe('Pricing Page (Authenticated)', () => {
+  test.use({ storageState: SHARED_USER_STATE });
+
+  test('nav shows a Dashboard link instead of sign in', async ({ page }) => {
     await page.goto('/pricing');
-    await authExpect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Sign In' })).toHaveCount(0);
   });
 
-  authTest('shows Subscribe Now buttons when authenticated', async ({ authenticatedPage: page }) => {
+  test('plan buttons offer to subscribe rather than start a trial', async ({ page }) => {
     await page.goto('/pricing');
-    const subscribeButton = page.getByRole('button', { name: /Subscribe Now|Start Free Trial/i });
-    await authExpect(subscribeButton.first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Subscribe Now' })).toHaveCount(2);
+    await expect(page.getByRole('button', { name: 'Start Free Trial' })).toHaveCount(0);
   });
 });
