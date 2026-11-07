@@ -190,7 +190,7 @@ export function NoteGenerationForm({
       <div className="flex gap-6">
         {/* Form column */}
         <div className="flex-1 min-w-0">
-          <form onSubmit={handleSubmit} noValidate>
+          <form method="post" onSubmit={handleSubmit} noValidate>
             {/* Patient selector — displays preselected patient from
                 /notes/new?patientId=... query param (Plan 04-03). A full
                 typeahead replaces this stub in a later iteration. */}

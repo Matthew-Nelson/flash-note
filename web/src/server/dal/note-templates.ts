@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type pg from 'pg';
+
 import { db } from '@/server/db';
 import type {
   NoteTemplate,
@@ -94,38 +96,9 @@ export async function findBuiltinTemplates(): Promise<NoteTemplateWithSections[]
 }
 
 /**
- * Fetch a single template by ID with its sections, regardless of ownership.
- * Callers that need authorization should use findTemplatesByScope() first.
- *
- * Returns null if the template does not exist or is archived.
- */
-export async function findTemplateById(
-  templateId: string
-): Promise<NoteTemplateWithSections | null> {
-  const templateResult = await db.query<NoteTemplateRow>(
-    `SELECT ${TEMPLATE_COLUMNS} FROM note_templates
-     WHERE id = $1 AND archived_at IS NULL`,
-    [templateId]
-  );
-  if (templateResult.rows.length === 0) return null;
-
-  const sectionsResult = await db.query<NoteTemplateSectionRow>(
-    `SELECT ${SECTION_COLUMNS} FROM note_template_sections
-     WHERE template_id = $1
-     ORDER BY sort_order`,
-    [templateId]
-  );
-
-  return {
-    ...rowToTemplate(templateResult.rows[0]),
-    sections: sectionsResult.rows.map((r) => rowToTemplateSection(r)),
-  };
-}
-
-/**
  * List templates visible within scope: built-in templates plus the caller's
  * own / their org's custom templates. Sections are not hydrated by this query
- * (callers that need sections should call findTemplateById).
+ * (callers that need sections should call findTemplateWithUserStyle).
  */
 export async function findTemplatesByScope(
   scope: QueryScope
@@ -152,6 +125,10 @@ export async function findTemplatesByScope(
  * Overlay rule: for each section, if the user has a row in user_style_preferences
  * for that section, their (verbosity, styling) wins; otherwise the section's
  * default (verbosity, styling) is used. LEFT JOIN + COALESCE in SQL.
+ *
+ * Authorization: returns null unless the template is built-in or owned by
+ * `userId`, the same visibility as findTemplatesByScope with a user scope.
+ * Org-shared templates are not visible yet.
  */
 export async function findTemplateWithUserStyle(
   templateId: string,
@@ -159,8 +136,9 @@ export async function findTemplateWithUserStyle(
 ): Promise<NoteTemplateWithSections | null> {
   const templateResult = await db.query<NoteTemplateRow>(
     `SELECT ${TEMPLATE_COLUMNS} FROM note_templates
-     WHERE id = $1 AND archived_at IS NULL`,
-    [templateId]
+     WHERE id = $1 AND archived_at IS NULL
+       AND (is_builtin = TRUE OR user_id = $2)`,
+    [templateId, userId]
   );
   if (templateResult.rows.length === 0) return null;
 
@@ -183,6 +161,26 @@ export async function findTemplateWithUserStyle(
     ...rowToTemplate(templateResult.rows[0]),
     sections: sectionsResult.rows.map((r) => rowToTemplateSection(r)),
   };
+}
+
+/**
+ * Whether `userId` may save a note against this template: it exists, is not
+ * archived, and is built-in or owned by the user. Takes the caller's
+ * transaction client so the check and the INSERT that references the template
+ * see the same snapshot.
+ */
+export async function isTemplateUsableByUser(
+  client: pg.PoolClient,
+  templateId: string,
+  userId: string
+): Promise<boolean> {
+  const result = await client.query(
+    `SELECT 1 FROM note_templates
+     WHERE id = $1 AND archived_at IS NULL
+       AND (is_builtin = TRUE OR user_id = $2)`,
+    [templateId, userId]
+  );
+  return result.rows.length > 0;
 }
 
 // Re-exported for DAL consumers that want to check verbosity/styling types

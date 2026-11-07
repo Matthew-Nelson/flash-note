@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import NewNotePage from './page';
 import type { SessionData } from '@/server/types';
 import { createMockSession } from '@/test/factories/session-factory';
+import { createMockPatient } from '@/test/factories/patient-factory';
 import type { NoteTemplateWithSections, Patient } from '@/lib/types';
 
 // Mock getSession
@@ -50,9 +51,13 @@ vi.mock('@/components/notes/PatientContextPreview', () => ({
   ),
 }));
 
-function makeSearchParams(value: { patientId?: string } = {}): Promise<{ patientId?: string }> {
+function makeSearchParams(
+  value: { patientId?: string | string[] } = {},
+): Promise<{ patientId?: string | string[] }> {
   return Promise.resolve(value);
 }
+
+const PATIENT_ID = '11111111-1111-1111-1111-111111111111';
 
 describe('NewNotePage', () => {
   beforeEach(() => {
@@ -109,22 +114,50 @@ describe('NewNotePage', () => {
   it('calls findPatientById with scope + patientId when ?patientId=... present', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
     await NewNotePage({
-      searchParams: makeSearchParams({ patientId: 'patient-123' }),
+      searchParams: makeSearchParams({ patientId: PATIENT_ID }),
     });
     expect(mockFindPatientById).toHaveBeenCalledWith(
       { type: 'user', userId: 'user-uuid' },
-      'patient-123',
+      PATIENT_ID,
     );
   });
 
-  it('forwards initialPatientId to NoteGenerationForm when query param provided', async () => {
+  it('forwards initialPatientId to NoteGenerationForm when the patient is found', async () => {
     mockGetSession.mockResolvedValue(createMockSession());
+    mockFindPatientById.mockResolvedValue(createMockPatient({ id: PATIENT_ID }));
     render(
       await NewNotePage({
-        searchParams: makeSearchParams({ patientId: 'patient-123' }),
+        searchParams: makeSearchParams({ patientId: PATIENT_ID }),
       }),
     );
     const form = screen.getByTestId('note-generation-form');
-    expect(form).toHaveAttribute('data-initial-patient-id', 'patient-123');
+    expect(form).toHaveAttribute('data-initial-patient-id', PATIENT_ID);
+  });
+
+  it.each([
+    ['not a UUID', 'patient-123'],
+    ['repeated', [PATIENT_ID, PATIENT_ID]],
+  ])('ignores a ?patientId= that is %s without querying the DAL', async (_label, patientId) => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    render(await NewNotePage({ searchParams: makeSearchParams({ patientId }) }));
+    expect(mockFindPatientById).not.toHaveBeenCalled();
+    expect(screen.getByTestId('note-generation-form')).toHaveAttribute(
+      'data-initial-patient-id',
+      '',
+    );
+  });
+
+  it('does not forward a patientId the DAL did not return (other user, archived, or missing)', async () => {
+    mockGetSession.mockResolvedValue(createMockSession());
+    mockFindPatientById.mockResolvedValue(null);
+    render(
+      await NewNotePage({
+        searchParams: makeSearchParams({ patientId: PATIENT_ID }),
+      }),
+    );
+    expect(screen.getByTestId('note-generation-form')).toHaveAttribute(
+      'data-initial-patient-id',
+      '',
+    );
   });
 });

@@ -99,7 +99,7 @@ export default function SignupPage() {
         </p>
       }
     >
-      <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+      <form method="post" className="space-y-6" onSubmit={handleSubmit} noValidate>
         <Input
           label="Email address"
           name="email"
