@@ -16,9 +16,8 @@ import {
   NetworkError,
 } from '@/server/services/llm';
 import {
-  findBuiltinTemplates,
-  findTemplateById,
   findTemplateWithUserStyle,
+  isTemplateUsableByUser,
   findPatientById,
   createClinicalNote,
   findClinicalNoteById,
@@ -120,21 +119,11 @@ export async function generateNoteAction(
   }
 
   // 6. Load template with per-user style overrides (Plan 04-03 / PROMPT-03).
-  //    Fallback to built-in SOAP template when no templateId provided so the
-  //    transitional UI (pre-Task 4a rewrite) keeps working.
+  //    The DAL returns null unless the template is built-in or the user's own.
+  //    No fallback to another template: a requested template the user can't
+  //    see must fail, not silently generate from a different one.
   const effectiveTemplateId = templateId ?? DEFAULT_SOAP_TEMPLATE_ID;
-  let loadedTemplate = await findTemplateWithUserStyle(effectiveTemplateId, session.userId);
-  if (!loadedTemplate) {
-    // Defense-in-depth: findTemplateById (no style overlay) in case the user
-    // has no preferences but the template exists.
-    loadedTemplate = await findTemplateById(effectiveTemplateId);
-  }
-  if (!loadedTemplate) {
-    // Last resort: the seeded builtin SOAP template by ID lookup.
-    const builtins = await findBuiltinTemplates();
-    loadedTemplate =
-      builtins.find((t) => t.id === DEFAULT_SOAP_TEMPLATE_ID) ?? null;
-  }
+  const loadedTemplate = await findTemplateWithUserStyle(effectiveTemplateId, session.userId);
   if (!loadedTemplate) {
     logger.error(
       {
@@ -379,6 +368,11 @@ export async function saveNoteAction(
   const client = await getPoolClient();
   try {
     await client.query('BEGIN');
+
+    if (!(await isTemplateUsableByUser(client, parsed.data.templateId, session.userId))) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'template_unavailable' };
+    }
 
     // M-5: Server-authoritative patientContext snapshot.
     // Re-load the patient INSIDE the transaction and ignore any client-supplied

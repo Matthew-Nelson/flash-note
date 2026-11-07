@@ -20,9 +20,8 @@ const mockGenerateNote = vi.hoisted(() => vi.fn());
 const mockIncrementUsage = vi.hoisted(() => vi.fn());
 const mockAuditLog = vi.hoisted(() => vi.fn());
 const mockAuditLogWithClient = vi.hoisted(() => vi.fn());
-const mockFindTemplateById = vi.hoisted(() => vi.fn());
 const mockFindTemplateWithUserStyle = vi.hoisted(() => vi.fn());
-const mockFindBuiltinTemplates = vi.hoisted(() => vi.fn());
+const mockIsTemplateUsableByUser = vi.hoisted(() => vi.fn());
 const mockFindPatientById = vi.hoisted(() => vi.fn());
 const mockCreateClinicalNote = vi.hoisted(() => vi.fn());
 const mockFindClinicalNoteById = vi.hoisted(() => vi.fn());
@@ -63,9 +62,8 @@ vi.mock('@/server/services/note-generation', () => ({
 }));
 
 vi.mock('@/server/dal', () => ({
-  findTemplateById: mockFindTemplateById,
   findTemplateWithUserStyle: mockFindTemplateWithUserStyle,
-  findBuiltinTemplates: mockFindBuiltinTemplates,
+  isTemplateUsableByUser: mockIsTemplateUsableByUser,
   findPatientById: mockFindPatientById,
   createClinicalNote: mockCreateClinicalNote,
   findClinicalNoteById: mockFindClinicalNoteById,
@@ -174,9 +172,7 @@ describe('generateNoteAction', () => {
     mockGenerateNote.mockResolvedValue(createGenerateResult());
     mockIncrementUsage.mockResolvedValue(undefined);
     mockAuditLog.mockResolvedValue(undefined);
-    mockFindTemplateById.mockResolvedValue(soapTemplate);
     mockFindTemplateWithUserStyle.mockResolvedValue(soapTemplate);
-    mockFindBuiltinTemplates.mockResolvedValue([soapTemplate]);
     mockFindPatientById.mockResolvedValue(null);
   });
 
@@ -618,14 +614,16 @@ describe('generateNoteAction', () => {
     expect(mockFindTemplateWithUserStyle).toHaveBeenCalledWith(SOAP_TEMPLATE_ID, 'user-1');
   });
 
-  it('returns template_unavailable when all template lookups fail', async () => {
+  it('returns template_unavailable when the template is not visible to the user, without substituting another', async () => {
+    const OTHER_USERS_TEMPLATE_ID = '22222222-2222-2222-2222-222222222222';
     mockFindTemplateWithUserStyle.mockResolvedValueOnce(null);
-    mockFindTemplateById.mockResolvedValueOnce(null);
-    mockFindBuiltinTemplates.mockResolvedValueOnce([]);
 
-    const result = await generateNoteAction(makeFormData());
+    const result = await generateNoteAction(
+      makeFormData({ templateId: OTHER_USERS_TEMPLATE_ID }),
+    );
 
     expect(result).toEqual({ success: false, error: 'template_unavailable' });
+    expect(mockFindTemplateWithUserStyle).toHaveBeenCalledWith(OTHER_USERS_TEMPLATE_ID, 'user-1');
     expect(mockGenerateNote).not.toHaveBeenCalled();
   });
 
@@ -727,6 +725,7 @@ describe('saveNoteAction', () => {
     mockCreateInitialVersions.mockResolvedValue([]);
     mockAuditLogWithClient.mockResolvedValue(undefined);
     mockFindPatientById.mockResolvedValue(null);
+    mockIsTemplateUsableByUser.mockResolvedValue(true);
   });
 
   // --- Auth / rate limit ---
@@ -769,6 +768,28 @@ describe('saveNoteAction', () => {
     fd.set('content', '{invalid-json');
     const result = await saveNoteAction(fd);
     expect(result).toEqual({ success: false, error: 'validation_error' });
+  });
+
+  // --- Template authorization ---
+
+  it('checks the template inside the transaction for the session user', async () => {
+    await saveNoteAction(makeSaveFormData({ userId: 'user-2' }));
+
+    expect(mockIsTemplateUsableByUser).toHaveBeenCalledWith(poolClient, SOAP_TEMPLATE_ID, 'user-1');
+    expect(poolClient.query).toHaveBeenNthCalledWith(1, 'BEGIN');
+  });
+
+  it('returns template_unavailable and rolls back when the template is not usable by the user', async () => {
+    mockIsTemplateUsableByUser.mockResolvedValueOnce(false);
+
+    const result = await saveNoteAction(makeSaveFormData());
+
+    expect(result).toEqual({ success: false, error: 'template_unavailable' });
+    expect(poolClient.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(poolClient.query).not.toHaveBeenCalledWith('COMMIT');
+    expect(mockCreateClinicalNote).not.toHaveBeenCalled();
+    expect(mockAuditLogWithClient).not.toHaveBeenCalled();
+    expect(poolClient.release).toHaveBeenCalled();
   });
 
   // --- Happy path transactional flow (Rule 1 + Rule 9) ---
