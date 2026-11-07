@@ -29,7 +29,7 @@ vi.mock('@/components/ui', () => ({
   ),
 }));
 
-const mockClipboardWriteText = vi.fn().mockResolvedValue(undefined);
+const mockClipboardWriteText = vi.fn();
 
 let user: UserEvent;
 

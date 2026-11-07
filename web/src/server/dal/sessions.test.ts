@@ -38,7 +38,7 @@ const { auditService } = await import('@/server/services/audit');
 
 describe('Session DAL', () => {
   beforeEach(() => {
-    // Mock crypto.randomUUID for deterministic tests; restoreMocks undoes this after each test
+    // Mock crypto.randomUUID for deterministic tests; restoreMocks undoes this before the next test
     vi.spyOn(crypto, 'randomUUID').mockReturnValue('test-uuid-token' as `${string}-${string}-${string}-${string}-${string}`);
   });
 

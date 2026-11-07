@@ -377,12 +377,15 @@ describe('generateNoteAction', () => {
   it('strips model and token counts from response (security)', async () => {
     const result = await generateNoteAction(makeFormData());
 
-    // metadata should only have generationTimeMs + optional modality/duration, not model/tokens.
-    // toEqual fails on any extra defined key, so model/inputTokens/outputTokens cannot leak.
+    // metadata is matched exactly, so model/tokens can't hide there; objectContaining
+    // on data would let them through at the top level, hence the explicit checks.
     expect(result).toEqual({
       success: true,
       data: expect.objectContaining({ metadata: { generationTimeMs: 1500 } }),
     });
+    for (const key of ['model', 'inputTokens', 'outputTokens']) {
+      expect(result.success && result.data).not.toHaveProperty(key);
+    }
   });
 
   it('passes patientContext to generateNote when provided', async () => {

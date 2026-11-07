@@ -39,7 +39,6 @@ const mockLogger = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
-  child: vi.fn().mockReturnThis(),
 }));
 
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
@@ -110,7 +109,6 @@ describe('db/index', () => {
   it('does not write pool to globalThis in production', async () => {
     vi.resetModules();
 
-
     vi.stubEnv('NODE_ENV', 'production');
     await import('./index');
     expect(globalForDb._flashnoteDb).toBeUndefined();
@@ -123,7 +121,6 @@ describe('db/index', () => {
 
     // Simulate HMR: reset modules so the next import re-evaluates the module body
     vi.resetModules();
-
 
     // Second import reuses the cached pool — isNewPool is false, so on() is NOT called again
     await import('./index');

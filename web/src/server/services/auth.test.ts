@@ -29,12 +29,12 @@ const mockLogger = vi.hoisted(() => ({
   warn: vi.fn(),
   error: vi.fn(),
   debug: vi.fn(),
-  child: vi.fn().mockReturnThis(),
 }));
 
 vi.mock('@/server/lib/logger', () => ({ logger: mockLogger }));
 
 const mockAuditLog = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
+const mockAuditLogWithClient = vi.hoisted(() => vi.fn(() => Promise.resolve(undefined)));
 const mockGetAccountLockoutStatus = vi.hoisted(() => vi.fn());
 const mockRecordFailedAttempt = vi.hoisted(() => vi.fn());
 const mockResetFailedAttempts = vi.hoisted(() => vi.fn());
@@ -42,7 +42,7 @@ const mockCreateToken = vi.hoisted(() => vi.fn());
 const mockSendVerificationEmail = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/services/audit', () => ({
-  auditService: { log: mockAuditLog, logWithClient: mockAuditLog },
+  auditService: { log: mockAuditLog, logWithClient: mockAuditLogWithClient },
 }));
 
 vi.mock('./lockout', () => ({
@@ -453,7 +453,7 @@ describe('auth service', () => {
     it('fires audit logs inside the transaction via logWithClient (Rule 9)', async () => {
       mockDbQuery.mockResolvedValueOnce({ rows: [] }); // findUserByEmail
 
-      setupMockClient();
+      const mockClient = setupMockClient();
       const userRow = createMockUserRow();
       mockClientQuery
         .mockResolvedValueOnce({ rows: [] })  // BEGIN
@@ -471,12 +471,12 @@ describe('auth service', () => {
       await register('new@example.com', 'Password1', context);
 
       // REGISTER and LEGAL_CONSENT_ACCEPTED should both be called via logWithClient
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({ action: 'REGISTER' })
       );
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({ action: 'LEGAL_CONSENT_ACCEPTED' })
       );
     });
@@ -636,8 +636,8 @@ describe('auth service', () => {
       expect(mockClientQuery.mock.calls[6][0]).toContain('UPDATE invite_codes');
 
       // Verify INVITE_CODE_REDEEMED audit was logged via logWithClient
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({
           action: 'INVITE_CODE_REDEEMED',
           metadata: { codeId: 'code-1' },
@@ -697,8 +697,8 @@ describe('auth service', () => {
       expect(mockClientQuery.mock.calls[9][0]).toContain('organization_id');
 
       // Verify ORG_MEMBER_JOINED audit was logged via logWithClient
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({
           action: 'ORG_MEMBER_JOINED',
           metadata: { organizationId: 'org-1', source: 'registration' },
@@ -706,8 +706,8 @@ describe('auth service', () => {
       );
 
       // Verify INVITE_CODE_REDEEMED audit was also logged via logWithClient
-      expect(mockAuditLog).toHaveBeenCalledWith(
-        expect.anything(), // client
+      expect(mockAuditLogWithClient).toHaveBeenCalledWith(
+        mockClient,
         expect.objectContaining({
           action: 'INVITE_CODE_REDEEMED',
           metadata: { codeId: 'code-2' },

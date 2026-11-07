@@ -31,9 +31,9 @@ describe('CheckoutSuccessAlert', () => {
   it('renders nothing when no ?success param', () => {
     mockSearchParams.get.mockReturnValue(null);
 
-    render(<CheckoutSuccessAlert />);
+    const { container } = render(<CheckoutSuccessAlert />);
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 
   it('renders alert when ?success=true', () => {
@@ -72,8 +72,8 @@ describe('CheckoutSuccessAlert', () => {
   it('does not show alert when ?success=false', () => {
     mockSearchParams.get.mockReturnValue('false');
 
-    render(<CheckoutSuccessAlert />);
+    const { container } = render(<CheckoutSuccessAlert />);
 
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(container).toBeEmptyDOMElement();
   });
 });

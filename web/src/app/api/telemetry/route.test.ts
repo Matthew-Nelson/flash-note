@@ -13,9 +13,7 @@ const mockLoggerChild = vi.hoisted(() =>
     debug: vi.fn(),
   }))
 );
-const mockCheckRateLimit = vi.hoisted(() =>
-  vi.fn().mockResolvedValue({ success: true, limit: 20, remaining: 19, reset: 0 })
-);
+const mockCheckRateLimit = vi.hoisted(() => vi.fn());
 
 vi.mock('@/server/lib/logger', () => ({
   logger: {

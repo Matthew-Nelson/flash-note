@@ -71,7 +71,7 @@ describe('ClaudeProvider', () => {
   });
 
   beforeEach(() => {
-    // unstubGlobals runs after every test, so the stub must be re-armed here
+    // unstubGlobals clears the stub before each test, so it must be re-armed here
     vi.stubGlobal('fetch', mockFetch);
     provider = new ClaudeProvider({
       apiKey: 'test-api-key',

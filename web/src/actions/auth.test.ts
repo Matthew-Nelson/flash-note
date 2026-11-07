@@ -626,10 +626,10 @@ describe('auth actions', () => {
       mockFindByCode.mockResolvedValueOnce({ id: 'code-1', type: 'personal', organizationId: null });
       mockValidateCodeRedeemable.mockReturnValueOnce(null); // null = redeemable
 
-      const result = await validateInviteCodeAction(toFormData({ code: 'VALID1' }));
+      const result = await validateInviteCodeAction(toFormData({ code: ' valid1 ' }));
 
       expect(result).toEqual({ success: true, data: { valid: true, type: 'personal' } });
-      // Code is normalized to upper case before lookup
+      // Code is trimmed and upper-cased before lookup
       expect(mockFindByCode).toHaveBeenCalledWith('VALID1');
       expect(mockAuditLog).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'INVITE_CODE_VALIDATED' })

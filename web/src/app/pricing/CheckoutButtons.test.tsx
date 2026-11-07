@@ -6,19 +6,14 @@ import { CheckoutButtons } from './CheckoutButtons';
 // --- vi.hoisted mocks ---
 
 const mockCreateCheckoutAction = vi.hoisted(() => vi.fn());
-const mockIsAllowedRedirectUrl = vi.hoisted(() => vi.fn());
 const mockRouterPush = vi.hoisted(() => vi.fn());
 
 const mockSearchParams = vi.hoisted(() => ({
-  get: vi.fn().mockReturnValue(null),
+  get: vi.fn(),
 }));
 
 vi.mock('@/actions/billing', () => ({
   createCheckoutAction: mockCreateCheckoutAction,
-}));
-
-vi.mock('@/lib/utils/redirect-validation', () => ({
-  isAllowedRedirectUrl: mockIsAllowedRedirectUrl,
 }));
 
 vi.mock('next/navigation', () => ({
@@ -52,7 +47,6 @@ function renderButtons(overrides: Partial<React.ComponentProps<typeof CheckoutBu
 describe('CheckoutButtons', () => {
   beforeEach(() => {
     mockSearchParams.get.mockReturnValue(null);
-    mockIsAllowedRedirectUrl.mockReturnValue(true);
 
     Object.defineProperty(window, 'history', {
       value: { replaceState: mockReplaceState },
@@ -173,18 +167,17 @@ describe('CheckoutButtons', () => {
     await waitFor(() => {
       expect(window.location.href).toBe(checkoutUrl);
     });
-    expect(mockIsAllowedRedirectUrl).toHaveBeenCalledWith(checkoutUrl);
   });
 
   it('does not redirect when the checkout URL fails redirect validation', async () => {
-    // Open-redirect guard: a server-supplied URL outside the allowlist must never become window.location
+    // Open-redirect guard: runs the real allowlist (Rule 6), so a server-supplied
+    // URL outside it must never become window.location
     const user = userEvent.setup();
     const untrustedUrl = 'https://evil.example.com/steal';
     mockCreateCheckoutAction.mockResolvedValue({
       success: true,
       data: { checkoutUrl: untrustedUrl },
     });
-    mockIsAllowedRedirectUrl.mockReturnValue(false);
 
     renderButtons();
 
@@ -196,7 +189,6 @@ describe('CheckoutButtons', () => {
     await waitFor(() => {
       expect(screen.getByText('Failed to start checkout. Please try again.')).toBeInTheDocument();
     });
-    expect(mockIsAllowedRedirectUrl).toHaveBeenCalledWith(untrustedUrl);
     expect(window.location.href).toBe('');
   });
 

@@ -9,9 +9,8 @@ import { PHI_REDACT_PATHS } from './logger';
  *
  * Strategy: Test PHI redaction against a real Pino instance configured with
  * the exported PHI_REDACT_PATHS (verifying actual behavior, not mocks). The
- * per-field expectations below are the spec: removing a path from production
- * fails the matching test. Test the logger singleton creation by importing it
- * under controlled NODE_ENV. Test createRequestLogger with mocked request headers.
+ * per-field expectations below are the spec: every path has a test, so removing
+ * one from production fails it. Test createRequestLogger with mocked request headers.
  */
 
 /**
@@ -234,6 +233,27 @@ describe('logger PHI redaction', () => {
     logger.info({ record: { firstName: 'Jane' } }, 'test');
     const output = JSON.parse(chunks[0]);
     expect(output.record.firstName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested lastName via *.lastName wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { lastName: 'Doe' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.lastName).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested phone via *.phone wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { phone: '555-0100' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.phone).toBe('[PHI_REDACTED]');
+  });
+
+  it('redacts nested context via *.context wildcard path', () => {
+    const { logger, chunks } = createTestLogger();
+    logger.info({ record: { context: 'post-op TKA' } }, 'test');
+    const output = JSON.parse(chunks[0]);
+    expect(output.record.context).toBe('[PHI_REDACTED]');
   });
 
   it('redacts nested dateOfBirth via *.dateOfBirth wildcard path', () => {

@@ -9,7 +9,8 @@ export function createMockSession(overrides: Partial<SessionData> = {}): Session
     userId: 'user-uuid',
     email: 'therapist@example.com',
     subscriptionStatus: 'active',
-    trialEndsAt: new Date('2026-03-15'),
+    // Relative, so a trialing session built from defaults is still in its trial
+    trialEndsAt: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     emailVerified: true,
     organizationId: null,
     ...overrides,
