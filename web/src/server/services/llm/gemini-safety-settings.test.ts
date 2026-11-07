@@ -11,7 +11,7 @@ import type { LLMRequestConfig, LLMRetryConfig } from './types';
  * threshold across all four harm categories. `BLOCK_MEDIUM_AND_ABOVE` false-positives
  * on clinical pain/treatment/anatomy content, so we deliberately use BLOCK_ONLY_HIGH.
  *
- * See .planning/phases/04-phi-storage/04-RESEARCH.md §7.1.
+ * See §7.1 of https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/.planning/phases/04-phi-storage/04-RESEARCH.md
  *
  * m-7 fallback: if Vertex AI rejects the string literal 'BLOCK_ONLY_HIGH', the provider
  * may fall back to the SDK's `HarmBlockThreshold.BLOCK_ONLY_HIGH` enum — but must NEVER

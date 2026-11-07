@@ -75,13 +75,13 @@ FlashNote is an AI-powered web application that helps Physical Therapists genera
 These decisions are the result of deliberate analysis. Don't re-litigate them without new information.
 
 - **Single-app architecture**: Pure Next.js with integrated backend. Chosen because there is one web client and no API-as-a-service requirement. If we later offer API access to note generation for third-party platforms, this decision should be revisited — that would require extracting a standalone API server.
-- **All-Google infrastructure**: Next.js deployed on Cloud Run (not Vercel). One BAA covers Cloud Run + Cloud SQL + Vertex AI. Eliminates serverless connection pooling concerns — Cloud Run runs the app as a long-lived container where `pg.Pool` works normally. See [docs/archive/planning/NEXTJS_MIGRATION_PLAN.md](docs/archive/planning/NEXTJS_MIGRATION_PLAN.md) for the full infrastructure analysis.
+- **All-Google infrastructure**: Next.js deployed on Cloud Run (not Vercel). One BAA covers Cloud Run + Cloud SQL + Vertex AI. Eliminates serverless connection pooling concerns — Cloud Run runs the app as a long-lived container where `pg.Pool` works normally. See the [Next.js migration plan](https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/archive/planning/NEXTJS_MIGRATION_PLAN.md) (historical) for the full infrastructure analysis.
 - **Auth**: Cookie-based sessions with opaque session tokens. The session ID is stored in an httpOnly cookie; all session state lives in the `sessions` DB table. Opaque tokens were chosen over JWT-in-cookie because every request requires a DB roundtrip for session validation anyway (token revocation, lockout checks), making JWT's "stateless" benefit moot. Opaque tokens are smaller (~36 bytes vs ~500 bytes) and simpler.
 - **Data Access Layer (DAL)**: All database access goes through a centralized DAL. This is the single authorization enforcement layer — the one codebase to audit for HIPAA compliance. See [Rule 5](#rule-5-all-data-access-must-go-through-the-dal).
-- **LLM Provider**: Google Gemini (gemini-2.5-flash) via Vertex AI — chosen for cost efficiency. Vertex AI (not direct Gemini API) for production because it's covered under the Google Cloud BAA.
+- **LLM Provider**: Google Gemini (gemini-2.5-flash) via Vertex AI — chosen for cost efficiency. Vertex AI (not direct Gemini API) for production because it's covered under the Google Cloud BAA. A Claude provider exists for local development only; config rejects `LLM_PROVIDER=claude` in production because there is no Anthropic BAA (`web/src/server/db/config.ts`).
 - **Database**: PostgreSQL on Cloud SQL with raw SQL queries (no ORM)
 - **EMR Integration**: Copy/paste only (v1) — no direct EMR integrations
-- **PHI Storage**: Currently pass-through only (no stored notes). PHI storage for patients, clinical notes, and versioning is designed and on the roadmap — see [docs/planning/PHI_STORAGE_PLAN.md](docs/planning/PHI_STORAGE_PLAN.md)
+- **PHI Storage**: Patients, clinical notes, and append-only note versions are stored in Postgres (`web/src/server/db/migrations/002_phi_storage.sql`). Versions are immutable (DB triggers block UPDATE/DELETE); notes and patients are archived, not deleted. PHI writes and their audit rows share one transaction (Rule 9).
 
 ## Tech Stack
 
@@ -91,8 +91,7 @@ These decisions are the result of deliberate analysis. Don't re-litigate them wi
 - Zod for validation
 - bcryptjs for password hashing
 - Upstash Redis for rate limiting (`@upstash/ratelimit`)
-- `@sentry/nextjs` for error tracking (active)
-- Pino structured logger + `@google-cloud/pino-logging-gcp-config` (planned -- not yet installed)
+- Pino structured logger + `@google-cloud/pino-logging-gcp-config` (`web/src/server/lib/logger.ts`); `pino-pretty` in dev
 - Tailwind CSS for styling
 - Stripe for billing
 - Google Vertex AI for LLM (Gemini 2.5 Flash)
@@ -103,46 +102,44 @@ These decisions are the result of deliberate analysis. Don't re-litigate them wi
 ```
 web/src/
   app/                    # Next.js App Router
-    login/                # Auth pages (flat directories, no route group)
-    signup/
-    forgot-password/
-    reset-password/
-    verify-email/
-    resend-verification/
-    check-email/
-    pricing/              # Public pages
-    terms/
-    privacy/
-    baa/
-    dashboard/            # Protected routes
-      settings/
-      loading.tsx         # Streaming fallback
-      error.tsx           # Error boundary
-      not-found.tsx       # 404 within dashboard
+    login/ signup/ forgot-password/ reset-password/
+    verify-email/ resend-verification/ check-email/   # Auth pages (flat, no route group)
+    pricing/ terms/ privacy/ baa/                     # Public pages
+    dashboard/            # Protected routes (+ loading.tsx, error.tsx, not-found.tsx)
+      notes/              # Notes list, notes/new (generation), notes/[id] (detail + versions)
+      patients/           # Patients list, patients/new, patients/[id]
+      templates/          # Note templates
+      settings/           # Account, password, note style preferences
     api/
       webhooks/stripe/    # Stripe webhook Route Handler
-      health/             # Health check endpoint
-      cleanup/webhook-events/  # Webhook event cleanup
-    layout.tsx            # Root layout
-    error.tsx             # Root error boundary
-    not-found.tsx         # Root 404 page
-    global-error.tsx      # Global error boundary (fatal/render errors)
-  components/             # React components (shared UI)
-    ui/                   # Primitives (Button, Card, Input, Spinner, Alert, Badge, etc.)
-    auth/                 # Auth-related UI (AuthLayout, LogoutButton, SessionAlert, etc.)
-    notes/                # Note generation UI (NoteGenerationForm, GeneratedNote)
+      health/             # Health check (probes the DB)
+      telemetry/          # Client error reports -> server logger
+      cleanup/webhook-events/  # Webhook event cleanup (not yet scheduled)
+    layout.tsx, error.tsx, not-found.tsx, global-error.tsx
+  components/             # React components
+    ui/                   # Primitives (Button, Card, Input, Spinner, Alert, Badge, ConfirmDialog)
+    auth/                 # AuthLayout, LogoutButton, SessionAlert, PasswordResetSection
+    notes/                # Generation form, generated note, note detail, versions, search
+    patients/             # Patient forms, detail, context field, typeahead, search
+    *.tsx                 # Layout chrome: DashboardShell, Sidebar, TopBar, MarketingNav, Footer, BetaBadge, ErrorBoundary
+  hooks/                  # Client hooks (use-phi-cleanup)
   lib/                    # Shared utilities (client + server safe)
-    schemas/              # Zod validation schemas (auth, notes)
+    schemas/              # Zod validation schemas
     types/                # TypeScript type definitions
     utils/                # Pure utility functions
+    telemetry.ts          # Client-side error reporting
   server/                 # Server-only code (enforced by 'server-only' package)
-    dal/                  # Data Access Layer (DB queries, row transforms)
-    services/             # Business logic (auth, billing, email, lockout, token, audit, note-generation, subscription, llm/)
-    db/                   # Database connection pool + migration runner
-    lib/                  # Server utilities (session cookie, rate limiting, request context, validation, etc.)
+    dal/                  # Data Access Layer (all SQL, scope enforcement, row transforms)
+    services/             # Business logic (auth, billing, email, lockout, token, audit, subscription, note-generation, llm/)
+    db/                   # Connection pool, config (env schema), migrations + runner
+    lib/                  # Server utilities (logger, session cookie, rate limiting, request context, validation)
     prompts/              # LLM prompt templates
-  actions/                # Server Actions (grouped by domain: auth, notes, billing)
-  test/                   # Test setup, helpers, factories
+  actions/                # Server Actions: auth, billing, notes, patients, templates
+  test/                   # Test setup, helpers, factories, integration tests
+  proxy.ts                # Next.js proxy (CSP nonce, optimistic auth redirect)
+  instrumentation*.ts     # Server onRequestError logging; client error capture
+web/tests/e2e/            # Playwright suite
+infra/                    # Terraform (Cloud Run, Cloud SQL, ALB, Secret Manager, IAM) — not yet applied
 ```
 
 **Key conventions:**
@@ -153,10 +150,12 @@ web/src/
 
 ## Database Schema
 
-11 tables:
+17 tables. Migrations live in `web/src/server/db/migrations/` (`001_initial_schema.sql`, `002_phi_storage.sql`, `003_seed_soap_prompts.sql`).
+
+Accounts, auth, and billing:
 - `users` - User accounts, subscription info, org membership, email verification, lockout state
 - `sessions` - Session storage (hashed tokens, device binding)
-- `audit_logs` - HIPAA-required action logging (immutable)
+- `audit_logs` - HIPAA-required action logging (immutable via DB triggers)
 - `usage` - Monthly usage tracking (input/output token split)
 - `email_tokens` - Email verification and password reset tokens (hashed, typed, with expiry)
 - `organizations` - Clinic/team management with seat limits
@@ -164,7 +163,15 @@ web/src/
 - `legal_acceptances` - Terms of Service / BAA consent tracking (per document version)
 - `invite_codes` - Personal or clinic-based invitation codes with expiry
 - `processed_webhook_events` - Stripe webhook deduplication (idempotency)
-- `migrations` - Migration tracking (auto-managed)
+
+PHI and notes:
+- `patients` - Patient records and persistent clinical context (PHI)
+- `clinical_notes` - Saved notes: SOAP content, original quick notes, patient context snapshot (PHI)
+- `note_versions` - Append-only version history per note (PHI; immutable via DB triggers)
+- `note_templates` / `note_template_sections` - Note templates; the default SOAP template is seeded with fixed non-RFC IDs (use `z.guid()`, not `z.uuid()`)
+- `user_style_preferences` - Per-user section style overrides (concise/detailed)
+
+- `migrations` - Migration tracking (created by `migrate.ts`)
 
 ## Important Patterns
 
@@ -284,8 +291,8 @@ gcloud run deploy flashnote-web --image=<artifact-registry-url>/flashnote-web --
 ## Security Requirements
 
 - Passwords: bcrypt with 12 rounds minimum
-- Session cookies: `httpOnly`, `Secure`, `SameSite=Lax`, `Path=/`
-- Session expiry: 7 days (configurable), validated against DB on every request
+- Session cookies: `httpOnly`, `Secure` (production only, so local HTTP dev works), `SameSite=Lax`, `Path=/`
+- Session expiry: 24-hour idle timeout with sliding refresh, 7-day absolute maximum (`web/src/server/db/config.ts`), validated against DB on every request
 - Rate limiting: Redis-backed (Upstash) — no in-memory rate limiters (serverless = no persistent memory)
 - Rate limit rules: 5 login attempts per 15 minutes (see rate limit config for full list)
 - All data access requires a valid session except public pages and auth flows
@@ -576,7 +583,7 @@ Next.js runs on Google Cloud Run as a containerized Node.js process. This is NOT
 - **Rate limiting must be Redis-backed.** Use Upstash `@upstash/ratelimit`. In-memory rate limiters would only apply to the single instance that receives the request — ineffective when scaled to multiple instances.
 - **Proxy runs on Node.js runtime.** Next.js 16's `proxy.ts` runs on the Node.js runtime (not Edge). While Node.js modules like `pg` and `bcryptjs` are technically available, the proxy intentionally avoids DB queries — it only checks cookie existence for fast optimistic redirects. Full session validation (DB lookup, lockout check) happens in Server Components and Server Actions via the DAL.
 - **Plan for container restarts.** Cloud Run may restart containers for updates, scaling, or health checks. Don't store durable state in memory. The database is the source of truth for all persistent state.
-- **Trusted proxy count for rate limiting**: Cloud Run's load balancer appends the real client IP to `x-forwarded-for` but does NOT strip client-supplied values. The `TRUSTED_PROXY_COUNT` env var (default: `1`) controls how many proxy hops to skip from the right when extracting the client IP. Set to `0` for local dev without a proxy. Do not take the leftmost IP — it is attacker-controlled.
+- **Trusted proxy count for rate limiting**: Cloud Run's load balancer appends the real client IP to `x-forwarded-for` but does NOT strip client-supplied values. The `TRUSTED_PROXY_COUNT` env var (code default: `1`) controls how many proxy hops to skip from the right when extracting the client IP. The deploy config sets it to `2` (global ALB + Cloud Run frontend; `infra/cloudrun-service.tf`, `.github/workflows/deploy.yml`). Set to `0` for local dev without a proxy. Do not take the leftmost IP — it is attacker-controlled.
 
 ## Next.js Proxy Responsibilities
 
@@ -584,8 +591,10 @@ The proxy (`proxy.ts`) runs on every matched request on the Node.js runtime. Kee
 
 **Proxy DOES:**
 - Generate CSP nonces and set `Content-Security-Policy` headers
-- Read the session cookie and redirect unauthenticated users away from `/dashboard/*` (optimistic check — cookie exists and isn't expired)
-- Allow public routes (`/`, `/login`, `/signup`, `/pricing`, `/terms`, `/privacy`, `/baa`, etc.) without auth checks
+- Read the session cookie and redirect unauthenticated users away from `/dashboard/*` (optimistic check — cookie exists)
+- Redirect users with a session cookie away from `/login` and `/signup` to `/dashboard`, unless the URL carries a known session-end `?reason=`, in which case the stale cookie is cleared
+- Pass every other route through untouched (there is no public-route allowlist; only `/dashboard/*` is gated)
+- Skip `/api/*` entirely (excluded by the matcher), so Route Handlers get no proxy-set CSP header
 
 **Proxy does NOT:**
 - Query the database (intentional — keeps proxy fast)
@@ -597,20 +606,12 @@ The proxy (`proxy.ts`) runs on every matched request on the Node.js runtime. Kee
 
 **Visibility into production errors is critical.** Silent failures in healthcare software are unacceptable.
 
-### Current State
+### Logging Stack
 
-Currently using `console.*` for server-side logging and `@sentry/nextjs` for error tracking (client and server). Next.js instrumentation (`instrumentation.ts`) captures unhandled Server Component/Action errors via Sentry.
-
-### PLANNED -- NOT YET IMPLEMENTED: GCP-Native Logging
-
-> The following describes the **target architecture** for logging. Migration from `console.*` + Sentry to Pino + Cloud Logging is planned but not yet started (see ROADMAP). Until this migration is complete, use `console.error()` for error logging and Sentry for error tracking.
-
-The planned stack: Pino structured logger + `@google-cloud/pino-logging-gcp-config` -> Cloud Logging -> Cloud Error Reporting. Full setup plan: [docs/planning/MONITORING_SETUP.md](docs/planning/MONITORING_SETUP.md)
-
-**Planned logging stack:**
-- **Server-side**: Pino structured logger with `@google-cloud/pino-logging-gcp-config`. Logs flow automatically to Cloud Logging. Cloud Error Reporting groups errors from structured `error`-level log entries.
-- **Client-side**: `POST /api/telemetry` endpoint receives client errors, logs them server-side through the same Pino pipeline.
-- **Next.js instrumentation**: `onRequestError` hook in `instrumentation.ts` captures unhandled Server Component/Action errors.
+- **Server-side**: Pino (`web/src/server/lib/logger.ts`) with `@google-cloud/pino-logging-gcp-config` in production, so logs are structured for Cloud Logging and `error`-level entries group in Cloud Error Reporting. `pino-pretty` in development. The logger redacts known PHI field paths; that is a backstop, not permission to log PHI.
+- **Client-side**: `lib/telemetry.ts` posts client errors to `POST /api/telemetry`, which logs them through the same Pino pipeline. Error boundaries report through it.
+- **Next.js instrumentation**: the `onRequestError` hook in `instrumentation.ts` logs unhandled Server Component/Action errors through Pino.
+- `console.*` is banned by ESLint (`no-console: error`) outside a few inline-disabled bootstrap files.
 
 ### When to Log at Error Level
 
@@ -631,10 +632,10 @@ Log at `error` level (which surfaces in Cloud Error Reporting) when:
 - **Transient background operations** - Polling failures, optional refreshes that retry automatically → `warn` level
 - **High-frequency expected conditions** - Rate limiting during normal operation → `info` level
 
-### How to Log Errors (Planned -- use `console.error()` until Pino migration)
+### How to Log Errors
 
 ```typescript
-// PLANNED: import { logger } from '@/server/lib/logger';
+import { logger } from '@/server/lib/logger';
 
 try {
   await riskyOperation();
@@ -684,61 +685,44 @@ try {
 
 ### HIPAA Audit Log Retention
 
-Cloud Logging log sink exports `audit_logs`-tagged entries to Cloud Storage with a 6-year locked retention policy (HIPAA requirement). This is separate from application-level `audit_logs` table — it's a defense-in-depth backup of the structured log stream.
-
-## Reference Document
-
-See `docs/reference/FLASHNOTE_HANDOFF.md` for complete project specification including:
-- Full API documentation
-- Database schema details
-- PT-specific AI prompts
-- HIPAA compliance checklist
-- Deployment strategy
+**Not yet configured.** The target is a Cloud Logging log sink exporting audit entries to Cloud Storage with a 6-year locked retention policy (HIPAA requirement), as a defense-in-depth backup alongside the application-level `audit_logs` table. Tracked in `docs/LAUNCH_CHECKLIST.md`.
 
 ## Work Priorities
 
-`docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Work is organized into **dependency-ordered phases**:
-
-- **Phase 0** (pre-migration foundations): HIPAA infrastructure, database schema hardening, prompt engineering, security audit triage
-- **Phase 1** (Next.js migration): Infrastructure scaffold → DAL → sessions → auth → proxy → notes → billing → integration tests
-- **Phase 2** (PHI storage): Patients, clinical notes, templates, versioning. Blocked on Phase 1 + HIPAA infra.
-- **Phase 3** (quality & features): UI quality, testing, accessibility, monitoring, clinic features
-
-When picking up work, start from the lowest incomplete phase. Don't jump to a later phase unless earlier phases are done or explicitly blocked on non-code dependencies (e.g., BAA signing).
+`docs/ROADMAP.md` is the single source of truth for what to work on and in what order. Its **Next up** section lists the work in priority order. Feature work comes before deployment: the project is a portfolio piece and the deployment track (`docs/LAUNCH_CHECKLIST.md`) is deferred.
 
 ## Documentation Guidelines
 
-**Status tracking convention:**
-- `docs/ROADMAP.md` — **single source of truth** for all code/technical task status
-- `docs/PRE_LAUNCH_CHECKLIST.md` — business, legal, and ops tasks
-- `docs/SUCCESS_METRICS.md` — quality gate criteria (pass/fail definitions, not task tracking)
-- **Planning docs never track status** — they describe *what* to build; ROADMAP tracks *is it done*
+**Where things live:**
+- `docs/ROADMAP.md` — **single source of truth** for technical task status and what's next
+- `docs/BUGS.md` — the only bug list (open and suspected bugs)
+- `docs/LAUNCH_CHECKLIST.md` — gates for the deferred deployment (infra, ops, payments, legal)
+- `docs/compliance/` — audit logging, incident response, testing strategy
+- `docs/STRIPE.md`, `docs/DESIGN_SYSTEM.md`, `docs/COMPONENT_PATTERNS.md` — reference
+- `docs/legal/` — legal drafts pending attorney review
 
 **Before starting a task:**
-1. Check `docs/ROADMAP.md` to understand current phase and priorities
-2. Review relevant docs in `docs/` that may inform your approach:
-   - `docs/guides/` - API reference and operational procedures
-   - `docs/planning/` - Design specs and research (don't implement unless asked)
-   - `docs/compliance/` - Security and testing requirements
-   - `docs/reference/` - Project specifications
+1. Check `docs/ROADMAP.md` for current priorities and `docs/BUGS.md` for known issues in the area
+2. Read the code you'll change. Docs can lag the code; the code wins.
 
 **After completing a task:**
-1. Update `docs/ROADMAP.md` to mark the item done
-2. Update any other docs affected by the changes
-3. Move fully-implemented planning docs to `docs/archive/`
+1. Update `docs/ROADMAP.md` (mark done, add to Recently completed)
+2. Remove fixed entries from `docs/BUGS.md`
+3. Update any other doc whose claims the change made false
 
 **Documentation principles:**
 - Keep docs current — outdated docs are worse than no docs
-- Single source of truth — task status lives in ROADMAP.md, not in planning docs
-- Don't over-document — only document what provides ongoing value
+- Delete, don't archive — git history is the archive; link an old version with a commit permalink if needed
+- Every claim must be checkable — cite a file path or command; don't write numbers you haven't measured
+- Planning docs are allowed while work is in progress; delete them when it ships
 - Prefer updating existing docs over creating new ones
-- Archive completed work rather than deleting (for historical reference)
 
 **What NOT to document:**
 - Trivial implementation details obvious from the code
 - Temporary debugging notes
 - Duplicate information already in another doc
 - Speculative features not discussed with the user
+- Business, financial, or personal planning (the repo is public)
 
 ## Additional Rules
 - Always use Context7 MCP when I need library/API documentation, code generation, setup or configuration steps without me having to explicitly ask.
