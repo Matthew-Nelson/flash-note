@@ -761,8 +761,8 @@ Full requirements: [compliance/TESTING_STRATEGY.md](./compliance/TESTING_STRATEG
 | Task | Priority | Status |
 |------|----------|--------|
 | Integration tests (auth lifecycle, sessions, billing webhooks) | P0 | ❌ |
-| E2E: Auth flow tests (login, register, logout, password reset) | P0 | ❌ |
-| E2E: Note generation flow | P0 | ❌ |
+| E2E: Auth flow tests (login, register, logout, password reset) | P0 | ✅ |
+| E2E: Note generation flow | P0 | ✅ (generation, gating, list/search/edit/archive; save-from-generation has no UI yet) |
 | E2E: Copy functionality edge cases | P1 | ❌ |
 | E2E: Rate limiting UX | P1 | ❌ |
 | DAST scanning (OWASP ZAP) in CI | P1 | ❌ |
@@ -864,6 +864,7 @@ Post-launch:
 
 | Item | Notes |
 |------|-------|
+| E2E Suite Remediation | Playwright suite rewritten for cookie sessions (old suite logged in through the deleted Express backend). Isolated `flashnote_e2e` DB recreated per run + its own `next dev` on :3100 with mock AI and no third-party keys. New coverage: lockout threshold, verification and password reset with real tokens, signed-out token replay, forged session cookie, cross-account note/patient access, Rule 4 logout clearing, note generation and subscription gating, notes list/search/edit/archive, patients. 89 tests. E2E workflow runs on main after merge. Found and fixed: saved-note edits always reported a false conflict (ms vs µs `updated_at` lock). |
 | Test Suite Remediation | Global Vitest isolation (`mockReset`, `restoreMocks`, `unstubEnvs`, `unstubGlobals`, silent logger). DAL/action/page authorization tests now assert the SQL scope filter, params, and "no DAL call when unauthenticated" instead of mocked return values; transaction failure paths assert ROLLBACK and no COMMIT; real Stripe signature verification test. `fireEvent` → `userEvent`, shared session/FormData factories, dead `src/test/helpers.ts` removed. 2219 → 2247 tests, no test deleted. Real-DB integration tests and CI Postgres still outstanding. |
 | Phase 1.6: Billing (PR #89) | Stripe billing service, webhook handlers with idempotency, checkout + portal Server Actions, pricing page converted to Server Component, old auth infrastructure deleted (8 files, 1361 lines). Code review fixes: env var mismatch, unsafe Stripe casts, audit log catch handlers, lazy singleton, H-2 guard widened, duplicate webhook log removed. 1195 tests, 98%+ coverage. |
 | Phase 1.4.5: Auth Page Rewiring (Gap Audit) | Converted 6 auth pages from `api.ts`/`useAuth()` to Server Actions. SessionAlert now reads URL query params instead of auth context. Middleware redirects authenticated users from `/login`/`/signup`. Logout appends `?reason=logged_out`. Gap audit identified 6 gaps in migration plan — 2 critical (auth page rewiring + old auth file deletion). 74 page tests rewritten. |
