@@ -47,17 +47,34 @@ test.describe('Patients', () => {
     await expect(page.getByRole('link', { name: `Pat ${other}` })).toHaveCount(0);
   });
 
-  test('a note started from a patient is generated with that patient selected', async ({ page }) => {
+  test('a note started from a patient is reviewed, saved, and listed on their record', async ({ page }) => {
     const user = await signInNewUser(page, { label: 'patient-note' });
     const lastName = uniqueWord('Hopper');
     const patient = await createPatient(user.id, { firstName: 'Grace', lastName });
 
-    await page.goto(`/dashboard/notes/new?patientId=${patient.id}`);
+    await page.goto(`/dashboard/patients/${patient.id}`);
+    await page.getByRole('main').getByRole('link', { name: 'New note', exact: true }).click();
+    await expect(page).toHaveURL(`/dashboard/notes/new?patientId=${patient.id}`);
     await expect(page.getByRole('textbox', { name: /^Patient/ })).toHaveValue(`Grace ${lastName}`);
 
     await fill(page.getByLabel('Session Notes'), 'Pt reports R shoulder pain 3/10');
     await page.getByRole('button', { name: 'Generate Professional Note' }).click();
-    await expect(page.getByText('Patient reports pain level of 4/10 at rest')).toBeVisible();
+
+    // The review replaces the form, and an edit made here is what gets saved
+    await expect(page.getByLabel('Session Notes')).toBeHidden();
+    await page.getByRole('button', { name: 'Edit Subjective section' }).click();
+    await page.getByRole('textbox', { name: 'Edit Subjective section content' }).fill('Edited during review.');
+    await page.getByRole('button', { name: 'Save Subjective section' }).click();
+    await page.getByRole('button', { name: 'Save note' }).click();
+
+    await expect(page).toHaveURL(/\/dashboard\/notes\/[0-9a-f-]{36}$/);
+    await expect(page.getByRole('heading', { name: `Note — Grace ${lastName}` })).toBeVisible();
+    await expect(page.getByText('Edited during review.')).toBeVisible();
+
+    await page.goto(`/dashboard/patients/${patient.id}`);
+    const notes = page.getByRole('table', { name: 'Notes for this patient' });
+    await expect(notes.getByRole('row')).toHaveCount(2); // header + the saved note
+    await expect(notes).toContainText('Edited during review.');
   });
 
   test("a patient's saved notes are listed on their record and open the note", async ({ page }) => {
