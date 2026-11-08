@@ -61,10 +61,8 @@ export interface GenerateNoteResponse {
 }
 
 /**
- * Default SOAP template UUID (seeded in migration 002). Used when an older
- * caller doesn't explicitly pass `templateId`. Plan 04-03 Task 4a's rewrite of
- * NoteGenerationForm will always pass an explicit templateId; this fallback
- * maintains backward compatibility with the transitional UI.
+ * Default SOAP template UUID (seeded in migration 002). The generate form
+ * doesn't send a templateId, so every generation uses this template today.
  */
 const DEFAULT_SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
 

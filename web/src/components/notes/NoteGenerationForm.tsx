@@ -101,8 +101,10 @@ export function NoteGenerationForm({
   const [patientContext, setPatientContext] = useState('');
   const [generatedNote, setGeneratedNote] = useState<GenerateNoteResponse | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // Save errors use the shared note copy: the local table above is worded for
+  // generation ("sign in to generate notes").
+  const [saveErrorCode, setSaveErrorCode] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
-  const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [isPending, startTransition] = useTransition();
   const [isSaving, startSaving] = useTransition();
   const router = useRouter();
@@ -114,6 +116,17 @@ export function NoteGenerationForm({
   // that completes after sign-out doesn't navigate to the note.
   const generationRef = useRef(0);
 
+  // Discard unmounts the focused Discard button; put focus back on the input
+  // the clinician returns to edit. Only after a discard, not on first render.
+  const quickNotesRef = useRef<HTMLTextAreaElement>(null);
+  const focusNotesAfterDiscard = useRef(false);
+  useEffect(() => {
+    if (!generatedNote && focusNotesAfterDiscard.current) {
+      focusNotesAfterDiscard.current = false;
+      quickNotesRef.current?.focus();
+    }
+  }, [generatedNote]);
+
   // Rule 4: Clear all PHI state when logout is initiated OR when navigating
   // away from /dashboard/notes/new via usePhiCleanup.
   function clearPhi() {
@@ -124,8 +137,8 @@ export function NoteGenerationForm({
     setDuration('');
     setGeneratedNote(null);
     setErrorCode(null);
+    setSaveErrorCode(null);
     setFieldErrors(null);
-    setActiveStep(1);
   }
   const cleanupRef = useRef(clearPhi);
 
@@ -140,8 +153,6 @@ export function NoteGenerationForm({
     e.preventDefault();
     setErrorCode(null);
     setFieldErrors(null);
-    setGeneratedNote(null);
-    setActiveStep(1);
     const generation = ++generationRef.current;
     startTransition(async () => {
       const formData = new FormData();
@@ -158,7 +169,6 @@ export function NoteGenerationForm({
       if (generation !== generationRef.current) return;
       if (result.success) {
         setGeneratedNote(result.data);
-        setActiveStep(2);
       } else {
         setErrorCode(result.error);
         if (result.fieldErrors) {
@@ -169,15 +179,15 @@ export function NoteGenerationForm({
   }
 
   function handleDiscard() {
+    focusNotesAfterDiscard.current = true;
     setGeneratedNote(null);
-    setErrorCode(null);
-    setActiveStep(1);
+    setSaveErrorCode(null);
   }
 
   // The form is hidden while a note is under review, so its fields still hold
   // the values the note was generated from.
   function handleSave(note: GenerateNoteResponse, content: NoteSection[]) {
-    setErrorCode(null);
+    setSaveErrorCode(null);
     const generation = generationRef.current;
     startSaving(async () => {
       const formData = new FormData();
@@ -194,7 +204,7 @@ export function NoteGenerationForm({
       if (result.success) {
         router.push(`/dashboard/notes/${result.data.id}`);
       } else {
-        setErrorCode(result.error);
+        setSaveErrorCode(result.error);
       }
     });
   }
@@ -209,7 +219,7 @@ export function NoteGenerationForm({
 
   return (
     <div>
-      <StepIndicator activeStep={activeStep} />
+      <StepIndicator activeStep={generatedNote ? 2 : 1} />
 
       {/* Error display — above form per spec */}
       <div aria-live="assertive">
@@ -218,6 +228,11 @@ export function NoteGenerationForm({
             {/* Prefer curated message from local table; fall back to shared
                 mapNoteError() which covers the Plan 04-03 codes. */}
             {NOTE_ERROR_MESSAGES[errorCode] ?? mapNoteError(errorCode)}
+          </Alert>
+        )}
+        {saveErrorCode && (
+          <Alert variant="error" className="mb-5">
+            {mapNoteError(saveErrorCode)}
           </Alert>
         )}
       </div>
@@ -362,6 +377,7 @@ export function NoteGenerationForm({
                   Session Notes <span className="text-fn-error">*</span>
                 </label>
                 <textarea
+                  ref={quickNotesRef}
                   id="quickNotes"
                   name="quickNotes"
                   value={quickNotes}

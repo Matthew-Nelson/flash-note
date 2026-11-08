@@ -32,6 +32,9 @@ export type Modality = z.infer<typeof generateNoteSchema>['modality'];
  */
 export const noteIdSchema = z.guid();
 
+/** Longest section content a save or edit accepts; the edit UI caps input to match. */
+export const NOTE_SECTION_MAX_LENGTH = 10000;
+
 /**
  * A single section in the saved note content JSONB array.
  * sectionId references note_template_sections.id.
@@ -40,7 +43,7 @@ export const noteIdSchema = z.guid();
 const noteSectionSchema = z.object({
   sectionId: z.guid(),
   title: z.string().min(1).max(100),
-  content: z.string().max(10000),
+  content: z.string().max(NOTE_SECTION_MAX_LENGTH),
 });
 
 /**
@@ -78,7 +81,7 @@ export const updateNoteSectionsSchema = z.object({
   noteId: z.guid(),
   expectedUpdatedAt: z.string().datetime(),
   sections: z
-    .record(z.guid(), z.string().max(10000))
+    .record(z.guid(), z.string().max(NOTE_SECTION_MAX_LENGTH))
     .refine(
       (v) => Object.keys(v).length > 0,
       'At least one section must be provided'

@@ -779,6 +779,35 @@ describe('NoteGenerationForm', () => {
     expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent('1');
   });
 
+  it('returns focus to the session notes after discarding', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Discard and edit session notes' }));
+
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveFocus();
+  });
+
+  it('does not take focus when the form first renders', () => {
+    render(<NoteGenerationForm />);
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).not.toHaveFocus();
+  });
+
+  it('words a signed-out save failure for saving, not generating', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    mockSaveNoteAction.mockResolvedValue({ success: false, error: 'unauthenticated' });
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+
+    expect(await screen.findByText('Please sign in to continue.')).toBeInTheDocument();
+    expect(screen.queryByText(/generate notes/i)).not.toBeInTheDocument();
+  });
+
   it('saves the reviewed note with its generation inputs, then opens it', async () => {
     const NOTE_ID = '55555555-5555-5555-5555-555555555555';
     const PATIENT_ID = '11111111-1111-1111-1111-111111111111';

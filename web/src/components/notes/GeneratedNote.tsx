@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { GenerateNoteResponse } from '@/actions/notes';
 import { Button } from '@/components/ui';
+import { NOTE_SECTION_MAX_LENGTH } from '@/lib/schemas/notes';
 import type { NoteSection as NoteSectionData } from '@/lib/types';
 
 type BillingData = NonNullable<GenerateNoteResponse['billing']>;
@@ -19,7 +20,11 @@ interface GeneratedNoteProps {
 }
 
 interface NoteSectionProps {
+  /** Template section id; unique per note, so it names the heading. */
+  sectionId: string;
   title: string;
+  /** Locks the section while the note is saving. */
+  disabled: boolean;
   content: string;
   isEditing?: boolean;
   editValue?: string;
@@ -173,7 +178,9 @@ function FullCopyButton({ text, label }: { text: string; label: string }) {
 
 /** SOAP section card with teal accent bar. Supports view and edit modes. */
 function NoteSection({
+  sectionId,
   title,
+  disabled,
   content,
   isEditing = false,
   editValue,
@@ -182,7 +189,7 @@ function NoteSection({
   onSave,
   onCancelEdit,
 }: NoteSectionProps) {
-  const sectionId = `section-heading-${title.toLowerCase()}`;
+  const headingId = `section-heading-${sectionId}`;
   const liveRegionRef = useRef<HTMLSpanElement>(null);
 
   function handleSave() {
@@ -201,7 +208,7 @@ function NoteSection({
 
   return (
     <section
-      aria-labelledby={sectionId}
+      aria-labelledby={headingId}
       className={`card border-l-[3px] border-fn-primary mb-4 ${
         isEditing ? 'ring-2 ring-fn-primary bg-fn-primary-50' : ''
       }`}
@@ -209,7 +216,7 @@ function NoteSection({
       <div className="flex items-center justify-between p-3 pb-0">
         <div className="flex items-center gap-2">
           <h3
-            id={sectionId}
+            id={headingId}
             className="text-fn-sm font-semibold text-fn-text-primary uppercase tracking-wide"
           >
             {title}
@@ -226,6 +233,7 @@ function NoteSection({
               <button
                 type="button"
                 onClick={handleCancel}
+                disabled={disabled}
                 className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-fn-text-secondary hover:text-fn-text-primary transition-colors rounded border border-transparent hover:border-fn-border cursor-pointer text-fn-sm"
                 aria-label={`Cancel editing ${title} section`}
               >
@@ -234,6 +242,7 @@ function NoteSection({
               <button
                 type="button"
                 onClick={handleSave}
+                disabled={disabled}
                 className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-fn-primary hover:text-fn-primary-dark transition-colors rounded border border-transparent hover:border-fn-primary cursor-pointer text-fn-sm font-medium"
                 aria-label={`Save ${title} section`}
               >
@@ -246,6 +255,7 @@ function NoteSection({
               <button
                 type="button"
                 onClick={onStartEdit}
+                disabled={disabled}
                 className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] p-2 text-fn-text-secondary hover:text-fn-text-primary transition-colors rounded border border-transparent hover:border-fn-border cursor-pointer"
                 aria-label={`Edit ${title} section`}
               >
@@ -263,6 +273,8 @@ function NoteSection({
           <textarea
             value={editValue ?? content}
             onChange={(e) => onEditChange?.(e.target.value)}
+            readOnly={disabled}
+            maxLength={NOTE_SECTION_MAX_LENGTH}
             aria-label={`Edit ${title} section content`}
             className="input-field w-full p-2 text-fn-sm text-fn-text-secondary leading-relaxed whitespace-pre-wrap resize-y min-h-[120px] bg-transparent"
           />
@@ -534,6 +546,13 @@ export function GeneratedNote({ note, onSave, isSaving }: GeneratedNoteProps) {
 
   const [generatedDate] = useState(() => new Date().toLocaleDateString());
 
+  // The review replaces the form, unmounting whatever had focus; move focus
+  // to the review's heading so keyboard and screen-reader users land on it.
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
   // An edit still open in a section counts, the same as for Copy All: what
   // the clinician sees on screen is what gets saved.
   const currentEdits = { ...editedNote, ...editingSections };
@@ -546,9 +565,13 @@ export function GeneratedNote({ note, onSave, isSaving }: GeneratedNoteProps) {
 
   return (
     <div className="mt-8">
-      {/* Action bar: h2 + Copy All */}
+      {/* Action bar: h2 + Save note + Copy All */}
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-fn-lg font-semibold text-fn-text-primary">
+        <h2
+          ref={headingRef}
+          tabIndex={-1}
+          className="text-fn-lg font-semibold text-fn-text-primary outline-none"
+        >
           Generated SOAP Note
         </h2>
         <div className="flex items-start gap-2">
@@ -620,7 +643,9 @@ export function GeneratedNote({ note, onSave, isSaving }: GeneratedNoteProps) {
             return (
               <NoteSection
                 key={sectionId}
+                sectionId={sectionId}
                 title={title}
+                disabled={isSaving}
                 content={displayContent}
                 isEditing={editingSections[sectionId] !== undefined}
                 editValue={editingSections[sectionId]}

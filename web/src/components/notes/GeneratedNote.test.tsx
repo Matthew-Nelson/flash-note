@@ -928,4 +928,51 @@ describe('GeneratedNote', () => {
       expect(screen.getByRole('button', { name: /Save note/ })).toBeDisabled();
     });
   });
+
+  describe('review accessibility and limits', () => {
+    it('moves focus to the review heading when the note appears', () => {
+      render(<GeneratedNote note={buildNote()} onSave={noop} isSaving={false} />);
+      expect(screen.getByRole('heading', { level: 2, name: 'Generated SOAP Note' })).toHaveFocus();
+    });
+
+    it('caps a section edit at the length the save accepts', async () => {
+      const user = userEvent.setup();
+      render(<GeneratedNote note={buildNote()} onSave={noop} isSaving={false} />);
+      await user.click(screen.getByRole('button', { name: 'Edit Subjective section' }));
+      expect(
+        screen.getByRole('textbox', { name: 'Edit Subjective section content' }),
+      ).toHaveAttribute('maxLength', '10000');
+    });
+
+    it('locks section edits while the note is saving', async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <GeneratedNote note={buildNote()} onSave={noop} isSaving={false} />,
+      );
+      await user.click(screen.getByRole('button', { name: 'Edit Plan section' }));
+      rerender(<GeneratedNote note={buildNote()} onSave={noop} isSaving />);
+
+      expect(screen.getByRole('textbox', { name: 'Edit Plan section content' })).toHaveAttribute('readonly');
+      expect(screen.getByRole('button', { name: 'Save Plan section' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Cancel editing Plan section' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Edit Subjective section' })).toBeDisabled();
+    });
+
+    it('names each section by its own heading, even with spaces or repeated titles', () => {
+      const note = buildNote({
+        content: [
+          { sectionId: '00000000-0000-0000-0000-0000000000c1', title: 'Chief Complaint', content: 'Knee pain.' },
+          { sectionId: '00000000-0000-0000-0000-0000000000c2', title: 'Notes', content: 'First.' },
+          { sectionId: '00000000-0000-0000-0000-0000000000c3', title: 'Notes', content: 'Second.' },
+        ],
+      });
+      render(<GeneratedNote note={note} onSave={noop} isSaving={false} />);
+
+      expect(screen.getByRole('region', { name: 'Chief Complaint' })).toHaveTextContent('Knee pain.');
+      const notes = screen.getAllByRole('region', { name: 'Notes' });
+      expect(notes).toHaveLength(2);
+      expect(notes[0]).toHaveTextContent('First.');
+      expect(notes[1]).toHaveTextContent('Second.');
+    });
+  });
 });
