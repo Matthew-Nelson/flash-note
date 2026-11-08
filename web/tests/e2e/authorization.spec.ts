@@ -64,11 +64,16 @@ test.describe('Cross-account access', () => {
     // The page loads the patient through the DAL with the intruder's scope, so nothing is shown
     await expect(page.getByRole('textbox', { name: /^Patient/ })).toHaveValue('');
 
-    // The id still rides along in the form; the action must refuse it server-side
+    // The page also drops the id, so the generation request never carries it
+    // and the note isn't tied to the owner's patient. Server-side refusal of a
+    // foreign patientId is covered in actions/notes.test.ts (generate and save).
     await fill(page.getByLabel('Session Notes'), 'Pt reports knee pain');
+    const generateRequest = page.waitForRequest(
+      (req) => req.method() === 'POST' && new URL(req.url()).pathname === '/dashboard/notes/new',
+    );
     await page.getByRole('button', { name: 'Generate Professional Note' }).click();
-    await expect(page.getByText("This patient no longer exists or you don't have access to it.")).toBeVisible();
-    await expect(page.getByText('Patient reports pain level of 4/10 at rest')).toHaveCount(0);
+    expect((await generateRequest).postData() ?? '').not.toContain(ownerPatient.id);
+    await expect(page.getByText('Patient reports pain level of 4/10 at rest')).toBeVisible();
   });
 
   test('the owner can open the same note and patient', async ({ page }) => {
