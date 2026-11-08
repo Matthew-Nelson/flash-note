@@ -17,7 +17,7 @@ What is built and on `main` today:
 
 - **Auth.** Email/password signup with invite-code gating, email verification, password reset, opaque-token cookie sessions (24h idle, 7-day absolute), progressive lockout, and Upstash rate limiting.
 - **Note generation.** Gemini 2.5 Flash; production config enforces Vertex AI with ADC, and a Claude provider exists for dev only. Template-driven prompts with explicit Gemini safety settings. A hallucinated-number detector. Patient context injected into generation. SOAP cards with inline editing and per-section copy.
-- **PHI storage.** Patients (create, edit, archive, persistent context). Clinical notes with append-only versions. Note templates. Per-user style preferences. Notes list with full-text search over note content (#118). **Gap:** a generated note can't be saved from the UI yet (see Next up, item 1).
+- **PHI storage.** Patients (create, edit, archive, persistent context). Clinical notes with append-only versions. Note templates. Per-user style preferences. Notes list with full-text search over note content (#118). A generated note is reviewed in place of the form and saved, then opens on its own page.
 - **Billing.** Stripe checkout, customer portal, and webhooks with idempotency and retry-safe rollback. Trial expiry enforced.
 - **Logging.** Pino with the GCP config, PHI redaction paths, and a client telemetry endpoint (`/api/telemetry`). Sentry has been removed.
 - **UI.** Sidebar dashboard layout and redesigned auth and marketing pages. Polish pass done: 44px touch targets, print stylesheet, reduced motion, 375px layouts.
@@ -32,14 +32,16 @@ This is the proposed order. Each item should be its own PR.
 
 ### 1. Close the generate → save loop
 
-PHI storage is built, but nothing in the UI calls `saveNoteAction`, so a clinician can't keep a generated note.
+A generated note now replaces the form for review, and Save note stores it and opens its page. Unsaved generations never reach the database.
 
 | Task | Status |
 |---|---|
-| Wire save into the generation flow (`saveNoteAction`, `web/src/actions/notes.ts:348`) | ❌ |
-| Move the generated note out from under the form, e.g. save and then open the note detail page (BUG-UI-12) | ❌ |
-| Add a "new note" link from the patient detail page, prefilled with the patient | ❌ |
-| E2E: generate → save → appears in patient history | ❌ |
+| Wire save into the generation flow (`saveNoteAction`) | ✅ |
+| Move the generated note out from under the form (BUG-UI-12): review in place of the form, then save and open the note | ✅ |
+| Add a "New note" link from the patient detail page, prefilled with the patient | ✅ |
+| E2E: generate → save → appears in patient history | ✅ |
+
+Still open, tracked in [BUGS.md](./BUGS.md) under "Note generation": a note started from the sidebar can't be linked to a patient, and the "Additional Context" field needs a keep, merge, or remove decision.
 
 ### 2. Triage the bug backlog
 
@@ -110,6 +112,7 @@ API-as-a-service is not planned. Pursuing it would require extracting a standalo
 
 | When | Work |
 |---|---|
+| 2026-11 | Generate → save loop: a generated note is reviewed in place of the form, saved, and opened on its own page; patients link to a new note for them. |
 | 2026-11 | Bug backlog re-verified against the code. Fixed: forms that sent credentials or PHI as a GET before hydration, generation and save accepting any user's template, patient updates that couldn't clear optional fields, and an unvalidated `?patientId=` on the new-note page. |
 | 2026-11 | #127 Playwright suite rewritten for cookie sessions, running on `main` after merge. #128 `next build` no longer needs runtime secrets. #129 ignore local artifacts. |
 | 2026-11 | #126 Security tests made able to fail; global Vitest mock isolation. #121 Closed PHI leaks and a TLS bypass found in the test audit. #120 Restored 95% branch coverage and fixed delimiter-tag reassembly. |

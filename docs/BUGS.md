@@ -6,14 +6,12 @@ Entries here are short on purpose. **Before fixing one, reproduce it with a fail
 
 Paths are relative to `web/src/`. Everything below was re-verified against the code on 2026-11-07. That check read the code; it did not run failing tests.
 
-## Generate → save loop (ROADMAP "Next up" item 1)
+## Note generation
 
 | Location | Problem |
 |---|---|
-| `actions/notes.ts:337` | `saveNoteAction` has no caller outside tests, so a generated note can't be saved from the UI. |
-| `components/notes/NoteGenerationForm.tsx:402` | BUG-UI-12: the generated note renders below the form on the same page instead of in its own view. |
-| Patient detail page, `components/patients/PatientNotesTable.tsx` | Nothing links to `/dashboard/notes/new?patientId=…`, not even the "no notes yet" empty state. The new-note patient field is read-only, so the UI has no way to link a note to a patient. `PatientTypeahead.tsx` is built but rendered nowhere. |
-| `components/notes/NoteGenerationForm.tsx:340` | "Additional Context" is free text marked TEMPORARY. When a linked patient has stored context, `generateNoteAction` ignores the typed text without telling the user. `saveNoteAction` doesn't persist it, so for an unlinked note the context that shaped generation is lost. Decide whether to keep it, merge it, or remove it. |
+| `app/dashboard/notes/new/page.tsx`, `components/notes/NoteGenerationForm.tsx` | The new-note page can only get a patient from `?patientId=`, which the patient page's "New note" link sets. Its patient field is read-only, and `components/patients/PatientTypeahead.tsx` is built but rendered nowhere, so a note started from the sidebar can't be linked to a patient. |
+| `components/notes/NoteGenerationForm.tsx:392` | "Additional Context" is free text marked TEMPORARY. When a linked patient has stored context, `generateNoteAction` ignores the typed text without telling the user. `saveNoteAction` doesn't persist it, so now that notes can be saved, an unlinked note loses the context that shaped it. Decide whether to keep it, merge it, or remove it. |
 
 ## Accessibility
 
