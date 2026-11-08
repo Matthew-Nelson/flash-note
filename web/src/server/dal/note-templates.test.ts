@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { mockDbQuery } from '@/test/dal-helpers';
+import type pg from 'pg';
+import { mockClientQuery, mockDbQuery } from '@/test/dal-helpers';
 import {
   createMockTemplateRow,
   createMockTemplateSectionRow,
@@ -7,9 +8,9 @@ import {
 import type { QueryScope } from '@/lib/types';
 import {
   findBuiltinTemplates,
-  findTemplateById,
   findTemplatesByScope,
   findTemplateWithUserStyle,
+  isTemplateUsableByUser,
 } from './note-templates';
 
 const USER_A = '00000000-0000-0000-0000-0000000000a1';
@@ -108,37 +109,6 @@ describe('note-templates DAL', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // findTemplateById
-  // ---------------------------------------------------------------------------
-
-  describe('findTemplateById', () => {
-    it('returns template with sections when found', async () => {
-      mockDbQuery
-        .mockResolvedValueOnce({ rows: [createMockTemplateRow()] })
-        .mockResolvedValueOnce({ rows: [createMockTemplateSectionRow()] });
-
-      const result = await findTemplateById(TEMPLATE);
-      expect(result?.id).toBe(TEMPLATE);
-      expect(result?.sections).toHaveLength(1);
-    });
-
-    it('returns null when template not found', async () => {
-      mockDbQuery.mockResolvedValueOnce({ rows: [] });
-      const result = await findTemplateById(TEMPLATE);
-      expect(result).toBeNull();
-    });
-
-    it('filters archived_at IS NULL', async () => {
-      mockDbQuery
-        .mockResolvedValueOnce({ rows: [createMockTemplateRow()] })
-        .mockResolvedValueOnce({ rows: [] });
-      await findTemplateById(TEMPLATE);
-      const [sql] = mockDbQuery.mock.calls[0] as [string, unknown[]];
-      expect(sql).toContain('archived_at IS NULL');
-    });
-  });
-
-  // ---------------------------------------------------------------------------
   // findTemplatesByScope
   // ---------------------------------------------------------------------------
 
@@ -223,6 +193,15 @@ describe('note-templates DAL', () => {
       expect(result).toBeNull();
     });
 
+    it('only finds built-in templates or templates owned by the user', async () => {
+      mockDbQuery.mockResolvedValueOnce({ rows: [] });
+      await findTemplateWithUserStyle(TEMPLATE, USER_A);
+      const [sql, params] = mockDbQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('archived_at IS NULL');
+      expect(sql).toContain('(is_builtin = TRUE OR user_id = $2)');
+      expect(params).toEqual([TEMPLATE, USER_A]);
+    });
+
     it('orders sections by sort_order', async () => {
       mockDbQuery
         .mockResolvedValueOnce({ rows: [createMockTemplateRow()] })
@@ -251,6 +230,34 @@ describe('note-templates DAL', () => {
       expect(result?.id).toBe(TEMPLATE);
       expect(result?.sections[0].verbosity).toBe('detailed');
       expect(result?.sections[0].styling).toBe('bullets');
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // isTemplateUsableByUser
+  // ---------------------------------------------------------------------------
+
+  describe('isTemplateUsableByUser', () => {
+    const client = { query: mockClientQuery } as unknown as pg.PoolClient;
+
+    it('queries on the caller transaction client with the ownership filter', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
+      await isTemplateUsableByUser(client, TEMPLATE, USER_A);
+      const [sql, params] = mockClientQuery.mock.calls[0] as [string, unknown[]];
+      expect(sql).toContain('archived_at IS NULL');
+      expect(sql).toContain('(is_builtin = TRUE OR user_id = $2)');
+      expect(params).toEqual([TEMPLATE, USER_A]);
+      expect(mockDbQuery).not.toHaveBeenCalled();
+    });
+
+    it('returns true when a row matches', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [{ '?column?': 1 }] });
+      expect(await isTemplateUsableByUser(client, TEMPLATE, USER_A)).toBe(true);
+    });
+
+    it('returns false when no row matches', async () => {
+      mockClientQuery.mockResolvedValueOnce({ rows: [] });
+      expect(await isTemplateUsableByUser(client, TEMPLATE, USER_A)).toBe(false);
     });
   });
 });

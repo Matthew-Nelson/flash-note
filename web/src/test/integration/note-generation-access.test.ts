@@ -56,7 +56,7 @@ vi.mock('@/server/dal/organizations', () => ({
 }));
 
 // Plan 04-03 Task 3: generateNoteAction now imports from the DAL barrel
-// (findTemplateWithUserStyle, findTemplateById, findBuiltinTemplates,
+// (findTemplateWithUserStyle, isTemplateUsableByUser,
 // findPatientById). We mock the barrel so the test doesn't transitively
 // load @/server/db (which calls process.exit on missing DATABASE_URL).
 //
@@ -75,9 +75,7 @@ const soapTemplate = vi.hoisted(() => ({
   sections: [] as unknown[],
 }));
 vi.mock('@/server/dal', () => ({
-  findTemplateById: vi.fn(() => Promise.resolve(soapTemplate)),
   findTemplateWithUserStyle: vi.fn(() => Promise.resolve(soapTemplate)),
-  findBuiltinTemplates: vi.fn(() => Promise.resolve([soapTemplate])),
   findPatientById: vi.fn(() => Promise.resolve(null)),
   createClinicalNote: vi.fn(),
   findClinicalNoteById: vi.fn(),

@@ -43,7 +43,7 @@ PHI storage is built, but nothing in the UI calls `saveNoteAction`, so a clinici
 
 ### 2. Triage the bug backlog
 
-Work through [BUGS.md](./BUGS.md). Start with the security items: the template ownership check, the auth forms' missing `method="post"`, and raw Zod messages in auth actions.
+Work through [BUGS.md](./BUGS.md). The backlog was re-verified against the code on 2026-11-07, and the three security and data-integrity bugs it found are fixed. Next by severity: the accessibility section, then error handling.
 
 ### 3. Note management features
 
@@ -110,6 +110,7 @@ API-as-a-service is not planned. Pursuing it would require extracting a standalo
 
 | When | Work |
 |---|---|
+| 2026-11 | Bug backlog re-verified against the code. Fixed: forms that sent credentials or PHI as a GET before hydration, generation and save accepting any user's template, patient updates that couldn't clear optional fields, and an unvalidated `?patientId=` on the new-note page. |
 | 2026-11 | #127 Playwright suite rewritten for cookie sessions, running on `main` after merge. #128 `next build` no longer needs runtime secrets. #129 ignore local artifacts. |
 | 2026-11 | #126 Security tests made able to fail; global Vitest mock isolation. #121 Closed PHI leaks and a TLS bypass found in the test audit. #120 Restored 95% branch coverage and fixed delimiter-tag reassembly. |
 | 2026-11 | #118 Full-text search on the notes list. #117 Cataloged BUG-UI-12. #122, #123 Dependency advisories and the Zod 4 migration. |
