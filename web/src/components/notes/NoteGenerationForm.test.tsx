@@ -7,14 +7,37 @@ import { NoteGenerationForm, NOTE_ERROR_MESSAGES } from './NoteGenerationForm';
 const mockGenerateNoteAction = vi.hoisted(() =>
   vi.fn<(formData: FormData) => Promise<unknown>>(),
 );
+const mockSaveNoteAction = vi.hoisted(() =>
+  vi.fn<(formData: FormData) => Promise<unknown>>(),
+);
 vi.mock('@/actions/notes', () => ({
   generateNoteAction: mockGenerateNoteAction,
+  saveNoteAction: mockSaveNoteAction,
+}));
+
+const mockPush = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: mockPush }),
+  usePathname: () => '/dashboard/notes/new',
 }));
 
 // Mock GeneratedNote child component — it has its own test file
 vi.mock('./GeneratedNote', () => ({
-  GeneratedNote: ({ note }: { note: { content: Array<{ content: string }> } }) => (
-    <div data-testid="generated-note">{note.content[0]?.content}</div>
+  GeneratedNote: ({
+    note,
+    onSave,
+    isSaving,
+  }: {
+    note: { content: Array<{ sectionId: string; title: string; content: string }> };
+    onSave: (content: Array<{ sectionId: string; title: string; content: string }>) => void;
+    isSaving: boolean;
+  }) => (
+    <div data-testid="generated-note">
+      {note.content[0]?.content}
+      <button type="button" disabled={isSaving} onClick={() => onSave(note.content)}>
+        Save note
+      </button>
+    </div>
   ),
 }));
 
@@ -152,38 +175,33 @@ describe('NoteGenerationForm', () => {
     resolveAction(buildSuccessResponse());
   });
 
-  it('clears previous generatedNote on new submission (stale note prevention)', async () => {
-    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+  it('a regenerated note replaces the discarded one (stale note prevention)', async () => {
+    mockGenerateNoteAction.mockResolvedValueOnce(buildSuccessResponse('First note.'));
     const user = userEvent.setup();
 
     render(<NoteGenerationForm />);
 
     await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'First notes');
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
+    expect(await screen.findByTestId('generated-note')).toHaveTextContent('First note.');
 
-    await waitFor(() => {
-      expect(screen.getByTestId('generated-note')).toBeInTheDocument();
-    });
-
-    // Submit again — note should clear during pending
+    await user.click(screen.getByRole('button', { name: 'Discard and edit session notes' }));
     let resolveSecond!: (v: unknown) => void;
-    mockGenerateNoteAction.mockReturnValue(
+    mockGenerateNoteAction.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveSecond = resolve;
       })
     );
-
-    // Wait for button to exit loading state before clicking again
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Generate Professional Note' })).toBeEnabled();
-    });
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
 
-    await waitFor(() => {
-      expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
-    });
+    // While the second generation is pending, the first note stays gone
+    expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
 
-    resolveSecond(buildSuccessResponse());
+    await act(async () => {
+      resolveSecond(buildSuccessResponse('Second note.'));
+      await Promise.resolve();
+    });
+    expect(await screen.findByTestId('generated-note')).toHaveTextContent('Second note.');
   });
 
   it('clears errorCode on new submission', async () => {
@@ -723,40 +741,143 @@ describe('NoteGenerationForm', () => {
     expect(durationInput).toHaveValue(null);
   });
 
-  it('resets step indicator to step 1 on new submission', async () => {
-    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
-    const user = userEvent.setup();
-
-    render(<NoteGenerationForm />);
-
-    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), 'Some notes');
+  async function generate(
+    user: ReturnType<typeof userEvent.setup>,
+    notes = '  pt reports pain 5/10, ROM improving  ',
+  ): Promise<void> {
+    await user.type(screen.getByRole('textbox', { name: /Session Notes/i }), notes);
     await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
-
     await waitFor(() => {
       expect(screen.getByTestId('generated-note')).toBeInTheDocument();
     });
+  }
 
-    // Submit again — step should reset to 1 during transition
-    let resolveSecond!: (v: unknown) => void;
-    mockGenerateNoteAction.mockReturnValue(
+  it('replaces the form with the review view once a note is generated (BUG-UI-12)', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+
+    expect(screen.queryByRole('textbox', { name: /Session Notes/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Generate Professional Note' })).not.toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: /Form steps/i });
+    expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent('2');
+  });
+
+  it('discarding the generated note returns to the form with the session notes kept', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user, 'Some notes for the visit');
+    await user.click(screen.getByRole('button', { name: 'Discard and edit session notes' }));
+
+    expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Session Notes/i })).toHaveValue('Some notes for the visit');
+    const nav = screen.getByRole('navigation', { name: /Form steps/i });
+    expect(nav.querySelector('[aria-current="step"]')).toHaveTextContent('1');
+  });
+
+  it('saves the reviewed note with its generation inputs, then opens it', async () => {
+    const NOTE_ID = '55555555-5555-5555-5555-555555555555';
+    const PATIENT_ID = '11111111-1111-1111-1111-111111111111';
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    mockSaveNoteAction.mockResolvedValue({ success: true, data: { id: NOTE_ID } });
+    const user = userEvent.setup();
+    render(<NoteGenerationForm initialPatientId={PATIENT_ID} />);
+
+    await user.selectOptions(screen.getByRole('combobox', { name: /Note Type/i }), 'progress_note');
+    await user.selectOptions(screen.getByRole('combobox', { name: /Modality/i }), 'telehealth');
+    await user.type(screen.getByRole('spinbutton', { name: /Duration/i }), '45');
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(`/dashboard/notes/${NOTE_ID}`);
+    });
+    const fd = mockSaveNoteAction.mock.calls[0][0];
+    expect(Object.fromEntries(fd)).toEqual({
+      templateId: SOAP_TEMPLATE_ID,
+      patientId: PATIENT_ID,
+      noteType: 'progress_note',
+      content: JSON.stringify(soapContent()),
+      quickNotes: 'pt reports pain 5/10, ROM improving',
+      modality: 'telehealth',
+      durationMinutes: '45',
+      generationTimeMs: '1000',
+    });
+  });
+
+  it('omits patientId and durationMinutes from the save when there are none', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    mockSaveNoteAction.mockResolvedValue({ success: true, data: { id: 'n1' } });
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+
+    await waitFor(() => {
+      expect(mockSaveNoteAction).toHaveBeenCalled();
+    });
+    const fd = mockSaveNoteAction.mock.calls[0][0];
+    expect(fd.has('patientId')).toBe(false);
+    expect(fd.has('durationMinutes')).toBe(false);
+  });
+
+  it('shows a curated error and stays on the review when saving fails', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    mockSaveNoteAction.mockResolvedValue({ success: false, error: 'template_unavailable' });
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+
+    expect(
+      await screen.findByText("The selected template isn't available. Please try again."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId('generated-note')).toBeInTheDocument();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('announces the save to assistive technology while it is in flight', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    mockSaveNoteAction.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
+
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+
+    expect(await screen.findByText('Saving note…')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save note' })).toBeDisabled();
+  });
+
+  it('does not open the note if the user signed out while the save was in flight (Rule 4)', async () => {
+    mockGenerateNoteAction.mockResolvedValue(buildSuccessResponse());
+    let resolveSave!: (v: unknown) => void;
+    mockSaveNoteAction.mockReturnValue(
       new Promise((resolve) => {
-        resolveSecond = resolve;
-      })
+        resolveSave = resolve;
+      }),
     );
+    const user = userEvent.setup();
+    render(<NoteGenerationForm />);
 
-    // Wait for button to exit loading state before clicking again
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Generate Professional Note' })).toBeEnabled();
+    await generate(user);
+    await user.click(screen.getByRole('button', { name: 'Save note' }));
+    act(() => {
+      window.dispatchEvent(new CustomEvent('flashnote:logout'));
     });
-    await user.click(screen.getByRole('button', { name: 'Generate Professional Note' }));
-
-    await waitFor(() => {
-      const nav = screen.getByRole('navigation', { name: /Form steps/i });
-      const activeCircle = nav.querySelector('[aria-current="step"]');
-      expect(activeCircle).toHaveTextContent('1');
+    await act(async () => {
+      resolveSave({ success: true, data: { id: 'n1' } });
+      await Promise.resolve();
     });
 
-    resolveSecond(buildSuccessResponse());
+    expect(mockPush).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('generated-note')).not.toBeInTheDocument();
   });
 
   it('renders "Additional Context" input that is functional', async () => {

@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import type { GenerateNoteResponse } from '@/actions/notes';
+import { Button } from '@/components/ui';
 import type { NoteSection as NoteSectionData } from '@/lib/types';
 
 type BillingData = NonNullable<GenerateNoteResponse['billing']>;
@@ -12,6 +13,9 @@ type GoalItem = NonNullable<GoalsData['shortTerm']>[number];
 
 interface GeneratedNoteProps {
   note: GenerateNoteResponse;
+  /** Receives every section with the reviewer's edits applied. */
+  onSave: (content: NoteSectionData[]) => void;
+  isSaving: boolean;
 }
 
 interface NoteSectionProps {
@@ -486,7 +490,7 @@ function buildFullNoteText(
     .join('\n\n');
 }
 
-export function GeneratedNote({ note }: GeneratedNoteProps) {
+export function GeneratedNote({ note, onSave, isSaving }: GeneratedNoteProps) {
   const [editingSections, setEditingSections] = useState<Record<string, string>>({});
   const [editedNote, setEditedNote] = useState<Partial<Record<string, string>>>({});
 
@@ -530,6 +534,16 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
 
   const [generatedDate] = useState(() => new Date().toLocaleDateString());
 
+  // An edit still open in a section counts, the same as for Copy All: what
+  // the clinician sees on screen is what gets saved.
+  const currentEdits = { ...editedNote, ...editingSections };
+
+  function handleSaveNote() {
+    onSave(
+      note.content.map((s) => ({ ...s, content: currentEdits[s.sectionId] ?? s.content })),
+    );
+  }
+
   return (
     <div className="mt-8">
       {/* Action bar: h2 + Copy All */}
@@ -537,10 +551,15 @@ export function GeneratedNote({ note }: GeneratedNoteProps) {
         <h2 className="text-fn-lg font-semibold text-fn-text-primary">
           Generated SOAP Note
         </h2>
-        <FullCopyButton
-          text={buildFullNoteText(note.content, { ...editedNote, ...editingSections })}
-          label="Copy full SOAP note"
-        />
+        <div className="flex items-start gap-2">
+          <Button type="button" onClick={handleSaveNote} loading={isSaving}>
+            Save note
+          </Button>
+          <FullCopyButton
+            text={buildFullNoteText(note.content, currentEdits)}
+            label="Copy full SOAP note"
+          />
+        </div>
       </div>
 
       {/* Metadata bar */}
