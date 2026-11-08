@@ -45,10 +45,10 @@ import { sanitizeFieldErrors } from '@/server/lib/validation';
 import type { ClinicalNote, NoteSection, QueryScope } from '@/lib/types';
 
 export interface GenerateNoteResponse {
-  subjective: string;
-  objective: string;
-  assessment: string;
-  plan: string;
+  /** The template the note was generated from; saveNoteAction needs it. */
+  templateId: string;
+  /** One entry per template section, in template order. */
+  content: NoteSection[];
   billing?: BillingSummary;
   goals?: GoalsTracking;
   alerts?: string[];
@@ -61,10 +61,8 @@ export interface GenerateNoteResponse {
 }
 
 /**
- * Default SOAP template UUID (seeded in migration 002). Used when an older
- * caller doesn't explicitly pass `templateId`. Plan 04-03 Task 4a's rewrite of
- * NoteGenerationForm will always pass an explicit templateId; this fallback
- * maintains backward compatibility with the transitional UI.
+ * Default SOAP template UUID (seeded in migration 002). The generate form
+ * doesn't send a templateId, so every generation uses this template today.
  */
 const DEFAULT_SOAP_TEMPLATE_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -205,17 +203,11 @@ export async function generateNoteAction(
       userAgent: context.userAgent,
     });
 
-    // 11. Map NoteSection[] back to flat S/O/A/P keys for the transitional UI
-    //     (Task 4a rewrites the UI to consume result.content directly).
-    const byTitle = new Map(result.content.map((s) => [s.title.toLowerCase(), s.content]));
-
     return {
       success: true,
       data: {
-        subjective: byTitle.get('subjective') ?? '',
-        objective: byTitle.get('objective') ?? '',
-        assessment: byTitle.get('assessment') ?? '',
-        plan: byTitle.get('plan') ?? '',
+        templateId: loadedTemplate.id,
+        content: result.content,
         billing: result.billing,
         goals: result.goals,
         alerts: result.alerts,

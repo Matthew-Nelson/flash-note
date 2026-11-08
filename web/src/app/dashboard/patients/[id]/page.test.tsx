@@ -255,6 +255,22 @@ describe('PatientDetailPage', () => {
     expect(notes).toHaveAttribute('data-count', '0');
   });
 
+  it('links to a new note for this patient from the Notes section', async () => {
+    mockGetSession.mockResolvedValue(session());
+    mockFindPatientById.mockResolvedValueOnce(
+      createMockPatient({ id: PATIENT_ID }),
+    );
+    render(
+      await PatientDetailPage({
+        params: Promise.resolve({ id: PATIENT_ID }),
+      }),
+    );
+    const link = screen.getByRole('link', { name: 'New note' });
+    expect(link).toHaveAttribute('href', `/dashboard/notes/new?patientId=${PATIENT_ID}`);
+    // A styled link, not <Link><Button>: no interactive element nested inside
+    expect(link.querySelector('button')).toBeNull();
+  });
+
   it('DAL is called with user scope from session (Rule 5)', async () => {
     mockGetSession.mockResolvedValue(session({ userId: 'alpha' }));
     mockFindPatientById.mockResolvedValueOnce(

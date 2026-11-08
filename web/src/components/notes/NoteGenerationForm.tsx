@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useTransition } from 'react';
-import { generateNoteAction } from '@/actions/notes';
+import { useRouter } from 'next/navigation';
+import { generateNoteAction, saveNoteAction } from '@/actions/notes';
 import type { GenerateNoteResponse } from '@/actions/notes';
 import { GeneratedNote } from './GeneratedNote';
 import { Alert, Button } from '@/components/ui';
-import type { NoteType, NoteTemplateWithSections, Patient } from '@/lib/types';
+import type { NoteSection, NoteType, NoteTemplateWithSections, Patient } from '@/lib/types';
 import { usePhiCleanup } from '@/hooks/use-phi-cleanup';
 import { mapNoteError } from './error-messages';
 
@@ -71,7 +72,7 @@ function StepIndicator({ activeStep }: { activeStep: 1 | 2 }) {
             activeStep === 2 ? 'text-fn-text-primary' : 'text-fn-text-secondary'
           }`}
         >
-          Review &amp; Copy
+          Review &amp; Save
         </span>
       </div>
     </nav>
@@ -100,15 +101,31 @@ export function NoteGenerationForm({
   const [patientContext, setPatientContext] = useState('');
   const [generatedNote, setGeneratedNote] = useState<GenerateNoteResponse | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  // Save errors use the shared note copy: the local table above is worded for
+  // generation ("sign in to generate notes").
+  const [saveErrorCode, setSaveErrorCode] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]> | null>(null);
-  const [activeStep, setActiveStep] = useState<1 | 2>(1);
   const [isPending, startTransition] = useTransition();
+  const [isSaving, startSaving] = useTransition();
+  const router = useRouter();
 
   // Incremented on every submit and on PHI cleanup. Server Actions can't be
   // aborted, so a response is applied only if its generation is still current
   // — otherwise a note in flight at logout would repopulate PHI (Rule 4), or a
-  // stale response could overwrite a newer one.
+  // stale response could overwrite a newer one. Saves check it too, so a save
+  // that completes after sign-out doesn't navigate to the note.
   const generationRef = useRef(0);
+
+  // Discard unmounts the focused Discard button; put focus back on the input
+  // the clinician returns to edit. Only after a discard, not on first render.
+  const quickNotesRef = useRef<HTMLTextAreaElement>(null);
+  const focusNotesAfterDiscard = useRef(false);
+  useEffect(() => {
+    if (!generatedNote && focusNotesAfterDiscard.current) {
+      focusNotesAfterDiscard.current = false;
+      quickNotesRef.current?.focus();
+    }
+  }, [generatedNote]);
 
   // Rule 4: Clear all PHI state when logout is initiated OR when navigating
   // away from /dashboard/notes/new via usePhiCleanup.
@@ -120,8 +137,8 @@ export function NoteGenerationForm({
     setDuration('');
     setGeneratedNote(null);
     setErrorCode(null);
+    setSaveErrorCode(null);
     setFieldErrors(null);
-    setActiveStep(1);
   }
   const cleanupRef = useRef(clearPhi);
 
@@ -136,8 +153,6 @@ export function NoteGenerationForm({
     e.preventDefault();
     setErrorCode(null);
     setFieldErrors(null);
-    setGeneratedNote(null);
-    setActiveStep(1);
     const generation = ++generationRef.current;
     startTransition(async () => {
       const formData = new FormData();
@@ -154,12 +169,42 @@ export function NoteGenerationForm({
       if (generation !== generationRef.current) return;
       if (result.success) {
         setGeneratedNote(result.data);
-        setActiveStep(2);
       } else {
         setErrorCode(result.error);
         if (result.fieldErrors) {
           setFieldErrors(result.fieldErrors);
         }
+      }
+    });
+  }
+
+  function handleDiscard() {
+    focusNotesAfterDiscard.current = true;
+    setGeneratedNote(null);
+    setSaveErrorCode(null);
+  }
+
+  // The form is hidden while a note is under review, so its fields still hold
+  // the values the note was generated from.
+  function handleSave(note: GenerateNoteResponse, content: NoteSection[]) {
+    setSaveErrorCode(null);
+    const generation = generationRef.current;
+    startSaving(async () => {
+      const formData = new FormData();
+      formData.set('templateId', note.templateId);
+      if (initialPatientId) formData.set('patientId', initialPatientId);
+      formData.set('noteType', noteType);
+      formData.set('content', JSON.stringify(content));
+      formData.set('quickNotes', quickNotes.trim());
+      formData.set('modality', modality);
+      if (duration.trim()) formData.set('durationMinutes', duration);
+      formData.set('generationTimeMs', String(note.metadata.generationTimeMs));
+      const result = await saveNoteAction(formData);
+      if (generation !== generationRef.current) return;
+      if (result.success) {
+        router.push(`/dashboard/notes/${result.data.id}`);
+      } else {
+        setSaveErrorCode(result.error);
       }
     });
   }
@@ -174,7 +219,7 @@ export function NoteGenerationForm({
 
   return (
     <div>
-      <StepIndicator activeStep={activeStep} />
+      <StepIndicator activeStep={generatedNote ? 2 : 1} />
 
       {/* Error display — above form per spec */}
       <div aria-live="assertive">
@@ -185,221 +230,243 @@ export function NoteGenerationForm({
             {NOTE_ERROR_MESSAGES[errorCode] ?? mapNoteError(errorCode)}
           </Alert>
         )}
+        {saveErrorCode && (
+          <Alert variant="error" className="mb-5">
+            {mapNoteError(saveErrorCode)}
+          </Alert>
+        )}
       </div>
 
-      <div className="flex gap-6">
-        {/* Form column */}
-        <div className="flex-1 min-w-0">
-          <form method="post" onSubmit={handleSubmit} noValidate>
-            {/* Patient selector — displays preselected patient from
-                /notes/new?patientId=... query param (Plan 04-03). A full
-                typeahead replaces this stub in a later iteration. */}
-            <div className="mb-5">
-              <label htmlFor="patient" className="label block text-fn-sm mb-1.5">
-                Patient{' '}
-                <span className="text-fn-2xs text-fn-text-secondary ml-1">
-                  {selectedPatient ? 'Selected' : '(optional)'}
-                </span>
-              </label>
-              <input
-                id="patient"
-                type="text"
-                readOnly
-                value={
-                  selectedPatient
-                    ? `${selectedPatient.firstName} ${selectedPatient.lastName}`
-                    : ''
-                }
-                placeholder={
-                  selectedPatient
-                    ? ''
-                    : 'No patient selected — generation will not be linked to a patient record.'
-                }
-                className="input-field w-full px-3 py-2.5 text-fn-base"
-              />
-            </div>
+      {/* Rule 13: mounted before the save starts so the announcement is read */}
+      <div aria-live="polite" className="sr-only">
+        {isSaving ? 'Saving note…' : ''}
+      </div>
 
-            {/* 2-col row: Template + Modality */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-              {/* Note Type (Template) */}
-              <div>
-                <label htmlFor="noteType" className="label block text-fn-sm mb-1.5">
-                  Note Type
+      {generatedNote ? (
+        <div>
+          <Button type="button" variant="secondary" onClick={handleDiscard} disabled={isSaving}>
+            Discard and edit session notes
+          </Button>
+          <GeneratedNote
+            note={generatedNote}
+            onSave={(content) => handleSave(generatedNote, content)}
+            isSaving={isSaving}
+          />
+        </div>
+      ) : (
+        <div className="flex gap-6">
+          {/* Form column */}
+          <div className="flex-1 min-w-0">
+            <form method="post" onSubmit={handleSubmit} noValidate>
+              {/* Patient selector — displays preselected patient from
+                  /notes/new?patientId=... query param (Plan 04-03). A full
+                  typeahead replaces this stub in a later iteration. */}
+              <div className="mb-5">
+                <label htmlFor="patient" className="label block text-fn-sm mb-1.5">
+                  Patient{' '}
+                  <span className="text-fn-2xs text-fn-text-secondary ml-1">
+                    {selectedPatient ? 'Selected' : '(optional)'}
+                  </span>
                 </label>
-                <select
-                  id="noteType"
-                  name="noteType"
-                  value={noteType}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value in NOTE_TYPE_LABELS) setNoteType(value as NoteType);
-                  }}
+                <input
+                  id="patient"
+                  type="text"
+                  readOnly
+                  value={
+                    selectedPatient
+                      ? `${selectedPatient.firstName} ${selectedPatient.lastName}`
+                      : ''
+                  }
+                  placeholder={
+                    selectedPatient
+                      ? ''
+                      : 'No patient selected — generation will not be linked to a patient record.'
+                  }
                   className="input-field w-full px-3 py-2.5 text-fn-base"
-                  disabled={isPending}
-                >
-                  {(Object.keys(NOTE_TYPE_LABELS) as NoteType[]).map((type) => (
-                    <option key={type} value={type}>
-                      {NOTE_TYPE_LABELS[type]}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
 
-              {/* Modality */}
-              <div>
-                <label htmlFor="modality" className="label block text-fn-sm mb-1.5">
-                  Modality
-                </label>
-                <select
-                  id="modality"
-                  name="modality"
-                  value={modality}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'in_person' || value === 'telehealth') setModality(value);
-                  }}
-                  className="input-field w-full px-3 py-2.5 text-fn-base"
-                  disabled={isPending}
-                >
-                  <option value="in_person">In Person</option>
-                  <option value="telehealth">Telehealth</option>
-                </select>
-              </div>
-            </div>
+              {/* 2-col row: Template + Modality */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                {/* Note Type (Template) */}
+                <div>
+                  <label htmlFor="noteType" className="label block text-fn-sm mb-1.5">
+                    Note Type
+                  </label>
+                  <select
+                    id="noteType"
+                    name="noteType"
+                    value={noteType}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value in NOTE_TYPE_LABELS) setNoteType(value as NoteType);
+                    }}
+                    className="input-field w-full px-3 py-2.5 text-fn-base"
+                    disabled={isPending}
+                  >
+                    {(Object.keys(NOTE_TYPE_LABELS) as NoteType[]).map((type) => (
+                      <option key={type} value={type}>
+                        {NOTE_TYPE_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* 2-col row: Duration + Session Date */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
-              {/* Duration */}
-              <div>
-                <label htmlFor="duration" className="label block text-fn-sm mb-1.5">
-                  Duration{' '}
+                {/* Modality */}
+                <div>
+                  <label htmlFor="modality" className="label block text-fn-sm mb-1.5">
+                    Modality
+                  </label>
+                  <select
+                    id="modality"
+                    name="modality"
+                    value={modality}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === 'in_person' || value === 'telehealth') setModality(value);
+                    }}
+                    className="input-field w-full px-3 py-2.5 text-fn-base"
+                    disabled={isPending}
+                  >
+                    <option value="in_person">In Person</option>
+                    <option value="telehealth">Telehealth</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* 2-col row: Duration + Session Date */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+                {/* Duration */}
+                <div>
+                  <label htmlFor="duration" className="label block text-fn-sm mb-1.5">
+                    Duration{' '}
+                    <span className="text-fn-text-secondary text-fn-2xs">(optional)</span>
+                  </label>
+                  <input
+                    id="duration"
+                    name="duration"
+                    type="number"
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    min={1}
+                    max={480}
+                    placeholder="45 min"
+                    className="input-field w-full px-3 py-2.5 text-fn-base"
+                    disabled={isPending}
+                  />
+                </div>
+
+                {/* Session Date — readonly, not sent in FormData */}
+                <div>
+                  <label htmlFor="sessionDate" className="label block text-fn-sm mb-1.5">
+                    Session Date
+                  </label>
+                  <input
+                    id="sessionDate"
+                    type="text"
+                    value={sessionDate}
+                    readOnly
+                    className="input-field w-full px-3 py-2.5 text-fn-base opacity-70 cursor-default"
+                  />
+                </div>
+              </div>
+
+              {/* Session Notes textarea */}
+              <div className="mb-5">
+                <label htmlFor="quickNotes" className="label block text-fn-sm mb-1.5">
+                  Session Notes <span className="text-fn-error">*</span>
+                </label>
+                <textarea
+                  ref={quickNotesRef}
+                  id="quickNotes"
+                  name="quickNotes"
+                  value={quickNotes}
+                  onChange={handleQuickNotesChange}
+                  required
+                  aria-required="true"
+                  aria-describedby={fieldErrors?.quickNotes ? 'quickNotes-error' : undefined}
+                  maxLength={5000}
+                  rows={8}
+                  placeholder="Pt reports decreased L knee pain 5/10, AROM flexion 95deg, performed manual therapy and therapeutic exercise..."
+                  className={`input-field w-full px-3 py-2 resize-y min-h-[200px] ${fieldErrors?.quickNotes ? 'input-field-error' : ''}`}
+                  disabled={isPending}
+                />
+                <div className="flex items-start justify-between mt-1">
+                  <div>
+                    {fieldErrors?.quickNotes && (
+                      <p id="quickNotes-error" className="text-fn-error text-fn-sm">
+                        {fieldErrors.quickNotes[0]}
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-fn-2xs text-fn-text-secondary ml-4 shrink-0">
+                    {wordCount} words
+                  </p>
+                </div>
+              </div>
+
+              {/* TEMPORARY: "Additional Context" free-text input.
+                  This field is a bridge until PHI Storage Phase 2 lands the functional patient
+                  selector and stored patient context. When PHI Storage PR 3 (Notes end-to-end)
+                  ships, this free-text input will be replaced by:
+                  1. A patient search/typeahead selector (backed by api.getPatients())
+                  2. Stored patient context from patients.context (auto-injected into generation)
+                  See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/PHI_STORAGE_PLAN.md (Chunk 6, "New Note page")
+                  See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/UI_OVERHAUL_PLAN.md ("Additional Context Deprecation Plan") */}
+              <div className="mb-6">
+                <label htmlFor="patientContext" className="label block text-fn-sm mb-1.5">
+                  Additional Context{' '}
                   <span className="text-fn-text-secondary text-fn-2xs">(optional)</span>
                 </label>
                 <input
-                  id="duration"
-                  name="duration"
-                  type="number"
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  min={1}
-                  max={480}
-                  placeholder="45 min"
-                  className="input-field w-full px-3 py-2.5 text-fn-base"
+                  id="patientContext"
+                  name="patientContext"
+                  type="text"
+                  value={patientContext}
+                  onChange={(e) => setPatientContext(e.target.value)}
+                  maxLength={500}
+                  placeholder="e.g., 68yo female, post-op TKA 6 weeks"
+                  className="input-field w-full px-3 py-2"
                   disabled={isPending}
                 />
               </div>
 
-              {/* Session Date — readonly, not sent in FormData */}
-              <div>
-                <label htmlFor="sessionDate" className="label block text-fn-sm mb-1.5">
-                  Session Date
-                </label>
-                <input
-                  id="sessionDate"
-                  type="text"
-                  value={sessionDate}
-                  readOnly
-                  className="input-field w-full px-3 py-2.5 text-fn-base opacity-70 cursor-default"
-                />
-              </div>
-            </div>
-
-            {/* Session Notes textarea */}
-            <div className="mb-5">
-              <label htmlFor="quickNotes" className="label block text-fn-sm mb-1.5">
-                Session Notes <span className="text-fn-error">*</span>
-              </label>
-              <textarea
-                id="quickNotes"
-                name="quickNotes"
-                value={quickNotes}
-                onChange={handleQuickNotesChange}
-                required
-                aria-required="true"
-                aria-describedby={fieldErrors?.quickNotes ? 'quickNotes-error' : undefined}
-                maxLength={5000}
-                rows={8}
-                placeholder="Pt reports decreased L knee pain 5/10, AROM flexion 95deg, performed manual therapy and therapeutic exercise..."
-                className={`input-field w-full px-3 py-2 resize-y min-h-[200px] ${fieldErrors?.quickNotes ? 'input-field-error' : ''}`}
+              {/* Submit button */}
+              <Button
+                type="submit"
+                size="lg"
                 disabled={isPending}
-              />
-              <div className="flex items-start justify-between mt-1">
-                <div>
-                  {fieldErrors?.quickNotes && (
-                    <p id="quickNotes-error" className="text-fn-error text-fn-sm">
-                      {fieldErrors.quickNotes[0]}
-                    </p>
-                  )}
-                </div>
-                <p className="text-fn-2xs text-fn-text-secondary ml-4 shrink-0">
-                  {wordCount} words
-                </p>
+                loading={isPending}
+                aria-busy={isPending}
+                className="w-full"
+              >
+                {isPending ? 'Generating...' : 'Generate Professional Note'}
+              </Button>
+
+              {/* Loading status */}
+              <div aria-live="polite" className="mt-3 min-h-[1.25rem]">
+                {isPending && (
+                  <p className="text-fn-sm text-fn-text-secondary text-center">
+                    Generating your professional note... (this may take up to 30 seconds)
+                  </p>
+                )}
               </div>
-            </div>
-
-            {/* TEMPORARY: "Additional Context" free-text input.
-                This field is a bridge until PHI Storage Phase 2 lands the functional patient
-                selector and stored patient context. When PHI Storage PR 3 (Notes end-to-end)
-                ships, this free-text input will be replaced by:
-                1. A patient search/typeahead selector (backed by api.getPatients())
-                2. Stored patient context from patients.context (auto-injected into generation)
-                See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/PHI_STORAGE_PLAN.md (Chunk 6, "New Note page")
-                See: https://github.com/Matthew-Nelson/flash-note/blob/bac14f6460a91f9ad03698ff66ab9ce0460ca7c3/docs/planning/UI_OVERHAUL_PLAN.md ("Additional Context Deprecation Plan") */}
-            <div className="mb-6">
-              <label htmlFor="patientContext" className="label block text-fn-sm mb-1.5">
-                Additional Context{' '}
-                <span className="text-fn-text-secondary text-fn-2xs">(optional)</span>
-              </label>
-              <input
-                id="patientContext"
-                name="patientContext"
-                type="text"
-                value={patientContext}
-                onChange={(e) => setPatientContext(e.target.value)}
-                maxLength={500}
-                placeholder="e.g., 68yo female, post-op TKA 6 weeks"
-                className="input-field w-full px-3 py-2"
-                disabled={isPending}
-              />
-            </div>
-
-            {/* Submit button */}
-            <Button
-              type="submit"
-              size="lg"
-              disabled={isPending}
-              loading={isPending}
-              aria-busy={isPending}
-              className="w-full"
-            >
-              {isPending ? 'Generating...' : 'Generate Professional Note'}
-            </Button>
-
-            {/* Loading status */}
-            <div aria-live="polite" className="mt-3 min-h-[1.25rem]">
-              {isPending && (
-                <p className="text-fn-sm text-fn-text-secondary text-center">
-                  Generating your professional note... (this may take up to 30 seconds)
-                </p>
-              )}
-            </div>
-          </form>
-        </div>
-
-        {/* Context panel stub — xl+ only */}
-        <aside className="hidden xl:block w-72 flex-shrink-0">
-          <div className="card p-4">
-            <h2 className="text-fn-sm font-semibold text-fn-text-primary mb-3">
-              Patient Context
-            </h2>
-            <p className="text-fn-sm text-fn-text-secondary">
-              Select a patient to see context
-            </p>
+            </form>
           </div>
-        </aside>
-      </div>
 
-      {generatedNote && <GeneratedNote note={generatedNote} />}
+          {/* Context panel stub — xl+ only */}
+          <aside className="hidden xl:block w-72 flex-shrink-0">
+            <div className="card p-4">
+              <h2 className="text-fn-sm font-semibold text-fn-text-primary mb-3">
+                Patient Context
+              </h2>
+              <p className="text-fn-sm text-fn-text-secondary">
+                Select a patient to see context
+              </p>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   );
 }

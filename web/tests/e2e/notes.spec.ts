@@ -7,8 +7,9 @@ import { createNote, uniqueWord } from './helpers/db';
  * Note workflows: generation (USE_MOCK_AI on the e2e server), subscription
  * gating, PHI clearing on logout, and the saved-notes list, search and detail.
  *
- * Saved notes are inserted through the DB helper: no UI control calls
- * saveNoteAction yet, so the list can't be populated through the app.
+ * The list, search and detail tests insert their notes through the DB helper
+ * so they don't depend on generation. Saving through the UI is covered in
+ * patients.spec.ts.
  */
 
 // First line of the mock generator's Subjective section (services/note-generation.ts)

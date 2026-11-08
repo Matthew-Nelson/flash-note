@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 
 import { getSession } from '@/server/lib/get-session';
@@ -84,12 +85,20 @@ export default async function PatientDetailPage({ params }: Props) {
           </section>
 
           <section aria-labelledby="patient-notes-heading" className="mt-8">
-            <h2
-              id="patient-notes-heading"
-              className="text-fn-lg font-semibold mb-3 text-fn-text-primary"
-            >
-              Notes
-            </h2>
+            <div className="flex items-center justify-between gap-4 mb-3">
+              <h2
+                id="patient-notes-heading"
+                className="text-fn-lg font-semibold text-fn-text-primary"
+              >
+                Notes
+              </h2>
+              <Link
+                href={`/dashboard/notes/new?patientId=${patient.id}`}
+                className="btn-primary inline-flex items-center justify-center min-h-[44px] px-4 py-2 text-fn-sm whitespace-nowrap"
+              >
+                New note
+              </Link>
+            </div>
             <PatientNotesTable patient={patient} notes={notes} />
           </section>
         </ClientPatientDetail>
